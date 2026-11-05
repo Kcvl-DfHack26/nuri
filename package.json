@@ -15,7 +15,7 @@
     "format:check": "oxfmt --check .",
     "lint": "oxlint --type-aware --deny-warnings && eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit && turbo run typecheck",
-    "test": "turbo run test",
+    "test": "bun test ./scripts && turbo run test",
     "test:integration": "bun run --cwd apps/api test:integration",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run deadcode",
     "deadcode": "fallow dead-code",
