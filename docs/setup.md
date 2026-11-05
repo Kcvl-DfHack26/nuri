@@ -160,7 +160,9 @@ Google CloudのAPIキーやサービスアカウントJSONをGitHub Secretに登
 
 ### Expo GitHub連携・環境変数
 
-ExpoのログインとEAS projectの接続は完了済み。GitHub Appの接続は未完了。アプリ内ブラウザで「Get started」が反応しない場合は、通常のブラウザで[プロジェクトのGitHub設定](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/github)を開いて進める。
+Expoのログイン、EAS project、GitHubリポジトリの接続は完了済み。[プロジェクトのGitHub設定](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/github)のBase directoryは `/apps/mobile` として保存済み。以下の1〜2はフォーク・再設定時の手順。
+
+接続後の確認では、Expo dashboardのRun workflow画面がmainとコミットSHAの両方で「No workflow files found」と表示した。ローカルの3ワークフローはEAS CLIの検証を通過しているが、GitHub経由の取得・自動実行は未確認。接続完了を配信成功と扱わず、初回PRまたは手動実行で結果を確認する。
 
 1. Expo dashboardのプロジェクト設定でGitHub Appを接続し、対象リポジトリへのアクセスを承認する。
 2. モノレポのプロジェクトルートを **`apps/mobile`** に設定する。ワークフローはこの直下の `.eas/workflows` にある。
