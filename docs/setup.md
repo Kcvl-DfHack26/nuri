@@ -124,6 +124,8 @@ bunx eas build --profile development --platform android
 
 iPhone実機への内部配布にはApple Developer Program、端末登録、署名情報が必要。初回は対話形式で `bunx eas device:create` / `bunx eas credentials` を実行して登録する。Apple側の契約・端末承認はIaCで代替できない。クラウドビルドはEASの利用枠を消費する。
 
+このプロジェクトではApple Developer Programは未契約のため、iPhoneではExpo Goを使う。Apple契約なしで作れるiOS SimulatorビルドはiPhoneへインストールできない。Androidのpreview APKは署名済みの単体アプリとして配布できる。
+
 このリポジトリはEASに接続済みで、`build:configure` / `update:configure`も実行済み。設定はfingerprint runtime policy、development/preview/production channel。フォーク時は `eas init`、`eas build:configure`、`eas update:configure` で自分のプロジェクトへ再接続する。
 
 ## 3. GitHubとExpoの手動設定
@@ -132,7 +134,7 @@ iPhone実機への内部配布にはApple Developer Program、端末登録、署
 
 通常のCIはsecretなしで動く。GitHubの **Settings → Actions → General** でActionsを有効にする。mainの保護を有効にするときは、初回のCI成功後に `quality`、`infrastructure`、`container` をrequired checkにする。
 
-**Settings → Environments → production** を作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
+**Settings → Environments → production** は作成済み。フォーク時は作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
 
 | 種別                 | 名前                             | 値・取得元                                                     |
 | -------------------- | -------------------------------- | -------------------------------------------------------------- |
@@ -162,7 +164,14 @@ Google CloudのAPIキーやサービスアカウントJSONをGitHub Secretに登
 
 Expoのログイン、EAS project、GitHubリポジトリの接続は完了済み。[プロジェクトのGitHub設定](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/github)のBase directoryは `/apps/mobile` として保存済み。以下の1〜2はフォーク・再設定時の手順。
 
-接続後の確認では、Expo dashboardのRun workflow画面がmainとコミットSHAの両方で「No workflow files found」と表示した。ローカルの3ワークフローはEAS CLIの検証を通過しているが、GitHub経由の取得・自動実行は未確認。接続完了を配信成功と扱わず、初回PRまたは手動実行で結果を確認する。
+Expo dashboardのRun workflow一覧にファイルが表示されない場合は、アプリディレクトリからEAS CLIでGit refを指定する。ワークフローの配置をリポジトリ直下へ変える必要はない。
+
+```sh
+cd apps/mobile
+bunx eas workflow:run .eas/workflows/preview-update.yml --ref main --non-interactive --wait
+```
+
+この手動配信はpreview channelだけを更新する。API URLが未設定ならオフラインショーケースになる。EASのビルドとワークフローでもNode 24.19.0/Bun 1.4.4を固定している。
 
 1. Expo dashboardのプロジェクト設定でGitHub Appを接続し、対象リポジトリへのアクセスを承認する。
 2. モノレポのプロジェクトルートを **`apps/mobile`** に設定する。ワークフローはこの直下の `.eas/workflows` にある。
@@ -170,7 +179,7 @@ Expoのログイン、EAS project、GitHubリポジトリの接続は完了済�
 4. `bunx eas workflow:validate .eas/workflows/pr-preview.yml --non-interactive` 等で検証する。
 5. 最初のDevelopment Buildを実機へ入れる。PR作成後のコメントにあるupdateリンクをDevelopment Buildで開く。
 
-PRは `pr-<number>` branchへ公開し、共通preview channelの最新版を全PRで上書きしない。ネイティブ依存変更時は `native-builds.yml` を手動実行して新しいDevelopment Buildを入れる。mainに対応するproduction updateは、GitHubのAPIデプロイ成功後にのみ `production-update.yml` を呼び出す。
+PRは `pr-<number>` branchへ公開し、共通preview channelの最新版を全PRで上書きしない。`native-builds.yml` は既定でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら、実行時に `ios_profile=development` / `android_profile=development` を選ぶ。iOS実機用のdevelopmentにはApple署名が必要。mainに対応するproduction updateは、GitHubのAPIデプロイ成功後にのみ `production-update.yml` を呼び出す。
 
 Expo GitHub Appの承認、Apple/Googleストアの契約・署名、access tokenの作成は手動。TestFlight/ストア提出はこの初期設定では自動実行しない。
 

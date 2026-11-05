@@ -1,0 +1,14 @@
+name: Preview update
+defaults:
+  tools:
+    node: '24.19.0'
+    bun: '1.4.4'
+on:
+  workflow_dispatch: {}
+jobs:
+  update:
+    type: update
+    environment: preview
+    params:
+      channel: preview
+      platform: all
