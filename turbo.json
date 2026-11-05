@@ -10,7 +10,14 @@
         "BETTER_AUTH_URL",
         "TRUSTED_ORIGINS",
         "PORT",
-        "EXPO_PUBLIC_API_URL"
+        "EXPO_PUBLIC_API_URL",
+        "STARTER_CONTAINER",
+        "WORKTREE_*",
+        "COMPOSE_PROJECT_NAME",
+        "PORTLESS_*",
+        "CI",
+        "EXPO_TUNNEL_SUBDOMAIN",
+        "EXPO_NO_TELEMETRY"
       ]
     },
     "typecheck": {
@@ -25,5 +32,6 @@
       "dependsOn": ["^typecheck"],
       "outputs": ["dist/**"]
     }
-  }
+  },
+  "cacheDir": ".turbo/cache"
 }

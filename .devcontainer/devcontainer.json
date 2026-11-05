@@ -1,13 +1,12 @@
 {
-  "name": "Expo + Hono + OpenTofu",
+  "name": "expo-hono-opentofu-starter",
   "dockerComposeFile": "../compose.yaml",
   "service": "workspace",
-  "workspaceFolder": "/workspace",
+  "workspaceFolder": "${localWorkspaceFolder}",
   "remoteUser": "node",
   "updateRemoteUserUID": true,
   "shutdownAction": "stopCompose",
-  "forwardPorts": [8080, 8081],
-  "portsAttributes": { "8080": { "label": "Hono API" }, "8081": { "label": "Expo Metro" } },
+  "forwardPorts": [],
   "postCreateCommand": "sudo chown -R node:node node_modules apps/mobile/node_modules apps/api/node_modules packages/shared/node_modules /home/node/.bun /home/node/.expo /home/node/.config/gcloud && bun install --frozen-lockfile && bun run setup && bun run db:migrate",
   "customizations": {
     "vscode": {
@@ -17,7 +16,15 @@
         "opentofu.vscode-opentofu",
         "openai.chatgpt"
       ],
-      "settings": { "editor.formatOnSave": true, "editor.defaultFormatter": "oxc.oxc-vscode" }
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+      }
     }
-  }
+  },
+  "initializeCommand": [
+    "sh",
+    "${localWorkspaceFolder}/scripts/worktree-init.sh",
+    "${localWorkspaceFolder}"
+  ]
 }

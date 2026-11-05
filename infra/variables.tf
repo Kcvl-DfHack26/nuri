@@ -10,7 +10,7 @@ variable "region" {
 variable "name" {
   description = "Resource prefix, one state per environment."
   type        = string
-  default     = "daylight-staging"
+  default     = "expo-hono-opentofu-starter-staging"
 }
 variable "github_repository" {
   description = "Repository allowed to deploy from main."
@@ -63,5 +63,5 @@ variable "api_origin" {
 variable "trusted_origins" {
   description = "Explicit browser/app origins accepted by Better Auth. No exp:// wildcards in production."
   type        = list(string)
-  default     = ["daylight://"]
+  default     = ["expo-hono-opentofu-starter://"]
 }

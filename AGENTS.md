@@ -2,7 +2,7 @@
 
 ## Product and platform contract
 
-- This is an Expo UI showcase named Daylight, backed by an independently deployed Hono API.
+- This is an Expo UI showcase named expo-hono-opentofu-starter, backed by an independently deployed Hono API.
 - **主にiOS向けにUXを最適化するが、Androidでも全機能が動作する必要がある。** iOSの典型的なアプリとして、Native Tabs、Stack、標準の戻る操作、シート、設定フォーム、Dynamic Type、ダークモードを優先する。Androidでは同じ機能をMaterialのネイティブUIと戻る操作で提供する。
 - Use universal `@expo/ui` first. Isolate iOS-only imports in platform files and provide working Android equivalents. Every icon needs an Android source. Every enabled control must perform its advertised behavior.
 - The showcase must work without Google Cloud credentials. Favorites, completion and preferences are device-local; do not imply account synchronization.
@@ -28,7 +28,7 @@
 ## Development and validation
 
 - Follow [docs/setup.md](docs/setup.md). Standard environment: Linux Dev Container and Docker Compose. Mac/Xcode/Android Studio are optional; use Expo Go or EAS builds for iPhone checks.
-- `bun run setup` creates missing local env files without overwriting existing values. `bun run dev` starts API 8080 and Metro 8081 through Turborepo.
+- `bun run setup` generates worktree-specific Compose settings and missing app env files without overwriting app values. `bun run dev` starts an isolated DB/API/Metro through Turborepo. Host ports are assigned by Portless/Docker; container-internal API/Metro ports are 8080/8081.
 - `bun run check`: formatting, type-aware lint, strict typecheck, Bun/Jest tests and Fallow. `bun run test:integration` requires a migrated PostgreSQL database.
 - `bun run doctor` and `bun run export:mobile` check Expo dependencies and bundle iOS/Android.
 - `tofu fmt -check -recursive infra`, `tofu -chdir=infra init -backend=false`, `tofu -chdir=infra validate`, `tflint --chdir=infra`: credential-free IaC checks. Also validate `infra/bootstrap`.

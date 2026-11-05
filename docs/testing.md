@@ -47,7 +47,7 @@ maestro test apps/mobile/.maestro/showcase.yaml
 
 JestはExpo UIのネイティブ境界をmockするため、SwiftUI/Composeの実描画を保証しない。bundle生成、型検査、mock付きテストと、実機での確認は区別して記録する。
 
-## 2026-11-05の初期設定検証
+## 2026-11-05の初期設定検証（改名前のビルド）
 
 - [GitHub CI](https://github.com/ReoHakase/expo-hono-opentofu-starter/actions/runs/41992135095): `2388c8b` のquality / infrastructure / containerが成功。lint・型・Bun/Jest・PostgreSQL認証統合テスト・Expo Doctor・両OSのbundle・OpenTofu/TFLint・Nodeコンテナーの起動を含む。
 - [PR自動preview](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/workflows/01a1aac0-058d-7452-9edb-5b69be862cb7): 同じcommitで両OSのupdate公開とPRコメントが成功。
@@ -56,3 +56,17 @@ JestはExpo UIのネイティブ境界をmockするため、SwiftUI/Composeの�
 - ローカルiPhone 17 Pro Simulator / iOS 26.5のExpo Goで `2388c8b` を起動。Today→詳細→戻る、保存→LibraryのSaved絞り込み、完了シートの本文とDone、同日の重複完了防止、進捗1/3への反映、検索の該当なし、ダークモード、触覚設定の切り替えを確認した。完了シートの画像は [PR #5](https://github.com/ReoHakase/expo-hono-opentofu-starter/pull/5) に添付。
 
 iPhone実機とAndroid端末での操作、日次目標スライダー、文字サイズ拡大、シートのスワイプ/Android Back、再起動後の保持、公開API経由の認証は未確認。Androidのビルド成功は操作確認の代わりにはしない。GCP本番デプロイと本番OTA、ストア提出は実行していない。
+
+## 2026-11-05の改名・worktree分離の検証
+
+- `bun run check`、`bun run test:integration`、`bun run build:api` が成功。IDの安定性、引用符・空白・ドル記号を含むパス、symlink、branch変更、detached HEAD、同時setupによるsecret保持と既存envの保持をBunで確認した。
+- Expo Doctorは20/20成功。SDK 58のiOS・Android bundle生成が成功。新しいアプリID・スキームに対応するネイティブビルドはまだ作成していない。
+- 実際のlinked worktreeを3つ作成し、ホストのみ・コンテナのみ・ホスト2つ＋コンテナ1つでAPI `/ready` とMetro `/status` が同時に成功した。コンテナ内部はそれぞれ8080/8081、ホスト公開ポートは6個すべて異なった。
+- 各DBへ異なる検証値を保存し、他worktreeの値が見えないこと、停止・再起動やホスト/コンテナの切替後も自分の値を保持することを確認した。1つの `services:down` 後も他のAPIが応答し、停止対象のDB volumeも保持された。ホストのAPI二重起動は既存プロセスを終了せず拒否された。
+- コンテナ内からlinked worktreeのGit操作が成功。Turborepoの共有キャッシュ参照による起動エラーを、worktree内への明示cacheDirで解消した。API終了処理も重複signalでDB poolを二重終了しないよう修正し、3コンテナのCtrl+C終了を確認した。
+- ルートとbootstrapのOpenTofu fmt/init（backend無効・lockfile読取専用）/validate、TFLintが成功。ShellCheckとGitHub Actionsのactionlintも成功。ホストにIaC CLIがないため、Dev Containerイメージ内の固定版を使用した。クラウドへのapply・配信は実行していない。
+- iPhone 17 Pro Simulator / iOS 26.5のExpo Goで起動し、設定画面の新名称・オフライン案内・ダークモード・触覚Switchを確認した。SQLiteに新しい `expo-hono-opentofu-starter.preferences` キーで設定が保存されたことも確認した。日次目標SliderのAX操作ではアプリ側の値変更を確認できていない。
+
+初回の依存導入を3つ同時に実行するとLefthookの共有hook更新が競合したため、初回install/コンテナ作成は順に実行する手順とした。Portless 0.15.8の同時route登録中に一度JSON読取警告を観測したが、登録後の全routeは正常に応答した。Dockerの容量上限により1台のReact Native DevTools取得がfallbackになった。検証専用コンテナ・volume・worktreeは終了後に削除し、通常の開発用DBと既存の旧DBは保持した。
+
+Androidのネイティブ実行、iPhone/Android実機、公開HTTPSトンネルを通した端末認証、新アプリIDのビルド/インストールは未実施。改名前のビルド成功記録は、新しい識別子のネイティブ検証には含めない。

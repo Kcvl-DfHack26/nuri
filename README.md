@@ -1,4 +1,4 @@
-# Daylight · Expo + Hono + OpenTofu
+# expo-hono-opentofu-starter
 
 小さな習慣を記録する、Expo UIのショーケース兼ハッカソン用スターター。iOSの使い心地を優先し、Androidでも同じ機能を提供する。
 
@@ -16,6 +16,8 @@ DockerとDev Containers対応エディタを用意し、**Reopen in Container**�
 ```sh
 bun run dev
 ```
+
+worktreeごとにAPI・MetroのポートとPostgreSQLを分離する。ホスト起動ではPortless、コンテナ起動ではDockerの自動割当を使う。初回の依存導入はcheckoutごとに順に実行する。
 
 iPhoneのExpo Goから、ホストのOSやLAN構成に依存せず開く場合:
 
@@ -43,16 +45,17 @@ bun run go
 
 ## よく使うコマンド
 
-| コマンド                                     | 内容                                             |
-| -------------------------------------------- | ------------------------------------------------ |
-| `bun run setup`                              | 未作成のローカルenvだけを生成                    |
-| `bun run dev`                                | TurborepoでAPIとMetroを起動                      |
-| `bun run check`                              | 整形、型付きlint、型検査、Bun/Jestテスト、Fallow |
-| `bun run test:integration`                   | PostgreSQLを使った認証・認可テスト               |
-| `bun run db:generate` / `bun run db:migrate` | migration生成 / 適用                             |
-| `bun run doctor`                             | Expoの互換性確認                                 |
-| `bun run export:mobile`                      | iOS・Androidのbundle生成                         |
-| `bun run build:api`                          | Node.js向けAPI build                             |
+| コマンド                                        | 内容                                             |
+| ----------------------------------------------- | ------------------------------------------------ |
+| `bun run setup`                                 | worktree設定と未作成のアプリenvを生成            |
+| `bun run dev`                                   | 自worktreeのDB・API・Metroを起動                 |
+| `bun run check`                                 | 整形、型付きlint、型検査、Bun/Jestテスト、Fallow |
+| `bun run test:integration`                      | PostgreSQLを使った認証・認可テスト               |
+| `bun run db:generate` / `bun run db:migrate`    | migration生成 / 適用                             |
+| `bun run doctor`                                | Expoの互換性確認                                 |
+| `bun run export:mobile`                         | iOS・Androidのbundle生成                         |
+| `bun run build:api`                             | Node.js向けAPI build                             |
+| `bun run services:up` / `bun run services:down` | 自worktreeのDB起動 / Compose停止（volume保持）   |
 
 ## 文書
 

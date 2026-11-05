@@ -1,7 +1,8 @@
 data "google_project" "current" {}
 
 locals {
-  api_origin = var.api_origin != "" ? var.api_origin : "https://${var.name}-${data.google_project.current.number}.${var.region}.run.app"
+  identity_prefix = length(var.name) <= 22 ? var.name : "${substr(var.name, 0, 13)}-${substr(sha256(var.name), 0, 8)}"
+  api_origin      = var.api_origin != "" ? var.api_origin : "https://${var.name}-${data.google_project.current.number}.${var.region}.run.app"
   apis = toset([
     "artifactregistry.googleapis.com", "run.googleapis.com", "sqladmin.googleapis.com",
     "secretmanager.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com"
@@ -22,12 +23,12 @@ resource "google_artifact_registry_repository" "api" {
 }
 
 resource "google_service_account" "runtime" {
-  account_id   = "${var.name}-runtime"
-  display_name = "Daylight Cloud Run runtime"
+  account_id   = "${local.identity_prefix}-runtime"
+  display_name = "expo-hono-opentofu-starter Cloud Run runtime"
   depends_on   = [google_project_service.enabled]
 }
 resource "google_service_account" "deployer" {
-  account_id   = "${var.name}-deploy"
+  account_id   = "${local.identity_prefix}-deploy"
   display_name = "GitHub deployment (no infrastructure administration)"
   depends_on   = [google_project_service.enabled]
 }
@@ -55,7 +56,7 @@ resource "google_artifact_registry_repository_iam_member" "push" {
 }
 
 resource "google_iam_workload_identity_pool" "github" {
-  workload_identity_pool_id = "${var.name}-github"
+  workload_identity_pool_id = "${local.identity_prefix}-github"
   depends_on                = [google_project_service.enabled]
 }
 resource "google_iam_workload_identity_pool_provider" "github" {
@@ -99,11 +100,11 @@ resource "google_sql_database_instance" "postgres" {
   depends_on = [google_project_service.enabled]
 }
 resource "google_sql_database" "app" {
-  name     = "daylight"
+  name     = "expo-hono-opentofu-starter"
   instance = google_sql_database_instance.postgres.name
 }
 resource "google_sql_user" "app" {
-  name                = "daylight"
+  name                = "expo-hono-opentofu-starter"
   instance            = google_sql_database_instance.postgres.name
   password_wo         = var.database_password
   password_wo_version = var.database_password_version

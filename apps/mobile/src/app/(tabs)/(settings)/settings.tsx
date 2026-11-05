@@ -116,7 +116,7 @@ export default function SettingsScreen() {
             <NativeText>
               {apiUrl
                 ? connection
-                : 'You’re using Daylight offline. All rituals are ready to explore.'}
+                : 'You’re using expo-hono-opentofu-starter offline. All rituals are ready to explore.'}
             </NativeText>
             {apiUrl ? (
               <Button
@@ -129,7 +129,7 @@ export default function SettingsScreen() {
               />
             ) : null}
           </FieldGroup.Section>
-          <FieldGroup.Section title="About Daylight">
+          <FieldGroup.Section title="About expo-hono-opentofu-starter">
             <NativeText>A small collection of everyday rituals.</NativeText>
             <NativeText>Version 0.1.0 · Made with Expo UI</NativeText>
           </FieldGroup.Section>
