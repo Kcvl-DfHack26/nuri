@@ -1,0 +1,11 @@
+# Invoked by GitHub Actions only after migration, deployment and readiness succeed.
+name: Production update
+on:
+  workflow_dispatch: {}
+jobs:
+  update:
+    type: update
+    environment: production
+    params:
+      channel: production
+      platform: all

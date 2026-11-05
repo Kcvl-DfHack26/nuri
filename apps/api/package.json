@@ -1,0 +1,37 @@
+{
+  "name": "@starter/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./contract": {
+      "types": "./src/contract.ts"
+    }
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --import tsx --watch src/index.ts",
+    "build": "bun build src/index.ts src/db/migrate.ts --target=node --outdir=dist --external=pg --external=better-auth --external=@better-auth/expo",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test src/app.test.ts",
+    "test:integration": "bun test src/auth.integration.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts"
+  },
+  "dependencies": {
+    "@better-auth/expo": "1.7.17",
+    "@hono/node-server": "2.1.6",
+    "@hono/zod-validator": "0.9.1",
+    "@starter/shared": "workspace:*",
+    "better-auth": "1.7.17",
+    "drizzle-orm": "0.45.4",
+    "hono": "4.13.16",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15"
+  }
+}

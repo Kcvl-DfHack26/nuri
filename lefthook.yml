@@ -1,0 +1,16 @@
+pre-commit:
+  parallel: false
+  commands:
+    format:
+      glob: '*.{ts,tsx,js,mjs,cjs,json,jsonc,yml,yaml,md}'
+      exclude: '^(.agents/|skills-lock.json|bun.lock|apps/api/drizzle/meta/)'
+      run: bunx oxfmt --write {staged_files}
+      stage_fixed: true
+    lint:
+      glob: '*.{ts,tsx,js,mjs,cjs}'
+      exclude: '^.agents/'
+      run: bunx oxlint --deny-warnings {staged_files}
+commit-msg:
+  commands:
+    conventional:
+      run: bunx commitlint --edit {1}

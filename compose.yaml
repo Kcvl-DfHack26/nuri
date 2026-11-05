@@ -1,0 +1,55 @@
+name: expo-hono-starter
+services:
+  workspace:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    init: true
+    user: node
+    working_dir: /workspace
+    command: sleep infinity
+    environment:
+      DATABASE_URL: postgresql://starter:starter@postgres:5432/starter
+      NODE_ENV: development
+    ports:
+      - '127.0.0.1:8080:8080'
+      - '127.0.0.1:8081:8081'
+    volumes:
+      - .:/workspace
+      - root-modules:/workspace/node_modules
+      - mobile-modules:/workspace/apps/mobile/node_modules
+      - api-modules:/workspace/apps/api/node_modules
+      - shared-modules:/workspace/packages/shared/node_modules
+      - bun-cache:/home/node/.bun
+      - gcloud-config:/home/node/.config/gcloud
+      - expo-config:/home/node/.expo
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api-tunnel:
+    profiles: [tunnel]
+    image: cloudflare/cloudflared:2026.10.7
+    command: tunnel --no-autoupdate --protocol http2 --url http://workspace:8080
+    depends_on: [workspace]
+  postgres:
+    image: postgres:17.7-bookworm
+    environment:
+      POSTGRES_USER: starter
+      POSTGRES_PASSWORD: starter
+      POSTGRES_DB: starter
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U starter -d starter']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+volumes:
+  root-modules:
+  mobile-modules:
+  api-modules:
+  shared-modules:
+  bun-cache:
+  gcloud-config:
+  expo-config:
+  postgres-data:

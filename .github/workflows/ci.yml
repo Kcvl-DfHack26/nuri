@@ -1,0 +1,89 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.7-bookworm
+        env:
+          POSTGRES_USER: starter
+          POSTGRES_PASSWORD: starter
+          POSTGRES_DB: starter
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U starter -d starter'
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://starter:starter@localhost:5432/starter
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - run: bun run check
+      - run: bun run db:migrate && bun run test:integration
+      - run: bun run doctor
+      - run: bun run export:mobile
+      - name: Commit conventions
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: mobile-bundles
+          path: apps/mobile/dist
+          retention-days: 7
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: opentofu/setup-opentofu@v2.0.2
+        with:
+          tofu_version: 1.13.8
+      - uses: terraform-linters/setup-tflint@v6.3.2
+        with:
+          tflint_version: v0.65.0
+      - run: tofu fmt -check -recursive infra
+      - run: tofu -chdir=infra init -backend=false -lockfile=readonly
+      - run: tofu -chdir=infra validate
+      - run: tofu -chdir=infra/bootstrap init -backend=false -lockfile=readonly
+      - run: tofu -chdir=infra/bootstrap validate
+      - run: tflint --init
+      - run: tflint --chdir=infra --config="$GITHUB_WORKSPACE/.tflint.hcl"
+      - run: tflint --chdir=infra/bootstrap --config="$GITHUB_WORKSPACE/.tflint.hcl"
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: docker build --tag daylight-api --file apps/api/Dockerfile .
+      - name: Run Node.js container smoke test
+        run: |
+          docker run -d --name api -p 8080:8080 \
+            -e DATABASE_URL=postgresql://unused:unused@localhost:5432/unused \
+            -e BETTER_AUTH_SECRET=ci-only-secret-not-for-real-deployments \
+            -e BETTER_AUTH_URL=https://example.com daylight-api
+          for _ in $(seq 1 20); do
+            if curl --fail --silent http://localhost:8080/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs api
+          exit 1

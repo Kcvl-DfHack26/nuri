@@ -1,0 +1,100 @@
+name: Deploy API and mobile update
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: >-
+      vars.GCP_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+      REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY }}
+      MIGRATION_JOB: ${{ vars.CLOUD_RUN_MIGRATION_JOB }}
+      TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ env.TARGET_SHA }}
+      - name: Check deployment configuration and current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for name in PROJECT_ID REGION SERVICE REPOSITORY MIGRATION_JOB; do
+            test -n "${!name}" || { echo "Missing $name"; exit 1; }
+          done
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$TARGET_SHA"
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$TARGET_SHA&status=success" --jq '[.workflow_runs[] | select(.event == "push")] | length')
+          test "$passed" -gt 0 || { echo 'This SHA has not passed the main CI workflow'; exit 1; }
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Build and push immutable API image
+        id: image
+        run: |
+          gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+          image="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/api:$TARGET_SHA"
+          docker build -f apps/api/Dockerfile -t "$image" .
+          docker push "$image"
+          digest=$(gcloud artifacts docker images describe "$image" --format='value(image_summary.digest)')
+          echo "uri=$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/api@$digest" >> "$GITHUB_OUTPUT"
+      - name: Migrate before deploying
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+        run: |
+          gcloud run jobs update "$MIGRATION_JOB" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --quiet
+          gcloud run jobs execute "$MIGRATION_JOB" --project="$PROJECT_ID" --region="$REGION" --wait --quiet
+      - name: Deploy candidate without traffic and check database readiness
+        id: candidate
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+        run: |
+          gcloud run deploy "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --no-traffic --tag=candidate --quiet
+          candidate_url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format=json | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')
+          curl --fail --retry 6 --retry-all-errors --retry-delay 5 "$candidate_url/ready"
+          revision=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format='value(status.latestReadyRevisionName)')
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+      - name: Promote tested revision
+        env:
+          REVISION: ${{ steps.candidate.outputs.revision }}
+        run: |
+          gcloud run services update-traffic "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --to-revisions="$REVISION=100" --quiet
+          url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')
+          curl --fail --retry 3 --retry-all-errors "$url/ready"
+      - uses: actions/setup-node@v7.1.0
+        if: vars.EXPO_UPDATE_ENABLED == 'true'
+        with:
+          node-version-file: .node-version
+      - uses: oven-sh/setup-bun@v2
+        if: vars.EXPO_UPDATE_ENABLED == 'true'
+        with:
+          bun-version-file: .bun-version
+      - if: vars.EXPO_UPDATE_ENABLED == 'true'
+        run: bun install --frozen-lockfile
+      - name: Publish matching production update through Expo Workflows
+        if: vars.EXPO_UPDATE_ENABLED == 'true'
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: bunx eas workflow:run .eas/workflows/production-update.yml --ref "$TARGET_SHA" --non-interactive --wait

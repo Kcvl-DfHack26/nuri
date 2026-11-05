@@ -1,0 +1,21 @@
+appId: dev.reohakase.daylight
+---
+- launchApp:
+    clearState: true
+- assertVisible: 'Today'
+- tapOn:
+    id: start-morning
+- assertVisible: 'A simple place to begin'
+- scrollUntilVisible:
+    element:
+      id: save-ritual
+    direction: DOWN
+- tapOn:
+    id: save-ritual
+- assertVisible: 'Remove from saved'
+- tapOn:
+    id: complete-ritual
+- assertVisible: 'A little time, well spent.'
+- tapOn:
+    id: dismiss-completion
+- assertVisible: 'Completed today'

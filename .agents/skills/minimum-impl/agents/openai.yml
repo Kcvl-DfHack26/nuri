@@ -1,0 +1,4 @@
+interface:
+  display_name: "最小実装"
+  short_description: "既存の責務と標準機能を使い、独自実装と保守の負担を減らす"
+  default_prompt: "$minimum-impl を使い、変更経路の正本と標準APIを確認し、受入条件を保ちながら重複する取得・変換・独自実装を減らしてください。"

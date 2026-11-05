@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/.env
+**/.env.*
+**/dist
+**/.expo
+**/.turbo
+.agents
+.artifacts
+infra

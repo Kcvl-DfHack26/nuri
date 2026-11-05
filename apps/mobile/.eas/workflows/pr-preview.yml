@@ -1,0 +1,14 @@
+name: PR preview
+on:
+  pull_request:
+    branches: [main]
+jobs:
+  preview:
+    type: update
+    environment: preview
+    params:
+      branch: pr-${{ github.event.pull_request.number }}
+      platform: all
+  comment:
+    needs: [preview]
+    type: github-comment

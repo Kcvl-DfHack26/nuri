@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "entry": ["apps/api/src/db/migrate.ts", "scripts/*.ts"],
+  "ignorePatterns": [".agents/**", "**/dist/**", "**/.expo/**", "**/drizzle/**", ".artifacts/**"],
+  "rules": {
+    "unused-files": "error",
+    "unused-exports": "error",
+    "unused-dependencies": "error",
+    "unresolved-imports": "error"
+  },
+  "ignoreDependencies": [
+    "@babel/runtime",
+    "@expo/ngrok",
+    "expo-dev-client",
+    "expo-system-ui",
+    "expo-updates"
+  ]
+}
