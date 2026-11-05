@@ -47,7 +47,7 @@ docker compose exec --user root workspace chown -R node:node \
 
 ### ホスト上のBunで開発する場合（任意）
 
-Node 24とBun 1.4.4を用意する。
+Node 24とBun 1.4.4を用意する。Composeで開発していた場合は、先に `docker compose stop workspace` で8080/8081を解放する。ホストとコンテナの開発サーバーを同じポートで同時に起動しない。
 
 ```sh
 docker compose -f compose.yaml -f compose.host.yaml up -d postgres
@@ -132,7 +132,7 @@ iPhone実機への内部配布にはApple Developer Program、端末登録、署
 
 ### GitHub Actions
 
-通常のCIはsecretなしで動く。GitHubの **Settings → Actions → General** でActionsを有効にする。mainの保護を有効にするときは、初回のCI成功後に `quality`、`infrastructure`、`container` をrequired checkにする。
+通常のCIはsecretなしで動く。GitHub Actionsは有効で、mainはPR経由の変更と `quality`、`infrastructure`、`container` の成功を必須に設定済み。最新mainへの追従、会話の解決も必要で、管理者にも適用する。承認人数は0、force pushとブランチ削除は禁止。フォーク時は初回CI成功後に同じ保護を設定する。
 
 **Settings → Environments → production** は作成済みで、利用できるブランチをmainだけに制限している。フォーク時は作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
 
@@ -174,6 +174,8 @@ bunx eas workflow:run .eas/workflows/preview-update.yml --ref main --non-interac
 ```
 
 この手動配信はpreview channelだけを更新する。API URLが未設定ならオフラインショーケースになる。EASのビルドとワークフローでもNode 24.19.0/Bun 1.4.4を固定している。
+
+PRイベントからの自動配信、手動preview配信、iOS Simulator / Android APKビルドまで実行済み。実行結果と確認範囲は [検証記録](testing.md#2026-11-05の初期設定検証) を参照する。
 
 1. Expo dashboardのプロジェクト設定でGitHub Appを接続し、対象リポジトリへのアクセスを承認する。
 2. モノレポのプロジェクトルートを **`apps/mobile`** に設定する。ワークフローはこの直下の `.eas/workflows` にある。

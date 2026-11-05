@@ -46,3 +46,13 @@ maestro test apps/mobile/.maestro/showcase.yaml
 クラウド実行例は `docs/examples/native-e2e.yml`。2026-11-05の実アカウントでの検証では、EASのMaestroジョブに有料プランが必要だったため、未使用のサンプルとして置いている。契約後に `apps/mobile/.eas/workflows/native-e2e.yml` へコピーし、`eas workflow:validate`を通してから実行する。iOS E2Eのために各開発者のMacを必須にしない。
 
 JestはExpo UIのネイティブ境界をmockするため、SwiftUI/Composeの実描画を保証しない。bundle生成、型検査、mock付きテストと、実機での確認は区別して記録する。
+
+## 2026-11-05の初期設定検証
+
+- [GitHub CI](https://github.com/ReoHakase/expo-hono-opentofu-starter/actions/runs/41992135095): `2388c8b` のquality / infrastructure / containerが成功。lint・型・Bun/Jest・PostgreSQL認証統合テスト・Expo Doctor・両OSのbundle・OpenTofu/TFLint・Nodeコンテナーの起動を含む。
+- [PR自動preview](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/workflows/01a1aac0-058d-7452-9edb-5b69be862cb7): 同じcommitで両OSのupdate公開とPRコメントが成功。
+- [手動preview配信](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/workflows/01a1aac0-7f64-7679-b78c-e0fd098d1d3d): 同じcommitで成功。
+- [iOS Simulatorビルド](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/builds/e473f917-7fc8-4930-bb93-2608408f03bf)と[Android preview APK](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/builds/43dce5d8-35a5-4990-bc67-2167e3445017)が成功。ビルド元は `9d35603`。その後のシート修正とBabel runtime変更はJavaScriptのみで、iOSのfingerprintが同一であることも確認した。
+- ローカルiPhone 17 Pro Simulator / iOS 26.5のExpo Goで `2388c8b` を起動。Today→詳細→戻る、保存→LibraryのSaved絞り込み、完了シートの本文とDone、同日の重複完了防止、進捗1/3への反映、検索の該当なし、ダークモード、触覚設定の切り替えを確認した。完了シートの画像は [PR #5](https://github.com/ReoHakase/expo-hono-opentofu-starter/pull/5) に添付。
+
+iPhone実機とAndroid端末での操作、日次目標スライダー、文字サイズ拡大、シートのスワイプ/Android Back、再起動後の保持、公開API経由の認証は未確認。Androidのビルド成功は操作確認の代わりにはしない。GCP本番デプロイと本番OTA、ストア提出は実行していない。
