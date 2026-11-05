@@ -162,30 +162,44 @@ Google CloudのAPIキーやサービスアカウントJSONをGitHub Secretに登
 
 登録したtokenの名称は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter production`。対象を `reohakase` アカウントに限定し、権限は `VIEW` / `RUN` / `PUBLISH`。アカウント管理権限は含めない。更新時は同じ制限のtokenを発行してEnvironment Secretを差し替え、旧tokenを失効させる。
 
-### Expo GitHub連携・環境変数
+### 手動preview配信（GitHub Actions）
 
-Expoのログイン、EAS project、GitHubリポジトリの接続は完了済み。[プロジェクトのGitHub設定](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/github)のBase directoryは `/apps/mobile` として保存済み。以下の1〜2はフォーク・再設定時の手順。
+PRを作成・更新すると、`Daylight preview` コメントだけを作成・更新する。**pushではExpoへ配信しない**。コメントの **🚀 previewを配信** チェックボックスを押すと、そのコメントに記載したSHAを両OSへ配信する。実行中・成功・失敗、配信SHA、OS別リンクとQRは同じコメントへ戻る。
 
-Expo dashboardのRun workflow一覧にファイルが表示されない場合は、アプリディレクトリからEAS CLIでGit refを指定する。ワークフローの配置をリポジトリ直下へ変える必要はない。
+Actionsの **Publish preview → Run workflow** から、branchを `main`、`pr` を公開中PRの番号として指定してもよい。
 
 ```sh
-cd apps/mobile
-bunx eas workflow:run .eas/workflows/preview-update.yml --ref main --non-interactive --wait
+gh workflow run preview.yml --ref main -f pr=PR_NUMBER
 ```
 
-この手動配信はpreview channelだけを更新する。API URLが未設定ならオフラインショーケースになる。EASのビルドとワークフローでもNode 24.19.0/Bun 1.4.4を固定している。
+- リポジトリのwrite権限を持つ利用者だけ実行できる。同一リポジトリからmainへ向けた公開中PRに限り、fork・bot操作・古いSHAのコメントは拒否する。
+- `pull_request_target` はコメント更新だけに使い、信頼済みworkflowのコードのみ実行する。配信側も認可後に固定SHAをcheckoutし、依存インストール時にはExpo tokenを渡さない。
+- GitHub Environment **preview** はmainからのworkflowだけを許可し、専用 `EXPO_TOKEN` を登録済み。token名は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter preview`、対象は `reohakase`、権限は `VIEW` / `PUBLISH`。productionのtokenとは分ける。
+- Expo公式 `expo/expo-github-action/preview` がGitHub runner上でbundle生成と `eas update` を実行する。**Expo Workflowsの60分枠は使わない**。GitHub Actionsの実行時間と、EAS UpdateのMAU・転送量・保存容量の枠は使う。
+- 配信先はEAS environment `preview`、branch `pr-<番号>`。共通preview channelやproductionは上書きしない。対応するfingerprintのDevelopment Buildからリンク・QRを開く。Expo Goは従来どおりローカル開発サーバーを使う。
 
-PRイベントからの自動配信、手動preview配信、iOS Simulator / Android APKビルドまで実行済み。実行結果と確認範囲は [検証記録](testing.md#2026-11-05の初期設定検証) を参照する。
+フォーク先ではGitHub Environment `preview` を同様に作り、Expo tokenを登録する。
 
-1. Expo dashboardのプロジェクト設定でGitHub Appを接続し、対象リポジトリへのアクセスを承認する。
-2. モノレポのプロジェクトルートを **`apps/mobile`** に設定する。ワークフローはこの直下の `.eas/workflows` にある。
-3. ExpoのEnvironment Variablesで、`EXPO_PUBLIC_API_URL` をdevelopment/preview/productionそれぞれに設定する。公開URLなのでvisibilityはplain text。previewは共有staging API、productionは本番API。ローカル `.env` はクラウドにはアップロードしない。
-4. `bunx eas workflow:validate .eas/workflows/pr-preview.yml --non-interactive` 等で検証する。
-5. 最初のDevelopment Buildを実機へ入れる。PR作成後のコメントにあるupdateリンクをDevelopment Buildで開く。
+```sh
+# tokenは対話入力する。引数・リポジトリへ書かない。
+gh secret set EXPO_TOKEN --env preview
+```
 
-PRは `pr-<number>` branchへ公開し、共通preview channelの最新版を全PRで上書きしない。`native-builds.yml` は既定でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら、実行時に `ios_profile=development` / `android_profile=development` を選ぶ。iOS実機用のdevelopmentにはApple署名が必要。mainに対応するproduction updateは、GitHubのAPIデプロイ成功後にのみ `production-update.yml` を呼び出す。
+この仕組みは `issue_comment` / `pull_request_target` を使うため、workflowをdefault branchへ取り込んだ後に有効になる。既に公開中のPRには、次のpushまたは手動実行でコメントを作成する。
 
-Expo GitHub Appの承認とCI token登録は完了済み。フォーク先ではそれぞれ自分のアカウントで設定する。Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出はこの初期設定では自動実行しない。
+### Expo GitHub連携・環境変数
+
+Expoのログイン、EAS project、GitHubリポジトリの接続は完了済み。[プロジェクトのGitHub設定](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/github)のBase directoryは `/apps/mobile`。Expo側にあった自動PR preview・手動preview workflowは削除し、GitHub Actionsへ統一した。
+
+フォーク・再設定時は以下を行う。
+
+1. Expo dashboardでGitHub Appを対象リポジトリへ接続し、Base directoryを `apps/mobile` にする。
+2. ExpoのEnvironment Variablesで `EXPO_PUBLIC_API_URL` をdevelopment/preview/productionそれぞれに設定する。公開URLなのでvisibilityはplain text。previewは共有staging API、productionは本番API。ローカル `.env` はクラウドへアップロードしない。未設定ならオフラインショーケースとして動く。
+3. GitHubのpreview Environmentへtokenを登録し、PRコメントまたはActionsから配信する。
+
+`apps/mobile/.eas/workflows/native-builds.yml` は手動でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら `ios_profile=development` / `android_profile=development` を選ぶ。iOS実機用にはApple署名が必要。本番は従来どおり、APIデプロイ成功後だけ `production-update.yml` を呼び出す。両方ともExpo Workflows側の実行となる。
+
+Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出は自動実行しない。初期設定のビルド・端末確認記録は [検証](testing.md) を参照する。
 
 ## 4. Google Cloudの準備（認証情報が用意できてから）
 
