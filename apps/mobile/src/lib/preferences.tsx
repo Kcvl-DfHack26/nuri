@@ -9,7 +9,7 @@ import { Appearance } from 'react-native';
 
 function readPreferences(): Preferences {
   try {
-    const raw = Storage.getItemSync('daylight.preferences');
+    const raw = Storage.getItemSync('expo-hono-opentofu-starter.preferences');
     return preferencesSchema.parse(raw ? JSON.parse(raw) : {});
   } catch {
     return preferencesSchema.parse({});
@@ -42,7 +42,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   function update(patch: Partial<Preferences>) {
     const next = preferencesSchema.parse({ ...preferences, ...patch });
     try {
-      Storage.setItemSync('daylight.preferences', JSON.stringify(next));
+      Storage.setItemSync('expo-hono-opentofu-starter.preferences', JSON.stringify(next));
       setPreferences(next);
       setStorageError(null);
     } catch {

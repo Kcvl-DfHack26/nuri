@@ -11,7 +11,7 @@ const auth = createAuth(db, {
   DATABASE_URL: 'unused',
   BETTER_AUTH_SECRET: 'unit-test-secret-not-for-real-deployments',
   BETTER_AUTH_URL: 'http://localhost:8080',
-  TRUSTED_ORIGINS: 'http://localhost:8081,daylight://',
+  TRUSTED_ORIGINS: 'http://localhost:8081,expo-hono-opentofu-starter://',
 });
 const app = createApp(auth, () => Promise.resolve(), ['http://localhost:8081']);
 afterAll(async () => {

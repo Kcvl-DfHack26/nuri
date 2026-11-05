@@ -19,7 +19,7 @@ jobs:
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||
       (github.event.issue.pull_request && github.event.sender.type == 'User' &&
-      contains(github.event.comment.body, '<!-- daylight-preview-request -->')))
+      contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

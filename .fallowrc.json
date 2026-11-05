@@ -13,6 +13,7 @@
     "@expo/ngrok",
     "expo-dev-client",
     "expo-system-ui",
-    "expo-updates"
+    "expo-updates",
+    "portless"
   ]
 }

@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Daylight",
+    "name": "expo-hono-opentofu-starter",
     "slug": "expo-hono-opentofu-starter",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "daylight",
+    "scheme": "expo-hono-opentofu-starter",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "dev.reohakase.daylight",
+      "bundleIdentifier": "dev.reohakase.expohonopentofustarter",
       "supportsTablet": true
     },
     "android": {
@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": true,
-      "package": "dev.reohakase.daylight",
+      "package": "dev.reohakase.expohonopentofustarter",
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {

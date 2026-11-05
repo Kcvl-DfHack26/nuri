@@ -1,5 +1,6 @@
-export const previewMarker = '<!-- daylight-preview -->';
-const requestLine = '- [ ] 🚀 **previewを配信** <!-- daylight-preview-request -->';
+export const previewMarker = '<!-- expo-hono-opentofu-starter-preview -->';
+const requestLine =
+  '- [ ] 🚀 **previewを配信** <!-- expo-hono-opentofu-starter-preview-request -->';
 const checkedLine = requestLine.replace('[ ]', '[x]');
 
 export function previewSha(body: string): string | undefined {
@@ -64,7 +65,7 @@ export function renderPreviewComment(input: {
 }) {
   return [
     previewMarker,
-    '### Daylight preview',
+    '### expo-hono-opentofu-starter preview',
     '',
     `対象SHA: ${input.sha}`,
     '',

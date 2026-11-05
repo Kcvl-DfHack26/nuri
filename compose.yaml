@@ -1,4 +1,4 @@
-name: expo-hono-starter
+name: ${COMPOSE_PROJECT_NAME:?Run sh scripts/worktree-init.sh first}
 services:
   workspace:
     build:
@@ -6,20 +6,27 @@ services:
       dockerfile: .devcontainer/Dockerfile
     init: true
     user: node
-    working_dir: /workspace
+    working_dir: ${WORKTREE_ROOT:?Run sh scripts/worktree-init.sh first}
     command: sleep infinity
     environment:
-      DATABASE_URL: postgresql://starter:starter@postgres:5432/starter
+      DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@postgres:5432/expo-hono-opentofu-starter
       NODE_ENV: development
+      STARTER_CONTAINER: '1'
+      PORT: '8080'
     ports:
-      - '127.0.0.1:8080:8080'
-      - '127.0.0.1:8081:8081'
+      - '127.0.0.1::8080'
+      - '127.0.0.1::8081'
     volumes:
-      - .:/workspace
-      - root-modules:/workspace/node_modules
-      - mobile-modules:/workspace/apps/mobile/node_modules
-      - api-modules:/workspace/apps/api/node_modules
-      - shared-modules:/workspace/packages/shared/node_modules
+      - type: bind
+        source: ${WORKTREE_ROOT}
+        target: ${WORKTREE_ROOT}
+      - type: bind
+        source: ${WORKTREE_GIT_COMMON_DIR:?Run sh scripts/worktree-init.sh first}
+        target: ${WORKTREE_GIT_COMMON_DIR}
+      - root-modules:${WORKTREE_ROOT}/node_modules
+      - mobile-modules:${WORKTREE_ROOT}/apps/mobile/node_modules
+      - api-modules:${WORKTREE_ROOT}/apps/api/node_modules
+      - shared-modules:${WORKTREE_ROOT}/packages/shared/node_modules
       - bun-cache:/home/node/.bun
       - gcloud-config:/home/node/.config/gcloud
       - expo-config:/home/node/.expo
@@ -34,13 +41,13 @@ services:
   postgres:
     image: postgres:17.7-bookworm
     environment:
-      POSTGRES_USER: starter
+      POSTGRES_USER: expo-hono-opentofu-starter
       POSTGRES_PASSWORD: starter
-      POSTGRES_DB: starter
+      POSTGRES_DB: expo-hono-opentofu-starter
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U starter -d starter']
+      test: ['CMD-SHELL', 'pg_isready -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter']
       interval: 5s
       timeout: 5s
       retries: 12

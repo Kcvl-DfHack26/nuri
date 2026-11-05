@@ -6,7 +6,7 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
-  TRUSTED_ORIGINS: z.string().default('daylight://'),
+  TRUSTED_ORIGINS: z.string().default('expo-hono-opentofu-starter://'),
 });
 
 export function readEnv() {

@@ -16,15 +16,15 @@ jobs:
       postgres:
         image: postgres:17.7-bookworm
         env:
-          POSTGRES_USER: starter
+          POSTGRES_USER: expo-hono-opentofu-starter
           POSTGRES_PASSWORD: starter
-          POSTGRES_DB: starter
+          POSTGRES_DB: expo-hono-opentofu-starter
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U starter -d starter"
+          --health-cmd "pg_isready -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
-      DATABASE_URL: postgresql://starter:starter@localhost:5432/starter
+      DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
       CI: '1'
     steps:
       - uses: actions/checkout@v7.0.1
@@ -74,13 +74,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
-      - run: docker build --tag daylight-api --file apps/api/Dockerfile .
+      - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
       - name: Run Node.js container smoke test
         run: |
           docker run -d --name api -p 8080:8080 \
             -e DATABASE_URL=postgresql://unused:unused@localhost:5432/unused \
             -e BETTER_AUTH_SECRET=ci-only-secret-not-for-real-deployments \
-            -e BETTER_AUTH_URL=https://example.com daylight-api
+            -e BETTER_AUTH_URL=https://example.com expo-hono-opentofu-starter-api
           for _ in $(seq 1 20); do
             if curl --fail --silent http://localhost:8080/health; then exit 0; fi
             sleep 1

@@ -27,18 +27,32 @@ Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v
 
 ## UIと端末内データ
 
-Daylightは小さな習慣を題材に、Native Tabs、Stack、ネイティブの設定フォーム、Picker、Slider、Switch、TextInput、Button、BottomSheetを試すアプリ。
+expo-hono-opentofu-starterは小さな習慣を題材に、Native Tabs、Stack、ネイティブの設定フォーム、Picker、Slider、Switch、TextInput、Button、BottomSheetを試すアプリ。
 
 共通 `@expo/ui` を使い、iOSではSwiftUI、AndroidではJetpack Composeのコントロールを表示する。タブのアイコンはSF SymbolsとMaterialを両方指定する。通常の画面レイアウトはReact Native、可変件数の検索結果はFlatListで実装する。
 
 お気に入り、日付ごとの完了、外観、触覚、目標は `expo-sqlite/kv-store` に保存する。認証セッションとは分離する。サンプルはアカウントへデータを同期しない。Google Cloud未設定でもオフラインの操作を試せる。
+
+## worktreeと開発プロセス
+
+正式名称、URLスキーム、保存prefixは `expo-hono-opentofu-starter`。両OSのアプリIDは `dev.reohakase.expohonopentofustarter`。旧識別子との互換処理・端末データの移行は設けず、新しいビルドと保存領域を使う。Expo owner、slug、project ID、Updates URLは既存接続を維持し、fingerprintでネイティブ互換性を管理する。
+
+worktreeの実パスをGitのhash-objectでハッシュ化した先頭12桁をIDとする。branch名やcommitに依存せず、symlinkは実パスへ正規化する。POSIXの初期化処理がルートのGit管理外 `.env` を生成する。アプリenvとsecretは各checkoutに置く。
+
+ホストはPortless 0.15.8の共有HTTP/80 proxyを使用し、API/Metroのホスト名とポートを分ける。Expoの接続モードとQRは標準CLIを使用する。コンテナはAPI 8080、Metro 8081、DB 5432を内部で使い、Dockerがホストのloopbackポートを割り当てる。独自のポート台帳・予約処理は持たない。Turborepoの `cacheDir` を `.turbo/cache` に明示し、親checkoutのキャッシュを参照せず各worktree内で完結させる。
+
+Composeのproject名でDB、ネットワーク、依存関係・認証設定のvolumeを分離する。checkoutとGit共通ディレクトリは同じ絶対パスへmountする。同じworktreeではホストまたはコンテナの一方を使う。開発コマンドはDBを起動して実ポートから接続先を解決し、migration後にNode APIを起動する。CI/Cloud Runの明示DATABASE_URLはそのまま使う。
+
+設定とSecureStoreはインストール済みアプリ単位であり、worktree別アプリIDは生成しない。端末で複数worktreeを切り替える場合、APIのログイン状態を確認する。各APIのDBとsecretは独立する。
+
+GCPのリソースprefixは正式名称と環境名から決める。サービスアカウントとWIF poolだけは、22文字を超えるprefixを先頭13文字とSHA-256先頭8文字（ハイフン区切り）へ短縮する。既存stateの切替・リソース置換は自動実行しない。
 
 ## 品質ゲート
 
 - Oxlint: Expo公式 `oxlint-config-universe/native` とNode設定、型付き解析。unsafe、未処理Promise、循環import、Hooks、テストの `.only` / skipを検査。
 - ESLint: Perfectionist、正規表現、複雑度、Hono、Drizzle、Turborepo、Testing Libraryなど、Oxlint本体と重複させない補完ルールだけ。依存境界は `no-restricted-imports` とpackageの公開exportsで制限する。
 - Oxfmt: 現在のCLIが正式対応する `.oxfmtrc.json` を使用。仕様案の `oxfmt.config.ts` に固執しない。
-- Fallow: Expo Routerとworkspaceの公開入口を検出。ネイティブautolinkingやBabelが利用する依存、トンネル用CLIだけを明示的に除外する。
+- Fallow: Expo Routerとworkspaceの公開入口を検出。ネイティブautolinkingやBabelが利用する依存、トンネル用CLIと子プロセスから起動するPortlessだけを明示的に除外する。
 - Lefthook: stagedファイルの整形/lintとCommitlint。Conventional Commitsを要求し、Gitmoji・Issue番号は必須にしない。
 - Bun Test: 共有ロジック、HTTP契約、実DB認証。Jest + jest-expo + RNTL: モバイルの画面操作。Maestro: 必要時だけ。
 

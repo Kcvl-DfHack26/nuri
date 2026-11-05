@@ -1,4 +1,4 @@
-appId: dev.reohakase.daylight
+appId: dev.reohakase.expohonopentofustarter
 ---
 - launchApp:
     clearState: true

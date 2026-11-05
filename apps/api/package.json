@@ -9,14 +9,14 @@
     }
   },
   "scripts": {
-    "dev": "node --env-file-if-exists=.env --import tsx --watch src/index.ts",
+    "dev": "bun ../../scripts/dev.ts api",
     "build": "bun build src/index.ts src/db/migrate.ts --target=node --outdir=dist --external=pg --external=better-auth --external=@better-auth/expo",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "bun test src/app.test.ts",
-    "test:integration": "bun test src/auth.integration.test.ts",
+    "test:integration": "bun ../../scripts/dev.ts integration",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts"
+    "db:migrate": "bun ../../scripts/dev.ts migrate"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.17",

@@ -4,80 +4,86 @@
 
 Google CloudのAPIキーはローカル開発・ショーケースに不要。クラウドの初期構築にはログイン済みのGoogleアカウントと課金を有効化したプロジェクト、CIにはWorkload Identity Federationを使う。長期のサービスアカウントJSONキーは作らない。
 
-## 1. ホストに必要なもの
+## 1. cloneとworktreeの準備
 
-- GitとDocker Engine + Compose v2。macOS/Linux、またはWindowsのWSL2でLinuxコンテナを動かせること。
-- Dev Containerを使う場合はVS Code等の対応エディタ。
-- 実機確認用のiPhone/Androidと、SDK 58対応のExpo Go。
+GitとDocker Engine + Compose v2を用意する。Dev ContainerはホストのNode/Bunを必要としない。WindowsではWSL2のLinuxファイルシステムを使う。
 
-Xcode、Android Studio、ホスト側のNode/Bun/gcloud/OpenTofuは必須ではない。WindowsではリポジトリをWSL2側のLinuxファイルシステムに置く。
+```sh
+git worktree add -b codex/my-change ../my-change HEAD
+cd ../my-change
+```
+
+各checkoutを初期化する。同じGitリポジトリの `bun install` / Dev Containerの初回作成は順に実行する。Lefthookが共有 `.git/hooks` を更新するため、初回インストール同士を同時に実行すると競合する。準備後の開発サーバーは並列起動できる。`node_modules`、ルートの生成 `.env`、DB volumeはコピーしない。アプリの環境ファイルは各worktreeで生成する。
 
 ### Dev Container（推奨）
 
-リポジトリをcloneし、**Reopen in Container**を実行する。postCreateCommandがvolumeの所有者を整え、`bun install --frozen-lockfile`、`bun run setup`、`bun run db:migrate`を実行する。
+worktreeをエディタで開いて **Reopen in Container** を実行する。ホストの `initializeCommand` が `sh scripts/worktree-init.sh` を実行し、実パス由来のID・Compose名・mount先をルートの生成 `.env` へ保存する。branch変更やdetached HEADでもIDは変わらない。checkoutとGit共通ディレクトリをホストと同じ絶対パスでmountするため、linked worktreeでもGitが動く。
+
+postCreateCommandがvolumeの所有者を整え、依存導入・アプリenv生成・migrationを実行する。
 
 ```sh
 bun run dev
 ```
 
-APIは8080、Metroは8081。PostgreSQLはComposeの内部ネットワークだけに公開する。`.env`は未作成の場合のみ生成し、既存の値を上書きしない。認証secretはランダムに生成される。
-
-### エディタなしでComposeだけを使う
+コンテナ内はAPI 8080、Metro 8081、DB 5432。ホスト公開先はDockerの自動割当で、loopback限定。エディタの追加port forwardは使わない。ホストから確認するには:
 
 ```sh
+docker compose port workspace 8080
+docker compose port workspace 8081
+```
+
+### エディタなしでComposeを使う
+
+ホストのNode/Bunは不要。初回は以下を実行する。
+
+```sh
+sh scripts/worktree-init.sh
 docker compose up -d --build
-# 以下は初回、または依存関係更新時
+docker compose exec --user root workspace chown -R node:node \
+  node_modules apps/mobile/node_modules apps/api/node_modules packages/shared/node_modules \
+  /home/node/.bun /home/node/.expo /home/node/.config/gcloud
 docker compose exec workspace bun install --frozen-lockfile
 docker compose exec workspace bun run setup
-docker compose exec workspace bun run db:migrate
-# 開発中はこのターミナルを維持
 docker compose exec workspace bun run dev
 ```
 
-volumeの所有権エラーが発生したときだけ、次を実行する。ホストのソース全体へchownしない。
+### ホストのBunで開発する
+
+Node 24とBun 1.4.4を用意する。同じworktreeのコンテナ開発から切り替える場合は、先に `docker compose stop workspace api-tunnel` を実行する。
 
 ```sh
-docker compose exec --user root workspace chown -R node:node \
-  /workspace/node_modules /workspace/apps/mobile/node_modules \
-  /workspace/apps/api/node_modules /workspace/packages/shared/node_modules \
-  /home/node/.bun /home/node/.expo /home/node/.config/gcloud
-```
-
-停止は `docker compose down`。DBや認証状態を保つため、通常は `-v` を付けない。API/Metroのホスト公開先はloopback限定で、実機へは次のトンネルを使う。
-
-### ホスト上のBunで開発する場合（任意）
-
-Node 24とBun 1.4.4を用意する。Composeで開発していた場合は、先に `docker compose stop workspace` で8080/8081を解放する。ホストとコンテナの開発サーバーを同じポートで同時に起動しない。
-
-```sh
-docker compose -f compose.yaml -f compose.host.yaml up -d postgres
 bun install --frozen-lockfile
 bun run setup
-bun run db:migrate
+# ホストで一度だけ。tablecast-poc等の既存のHTTP/80 proxyは再利用する。
+bunx --no-install portless proxy start --no-tls --port 80
 bun run dev
 ```
 
-`compose.host.yaml`だけがDBの5432をホストのloopbackへ公開する。ホストとコンテナのnode_modulesは別volumeで分離している。
+Portless 0.15.8がAPIとMetroに別の空きポートとworktree別ホスト名を割り当てる。APIは `http://api.<ID>.expo-hono-opentofu-starter.localhost`、Webは `http://metro.<ID>.expo-hono-opentofu-starter.localhost`。ExpoのQRには標準のLAN/トンネル接続先を使い、端末に `.localhost` を設定しない。共有proxyの初回起動に管理者認証が必要な環境では、上記コマンドをホストの対話ターミナルで実行する。
 
-### Drizzle 1.0 RC のマイグレーション
-
-Drizzle ORMとKitは `1.0.0-rc.5` を使う。スキーマを変更したら、リポジトリのルートで以下を実行する。Compose開発では各コマンドに `docker compose exec workspace` を付ける。
+`dev` / `dev:api` は自worktreeのPostgreSQLを起動してhealthcheck・migration後にAPIを開始する。ホストのDB公開先もDockerが自動割当する。`dev:mobile` はDBなしで起動できる。`db:migrate` と `test:integration` も同じDBを解決する。CIやAPIの環境ファイルに明示した `DATABASE_URL` があれば、その接続先を使う。
 
 ```sh
-bun run db:generate
-bun run db:migrate
+bun run dev:api
+bun run dev:mobile
+bun run services:up
+bun run services:down
 ```
 
-`apps/api/drizzle/<timestamp>_<name>/` の `migration.sql` と `snapshot.json` を一緒にコミットする。生成物はformatterの対象外。旧形式の履歴はリポジトリ内で変換済みなので、更新後も通常の `bun run db:migrate` を使う。既存DBでは最初の実行時にDrizzleが履歴テーブルへ `name` / `applied_at` を追加し、適用済みSQLを再実行せずに移行する。DBやmigration履歴を削除してやり直さない。
+Ctrl+Cは開発プロセスとそのPortless routeを終了する。`services:down`、またはホストの `docker compose down` は自worktreeのComposeだけを停止し、volumeを保持する。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。同一worktreeのAPIまたはMetroの二重起動は既存プロセスを奪わず失敗する。
+
+`setup` は既存アプリenvとsecretを保持する。APIの `DATABASE_URL` と `BETTER_AUTH_URL` は空でローカル自動設定になり、実機認証ではHTTPSトンネルURLを明示する。ルート `.env` はCompose用の生成設定専用。自分の環境値は `apps/api/.env` / `apps/mobile/.env` に置く。
+
+旧構成からは新しいDB・volume・保存namespaceで開始する。データ移行や旧スキームの互換処理はない。旧Composeの稼働を止めたい場合は、その旧設定・project名で通常停止する。旧volumeは新環境へ自動接続しない。
 
 ## 2. iPhone / Android から開く
 
 ### まずExpo Goでショーケース
 
-Metroが既に起動していれば止め、コンテナ内で実行する。
+同じworktreeのMetroが起動していれば止め、worktreeルートから実行する。
 
 ```sh
-cd /workspace/apps/mobile
+cd apps/mobile
 bun run go
 ```
 
@@ -110,11 +116,11 @@ docker compose logs api-tunnel
 
 APIとMetroを再起動する。APIの `.env.example` には開発専用の `exp://**` originが含まれている。共有の本番APIにこのワイルドカードを入れない。実機の `localhost` はPCではなく端末自身なので、localhost URLをモバイルへ設定しない。
 
-ホスト開発時は以下を使える（Docker Desktop/OrbStack）。Linuxでは `--add-host=host.docker.internal:host-gateway` も付ける。
+ホスト開発時は、API起動ログの実ポートで `API_PORT` を置き換えて以下を使える（Docker Desktop/OrbStack）。Linuxでは `--add-host=host.docker.internal:host-gateway` も付ける。
 
 ```sh
 docker run --rm cloudflare/cloudflared:2026.10.7 tunnel \
-  --no-autoupdate --protocol http2 --url http://host.docker.internal:8080
+  --no-autoupdate --protocol http2 --url http://host.docker.internal:API_PORT
 ```
 
 Cloudflareトンネルは外向きTCP 7844が必要。今回のホストではこの通信がタイムアウトしたため、公開API経由の実機認証は未確認。利用できるネットワーク、別のHTTPSトンネル、またはstaging Cloud Runを使う。
@@ -175,7 +181,7 @@ Google CloudのAPIキーやサービスアカウントJSONをGitHub Secretに登
 
 ### 手動preview配信（GitHub Actions）
 
-PRを作成・更新すると、`Daylight preview` コメントだけを作成・更新する。**pushではExpoへ配信しない**。コメントの **🚀 previewを配信** チェックボックスを押すと、そのコメントに記載したSHAを両OSへ配信する。実行中・成功・失敗、配信SHA、OS別リンクとQRは同じコメントへ戻る。
+PRを作成・更新すると、`expo-hono-opentofu-starter preview` コメントだけを作成・更新する。**pushではExpoへ配信しない**。コメントの **🚀 previewを配信** チェックボックスを押すと、そのコメントに記載したSHAを両OSへ配信する。実行中・成功・失敗、配信SHA、OS別リンクとQRは同じコメントへ戻る。
 
 Actionsの **Publish preview → Run workflow** から、branchを `main`、`pr` を公開中PRの番号として指定してもよい。
 
@@ -255,7 +261,7 @@ cp infra/terraform.tfvars.example infra/terraform.tfvars
 # フォークでは gh api repos/OWNER/REPO --jq .id で取得
 ```
 
-stagingとproductionは別のstate prefix、resource name、認証secret、DBを使う。最初は例の `daylight-staging` / `daylight/staging` を作成する。productionを用意するときは別の作業コピーで `name=daylight-production`、prefix `daylight/production` を設定し、stagingのstateを上書きしない。
+stagingとproductionは別のstate prefix、resource name、認証secret、DBを使う。最初は例の `expo-hono-opentofu-starter-staging` / `expo-hono-opentofu-starter/staging` を作成する。productionを用意するときは別の作業コピーで `name=expo-hono-opentofu-starter-production`、prefix `expo-hono-opentofu-starter/production` を設定し、stagingのstateを上書きしない。
 
 ```sh
 tofu -chdir=infra init -backend-config=backend.hcl
@@ -275,9 +281,9 @@ DBパスワードはephemeral/write-onlyのためstateに保存しない。次�
 
 ```sh
 export GCP_PROJECT=YOUR_PROJECT_ID
-export RESOURCE_NAME=daylight-staging
+export RESOURCE_NAME=expo-hono-opentofu-starter-staging
 SQL_CONNECTION=$(tofu -chdir=infra output -raw sql_connection_name)
-printf 'postgresql://daylight:%s@localhost/daylight?host=/cloudsql/%s' \
+printf 'postgresql://expo-hono-opentofu-starter:%s@localhost/expo-hono-opentofu-starter?host=/cloudsql/%s' \
   "$TF_VAR_database_password" "$SQL_CONNECTION" | \
   gcloud secrets versions add "$RESOURCE_NAME-database-url" --project="$GCP_PROJECT" --data-file=-
 openssl rand -hex 32 | tr -d '\n' | \
@@ -305,7 +311,7 @@ gcloud artifacts docker images describe "$REGISTRY/api:bootstrap" \
 ```sh
 tofu -chdir=infra plan
 tofu -chdir=infra apply
-gcloud run jobs execute daylight-staging-migrate --region=asia-northeast1 --wait
+gcloud run jobs execute expo-hono-opentofu-starter-staging-migrate --region=asia-northeast1 --wait
 API_ORIGIN=$(tofu -chdir=infra output -raw service_uri)
 curl --fail "$API_ORIGIN/ready"
 ```
