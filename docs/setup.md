@@ -174,7 +174,7 @@ gh workflow run preview.yml --ref main -f pr=PR_NUMBER
 
 - リポジトリのwrite権限を持つ利用者だけ実行できる。同一リポジトリからmainへ向けた公開中PRに限り、fork・bot操作・古いSHAのコメントは拒否する。
 - `pull_request_target` はコメント更新だけに使い、信頼済みworkflowのコードのみ実行する。配信側も認可後に固定SHAをcheckoutし、依存インストール時にはExpo tokenを渡さない。
-- GitHub Environment **preview** はmainからのworkflowだけを許可し、専用 `EXPO_TOKEN` を登録済み。token名は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter preview`、対象は `reohakase`、権限は `VIEW` / `PUBLISH`。productionのtokenとは分ける。
+- GitHub Environment **preview** はmainからのworkflowだけを許可し、専用 `EXPO_TOKEN` を登録済み。token名は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter preview`、対象は `reohakase`、権限は `VIEW` / `RUN` / `PUBLISH`。productionのtokenとは分ける。
 - Expo公式 `expo/expo-github-action/preview` がGitHub runner上でbundle生成と `eas update` を実行する。**Expo Workflowsの60分枠は使わない**。GitHub Actionsの実行時間と、EAS UpdateのMAU・転送量・保存容量の枠は使う。
 - 配信先はEAS environment `preview`、branch `pr-<番号>`。共通preview channelやproductionは上書きしない。対応するfingerprintのDevelopment Buildからリンク・QRを開く。Expo Goは従来どおりローカル開発サーバーを使う。
 
