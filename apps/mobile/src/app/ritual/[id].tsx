@@ -1,4 +1,4 @@
-import { BottomSheet, Button } from '@expo/ui';
+import { BottomSheet, Button, RNHostView } from '@expo/ui';
 import { rituals } from '@starter/shared';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -101,24 +101,26 @@ export default function RitualScreen() {
           }}
           contentPadding={24}
         >
-          <ScrollView contentContainerStyle={{ gap: 18, paddingBottom: 24 }}>
-            <Text style={{ color: colors.text, fontSize: 28, fontWeight: '600' }}>
-              {storageError ? 'Let’s try that again' : 'A little time, well spent.'}
-            </Text>
-            <Text style={{ color: colors.secondary, fontSize: 17, lineHeight: 25 }}>
-              {storageError ??
-                'Your ritual is complete. Take this feeling with you into the rest of your day.'}
-            </Text>
-            <NativeHost matchContents>
-              <Button
-                label="Done"
-                onPress={() => {
-                  setPresented(false);
-                }}
-                testID="dismiss-completion"
-              />
-            </NativeHost>
-          </ScrollView>
+          <RNHostView matchContents={{ vertical: true }}>
+            <ScrollView contentContainerStyle={{ gap: 18, paddingBottom: 24 }}>
+              <Text style={{ color: colors.text, fontSize: 28, fontWeight: '600' }}>
+                {storageError ? 'Let’s try that again' : 'A little time, well spent.'}
+              </Text>
+              <Text style={{ color: colors.secondary, fontSize: 17, lineHeight: 25 }}>
+                {storageError ??
+                  'Your ritual is complete. Take this feeling with you into the rest of your day.'}
+              </Text>
+              <NativeHost matchContents>
+                <Button
+                  label="Done"
+                  onPress={() => {
+                    setPresented(false);
+                  }}
+                  testID="dismiss-completion"
+                />
+              </NativeHost>
+            </ScrollView>
+          </RNHostView>
         </BottomSheet>
       </NativeHost>
     </ScrollView>

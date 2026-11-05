@@ -1,16 +1,31 @@
-name: Development builds
+name: Native builds
+defaults:
+  tools:
+    node: '24.19.0'
+    bun: '1.4.4'
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      ios_profile:
+        type: choice
+        description: Simulator needs no Apple Developer membership.
+        options: [simulator, development]
+        default: simulator
+        required: true
+      android_profile:
+        type: choice
+        description: Preview runs standalone; development connects to Metro.
+        options: [preview, development]
+        default: preview
+        required: true
 jobs:
   ios:
     type: build
-    environment: development
     params:
       platform: ios
-      profile: development
+      profile: ${{ inputs.ios_profile }}
   android:
     type: build
-    environment: development
     params:
       platform: android
-      profile: development
+      profile: ${{ inputs.android_profile }}

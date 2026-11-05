@@ -47,7 +47,7 @@ docker compose exec --user root workspace chown -R node:node \
 
 ### ホスト上のBunで開発する場合（任意）
 
-Node 24とBun 1.4.4を用意する。
+Node 24とBun 1.4.4を用意する。Composeで開発していた場合は、先に `docker compose stop workspace` で8080/8081を解放する。ホストとコンテナの開発サーバーを同じポートで同時に起動しない。
 
 ```sh
 docker compose -f compose.yaml -f compose.host.yaml up -d postgres
@@ -124,28 +124,30 @@ bunx eas build --profile development --platform android
 
 iPhone実機への内部配布にはApple Developer Program、端末登録、署名情報が必要。初回は対話形式で `bunx eas device:create` / `bunx eas credentials` を実行して登録する。Apple側の契約・端末承認はIaCで代替できない。クラウドビルドはEASの利用枠を消費する。
 
+このプロジェクトではApple Developer Programは未契約のため、iPhoneではExpo Goを使う。Apple契約なしで作れるiOS SimulatorビルドはiPhoneへインストールできない。Androidのpreview APKは署名済みの単体アプリとして配布できる。
+
 このリポジトリはEASに接続済みで、`build:configure` / `update:configure`も実行済み。設定はfingerprint runtime policy、development/preview/production channel。フォーク時は `eas init`、`eas build:configure`、`eas update:configure` で自分のプロジェクトへ再接続する。
 
 ## 3. GitHubとExpoの手動設定
 
 ### GitHub Actions
 
-通常のCIはsecretなしで動く。GitHubの **Settings → Actions → General** でActionsを有効にする。mainの保護を有効にするときは、初回のCI成功後に `quality`、`infrastructure`、`container` をrequired checkにする。
+通常のCIはsecretなしで動く。GitHub Actionsは有効で、mainはPR経由の変更と `quality`、`infrastructure`、`container` の成功を必須に設定済み。最新mainへの追従、会話の解決も必要で、管理者にも適用する。承認人数は0、force pushとブランチ削除は禁止。フォーク時は初回CI成功後に同じ保護を設定する。
 
-**Settings → Environments → production** を作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
+**Settings → Environments → production** は作成済みで、利用できるブランチをmainだけに制限している。フォーク時は作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
 
-| 種別                 | 名前                             | 値・取得元                                                     |
-| -------------------- | -------------------------------- | -------------------------------------------------------------- |
-| Repository Variable  | `GCP_DEPLOY_ENABLED`             | 初期は未設定。GCP構築・secret投入・初期サービス作成後に `true` |
-| Environment Variable | `GCP_PROJECT_ID`                 | 対象GCP project ID                                             |
-| Environment Variable | `GCP_REGION`                     | 例: `asia-northeast1`                                          |
-| Environment Variable | `CLOUD_RUN_SERVICE`              | OpenTofuの `name`                                              |
-| Environment Variable | `ARTIFACT_REPOSITORY`            | OpenTofuの `name`                                              |
-| Environment Variable | `CLOUD_RUN_MIGRATION_JOB`        | `<name>-migrate`                                               |
-| Environment Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `tofu output -raw workload_identity_provider`                  |
-| Environment Variable | `GCP_SERVICE_ACCOUNT`            | `tofu output -raw deploy_service_account`                      |
-| Repository Variable  | `EXPO_UPDATE_ENABLED`            | 本番API、EAS環境、署名済みビルドの準備後に `true`              |
-| Environment Secret   | `EXPO_TOKEN`                     | Expoで作成するCI用access token。本番配信を有効にする場合のみ   |
+| 種別                 | 名前                             | 値・取得元                                                      |
+| -------------------- | -------------------------------- | --------------------------------------------------------------- |
+| Repository Variable  | `GCP_DEPLOY_ENABLED`             | 現在 `false`。GCP構築・secret投入・初期サービス作成後に `true`  |
+| Environment Variable | `GCP_PROJECT_ID`                 | 対象GCP project ID                                              |
+| Environment Variable | `GCP_REGION`                     | 例: `asia-northeast1`                                           |
+| Environment Variable | `CLOUD_RUN_SERVICE`              | OpenTofuの `name`                                               |
+| Environment Variable | `ARTIFACT_REPOSITORY`            | OpenTofuの `name`                                               |
+| Environment Variable | `CLOUD_RUN_MIGRATION_JOB`        | `<name>-migrate`                                                |
+| Environment Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `tofu output -raw workload_identity_provider`                   |
+| Environment Variable | `GCP_SERVICE_ACCOUNT`            | `tofu output -raw deploy_service_account`                       |
+| Repository Variable  | `EXPO_UPDATE_ENABLED`            | 現在 `false`。本番API、EAS環境、署名済みビルドの準備後に `true` |
+| Environment Secret   | `EXPO_TOKEN`                     | 登録済み。ExpoのCI用access token                                |
 
 例（値を確認してから実行）:
 
@@ -158,11 +160,22 @@ gh secret set EXPO_TOKEN --env production
 
 Google CloudのAPIキーやサービスアカウントJSONをGitHub Secretに登録する必要はない。`EXPO_TOKEN`はExpo account settingsのAccess Tokensから発行する。リポジトリ内、`EXPO_PUBLIC_*`、Issue本文へ貼らない。
 
+登録したtokenの名称は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter production`。対象を `reohakase` アカウントに限定し、権限は `VIEW` / `RUN` / `PUBLISH`。アカウント管理権限は含めない。更新時は同じ制限のtokenを発行してEnvironment Secretを差し替え、旧tokenを失効させる。
+
 ### Expo GitHub連携・環境変数
 
 Expoのログイン、EAS project、GitHubリポジトリの接続は完了済み。[プロジェクトのGitHub設定](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/github)のBase directoryは `/apps/mobile` として保存済み。以下の1〜2はフォーク・再設定時の手順。
 
-接続後の確認では、Expo dashboardのRun workflow画面がmainとコミットSHAの両方で「No workflow files found」と表示した。ローカルの3ワークフローはEAS CLIの検証を通過しているが、GitHub経由の取得・自動実行は未確認。接続完了を配信成功と扱わず、初回PRまたは手動実行で結果を確認する。
+Expo dashboardのRun workflow一覧にファイルが表示されない場合は、アプリディレクトリからEAS CLIでGit refを指定する。ワークフローの配置をリポジトリ直下へ変える必要はない。
+
+```sh
+cd apps/mobile
+bunx eas workflow:run .eas/workflows/preview-update.yml --ref main --non-interactive --wait
+```
+
+この手動配信はpreview channelだけを更新する。API URLが未設定ならオフラインショーケースになる。EASのビルドとワークフローでもNode 24.19.0/Bun 1.4.4を固定している。
+
+PRイベントからの自動配信、手動preview配信、iOS Simulator / Android APKビルドまで実行済み。実行結果と確認範囲は [検証記録](testing.md#2026-11-05の初期設定検証) を参照する。
 
 1. Expo dashboardのプロジェクト設定でGitHub Appを接続し、対象リポジトリへのアクセスを承認する。
 2. モノレポのプロジェクトルートを **`apps/mobile`** に設定する。ワークフローはこの直下の `.eas/workflows` にある。
@@ -170,9 +183,9 @@ Expoのログイン、EAS project、GitHubリポジトリの接続は完了済�
 4. `bunx eas workflow:validate .eas/workflows/pr-preview.yml --non-interactive` 等で検証する。
 5. 最初のDevelopment Buildを実機へ入れる。PR作成後のコメントにあるupdateリンクをDevelopment Buildで開く。
 
-PRは `pr-<number>` branchへ公開し、共通preview channelの最新版を全PRで上書きしない。ネイティブ依存変更時は `native-builds.yml` を手動実行して新しいDevelopment Buildを入れる。mainに対応するproduction updateは、GitHubのAPIデプロイ成功後にのみ `production-update.yml` を呼び出す。
+PRは `pr-<number>` branchへ公開し、共通preview channelの最新版を全PRで上書きしない。`native-builds.yml` は既定でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら、実行時に `ios_profile=development` / `android_profile=development` を選ぶ。iOS実機用のdevelopmentにはApple署名が必要。mainに対応するproduction updateは、GitHubのAPIデプロイ成功後にのみ `production-update.yml` を呼び出す。
 
-Expo GitHub Appの承認、Apple/Googleストアの契約・署名、access tokenの作成は手動。TestFlight/ストア提出はこの初期設定では自動実行しない。
+Expo GitHub Appの承認とCI token登録は完了済み。フォーク先ではそれぞれ自分のアカウントで設定する。Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出はこの初期設定では自動実行しない。
 
 ## 4. Google Cloudの準備（認証情報が用意できてから）
 
@@ -286,6 +299,6 @@ bun run doctor
 bun run export:mobile
 ```
 
-Codexはrootの `AGENTS.md` と `.agents/skills` を使う。Expo MCPは `.codex/config.toml` に設定済み。MCPのOAuth、Expo CLIのログイン、GitHubの接続はそれぞれ認証する。認証データはリポジトリへコピーしない。
+Codexはrootの `AGENTS.md` と `.agents/skills` を使う。Expo MCPは `.codex/config.toml` に設定済み。このホストでは `codex mcp login expo` のOAuthも完了済み。MCPのOAuth、Expo CLIのログイン、GitHubの接続はそれぞれ認証する。別のホストやDev Containerでは各自ログインし、認証データはリポジトリへコピーしない。
 
 詳細な実機手順とMaestroの有料プラン条件は [testing.md](testing.md)。インフラだけの `fmt` / `init -backend=false` / `validate` / TFLintはGCP認証なしで実行できる。
