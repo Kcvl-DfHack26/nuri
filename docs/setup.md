@@ -59,6 +59,17 @@ bun run dev
 
 `compose.host.yaml`だけがDBの5432をホストのloopbackへ公開する。ホストとコンテナのnode_modulesは別volumeで分離している。
 
+### Drizzle 1.0 RC のマイグレーション
+
+Drizzle ORMとKitは `1.0.0-rc.5` を使う。スキーマを変更したら、リポジトリのルートで以下を実行する。Compose開発では各コマンドに `docker compose exec workspace` を付ける。
+
+```sh
+bun run db:generate
+bun run db:migrate
+```
+
+`apps/api/drizzle/<timestamp>_<name>/` の `migration.sql` と `snapshot.json` を一緒にコミットする。生成物はformatterの対象外。旧形式の履歴はリポジトリ内で変換済みなので、更新後も通常の `bun run db:migrate` を使う。既存DBでは最初の実行時にDrizzleが履歴テーブルへ `name` / `applied_at` を追加し、適用済みSQLを再実行せずに移行する。DBやmigration履歴を削除してやり直さない。
+
 ## 2. iPhone / Android から開く
 
 ### まずExpo Goでショーケース
