@@ -134,20 +134,20 @@ iPhone実機への内部配布にはApple Developer Program、端末登録、署
 
 通常のCIはsecretなしで動く。GitHubの **Settings → Actions → General** でActionsを有効にする。mainの保護を有効にするときは、初回のCI成功後に `quality`、`infrastructure`、`container` をrequired checkにする。
 
-**Settings → Environments → production** は作成済み。フォーク時は作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
+**Settings → Environments → production** は作成済みで、利用できるブランチをmainだけに制限している。フォーク時は作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
 
-| 種別                 | 名前                             | 値・取得元                                                     |
-| -------------------- | -------------------------------- | -------------------------------------------------------------- |
-| Repository Variable  | `GCP_DEPLOY_ENABLED`             | 初期は未設定。GCP構築・secret投入・初期サービス作成後に `true` |
-| Environment Variable | `GCP_PROJECT_ID`                 | 対象GCP project ID                                             |
-| Environment Variable | `GCP_REGION`                     | 例: `asia-northeast1`                                          |
-| Environment Variable | `CLOUD_RUN_SERVICE`              | OpenTofuの `name`                                              |
-| Environment Variable | `ARTIFACT_REPOSITORY`            | OpenTofuの `name`                                              |
-| Environment Variable | `CLOUD_RUN_MIGRATION_JOB`        | `<name>-migrate`                                               |
-| Environment Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `tofu output -raw workload_identity_provider`                  |
-| Environment Variable | `GCP_SERVICE_ACCOUNT`            | `tofu output -raw deploy_service_account`                      |
-| Repository Variable  | `EXPO_UPDATE_ENABLED`            | 本番API、EAS環境、署名済みビルドの準備後に `true`              |
-| Environment Secret   | `EXPO_TOKEN`                     | Expoで作成するCI用access token。本番配信を有効にする場合のみ   |
+| 種別                 | 名前                             | 値・取得元                                                      |
+| -------------------- | -------------------------------- | --------------------------------------------------------------- |
+| Repository Variable  | `GCP_DEPLOY_ENABLED`             | 現在 `false`。GCP構築・secret投入・初期サービス作成後に `true`  |
+| Environment Variable | `GCP_PROJECT_ID`                 | 対象GCP project ID                                              |
+| Environment Variable | `GCP_REGION`                     | 例: `asia-northeast1`                                           |
+| Environment Variable | `CLOUD_RUN_SERVICE`              | OpenTofuの `name`                                               |
+| Environment Variable | `ARTIFACT_REPOSITORY`            | OpenTofuの `name`                                               |
+| Environment Variable | `CLOUD_RUN_MIGRATION_JOB`        | `<name>-migrate`                                                |
+| Environment Variable | `GCP_WORKLOAD_IDENTITY_PROVIDER` | `tofu output -raw workload_identity_provider`                   |
+| Environment Variable | `GCP_SERVICE_ACCOUNT`            | `tofu output -raw deploy_service_account`                       |
+| Repository Variable  | `EXPO_UPDATE_ENABLED`            | 現在 `false`。本番API、EAS環境、署名済みビルドの準備後に `true` |
+| Environment Secret   | `EXPO_TOKEN`                     | 登録済み。ExpoのCI用access token                                |
 
 例（値を確認してから実行）:
 
@@ -159,6 +159,8 @@ gh secret set EXPO_TOKEN --env production
 ```
 
 Google CloudのAPIキーやサービスアカウントJSONをGitHub Secretに登録する必要はない。`EXPO_TOKEN`はExpo account settingsのAccess Tokensから発行する。リポジトリ内、`EXPO_PUBLIC_*`、Issue本文へ貼らない。
+
+登録したtokenの名称は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter production`。対象を `reohakase` アカウントに限定し、権限は `VIEW` / `RUN` / `PUBLISH`。アカウント管理権限は含めない。更新時は同じ制限のtokenを発行してEnvironment Secretを差し替え、旧tokenを失効させる。
 
 ### Expo GitHub連携・環境変数
 
@@ -181,7 +183,7 @@ bunx eas workflow:run .eas/workflows/preview-update.yml --ref main --non-interac
 
 PRは `pr-<number>` branchへ公開し、共通preview channelの最新版を全PRで上書きしない。`native-builds.yml` は既定でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら、実行時に `ios_profile=development` / `android_profile=development` を選ぶ。iOS実機用のdevelopmentにはApple署名が必要。mainに対応するproduction updateは、GitHubのAPIデプロイ成功後にのみ `production-update.yml` を呼び出す。
 
-Expo GitHub Appの承認、Apple/Googleストアの契約・署名、access tokenの作成は手動。TestFlight/ストア提出はこの初期設定では自動実行しない。
+Expo GitHub Appの承認とCI token登録は完了済み。フォーク先ではそれぞれ自分のアカウントで設定する。Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出はこの初期設定では自動実行しない。
 
 ## 4. Google Cloudの準備（認証情報が用意できてから）
 
@@ -295,6 +297,6 @@ bun run doctor
 bun run export:mobile
 ```
 
-Codexはrootの `AGENTS.md` と `.agents/skills` を使う。Expo MCPは `.codex/config.toml` に設定済み。MCPのOAuth、Expo CLIのログイン、GitHubの接続はそれぞれ認証する。認証データはリポジトリへコピーしない。
+Codexはrootの `AGENTS.md` と `.agents/skills` を使う。Expo MCPは `.codex/config.toml` に設定済み。このホストでは `codex mcp login expo` のOAuthも完了済み。MCPのOAuth、Expo CLIのログイン、GitHubの接続はそれぞれ認証する。別のホストやDev Containerでは各自ログインし、認証データはリポジトリへコピーしない。
 
 詳細な実機手順とMaestroの有料プラン条件は [testing.md](testing.md)。インフラだけの `fmt` / `init -backend=false` / `validate` / TFLintはGCP認証なしで実行できる。
