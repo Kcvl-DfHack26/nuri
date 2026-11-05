@@ -21,7 +21,7 @@ jobs:
           POSTGRES_DB: starter
         ports: ['5432:5432']
         options: >-
-          --health-cmd 'pg_isready -U starter -d starter'
+          --health-cmd "pg_isready -U starter -d starter"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       DATABASE_URL: postgresql://starter:starter@localhost:5432/starter
