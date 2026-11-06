@@ -23,6 +23,7 @@ function Navigation() {
         <Stack.Screen name="account" options={{ title: 'ログイン' }} />
         <Stack.Screen name="users/[id]" options={{ title: 'プロフィール' }} />
         <Stack.Screen name="settings" options={{ title: '設定' }} />
+        <Stack.Screen name="post" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/steps" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/finish" options={{ headerShown: false }} />

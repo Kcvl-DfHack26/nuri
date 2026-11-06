@@ -43,6 +43,10 @@ const CART = Icon.select({
   android: import('@expo/material-symbols/shopping_cart.xml'),
 });
 const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
+const UPLOAD = Icon.select({
+  ios: 'square.and.arrow.up',
+  android: import('@expo/material-symbols/upload.xml'),
+});
 
 // Hero layout from Plan A ⑤ (390×540 frame). The guides and pins were drawn on its top 480pt.
 const heroCrop: PhotoCrop = {
@@ -71,7 +75,9 @@ const atFrame = (x: number, y: number) =>
   ({ left: `${(x / 390) * 100}%`, top: `${(y / 540) * 100}%` }) as const;
 
 // Plan A ⑤ レシピ詳細.
-export function RecipeDetail({ id }: { id: string }) {
+// ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top and a single
+// 投稿 action instead of share, save and the make actions.
+export function RecipeDetail({ id, onPost }: { id: string; onPost?: () => void }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const recipe = findRecipe(id);
@@ -220,19 +226,36 @@ export function RecipeDetail({ id }: { id: string }) {
             backOrHome();
           }}
         />
-        <View className="flex-1" />
-        <GlassIconButton
-          icon={SHARE}
-          label="共有"
-          onPress={() => {
-            void Share.share({
-              message: `${recipe.title}（${recipe.author}）をnuriで見つけました`,
-            }).catch(() => undefined);
-          }}
-        />
-        <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />
+        {onPost ? (
+          <>
+            <View className="flex-1 items-center">
+              <View className="min-h-9 justify-center rounded-full border border-black bg-white px-[22px]">
+                <Text className="font-maru-bold text-label text-ink-primary">プレビュー</Text>
+              </View>
+            </View>
+            <View className="w-10" />
+          </>
+        ) : (
+          <>
+            <View className="flex-1" />
+            <GlassIconButton
+              icon={SHARE}
+              label="共有"
+              onPress={() => {
+                void Share.share({
+                  message: `${recipe.title}（${recipe.author}）をnuriで見つけました`,
+                }).catch(() => undefined);
+              }}
+            />
+            <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />
+          </>
+        )}
       </View>
-      <BottomBar recipeId={recipe.id} bottom={insets.bottom} />
+      {onPost ? (
+        <PostBar onPost={onPost} bottom={insets.bottom} />
+      ) : (
+        <BottomBar recipeId={recipe.id} bottom={insets.bottom} />
+      )}
     </View>
   );
 }
@@ -343,6 +366,26 @@ function BottomBar({ recipeId, bottom }: { recipeId: string; bottom: number }) {
       >
         <Image accessible={false} source={sparkleWhite} style={{ width: 20, height: 20 }} />
         <Text className="font-maru-bold text-action text-white">メイクをはじめる</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function PostBar({ onPost, bottom }: { onPost: () => void; bottom: number }) {
+  const white = useTokenColor('--color-bg-surface');
+  return (
+    <View
+      className="absolute inset-x-0 bottom-0 bg-[rgba(242,242,242,0.85)] px-4 pt-3"
+      style={{ paddingBottom: Math.max(bottom, 12) }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPost}
+        className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80"
+        style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
+      >
+        <SocialIcon name={UPLOAD} size={20} color={white} />
+        <Text className="font-maru-bold text-action text-white">投稿</Text>
       </Pressable>
     </View>
   );
