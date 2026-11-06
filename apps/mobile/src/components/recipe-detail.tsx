@@ -104,7 +104,7 @@ export function RecipeDetail({ id }: { id: string }) {
           className="-mt-[50px] gap-3 rounded-t-[28px] bg-white px-5 pt-5"
           style={{ boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)' }}
         >
-          <View className="flex-row flex-wrap items-center gap-2.5">
+          <View className="gap-2">
             <Text
               accessibilityRole="header"
               className="font-maru-bold text-headline text-ink-primary"
@@ -137,7 +137,7 @@ export function RecipeDetail({ id }: { id: string }) {
               accessibilityRole="button"
               accessibilityLabel="フォロー（準備中）"
               accessibilityState={{ disabled: true }}
-              className="min-h-[30px] justify-center rounded-full border border-accent-rose bg-white px-3.5"
+              className="min-h-8 justify-center rounded-full border border-accent-rose bg-white px-4"
             >
               <Text className="font-maru-bold text-label text-accent-rose">フォロー</Text>
             </View>

@@ -99,7 +99,7 @@ export const partCards: {
     part: 'brow',
     recipeCount: 96,
     photo: photosBrowCloseup,
-    crop: { width: '200%', height: '279.03%', left: '-100%', top: '0%' },
+    crop: { width: '300.58%', height: '419.35%', left: '-175.43%', top: '-32.26%' },
     dimmed: false,
   },
   {
