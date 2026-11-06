@@ -6,6 +6,8 @@ Google CloudのAPIキーはローカル開発・ショーケースに不要。�
 
 ## 1. cloneとworktreeの準備
 
+コード・設定・文書の変更は、Issueの起票または既存Issueの確認と担当設定から始める。Issueに対応するブランチで実装・検証し、コミット・push・Draft PR作成まで進める。詳細は [AGENTS.md](../AGENTS.md#issue--branch--pr)、独自UIの追加は [UI開発手順](ui.md)を参照。
+
 ローカルのAPI・Metro・PostgreSQLはすべてDocker Composeで動かす。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。ホストのBunは任意。WindowsではWSL2のLinuxファイルシステムを使う。
 
 ```sh

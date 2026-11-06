@@ -95,5 +95,6 @@ iPhone/Android実機での接続・認証、新しいDev Containerイメージ�
 - 1 worktreeで新規の依存導入・DB初期化・migration・API/Metro起動が成功。API `/ready`、Metro `/status`、iOS manifestとHTTPS bundle取得、HTTP/2、WSSの101 handshakeが成功した。コンテナ内部の8080/8081はHTTPのまま、DBはホスト非公開である。
 - HTTPS APIへの登録・セッション取得とMetro originのCORSが成功。セッションcookieにSecure・HttpOnlyが付くことを確認し、検証ユーザーは削除した。
 - `bun run check` と通常/editor/tunnel/Expo GoのCompose設定検証が成功。Expo Goのトンネル構成は従来どおりMetroのproxy URLを空にして外部トンネルを使う。
+- mainのUniwind構成を取り込んだ後も `bun run check` とHTTPS bundle取得が成功。生成型・Metro設定・CSS生成のCI検査を維持した。
 
 ブラウザの警告を消すためのOSへのCA信頼登録、iPhone/Android実機での接続・認証は未実施。通常利用時はホストで `portless trust` を行う。共有HTTP proxyのHTTPSへの切替は、利用中worktreeを止めた上でホスト側で一度行い、各worktreeの停止処理からは行わない。

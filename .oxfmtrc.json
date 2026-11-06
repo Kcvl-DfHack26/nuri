@@ -5,6 +5,7 @@
     ".agents/**",
     "skills-lock.json",
     "bun.lock",
+    "apps/mobile/uniwind-types.d.ts",
     "**/drizzle/**",
     "**/.expo/**",
     "**/dist/**",

@@ -31,6 +31,8 @@ expo-hono-opentofu-starterは小さな習慣を題材に、Native Tabs、Stack�
 
 共通 `@expo/ui` を使い、iOSではSwiftUI、AndroidではJetpack Composeのコントロールを表示する。タブのアイコンはSF SymbolsとMaterialを両方指定する。通常の画面レイアウトはReact Native、可変件数の検索結果はFlatListで実装する。
 
+独自デザインが必要な部分にはUniwind Free 1.13.2／Tailwind CSS 4.3.4とReact Native ReusablesのUniwind用ソースを使う。初期導入はText／Buttonだけで、既存画面は置換しない。独自UIはCSSのneutralテーマ、標準UIは既存のOSセマンティックカラーを使い、端末内の外観設定から `Uniwind.setTheme` へ一本化して連動させる。Portal・Reanimated等は未導入。[使い分け・追加手順](ui.md)を参照。
+
 お気に入り、日付ごとの完了、外観、触覚、目標は `expo-sqlite/kv-store` に保存する。認証セッションとは分離する。サンプルはアカウントへデータを同期しない。Google Cloud未設定でもオフラインの操作を試せる。
 
 ## worktreeと開発プロセス
