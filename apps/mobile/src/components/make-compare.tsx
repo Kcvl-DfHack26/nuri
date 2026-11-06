@@ -126,8 +126,12 @@ export function MakeCompare({ id }: { id: string }) {
             backOrHome();
           }}
         />
-        <View className="min-h-9 flex-row items-center rounded-[18px] border border-white bg-white/70 px-4">
-          <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
+        {/* Shrinks so large text wraps the title instead of pushing the share button away. */}
+        <View className="min-h-9 shrink flex-row items-center rounded-[18px] border border-white bg-white/70 px-4">
+          <Text
+            accessibilityRole="header"
+            className="shrink text-center font-maru-bold text-label text-ink-primary"
+          >
             完成プレビュー
           </Text>
         </View>
