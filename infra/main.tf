@@ -24,7 +24,7 @@ resource "google_artifact_registry_repository" "api" {
 
 resource "google_service_account" "runtime" {
   account_id   = "${local.identity_prefix}-runtime"
-  display_name = "expo-hono-opentofu-starter Cloud Run runtime"
+  display_name = "nuri Cloud Run runtime"
   depends_on   = [google_project_service.enabled]
 }
 resource "google_service_account" "deployer" {

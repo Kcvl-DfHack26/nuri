@@ -10,12 +10,12 @@ variable "region" {
 variable "name" {
   description = "Resource prefix, one state per environment."
   type        = string
-  default     = "expo-hono-opentofu-starter-staging"
+  default     = "nuri-staging"
 }
 variable "github_repository" {
   description = "Repository allowed to deploy from main."
   type        = string
-  default     = "ReoHakase/expo-hono-opentofu-starter"
+  default     = "Kcvl-DfHack26/nuri"
 }
 variable "github_repository_id" {
   description = "Immutable GitHub repository ID, from gh api repos/OWNER/REPO --jq .id."
@@ -63,5 +63,5 @@ variable "api_origin" {
 variable "trusted_origins" {
   description = "Explicit browser/app origins accepted by Better Auth. No exp:// wildcards in production."
   type        = list(string)
-  default     = ["expo-hono-opentofu-starter://"]
+  default     = ["nuri://"]
 }

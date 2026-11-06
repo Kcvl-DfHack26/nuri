@@ -36,7 +36,7 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 | `APPLE_CLIENT_ID` / `APPLE_CLIENT_SECRET`   | 実Apple Services IDと署名済みclient-secret JWT。期限前に更新 |
 | `RESEND_API_KEY` / `EMAIL_FROM`             | 実メール送信キーと検証済み送信元                             |
 | `PASSKEY_RP_ID` / `PASSKEY_ORIGINS`         | パスキーのRPドメインと許可origin（カンマ区切り）             |
-| `APPLE_APP_ID`                              | `TEAM_ID.dev.reohakase.expohonopentofustarter`               |
+| `APPLE_APP_ID`                              | `TEAM_ID.com.kcvl.nuri`                                      |
 | `ANDROID_SHA256_CERT_FINGERPRINTS`          | Android署名証明書のSHA-256（カンマ区切り）                   |
 
 実OAuthのcallbackは `<BETTER_AUTH_URL>/api/auth/callback/google` と `/apple`。ローカルは別provider IDの `/emulate-google` と `/emulate-apple` で、実プロバイダのidentityと混在させない。キー未設定のログイン方法はcapabilitiesに従って利用不可にする。認証バイパス・organization・パスワードログインは設けない。

@@ -58,7 +58,7 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
                 relation: ['delegate_permission/common.get_login_creds'],
                 target: {
                   namespace: 'android_app',
-                  package_name: 'dev.reohakase.expohonopentofustarter',
+                  package_name: 'com.kcvl.nuri',
                   sha256_cert_fingerprints: env.ANDROID_SHA256_CERT_FINGERPRINTS.split(','),
                 },
               },

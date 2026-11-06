@@ -6,7 +6,7 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
-  TRUSTED_ORIGINS: z.string().default('expo-hono-opentofu-starter://'),
+  TRUSTED_ORIGINS: z.string().default('nuri://'),
   AUTH_EMULATE: z
     .enum(['true', 'false'])
     .default('false')
@@ -17,7 +17,7 @@ const schema = z.object({
   APPLE_EMULATOR_PUBLIC_URL: z.url().optional(),
   RESEND_API_URL: z.url().default('https://api.resend.com'),
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default('サンプルSNS <login@example.com>'),
+  EMAIL_FROM: z.string().default('nuri <login@example.com>'),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   APPLE_CLIENT_ID: z.string().optional(),
@@ -35,9 +35,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env) {
     BETTER_AUTH_URL:
       development && !env.BETTER_AUTH_URL?.trim() ? env.DEV_API_ORIGIN : env.BETTER_AUTH_URL,
     TRUSTED_ORIGINS: development
-      ? [env.TRUSTED_ORIGINS ?? 'expo-hono-opentofu-starter://', env.DEV_METRO_ORIGIN]
-          .filter(Boolean)
-          .join(',')
+      ? [env.TRUSTED_ORIGINS ?? 'nuri://', env.DEV_METRO_ORIGIN].filter(Boolean).join(',')
       : env.TRUSTED_ORIGINS,
   });
   if (!result.success) {

@@ -24,7 +24,7 @@ export function authCapabilities(env: Environment) {
 
 export function createAuth(db: Database, env: Environment) {
   return betterAuth({
-    appName: 'expo-hono-opentofu-starter',
+    appName: 'nuri',
     database: drizzleAdapter(db, { provider: 'pg', schema }),
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
@@ -71,7 +71,7 @@ export function createAuth(db: Database, env: Environment) {
       expo(),
       passkey({
         rpID: env.PASSKEY_RP_ID ?? new URL(env.BETTER_AUTH_URL).hostname,
-        rpName: 'expo-hono-opentofu-starter',
+        rpName: 'nuri',
         origin: (env.PASSKEY_ORIGINS ?? env.BETTER_AUTH_URL)
           .split(',')
           .map((value) => value.trim()),

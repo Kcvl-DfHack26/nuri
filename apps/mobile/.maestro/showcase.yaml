@@ -1,4 +1,4 @@
-appId: dev.reohakase.expohonopentofustarter
+appId: com.kcvl.nuri
 ---
 - launchApp:
     clearState: true

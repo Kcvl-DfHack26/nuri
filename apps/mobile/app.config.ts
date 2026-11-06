@@ -8,8 +8,8 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
   const rpId = process.env.EXPO_PUBLIC_PASSKEY_RP_ID;
   return {
     ...config,
-    name: config.name ?? 'expo-hono-opentofu-starter',
-    slug: config.slug ?? 'expo-hono-opentofu-starter',
+    name: config.name ?? 'nuri',
+    slug: config.slug ?? 'nuri',
     ios: { ...config.ios, ...(rpId ? { associatedDomains: [`webcredentials:${rpId}`] } : {}) },
   };
 }

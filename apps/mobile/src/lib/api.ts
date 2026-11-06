@@ -14,8 +14,8 @@ export const authClient = createAuthClient({
   baseURL: apiUrl ?? 'http://localhost:8080',
   plugins: [
     expoClient({
-      scheme: 'expo-hono-opentofu-starter',
-      storagePrefix: 'expo-hono-opentofu-starter',
+      scheme: 'nuri',
+      storagePrefix: 'nuri',
       storage: SecureStore,
     }),
     magicLinkClient(),

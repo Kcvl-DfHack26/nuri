@@ -214,7 +214,7 @@ export function Settings() {
             </FieldGroup.Section>
           ) : null}
           <FieldGroup.Section title="このアプリについて">
-            <NativeText>expo-hono-opentofu-starter</NativeText>
+            <NativeText>nuri</NativeText>
             <NativeText>日本語SNSのサンプル · 0.1.0</NativeText>
             <FieldGroup.SectionFooter>
               <NativeText>

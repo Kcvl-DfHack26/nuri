@@ -80,6 +80,6 @@ Dev Containers対応エディタでは **Reopen in Container** で編集・検�
 - [認証とseed](docs/auth.md)
 - [テストと実機チェック](docs/testing.md)
 - [エージェントの作業規約](AGENTS.md)
-- [Expoプロジェクト](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter)
+- [Expoプロジェクト](https://expo.dev/accounts/kcvlb4/projects/nuri)
 
 通常のCIにはGoogle CloudやExpoのsecretは不要。GCPデプロイと本番OTA配信は、設定完了後に明示的に有効化する。

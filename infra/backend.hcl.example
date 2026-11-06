@@ -1,2 +1,2 @@
 bucket = "YOUR_PROJECT-tofu-state"
-prefix = "expo-hono-opentofu-starter/staging"
+prefix = "nuri/staging"

@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "expo-hono-opentofu-starter",
-    "slug": "expo-hono-opentofu-starter",
+    "name": "nuri",
+    "slug": "nuri",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "expo-hono-opentofu-starter",
+    "scheme": "nuri",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "dev.reohakase.expohonopentofustarter",
+      "bundleIdentifier": "com.kcvl.nuri",
       "supportsTablet": true
     },
     "android": {
@@ -20,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": true,
-      "package": "dev.reohakase.expohonopentofustarter",
+      "package": "com.kcvl.nuri",
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -45,7 +45,7 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "owner": "reohakase",
+    "owner": "kcvlb4",
     "extra": {
       "router": {
         "asyncRoutes": {
@@ -53,14 +53,14 @@
         }
       },
       "eas": {
-        "projectId": "1f2d3048-c03b-4d7e-8220-7385b3875389"
+        "projectId": "78c53f89-e14a-4458-b16e-fe31cea9381d"
       }
     },
     "runtimeVersion": {
       "policy": "fingerprint"
     },
     "updates": {
-      "url": "https://u.expo.dev/1f2d3048-c03b-4d7e-8220-7385b3875389"
+      "url": "https://u.expo.dev/78c53f89-e14a-4458-b16e-fe31cea9381d"
     }
   }
 }

@@ -8,7 +8,7 @@ const base = {
   BETTER_AUTH_SECRET: 'test-secret-with-at-least-32-characters',
   DEV_API_ORIGIN: 'https://api.checkout.localhost',
   DEV_METRO_ORIGIN: 'https://metro.checkout.localhost',
-  TRUSTED_ORIGINS: 'expo-hono-opentofu-starter://,exp://**',
+  TRUSTED_ORIGINS: 'nuri://,exp://**',
 };
 
 describe('API environment', () => {
@@ -28,7 +28,7 @@ describe('API environment', () => {
     const production = {
       ...base,
       NODE_ENV: 'production',
-      TRUSTED_ORIGINS: 'expo-hono-opentofu-starter://',
+      TRUSTED_ORIGINS: 'nuri://',
     };
     expect(() => readEnv({ ...production, BETTER_AUTH_URL: '' })).toThrow('BETTER_AUTH_URL');
     expect(() => readEnv({ ...production, BETTER_AUTH_URL: 'http://api.example.com' })).toThrow(
