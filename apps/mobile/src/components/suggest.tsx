@@ -73,10 +73,14 @@ export function Suggest() {
             似合うメイクを見つける
           </Text>
         </View>
-        <Tag>
-          <SocialIcon name={SCAN} size={14} color={rose} />
-          <Text className="font-maru-bold text-label text-accent-rose">顔の形を見ています…</Text>
-        </Tag>
+        {/* Plan A's scanning label is decoration: nothing is analysed yet, so screen readers
+            hear only the hero's sample-photo label instead of a running status. */}
+        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+          <Tag>
+            <SocialIcon name={SCAN} size={14} color={rose} />
+            <Text className="font-maru-bold text-label text-accent-rose">顔の形を見ています…</Text>
+          </Tag>
+        </View>
       </View>
       <View className="-mt-6 flex-row justify-center">
         <Action label="写真から" accessibilityLabel="写真から診断（準備中）">
@@ -96,6 +100,7 @@ export function Suggest() {
         </Action>
         <Action
           label="前回の診断"
+          accessibilityLabel="前回の診断（見本）"
           onPress={() => {
             router.push('/diagnosis');
           }}

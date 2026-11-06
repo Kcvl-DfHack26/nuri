@@ -25,7 +25,7 @@ test('opens the sample result from the previous diagnosis and keeps capture disa
   expect(screen.getByRole('button', { name: 'カメラで診断（準備中）' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '写真から診断（準備中）' })).toBeDisabled();
 
-  await fireEvent.press(screen.getByRole('button', { name: '前回の診断' }));
+  await fireEvent.press(screen.getByRole('button', { name: '前回の診断（見本）' }));
   expect(router.push).toHaveBeenCalledWith('/diagnosis');
 });
 

@@ -163,6 +163,10 @@ export function Diagnosis() {
             </View>
           </View>
         </View>
+        {/* Diagnosis is not built; say so instead of presenting the sample as the viewer's own result. */}
+        <Text className="-mt-3 mx-5 font-maru text-meta text-ink-secondary">
+          見本の診断結果です。写真からの診断はまだ使えません
+        </Text>
         <View className="mx-4 gap-2.5">
           <View className="gap-0.5 pl-1">
             <Text

@@ -29,6 +29,8 @@ Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v
 
 下のタブはPlan Aのメイク・提案・投稿・マイをNative Tabsで構成し、設定はマイの歯車からStackで開く。メイクの流れ（①②⑤⑦⑩）はFigma Plan Aの見た目を再現し、レシピはAPIを作るまで `src/components/recipes.ts` の固定データで持つ。画像を含むため、`src/lib` ではなくUIと同じ層に置く。色と文字はFoundationsの値を `global.css` へ追加し、ネイティブのアイコン色は `useTokenColor` で同じCSS変数から読む。投稿タブは既存のSNSサンプルを使う。X型のFlatList、投稿、反応はReusables Text／Button + Uniwind Free 1.13.2／Tailwind CSS 4.3.4、設定とOS操作は共通 `@expo/ui`。SF SymbolsとMaterialの両ソースを指定する。
 
+提案タブ（⑬⑭）は、カメラ・写真選択・顔の診断を作るまで固定の見本を表示する。⑬の「前回の診断」は見本の⑭を開き、⑭には見本の結果であることを画面上に書く。⑬の「顔の形を見ています…」は飾りとして読み上げから外す。写真はどこにも送らない。
+
 独自UIはCSSのneutralテーマ、標準UIはOSセマンティックカラー。端末内の外観設定から `Uniwind.setTheme` へ一本化して連動する。Portal・Reanimated等は追加しない。[UI開発手順](ui.md)を参照。
 
 外観と触覚は `expo-sqlite/kv-store`。投稿といいねはPostgreSQLに保存し、ログインユーザーに紐付く。以前の習慣・お気に入り・完了・目標はSNSサンプルから除いた。API未設定時は接続案内を表示する。
