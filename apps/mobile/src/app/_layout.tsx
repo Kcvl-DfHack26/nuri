@@ -32,8 +32,8 @@ function Navigation() {
           options={{
             headerShown: false,
             presentation: 'formSheet',
-            // Plan A ⑥ covers about half the screen; its colors and ingredients scroll inside.
-            sheetAllowedDetents: [0.5],
+            // Plan A ⑥ opens at about half the screen; large text can expand it to full height.
+            sheetAllowedDetents: [0.5, 1],
             sheetGrabberVisible: true,
             sheetCornerRadius: 28,
           }}

@@ -140,37 +140,41 @@ function FilterChips({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      className="mt-2 grow-0"
+      className="mt-px grow-0"
       contentContainerClassName="gap-2 px-4"
     >
       {options.map((option) => {
         const selected = option.value === value;
         return (
+          // hitSlop cannot reach past the scroll view, so the 48pt target is the pressable
+          // itself and the 34pt Plan A chip is drawn inside it.
           <Pressable
             key={option.value}
             accessibilityRole="button"
             accessibilityState={{ selected }}
-            // The 34pt chip keeps Plan A's look; hitSlop extends the target to 48pt.
-            hitSlop={{ top: 7, bottom: 7 }}
             onPress={() => {
               onChange(option.value);
             }}
-            className={cn(
-              'min-h-[34px] flex-row items-center gap-1 rounded-[17px] px-3.5 active:opacity-80',
-              selected ? 'bg-accent-rose' : 'bg-neutral-soft',
-            )}
+            className="min-h-12 justify-center active:opacity-80"
           >
-            {option.value === 'round' ? (
-              <Image accessible={false} source={sparkleInk} style={{ width: 16, height: 16 }} />
-            ) : null}
-            <Text
+            <View
               className={cn(
-                'font-maru-bold text-label',
-                selected ? 'text-white' : 'text-ink-primary',
+                'min-h-[34px] flex-row items-center gap-1 rounded-[17px] px-3.5',
+                selected ? 'bg-accent-rose' : 'bg-neutral-soft',
               )}
             >
-              {option.label}
-            </Text>
+              {option.value === 'round' ? (
+                <Image accessible={false} source={sparkleInk} style={{ width: 16, height: 16 }} />
+              ) : null}
+              <Text
+                className={cn(
+                  'font-maru-bold text-label',
+                  selected ? 'text-white' : 'text-ink-primary',
+                )}
+              >
+                {option.label}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
