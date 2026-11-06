@@ -1,6 +1,8 @@
 # 開発環境と外部サービスの設定
 
-2026年11月6日。GitHubは [ReoHakase/expo-hono-opentofu-starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)、Expoは [@reohakase/expo-hono-opentofu-starter](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter)。Expo project IDは `1f2d3048-c03b-4d7e-8220-7385b3875389`。
+nuriのGitHubは [Kcvl-DfHack26/nuri](https://github.com/Kcvl-DfHack26/nuri)、Expoは [@kcvlb4/nuri](https://expo.dev/accounts/kcvlb4/projects/nuri)。Expo project IDは `78c53f89-e14a-4458-b16e-fe31cea9381d`。
+
+この文書はスターター（[ReoHakase/expo-hono-opentofu-starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)、2026年11月6日）の手順を引き継いでいる。「完了済み」「登録済み」やtoken名はスターターでの記録で、nuriのGitHub・Expo・Google Cloudでの設定状況は未確認。
 
 Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel EmulateでGoogle／Apple OAuthとメールを試せる。[認証とseed](auth.md)を参照。クラウドの初期構築にはログイン済みのGoogleアカウントと課金を有効化したプロジェクト、CIにはWorkload Identity Federationを使う。長期のサービスアカウントJSONキーは作らない。
 
@@ -198,7 +200,7 @@ gh secret set EXPO_TOKEN --env preview
 
 ### Expo GitHub連携・環境変数
 
-Expoのログイン、EAS project、GitHubリポジトリの接続は完了済み。[プロジェクトのGitHub設定](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter/github)のBase directoryは `/apps/mobile`。Expo側にあった自動PR preview・手動preview workflowは削除し、GitHub Actionsへ統一した。
+スターターではExpoのログイン、EAS project、GitHubリポジトリの接続を完了し、プロジェクトのGitHub設定のBase directoryを `/apps/mobile` にした。nuriの [プロジェクトのGitHub設定](https://expo.dev/accounts/kcvlb4/projects/nuri/github) は未確認のため、下の手順で確認する。Expo側にあった自動PR preview・手動preview workflowは削除し、GitHub Actionsへ統一した。
 
 フォーク・再設定時は以下を行う。
 
@@ -249,11 +251,11 @@ tofu -chdir=infra/bootstrap init -migrate-state \
 cp infra/backend.hcl.example infra/backend.hcl
 cp infra/terraform.tfvars.example infra/terraform.tfvars
 # bucket/project_id/region/nameを編集
-# github_repository_id はこのリポジトリでは 1446638863
+# github_repository_id はこのリポジトリでは 1447386190
 # フォークでは gh api repos/OWNER/REPO --jq .id で取得
 ```
 
-stagingとproductionは別のstate prefix、resource name、認証secret、DBを使う。最初は例の `expo-hono-opentofu-starter-staging` / `expo-hono-opentofu-starter/staging` を作成する。productionを用意するときは別の作業コピーで `name=expo-hono-opentofu-starter-production`、prefix `expo-hono-opentofu-starter/production` を設定し、stagingのstateを上書きしない。
+stagingとproductionは別のstate prefix、resource name、認証secret、DBを使う。最初は例の `nuri-staging` / `nuri/staging` を作成する。productionを用意するときは別の作業コピーで `name=expo-hono-opentofu-starter-production`、prefix `expo-hono-opentofu-starter/production` を設定し、stagingのstateを上書きしない。
 
 ```sh
 tofu -chdir=infra init -backend-config=backend.hcl
@@ -273,7 +275,7 @@ DBパスワードはephemeral/write-onlyのためstateに保存しない。次�
 
 ```sh
 export GCP_PROJECT=YOUR_PROJECT_ID
-export RESOURCE_NAME=expo-hono-opentofu-starter-staging
+export RESOURCE_NAME=nuri-staging
 SQL_CONNECTION=$(tofu -chdir=infra output -raw sql_connection_name)
 printf 'postgresql://expo-hono-opentofu-starter:%s@localhost/expo-hono-opentofu-starter?host=/cloudsql/%s' \
   "$TF_VAR_database_password" "$SQL_CONNECTION" | \
@@ -303,7 +305,7 @@ gcloud artifacts docker images describe "$REGISTRY/api:bootstrap" \
 ```sh
 tofu -chdir=infra plan
 tofu -chdir=infra apply
-gcloud run jobs execute expo-hono-opentofu-starter-staging-migrate --region=asia-northeast1 --wait
+gcloud run jobs execute nuri-staging-migrate --region=asia-northeast1 --wait
 API_ORIGIN=$(tofu -chdir=infra output -raw service_uri)
 curl --fail "$API_ORIGIN/ready"
 ```
