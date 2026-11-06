@@ -4,7 +4,7 @@ import { stackOptions } from '@/theme/navigation';
 export default function Layout() {
   return (
     <Stack screenOptions={stackOptions}>
-      <Stack.Screen name="settings" options={{ title: '設定', headerLargeTitleEnabled: true }} />
+      <Stack.Screen name="suggest" options={{ title: '提案', headerLargeTitleEnabled: true }} />
     </Stack>
   );
 }

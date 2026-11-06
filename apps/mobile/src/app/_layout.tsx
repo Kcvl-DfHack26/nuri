@@ -1,6 +1,10 @@
 import '../../global.css';
 
+import { ZenMaruGothic_500Medium } from '@expo-google-fonts/zen-maru-gothic/500Medium';
+import { ZenMaruGothic_700Bold } from '@expo-google-fonts/zen-maru-gothic/700Bold';
+import { ZenMaruGothic_900Black } from '@expo-google-fonts/zen-maru-gothic/900Black';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
@@ -18,6 +22,10 @@ function Navigation() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="account" options={{ title: 'ログイン' }} />
         <Stack.Screen name="users/[id]" options={{ title: 'プロフィール' }} />
+        <Stack.Screen name="settings" options={{ title: '設定' }} />
+        <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
+        <Stack.Screen name="recipes/[id]/steps" options={{ headerShown: false }} />
+        <Stack.Screen name="recipes/[id]/finish" options={{ headerShown: false }} />
         <Stack.Screen
           name="compose"
           options={{
@@ -47,6 +55,15 @@ export default function RootLayout() {
   const [client] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30000 } } }),
   );
+  // Plan A text uses Zen Maru Gothic; fall back to the system font if loading fails.
+  const [fontsLoaded, fontError] = useFonts({
+    ZenMaruGothic_500Medium,
+    ZenMaruGothic_700Bold,
+    ZenMaruGothic_900Black,
+  });
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
   return (
     <QueryClientProvider client={client}>
       <PreferencesProvider>

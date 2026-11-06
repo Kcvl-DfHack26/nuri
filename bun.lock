@@ -74,6 +74,7 @@
         "@babel/runtime": "7.29.13",
         "@better-auth/expo": "^1.7.17",
         "@better-auth/passkey": "1.7.17",
+        "@expo-google-fonts/zen-maru-gothic": "0.4.2",
         "@expo/material-symbols": "0.1.1",
         "@expo/ui": "~58.0.27",
         "@rn-primitives/slot": "1.5.2",
@@ -89,6 +90,7 @@
         "expo-dev-client": "~58.0.18",
         "expo-font": "58.0.11",
         "expo-haptics": "~58.0.7",
+        "expo-image": "58.0.18",
         "expo-linking": "~58.0.16",
         "expo-network": "~58.0.4",
         "expo-router": "~58.0.30",
@@ -461,6 +463,8 @@
     "@eslint/plugin-kit": ["@eslint/plugin-kit@0.7.3", "", { "dependencies": { "@eslint/core": "^1.2.1", "levn": "^0.4.1" } }, "sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q=="],
 
     "@expo-google-fonts/material-symbols": ["@expo-google-fonts/material-symbols@0.4.53", "", {}, "sha512-SgCSm8rUYvwy+5ABvwlV/h7xbJkWAsenChSKlUwMLVyEw/QoUon055QixCOtGCjrSRWqFGDvR0ghVa5nA2OkIg=="],
+
+    "@expo-google-fonts/zen-maru-gothic": ["@expo-google-fonts/zen-maru-gothic@0.4.2", "", {}, "sha512-Vwb2z+DjCfx1HlT9ij/fbSSu7z3rloiyKAR0N+iWRYkFG1S24VPKHCJKf+jrPvS9x1sMKR2HjdFvE1In1bFhnA=="],
 
     "@expo/apple-utils": ["@expo/apple-utils@2.3.0", "", { "bin": { "apple-utils": "bin.js" } }, "sha512-DYL8IzacOz2RhX+8DwJS7qZZkcJEq5EiFipcYna45a0SxVFdbNBNawD+RrKNJSQS8oqvpZ6KXmuqIAWfLtN3Ug=="],
 
@@ -1661,6 +1665,8 @@
     "expo-glass-effect": ["expo-glass-effect@58.0.5", "", { "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-PkL1X/r0cTs6NG47Xp3TxRvtqSeRmPYhPOHp3GDmZB2oOxpjXge6qLi/bSSv0asFWqf+MLOlXZ+hq2Imuh0Z1g=="],
 
     "expo-haptics": ["expo-haptics@58.0.7", "", { "peerDependencies": { "expo": "*" } }, "sha512-mAY3rbng6EuYysq9wnJKhKwYYlDjqnPYcS5OXe3zj4TlAaOFMl/EfiSOuAMawc2nsXCAnwJ5U0E11nq5zQO0mg=="],
+
+    "expo-image": ["expo-image@58.0.18", "", { "dependencies": { "sf-symbols-typescript": "^2.2.0" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*", "react-native-web": "*" }, "optionalPeers": ["react-native-web"] }, "sha512-bWbFD8eBbZywr1WssV6KtcglRlpD5WpzVj+oA3hfjX1MJBN43IeB7A6EQAGXE0eGBVG93Mf2dRBmCRJ/e/Hw6g=="],
 
     "expo-json-utils": ["expo-json-utils@58.0.1", "", {}, "sha512-jNHNElOUPz2/vW3CbDKRn6tTF6eE9wwVbh/Isnqp5c/CdTcONzFVR3YHN3WQ05PnkmieyEqVfeOusOd1X9FDtQ=="],
 

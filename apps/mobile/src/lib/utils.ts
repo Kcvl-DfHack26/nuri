@@ -5,7 +5,23 @@ import { extendTailwindMerge } from 'tailwind-merge';
 
 // Register global.css typography tokens so they never replace text color utilities.
 const twMerge = extendTailwindMerge({
-  extend: { theme: { text: ['body', 'caption', 'title'] } },
+  extend: {
+    theme: {
+      text: [
+        'body',
+        'caption',
+        'title',
+        'micro',
+        'meta',
+        'label',
+        'ui',
+        'action',
+        'heading',
+        'headline',
+        'display',
+      ],
+    },
+  },
 });
 
 export function cn(...inputs: ClassValue[]) {
