@@ -1,6 +1,11 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
-  "entry": ["apps/api/src/db/migrate.ts", "scripts/*.ts"],
+  "entry": [
+    "apps/api/src/db/migrate.ts",
+    "scripts/*.ts",
+    "apps/mobile/src/components/ui/text.tsx",
+    "apps/mobile/src/components/ui/button.tsx"
+  ],
   "ignorePatterns": [".agents/**", "**/dist/**", "**/.expo/**", "**/drizzle/**", ".artifacts/**"],
   "rules": {
     "unused-files": "error",

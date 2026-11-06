@@ -5,7 +5,7 @@ import { preferencesSchema } from '@starter/shared';
 import * as Haptics from 'expo-haptics';
 import Storage from 'expo-sqlite/kv-store';
 import { createContext, use, useEffect, useState } from 'react';
-import { Appearance } from 'react-native';
+import { Uniwind } from 'uniwind';
 
 function readPreferences(): Preferences {
   try {
@@ -34,9 +34,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState(readPreferences);
   const [storageError, setStorageError] = useState<string | null>(null);
   useEffect(() => {
-    Appearance.setColorScheme(
-      preferences.appearance === 'system' ? 'unspecified' : preferences.appearance,
-    );
+    Uniwind.setTheme(preferences.appearance);
   }, [preferences.appearance]);
 
   function update(patch: Partial<Preferences>) {

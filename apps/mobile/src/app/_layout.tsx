@@ -1,3 +1,5 @@
+import '../../global.css';
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';

@@ -6,6 +6,6 @@ module.exports = {
   passWithNoTests: false,
   // Bun's isolated linker adds .bun before the same packages supported by jest-expo.
   transformIgnorePatterns: [
-    '/node_modules/(?!(\\.bun|react-native|@react-native|expo|@expo|@starter|@testing-library))',
+    '/node_modules/(?!(\\.bun|react-native|@react-native|@rn-primitives|expo|@expo|@starter|@testing-library))',
   ],
 };

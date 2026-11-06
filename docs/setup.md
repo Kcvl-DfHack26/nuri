@@ -6,6 +6,8 @@ Google CloudのAPIキーはローカル開発・ショーケースに不要。�
 
 ## 1. cloneとworktreeの準備
 
+コード・設定・文書の変更は、Issueの起票または既存Issueの確認と担当設定から始める。Issueに対応するブランチで実装・検証し、コミット・push・Draft PR作成まで進める。詳細は [AGENTS.md](../AGENTS.md#issue--branch--pr)、独自UIの追加は [UI開発手順](ui.md)を参照。
+
 GitとDocker Engine + Compose v2を用意する。Dev ContainerはホストのNode/Bunを必要としない。WindowsではWSL2のLinuxファイルシステムを使う。
 
 ```sh
