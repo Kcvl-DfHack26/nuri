@@ -1,0 +1,51 @@
+import { fireEvent, render, screen } from '@testing-library/react-native';
+import { router } from 'expo-router';
+
+import { MakeCompare } from './make-compare';
+import { MakeFinish } from './make-finish';
+
+jest.mock('@expo/ui', () => ({
+  Icon: Object.assign(() => null, { select: () => 'icon' }),
+}));
+jest.mock('@/components/native-host', () => ({
+  NativeHost: jest.requireActual<typeof import('react-native')>('react-native').View,
+}));
+jest.mock('expo-image', () => ({ Image: () => null }));
+jest.mock('expo-router', () => ({
+  router: { back: jest.fn(), push: jest.fn(), dismissTo: jest.fn(), canGoBack: () => true },
+}));
+jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
+test('opens the comparison from the finish screen', async () => {
+  await render(<MakeFinish id="fox" />);
+  await fireEvent.press(screen.getByRole('button', { name: 'メイク前と比べる' }));
+  expect(router.push).toHaveBeenCalledWith('/recipes/fox/compare');
+});
+
+test('moves the divider with accessibility actions and goes back', async () => {
+  await render(<MakeCompare id="fox" />);
+  const divider = screen.getByRole('adjustable', { name: 'メイク前とメイク後の境目' });
+  expect(divider).toHaveAccessibilityValue({ text: 'メイク前50% メイク後50%' });
+
+  await fireEvent(divider, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+  expect(divider).toHaveAccessibilityValue({ text: 'メイク前60% メイク後40%' });
+  await fireEvent(divider, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+  await fireEvent(divider, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+  expect(divider).toHaveAccessibilityValue({ text: 'メイク前40% メイク後60%' });
+
+  await fireEvent.press(screen.getByRole('button', { name: '戻る' }));
+  expect(router.back).toHaveBeenCalled();
+});
+
+test('shows unbuilt actions and layer toggles as disabled', async () => {
+  await render(<MakeCompare id="fox" />);
+  expect(screen.getByRole('button', { name: '共有（準備中）' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '写真を保存（準備中）' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: 'レシピを投稿する（準備中）' })).toBeDisabled();
+  expect(screen.getByRole('checkbox', { name: '眉（準備中）' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'シェード（準備中）' })).not.toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'リップ（準備中）' })).toBeDisabled();
+});

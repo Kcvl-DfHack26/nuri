@@ -1,0 +1,286 @@
+import type { ReactNode } from 'react';
+
+import { Icon } from '@expo/ui';
+import { Image } from 'expo-image';
+import { StatusBar } from 'expo-status-bar';
+import { useMemo, useState } from 'react';
+import { PanResponder, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import type { PartId } from '@/components/recipes';
+
+import { FaceScene } from '@/components/face-scene';
+import { GlassIconButton } from '@/components/glass-icon-button';
+import { arPhotos, findRecipe, parts } from '@/components/recipes';
+import { SocialIcon } from '@/components/social-icon';
+import { Text } from '@/components/ui/text';
+import { backOrHome } from '@/lib/navigation';
+import { cn } from '@/lib/utils';
+import { useTokenColor } from '@/theme/tokens';
+
+const BACK = Icon.select({
+  ios: 'chevron.left',
+  android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
+});
+const SHARE = Icon.select({
+  ios: 'square.and.arrow.up',
+  android: import('@expo/material-symbols/ios_share.xml'),
+});
+export const COMPARE = Icon.select({
+  ios: 'arrow.left.and.line.vertical.and.arrow.right',
+  android: import('@expo/material-symbols/arrow_range.xml'),
+});
+const CHECK = Icon.select({
+  ios: 'checkmark',
+  android: import('@expo/material-symbols/check.xml'),
+});
+const DOWNLOAD = Icon.select({
+  ios: 'arrow.down.to.line',
+  android: import('@expo/material-symbols/download.xml'),
+});
+const PLUS = Icon.select({
+  ios: 'plus.circle',
+  android: import('@expo/material-symbols/add_circle.xml'),
+});
+
+/** The 48pt handle stays fully on screen; VoiceOver/TalkBack move the divider in 10% steps. */
+const HANDLE_SIZE = 48;
+const STEP = 0.1;
+/** Plan A's sample layer state. Layers cannot be re-rendered without the AR pipeline yet. */
+const SAMPLE_HIDDEN_PARTS: PartId[] = ['shading'];
+
+// Plan A ⑪ 完成プレビュー（比較）: drag the divider to compare the bare face with the finished look.
+export function MakeCompare({ id }: { id: string }) {
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const rose = useTokenColor('--color-accent-rose');
+  // Divider position as a share of the width, so it survives rotation and window resizing.
+  const [position, setPosition] = useState(0.5);
+  const edge = HANDLE_SIZE / 2 / width;
+  const clamp = (value: number) => Math.min(Math.max(value, edge), 1 - edge);
+  // A tap or drag anywhere on the photo moves the divider under the finger.
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (event) => {
+          setPosition(event.nativeEvent.pageX / width);
+        },
+        onPanResponderMove: (_event, gesture) => {
+          setPosition(gesture.moveX / width);
+        },
+      }),
+    [width],
+  );
+  const shown = clamp(position);
+  const x = shown * width;
+  const percent = Math.round(shown * 100);
+  const steps = findRecipe(id)?.detail;
+
+  return (
+    <View className="flex-1 bg-white">
+      <StatusBar style="dark" />
+      <View className="absolute inset-0" {...pan.panHandlers}>
+        <FaceScene photo={arPhotos.camera} />
+        <Slice from={x} to={width} className="inset-y-0">
+          <FaceScene photo={arPhotos.finished} />
+        </Slice>
+        <View
+          pointerEvents="none"
+          className="absolute inset-y-0 w-[3px] bg-white"
+          style={{ left: x - 1.5, boxShadow: '0px 0px 6px rgba(0, 0, 0, 0.18)' }}
+        />
+        <View
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel="メイク前とメイク後の境目"
+          accessibilityValue={{ text: `メイク前${percent}% メイク後${100 - percent}%` }}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(event) => {
+            const delta = event.nativeEvent.actionName === 'increment' ? STEP : -STEP;
+            setPosition(clamp(shown + delta));
+          }}
+          className="absolute top-[39.1%] size-12 items-center justify-center rounded-full bg-white"
+          style={{ left: x - HANDLE_SIZE / 2, boxShadow: '0px 4px 7px rgba(196, 61, 112, 0.2)' }}
+        >
+          <SocialIcon name={COMPARE} size={24} color={rose} />
+        </View>
+      </View>
+      <View
+        pointerEvents="none"
+        className="absolute inset-x-0 top-0 h-[170px]"
+        style={{
+          backgroundImage:
+            'linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0))',
+        }}
+      />
+      <View
+        className="absolute inset-x-4 flex-row items-center justify-between gap-2"
+        style={{ top: insets.top + 8 }}
+      >
+        <GlassIconButton
+          icon={BACK}
+          label="戻る"
+          onPress={() => {
+            backOrHome();
+          }}
+        />
+        <View className="min-h-9 flex-row items-center rounded-[18px] border border-white bg-white/70 px-4">
+          <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
+            完成プレビュー
+          </Text>
+        </View>
+        <GlassIconButton icon={SHARE} label="共有（準備中）" />
+      </View>
+      {/* Each tag is clipped with its side of the photo, like the photos themselves. */}
+      <Slice from={0} to={x} style={{ top: insets.top + 64 }}>
+        <Tag
+          label="Before"
+          className="ml-4 self-start bg-white/78"
+          textClassName="text-ink-primary"
+        />
+      </Slice>
+      <Slice from={x} to={width} style={{ top: insets.top + 64 }}>
+        <Tag label="After" className="mr-4 self-end bg-accent-rose" textClassName="text-white" />
+      </Slice>
+      <View
+        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-[28px] bg-white/86 px-4 pt-[18px]"
+        style={{
+          paddingBottom: insets.bottom + 12,
+          boxShadow: '0px -6px 12px rgba(196, 61, 112, 0.12)',
+        }}
+      >
+        <View className="flex-row flex-wrap items-center justify-between gap-x-3">
+          <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
+            手順を重ねて確認
+          </Text>
+          <Text className="font-maru text-meta text-ink-secondary">タップでオン・オフ</Text>
+        </View>
+        {steps ? (
+          <View className="flex-row flex-wrap gap-2">
+            {steps.overview.map((partId, index) => (
+              <LayerChip
+                key={partId}
+                part={partId}
+                label={steps.steps[index]?.label ?? parts[partId].label}
+                visible={!SAMPLE_HIDDEN_PARTS.includes(partId)}
+              />
+            ))}
+          </View>
+        ) : null}
+        <Controls />
+      </View>
+    </View>
+  );
+}
+
+/** Shows the slice of a full-width layer between `from` and `to`, measured from the left edge. */
+function Slice({
+  from,
+  to,
+  className,
+  style,
+  children,
+}: {
+  from: number;
+  to: number;
+  className?: string;
+  style?: { top: number };
+  children: ReactNode;
+}) {
+  const { width } = useWindowDimensions();
+  return (
+    <View
+      pointerEvents="none"
+      className={cn('absolute overflow-hidden', className)}
+      style={[{ left: from, width: Math.max(to - from, 0) }, style]}
+    >
+      <View style={{ marginLeft: -from, width, height: '100%' }}>{children}</View>
+    </View>
+  );
+}
+
+function Tag({
+  label,
+  className,
+  textClassName,
+}: {
+  label: string;
+  className: string;
+  textClassName: string;
+}) {
+  return (
+    <View
+      className={cn('rounded-[15px] border border-white px-3 py-[5px]', className)}
+      style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
+    >
+      <Text className={cn('font-maru-bold text-label', textClassName)}>{label}</Text>
+    </View>
+  );
+}
+
+function LayerChip({ part, label, visible }: { part: PartId; label: string; visible: boolean }) {
+  const rose = useTokenColor('--color-accent-rose');
+  const secondary = useTokenColor('--color-ink-secondary');
+  // Turning a step's layer on or off needs the AR renderer, so the chips show Plan A's state only.
+  return (
+    <View
+      accessible
+      accessibilityRole="checkbox"
+      accessibilityLabel={`${label}（準備中）`}
+      accessibilityState={{ checked: visible, disabled: true }}
+      className={cn(
+        'min-h-9 flex-row items-center gap-1 rounded-[18px] border-[1.5px] px-3',
+        visible ? 'border-accent-rose bg-pastel-pink' : 'border-line-soft bg-white',
+      )}
+    >
+      {visible ? (
+        <SocialIcon name={CHECK} size={16} color={rose} />
+      ) : (
+        <Image
+          accessible={false}
+          source={parts[part].icon}
+          tintColor={secondary}
+          style={{ width: 16, height: 16 }}
+        />
+      )}
+      <Text
+        className={cn(
+          'font-maru-bold text-label',
+          visible ? 'text-accent-rose' : 'text-ink-secondary',
+        )}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function Controls() {
+  const ink = useTokenColor('--color-ink-primary');
+  return (
+    <View className="flex-row items-center gap-2.5">
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="写真を保存（準備中）"
+        accessibilityState={{ disabled: true }}
+        className="size-[52px] items-center justify-center rounded-full bg-neutral-soft"
+      >
+        <SocialIcon name={DOWNLOAD} size={22} color={ink} />
+      </View>
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="レシピを投稿する（準備中）"
+        accessibilityState={{ disabled: true }}
+        className="min-h-[52px] flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px]"
+        style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
+      >
+        <SocialIcon name={PLUS} size={20} color="white" />
+        <Text className="font-maru-bold text-action text-white">レシピを投稿する</Text>
+      </View>
+    </View>
+  );
+}
