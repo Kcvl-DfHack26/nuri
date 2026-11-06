@@ -2,11 +2,13 @@
 
 ## Product and platform contract
 
-- This is an Expo UI showcase named expo-hono-opentofu-starter, backed by an independently deployed Hono API.
+- This is a Japanese consumer SNS sample named expo-hono-opentofu-starter, backed by an independently deployed Hono API. There is no organization feature.
 - **主にiOS向けにUXを最適化するが、Androidでも全機能が動作する必要がある。** iOSの典型的なアプリとして、Native Tabs、Stack、標準の戻る操作、シート、設定フォーム、Dynamic Type、ダークモードを優先する。Androidでは同じ機能をMaterialのネイティブUIと戻る操作で提供する。
-- Use universal `@expo/ui` first. Isolate iOS-only imports in platform files and provide working Android equivalents. Every icon needs an Android source. Every enabled control must perform its advertised behavior.
+- Use universal `@expo/ui` first for settings and platform controls. Main social features use an X-style custom timeline/composer with React Native Reusables and Uniwind; navigation stays native. Isolate iOS-only imports in platform files and provide working Android equivalents. Every icon needs an Android source. Every enabled control must perform its advertised behavior.
 - For intentionally custom UI, use the local React Native Reusables components with Uniwind; follow [docs/ui.md](docs/ui.md). Native controls keep their OS appearance. Custom UI uses the neutral light/dark tokens in `apps/mobile/global.css`; do not copy these tokens into a second JS palette.
-- The showcase must work without Google Cloud credentials. Favorites, completion and preferences are device-local; do not imply account synchronization.
+- The sample must work without Google Cloud credentials using local PostgreSQL and Vercel Emulate. Posts and likes are server data; appearance and haptic preferences are device-local. Seed is development-only, idempotent and must preserve user-created data.
+- Use functional Japanese labels without punctuation in headings. Do not invent a brand or accent color. Use official Apple/Google login artwork, native symbols with Android sources, scalable text and minimum 48pt/dp custom touch targets. Separate account information from navigation/actions.
+- Inspect the actual native screen after UI changes. Keep safe-area and keyboard insets in loading/error/empty states too. Like mutations use TanStack Query optimistic cache updates scoped to the post, with rollback and stable references for unchanged rows; never refetch the whole feed or disable all rows for one like. Profile is a user object with its own summary/actions and post collection. Mutations must not enable pull-to-refresh; only a user pull controls that animation. Sheets start at a content-appropriate detent.
 - Decision history: [Expo技術選定検討](chatgpt-conversation://6aec01ec-6938-83e8-94df-24f41ae3ad55). Record implementation decisions and differences in [docs/architecture.md](docs/architecture.md).
 
 ## Boundaries

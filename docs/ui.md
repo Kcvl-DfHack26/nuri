@@ -2,7 +2,11 @@
 
 設定フォーム、Picker、Switch、Slider、Menu、BottomSheetは共通 `@expo/ui` を優先する。Native Tabs・Stack・戻る操作はExpo Routerが担当する。独自の配色や見た目が必要な部分は、React Native ReusablesのローカルコンポーネントとUniwindで実装する。
 
-今回の導入は基盤のみ。既存Today／Library／Settingsの表示・操作と、OSセマンティックカラー・グリーンのアクセントを維持する。
+主要SNS機能はXを参考にした独自UIを使う。タイムラインは左にアバター、右に名前・日時・本文・いいね／共有を配置する。本文・反応はReusables／Uniwind、プロフィールは独立したユーザーの概要とネイティブ編集ボタンを使う。投稿者のアイコンからユーザー→投稿一覧へ移動できる。投稿カードは外側の横余白12pt・カード間8pt・角丸16pt、内側は横と上12pt。40ptアバターと8ptの間隔で密度を保ち、いいね・共有は右寄せで4pt間隔にする。操作のタップ領域は48pt/dp以上にする。未実装の返信・リポスト・フォローを操作可能なボタンとして置かない。
+
+Native Tabs・Stack・戻る操作・共有シートはOS標準。設定はネイティブのForm／Picker／Switchを使う。投稿シートは65%、プロフィール編集は40%の高さから開く。iOS 26の投稿導線はタブ直上のBottomAccessory、それ以前とAndroidはツールバー。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。アプリ独自のグリーンは使わない。
+
+Googleは公式の多色ロゴ付き白ボタン、AppleはiOSの公式AppleAuthenticationButton（ライトで黒、ダークで白）を使う。AndroidのAppleボタンも公式生成画像。出典は `apps/mobile/assets/auth/README.md` にある。
 
 ## 構成
 
@@ -12,6 +16,14 @@
 - 上流からの調整は、import先、React 19のref型・Context、未対応roleの型キャスト除去、ネイティブの最小48pt/dp・可変高・文字の折り返し。`style`、`className`、accessibility propsは通常どおり渡せる。
 - `Button` は `variant`／`size`／`onPress`／`disabled`、`Text` は `variant`／`asChild` を提供する。ラベルにはローカルの `Text` を使うとButtonのvariantに追従する。アイコンのみの操作には明示的なaccessibilityLabelを付ける。
 - Portal・アニメーション・アイコン用の追加依存は初期構成に含めない。現在のText／Buttonには不要で、独自のoverlayは実際に必要になったときだけ導入する。
+
+## 文字とアイコンと日時
+
+独自UIのサイズは `global.css` の `text-body`（17/24pt）、`text-caption`（13/18pt）、`text-title`（22/28pt）に集約する。名前はbodyのsemibold、本文・操作ラベルはbody、日時・反応数・補足はcaption。`lib/utils.ts` のtailwind-mergeにもこの3つを文字サイズとして登録し、文字色を上書きさせない。ネイティブのナビゲーション・FormはOSの文字スタイルを使う。Dynamic Typeは無効化しない。
+
+操作アイコンは `theme/metrics.ts` の20pt。アバターは投稿40pt、ユーザー概要80pt。補助的なchevronとOSのタブアイコンは役割の違う標準サイズを保つ。Google／Appleの公式ロゴはブランド規約を優先する。
+
+投稿日時は `lib/date.ts` で1分未満は「たった今」、1時間未満は分、24時間未満は時間、それ以前は月日、別年は年月日。読み上げは正確な年月日時刻を使う。一覧内で基準時刻を共有し、画面への復帰と手動更新で揃えて更新する。いいねした行だけ時刻表記が進まないようにする。行ごとの `toLocaleString` のオプション指定はしない。
 
 ## 外観と色
 
@@ -38,7 +50,7 @@ export function CustomSection() {
       <Button onPress={() => setEnabled((current) => !current)}>
         <Text>{enabled ? 'Turn off' : 'Turn on'}</Text>
       </Button>
-      <NativeHost matchContents>
+      <NativeHost matchContents={{ vertical: true }}>
         <Switch label="Native control" value={enabled} onValueChange={setEnabled} />
       </NativeHost>
     </View>
@@ -75,6 +87,8 @@ bun run doctor
 bun run export:mobile
 ```
 
+いいねは行ごとの `useMutation` で対象投稿IDを楽観更新し、ホーム／プロフィールのTanStack Queryキャッシュに反映する。`onError` はその投稿だけ復元し、別投稿の並行操作を巻き戻さない。成功時の全件invalidateを行わず、未変更オブジェクトの参照を保ってmemo化したPostRowの再描画を省く。FlatListの `refreshing` を立てない。pull-to-refresh専用状態を持ち、背景の再取得で画面が下へずれないことをRNTLと実画面で確認する。
+
 JestはButtonの操作・disabled、Textのアクセシビリティ、外観設定の保存・復元・失敗後の再試行を検証する。MetroによるclassName変換とネイティブ描画はJestだけでは検証できないため、iOS／AndroidのExpo Goでライト／ダーク、system追従、大きな文字、標準UIとの併用を確認する。bundle成功を端末確認の代わりにはしない。
 
 ## 参照
@@ -83,3 +97,8 @@ JestはButtonの操作・disabled、Textのアクセシビリティ、外観設�
 - [UniwindのテーマとAppearance連動](https://docs.uniwind.dev/theming/basics)
 - [Uniwindの型生成](https://docs.uniwind.dev/api/generate-artifacts)
 - [Expo UI SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/ui/)
+
+- [MobbinのXタイムライン参照](https://mobbin.com/screens/ef7b7aa6-f2ae-4957-a3e2-6271022bad6c)
+- [Apple HIG Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
+- [Apple HIG Sign in with Apple](https://developer.apple.com/design/human-interface-guidelines/sign-in-with-apple)
+- [Google Sign-In branding](https://developers.google.com/identity/branding-guidelines)

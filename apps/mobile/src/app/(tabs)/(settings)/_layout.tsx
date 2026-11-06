@@ -1,12 +1,10 @@
 import { Stack } from 'expo-router/stack';
 
-export default function SettingsLayout() {
+import { stackOptions } from '@/theme/navigation';
+export default function Layout() {
   return (
-    <Stack>
-      <Stack.Screen
-        name="settings"
-        options={{ title: 'Settings', headerLargeTitleEnabled: true }}
-      />
+    <Stack screenOptions={stackOptions}>
+      <Stack.Screen name="settings" options={{ title: '設定', headerLargeTitleEnabled: true }} />
     </Stack>
   );
 }

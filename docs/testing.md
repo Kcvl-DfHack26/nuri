@@ -25,19 +25,19 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 
 ## iOS / Android 共通の実機チェック
 
-1. Todayからmorningを開く。詳細、戻る操作、タブの状態を確認する。
-2. お気に入り登録・解除。LibraryのSavedで反映されることを確認する。
-3. 検索、該当なし、検索の消去による復帰を確認する。
-4. 完了を押し、シートをボタン/スワイプ/Android Backで閉じる。Todayの進捗が増え、同日の重複記録が起こらないことを確認する。
-5. 外観をSystem/Light/Darkに切り替える。目標を変えてTodayの分母が変わること、触覚設定が操作に反映されることを確認する。
-6. アプリを終了して再起動し、端末内設定とお気に入りが保持されることを確認する。
-7. 文字サイズを大きくし、小さい端末でも画面をスクロールして全操作に届くことを確認する。
-8. API設定時はAccountで登録・ログイン・ログアウトする。キーボードで操作が隠れないこと、通信切断でも入力が失われず再試行できることを確認する。
-9. API未設定時はオフライン案内、API停止時は接続エラーと再試行を確認する。
+1. `bun run db:seed` 後、ホームで複数ユーザーの画像と投稿を確認する。再実行して件数が増えず、利用者の投稿が残ることも確認する。
+2. 投稿者のアイコン→プロフィール→戻る。ユーザー情報・編集と、そのユーザーの投稿一覧が明確に分かれていることを確認する。
+3. 未ログインのいいね／投稿はログインへ進む。Google／AppleのEmulate同意から復帰し、セッションが保持されることを確認する。
+4. 投稿シートで入力、失敗時の本文保持、再試行、閉じる・スワイプ・Android Backを確認する。キーボード表示中も操作に届くことを確認する。
+5. いいねを切り替えてもスクロール位置・行高が変わらないこと、他の投稿がpendingにならないことを確認する。共有シートと自分の投稿だけの削除も確認する。
+6. プロフィール編集とログアウト。表示情報と操作行が区別され、再起動後のセッション・設定が維持されることを確認する。
+7. 外観をsystem／light／darkへ切り替え、文字を最大へ拡大する。全タブ、loading／error／empty、ログイン、シートで見切れ・操作不能がないことを確認する。
+8. メールの単回リンク、失効・他端末の拒否、パスキー登録・ログイン・削除を確認する。Expo Goではnative passkeyが利用不可であることを表示する。
+9. API停止時のエラーと再試行。OS関連付け・実プロバイダでの認証はローカルEmulate／仮想WebAuthnの検証と別に記録する。
 
 ## Maestro
 
-`apps/mobile/.maestro/showcase.yaml` が主要な詳細・保存・完了フローを検証する。開発サーバーを必要としないpreview/simulatorビルドで実行する。
+`apps/mobile/.maestro/showcase.yaml` が未ログイン時のホーム・プロフィール・設定フローを検証する。開発サーバーを必要としないpreview/simulatorビルドで実行する。
 
 ```sh
 maestro test apps/mobile/.maestro/showcase.yaml
@@ -46,6 +46,18 @@ maestro test apps/mobile/.maestro/showcase.yaml
 クラウド実行例は `docs/examples/native-e2e.yml`。2026-11-05の実アカウントでの検証では、EASのMaestroジョブに有料プランが必要だったため、未使用のサンプルとして置いている。契約後に `apps/mobile/.eas/workflows/native-e2e.yml` へコピーし、`eas workflow:validate`を通してから実行する。iOS E2Eのために各開発者のMacを必須にしない。
 
 JestはExpo UIのネイティブ境界をmockするため、SwiftUI/Composeの実描画を保証しない。bundle生成、型検査、mock付きテストと、実機での確認は区別して記録する。
+
+## 2026-11-06の認証付きSNSの検証
+
+- `bun run check` が成功。Jestは5 suites／21 testsで、いいねの対象行だけの更新・全件再取得なし・並行更新の失敗復元・プロフィールキャッシュ、日時の粒度、文字サイズと色クラスの併用を含む。import境界の許可／禁止パターンはBunで確認した。
+- 実PostgreSQLとVercel Emulateの統合テストは3 tests／58 assertions成功。Google／AppleのOAuth、アカウント連携、magic linkの単回性・native callback、WebAuthn署名・origin・リプレイ拒否、投稿の所有者認可といいねの冪等性を確認した。認証の迂回用エンドポイントは追加していない。
+- Expo Doctorは20/20成功。iOS／Androidのbundle生成とNode向けAPI buildが成功した。
+- 開発DBでseedを再実行し、画像付きユーザー4件・サンプル投稿8件が重複せず、既存の利用者投稿2件が保持された。アバターはAPIの静的配信から取得した。
+- iPhone 17 Pro Simulator／iOS 26.5／Expo Goで実APIとseedを使用。角丸カードと8ptのカード間隔、右寄せしたいいね・共有、投稿者→プロフィール→戻る、共有シート、アカウント情報と操作行の区別を確認した。いいね2→3→2で投稿の位置が変わらない操作を動画に記録した。
+- ライト／ダークの切替を確認し、独自の文字サイズクラスが文字色を消していた不具合を共通のtailwind-merge設定で修正した。プロフィールではSimulatorの文字拡大操作後も本文が折り返された。最大アクセシビリティ文字サイズと全画面の組み合わせは未確認。
+- ログイン画面で黒地の公式AppleボタンとGoogleの多色ロゴを確認。Google Emulateからアプリへ復帰し、元のテストユーザーで再ログインした。投稿シートは初期高さとキーボード表示時の拡張・投稿操作領域を確認した。CUAの文字入力が反映されなかったため、この操作による新規投稿完了は未確認である。
+
+Androidのネイティブ実行、iPhone実機、実Google／Appleプロバイダ、メール実配送、OS関連付けを使う実機パスキー、Maestroは未実施。Expo Goではnative passkeyを無効にし、代わりのログイン方法を案内する。追加のネイティブ依存・associated domainsを使うには新しい互換ビルドが必要である。DBは追加migrationを適用する。GCP apply・本番配信・OTA公開は実行していない。
 
 ## 2026-11-05の初期設定検証（改名前のビルド）
 

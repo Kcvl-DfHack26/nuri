@@ -82,7 +82,7 @@ test('keeps the current theme on storage failure and allows retry', async () => 
   });
   await fireEvent.press(screen.getByText('Use dark'));
   expect(screen.getByRole('alert')).toHaveTextContent(
-    'Your changes could not be saved. Please try again.',
+    '設定を保存できませんでした。もう一度お試しください。',
   );
   expect(setTheme).toHaveBeenLastCalledWith('system');
   expect(screen.getByTestId('appearance')).toHaveTextContent('system');

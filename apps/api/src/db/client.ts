@@ -10,3 +10,5 @@ export function connectDatabase(connectionString: string) {
   });
   return { db: drizzle({ client: pool }), pool };
 }
+
+export type Database = ReturnType<typeof connectDatabase>['db'];

@@ -1,26 +1,26 @@
-import { describe, expect, test } from 'bun:test';
+import { expect, test } from 'bun:test';
 
-import {
-  catalogQuerySchema,
-  filterRituals,
-  preferencesSchema,
-  ritualSchema,
-  rituals,
-} from './index';
+import { feedQuerySchema, postInputSchema, preferencesSchema, profileInputSchema } from './index';
 
-describe('ritual catalog', () => {
-  test('searches titles and categories without case or surrounding whitespace', () => {
-    expect(filterRituals('  MOVEMENT ')).toHaveLength(1);
-    expect(filterRituals('chapter')[0]?.id).toBe('read');
-    expect(filterRituals('not in the catalog')).toEqual([]);
+test('trims posts and rejects empty or unbounded content', () => {
+  expect(postInputSchema.parse({ body: '  こんにちは  ' }).body).toBe('こんにちは');
+  for (const body of ['', '  ', 'あ'.repeat(501)]) {
+    expect(postInputSchema.safeParse({ body }).success).toBe(false);
+  }
+  expect(postInputSchema.safeParse({ body: 'あ'.repeat(500) }).success).toBe(true);
+});
+test('bounds pagination and profile input', () => {
+  expect(feedQuerySchema.parse({})).toEqual({ offset: 0 });
+  for (const offset of ['-1', '1.5', '10001', 'NaN']) {
+    expect(feedQuerySchema.safeParse({ offset }).success).toBe(false);
+  }
+  expect(profileInputSchema.safeParse({ name: ' ' }).success).toBe(false);
+  expect(profileInputSchema.parse({ name: ' はなこ ' }).name).toBe('はなこ');
+});
+test('preserves appearance preferences while removing obsolete ritual data', () => {
+  expect(preferencesSchema.parse({ appearance: 'dark', favorites: ['old'] })).toEqual({
+    appearance: 'dark',
+    haptics: true,
   });
-  test('rejects unbounded search and invalid saved preferences', () => {
-    expect(catalogQuerySchema.safeParse({ q: 'x'.repeat(101) }).success).toBe(false);
-    expect(preferencesSchema.safeParse({ dailyGoal: 0 }).success).toBe(false);
-    expect(preferencesSchema.parse({}).dailyGoal).toBe(3);
-  });
-  test('ships valid, uniquely addressable rituals', () => {
-    expect(rituals.every((item) => ritualSchema.safeParse(item).success)).toBe(true);
-    expect(new Set(rituals.map((item) => item.id)).size).toBe(rituals.length);
-  });
+  expect(preferencesSchema.safeParse({ appearance: 'unknown' }).success).toBe(false);
 });

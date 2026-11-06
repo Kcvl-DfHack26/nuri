@@ -3,6 +3,13 @@
 
 /* Reusables neutral theme. Native controls keep their OS semantic colors. */
 @theme {
+  /* Match native body text, with one quieter metadata size and one section title. */
+  --text-body: 17px;
+  --text-body--line-height: 24px;
+  --text-caption: 13px;
+  --text-caption--line-height: 18px;
+  --text-title: 22px;
+  --text-title--line-height: 28px;
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;

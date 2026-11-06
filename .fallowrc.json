@@ -18,6 +18,8 @@
     "@expo/ngrok",
     "expo-dev-client",
     "expo-system-ui",
-    "expo-updates"
+    "expo-updates",
+    "expo-splash-screen",
+    "eslint-import-resolver-typescript"
   ]
 }

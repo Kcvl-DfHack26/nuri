@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/mobile/package.json apps/mobile/package.json
+COPY apps/emulate/package.json apps/emulate/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN bun install --frozen-lockfile --ignore-scripts
 COPY apps/api apps/api
@@ -15,6 +16,7 @@ WORKDIR /app
 COPY package.json bun.lock bunfig.toml ./
 COPY apps/api/package.json apps/api/package.json
 COPY apps/mobile/package.json apps/mobile/package.json
+COPY apps/emulate/package.json apps/emulate/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN bun install --frozen-lockfile --production --filter @starter/api --ignore-scripts
 
@@ -25,6 +27,7 @@ COPY --from=dependencies --chown=node:node /app/node_modules /app/node_modules
 COPY --from=dependencies --chown=node:node /app/apps /app/apps
 COPY --from=build --chown=node:node /app/apps/api/dist ./dist
 COPY --from=build --chown=node:node /app/apps/api/drizzle ./drizzle
+COPY --from=build --chown=node:node /app/apps/api/assets ./assets
 COPY --from=build --chown=node:node /app/apps/api/package.json ./package.json
 USER node
 EXPOSE 8080
