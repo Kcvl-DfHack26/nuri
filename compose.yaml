@@ -11,8 +11,8 @@ x-runtime: &runtime
   environment: &environment
     NODE_ENV: development
     DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@postgres:5432/expo-hono-opentofu-starter
-    DEV_API_ORIGIN: http://api.${COMPOSE_PROJECT_NAME}.localhost
-    DEV_METRO_ORIGIN: http://metro.${COMPOSE_PROJECT_NAME}.localhost
+    DEV_API_ORIGIN: https://api.${COMPOSE_PROJECT_NAME}.localhost
+    DEV_METRO_ORIGIN: https://metro.${COMPOSE_PROJECT_NAME}.localhost
     BUN_INSTALL_CACHE_DIR: ${WORKTREE_ROOT}/node_modules/.cache/bun
   volumes:
     - type: bind
@@ -70,7 +70,7 @@ services:
     stdin_open: true
     environment:
       <<: *environment
-      EXPO_PACKAGER_PROXY_URL: http://metro.${COMPOSE_PROJECT_NAME}.localhost
+      EXPO_PACKAGER_PROXY_URL: https://metro.${COMPOSE_PROJECT_NAME}.localhost
     command: bun run --cwd apps/mobile dev
     stop_signal: SIGINT
     ports: ['127.0.0.1:8081:8081']

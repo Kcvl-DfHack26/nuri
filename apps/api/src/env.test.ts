@@ -6,8 +6,8 @@ const base = {
   NODE_ENV: 'development',
   DATABASE_URL: 'postgresql://local/database',
   BETTER_AUTH_SECRET: 'test-secret-with-at-least-32-characters',
-  DEV_API_ORIGIN: 'http://api.checkout.localhost',
-  DEV_METRO_ORIGIN: 'http://metro.checkout.localhost',
+  DEV_API_ORIGIN: 'https://api.checkout.localhost',
+  DEV_METRO_ORIGIN: 'https://metro.checkout.localhost',
   TRUSTED_ORIGINS: 'expo-hono-opentofu-starter://,exp://**',
 };
 

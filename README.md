@@ -16,23 +16,23 @@ Google Cloudなしでも、習慣・お気に入り・設定を端末内に保�
 ```sh
 npm install --global portless@0.16.0
 sh scripts/worktree-init.sh
-# ホストで一度だけ。既存のHTTP/80 proxyは再利用する。
-portless proxy start --no-tls --port 80
-PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose up --build api metro
+# ホストで一度だけ。既存のHTTPS/443 proxyは再利用する。
+portless proxy start --https --port 443
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-依存導入・未作成の環境ファイル生成・DB migrationが自動で行われる。PortlessがAPI・Metroの空きポートと `http://<service>.<Compose project名>.localhost` を割り当て、PostgreSQLとvolumeはworktreeごとに分離する。DBポートはホストへ公開しない。
+依存導入・未作成の環境ファイル生成・DB migrationが自動で行われる。PortlessがAPI・Metroの空きポートと `https://<service>.expo-hono-opentofu-starter-<ID>.localhost` を割り当て、PostgreSQLとvolumeはworktreeごとに分離する。DBポートはホストへ公開しない。
 
 Expo GoでiPhone・Androidから開く場合は、上の起動をCtrl+Cで止めてトンネル用構成を使う。
 
 ```sh
-PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose \
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose \
   -f compose.yaml -f compose.go.yaml up --build api metro
 ```
 
 MetroログのQRコードをSDK 58対応のExpo Goで開く。API未設定でもショーケースを試せる。実機の認証には別途HTTPS APIトンネルを設定する。
 
-Dev Containers対応エディタでは **Reopen in Container** で編集・検査環境へ入れる。アプリの起動・停止はホストのPortlessで行う。終了時は `PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose --profile '*' down` を使う。自worktreeのrouteとコンテナだけを終了し、volumeを保持する。
+Dev Containers対応エディタでは **Reopen in Container** で編集・検査環境へ入れる。アプリの起動・停止はホストのPortlessで行う。終了時は `PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down` を使う。自worktreeのrouteとコンテナだけを終了し、volumeを保持する。
 
 **Bunの短縮コマンド、APIトンネル、Google Cloud・GitHub・EASの初期設定は [docs/setup.md](docs/setup.md) にまとめている。**
 

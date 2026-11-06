@@ -19,27 +19,31 @@ POSIXの初期化処理が実パス由来のID・Compose名・mount先をルー�
 
 ### 起動・接続・停止
 
-ホストで共有HTTP/80 proxyを一度起動する。tablecast-poc等の既存のproxyは再利用する。初回に管理者認証が必要な場合は、ホストの対話ターミナルで実行する。
+ホストで共有HTTPS/443 proxyを一度起動する。tablecast-poc等の既存のproxyは再利用する。初回のローカルCA登録や管理者認証はホストの対話ターミナルで行う。既存proxyがHTTPの場合は、そのホストで利用中のworktreeを止め、`portless proxy stop` の後に以下のHTTPS proxyを起動する。この切替はホスト全体で一度行う。
 
 ```sh
-portless proxy start --no-tls --port 80
-PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose up --build api metro
+portless proxy start --https --port 443
+# CAの信頼登録を後から行う場合
+portless trust
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
 Composeが依存導入・未作成のアプリenv生成・PostgreSQLのhealthcheck・migrationを行う。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432。PostgreSQLはホストへ公開せず、PortlessがHTTPサービスにloopback上の空きポートを割り当てる。
 
-| サービス    | ホストからのURL                                          |
-| ----------- | -------------------------------------------------------- |
-| API         | `http://api.expo-hono-opentofu-starter-<ID>.localhost`   |
-| Metro / Web | `http://metro.expo-hono-opentofu-starter-<ID>.localhost` |
+| サービス    | ホストからのURL                                           |
+| ----------- | --------------------------------------------------------- |
+| API         | `https://api.expo-hono-opentofu-starter-<ID>.localhost`   |
+| Metro / Web | `https://metro.expo-hono-opentofu-starter-<ID>.localhost` |
+
+URL形式は `https://<service>.<repo>-<worktree ID>.localhost`。ホストのブラウザ用であり、iPhone/Android実機は後述のHTTPSトンネルを使う。API・Metroの内部通信は引き続きHTTPで、TLS終端はホストのPortlessが担当する。
 
 実際のURLはPortlessが表示する。ホスト公開ポートは `portless compose port api 8080` / `portless compose port metro 8081` で確認できる。Portlessはprojectごとに割当を保持し、複数worktree間の衝突を避ける。開発では `.env` の空の `BETTER_AUTH_URL` をComposeのAPI originで補い、Metro originも許可originへ追加する。
 
 ```sh
 # バックグラウンド起動
-PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose up -d --build api metro
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up -d --build api metro
 # 自worktreeだけを終了。DBや認証設定のvolumeは保持する。
-PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose --profile '*' down
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down
 ```
 
 foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存サービスも終了するには `portless compose --profile '*' down` を使う。detachedのrouteは `portless compose --profile '*' down` まで残る。同一worktreeへの `up` はCompose標準の再利用・更新となるため、既存コンテナへ接続する。別のworktreeは別projectとして起動する。
@@ -58,7 +62,7 @@ worktreeをエディタで開いて **Reopen in Container** を実行する。`i
 
 ### ホストのBunで短縮コマンドを使う
 
-ホストにBun 1.4.4があれば以下のaliasを使える。サーバー本体は引き続きCompose内で動く。共通の `bun run compose <args>` がHTTP/80設定をまとめ、BunとComposeのdotenv解釈の違いによるパスの変形を避けるため、生成したパス変数をCompose自身に読み直させる。
+ホストにBun 1.4.4があれば以下のaliasを使える。サーバー本体は引き続きCompose内で動く。共通の `bun run compose <args>` がHTTPS/443設定をまとめ、BunとComposeのdotenv解釈の違いによるパスの変形を避けるため、生成したパス変数をCompose自身に読み直させる。
 
 ```sh
 bun install --frozen-lockfile
@@ -82,7 +86,7 @@ bun run services:down
 同じworktreeで起動中のMetroがあればCtrl+Cで止め、ホストのworktreeルートから実行する。
 
 ```sh
-PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose \
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose \
   -f compose.yaml -f compose.go.yaml up --build api metro
 ```
 
@@ -97,7 +101,7 @@ PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose \
 Expo GoトンネルはMetro専用なので、APIには別のworktree別HTTPSトンネルを使う。起動中のAPIに対してホストで実行する。
 
 ```sh
-PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose --profile tunnel up -d api-tunnel
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile tunnel up -d api-tunnel
 portless compose logs api-tunnel
 ```
 

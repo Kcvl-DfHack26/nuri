@@ -30,7 +30,7 @@
     "services:down": "bun run compose --profile '*' down",
     "dev:go": "bun run compose -f compose.yaml -f compose.go.yaml up --build api metro",
     "hooks:install": "lefthook install",
-    "compose": "env -u WORKTREE_ROOT -u WORKTREE_GIT_COMMON_DIR PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose"
+    "compose": "env -u WORKTREE_ROOT -u WORKTREE_GIT_COMMON_DIR PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

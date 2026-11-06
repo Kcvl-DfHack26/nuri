@@ -60,7 +60,7 @@ describe('Compose setup', () => {
       stderr: 'pipe',
     });
     expect((await new Response(child.stdout).text()).trim()).toBe(
-      JSON.stringify([null, null, '80', '0', 'compose', 'config']),
+      JSON.stringify([null, null, '443', '1', 'compose', 'config']),
     );
     expect(await child.exited).toBe(0);
   });

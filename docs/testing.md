@@ -87,3 +87,13 @@ Dockerの容量上限により、3 worktreeそれぞれへの依存の新規導�
 Dev Container CLI 0.90.0 / Docker Compose 5.5.0による新規buildは未完了。最初はBakeが生成Dockerfileの外部パスへのread許可を要求し、Git管理外のcheckout内をTMPDIRにして再試行した後はGoogle Cloud CLI導入中に容量不足で停止した。既存イメージでのworkspace検証と新規build成功は区別する。
 
 iPhone/Android実機での接続・認証、新しいDev Containerイメージの初回作成、3 worktreeの完全に独立した依存導入は未確認。UIやネイティブ依存・アプリIDを変更しておらず、今回ネイティブビルド・配信・IaC applyは実行していない。
+
+## 2026-11-06のHTTPS切替の検証
+
+- 標準の `<service>.<repo>-<worktree ID>.localhost` を維持し、PortlessをHTTPS/443、APIの開発認証URL・許可origin・Metroのproxy URLをHTTPSへ変更した。worktree-init、Compose project名、DB・volume名は変更していない。
+- 他の開発環境のHTTP proxyを維持するため、Git管理外の専用stateで検証用HTTPS proxyを443に起動した。OSの信頼ストアは変更せず、検証用CAを明示して証明書を検証した。
+- 1 worktreeで新規の依存導入・DB初期化・migration・API/Metro起動が成功。API `/ready`、Metro `/status`、iOS manifestとHTTPS bundle取得、HTTP/2、WSSの101 handshakeが成功した。コンテナ内部の8080/8081はHTTPのまま、DBはホスト非公開である。
+- HTTPS APIへの登録・セッション取得とMetro originのCORSが成功。セッションcookieにSecure・HttpOnlyが付くことを確認し、検証ユーザーは削除した。
+- `bun run check` と通常/editor/tunnel/Expo GoのCompose設定検証が成功。Expo Goのトンネル構成は従来どおりMetroのproxy URLを空にして外部トンネルを使う。
+
+ブラウザの警告を消すためのOSへのCA信頼登録、iPhone/Android実機での接続・認証は未実施。通常利用時はホストで `portless trust` を行う。共有HTTP proxyのHTTPSへの切替は、利用中worktreeを止めた上でホスト側で一度行い、各worktreeの停止処理からは行わない。
