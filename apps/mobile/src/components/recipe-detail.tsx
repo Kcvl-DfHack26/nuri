@@ -2,7 +2,7 @@ import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, Share, View } from 'react-native';
+import { Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PhotoCrop, Product, Recipe } from '@/components/recipes';
@@ -73,6 +73,7 @@ const atFrame = (x: number, y: number) =>
 // Plan A ⑤ レシピ詳細.
 export function RecipeDetail({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
   const recipe = findRecipe(id);
   if (!recipe?.detail) {
     return (
@@ -92,17 +93,24 @@ export function RecipeDetail({ id }: { id: string }) {
     );
   }
   const { detail } = recipe;
+  // Plan A keeps the face fixed; only the sheet scrolls up over it.
+  const heroHeight = (window.width * 540) / 390;
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
+      <View className="absolute inset-x-0 top-0">
+        <Hero recipe={recipe} />
+      </View>
       <ScrollView
         contentInsetAdjustmentBehavior="never"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
+        contentContainerStyle={{ paddingTop: heroHeight - 50, paddingBottom: insets.bottom + 96 }}
       >
-        <Hero recipe={recipe} />
         <View
-          className="-mt-[50px] gap-3 rounded-t-[28px] bg-white px-5 pt-5"
-          style={{ boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)' }}
+          className="gap-3 rounded-t-[28px] bg-white px-5 pt-5"
+          style={{
+            minHeight: window.height,
+            boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)',
+          }}
         >
           <View className="gap-2">
             <Text
