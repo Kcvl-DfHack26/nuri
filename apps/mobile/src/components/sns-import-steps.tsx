@@ -99,7 +99,7 @@ export function SnsImportSteps() {
         }}
       />
       <View
-        className="absolute inset-x-4 min-h-11 items-center justify-center"
+        className="absolute inset-x-3 min-h-12 items-center justify-center"
         style={{ top: insets.top }}
         onLayout={(event) => {
           setHeaderHeight(event.nativeEvent.layout.height);
@@ -111,7 +111,8 @@ export function SnsImportSteps() {
         >
           読み取った手順
         </Text>
-        <View className="absolute left-0">
+        {/* Room around the 40pt button so its hitSlop reaches the full 48pt target. */}
+        <View className="absolute left-0 size-12 items-center justify-center">
           <GlassIconButton
             icon={BACK}
             label="戻る"

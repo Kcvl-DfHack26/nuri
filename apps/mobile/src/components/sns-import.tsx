@@ -180,16 +180,18 @@ function SheetHeader() {
       >
         SNSの動画をレシピにする
       </Text>
+      {/* hitSlop cannot reach past this 36pt row, so the 48pt target holds the 36pt circle. */}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="閉じる"
-        hitSlop={6}
         onPress={() => {
           backOrHome();
         }}
-        className="size-9 items-center justify-center rounded-full bg-neutral-soft active:opacity-70"
+        className="-my-1.5 -mr-1.5 size-12 items-center justify-center active:opacity-70"
       >
-        <SocialIcon name={CLOSE} size={18} color={ink} />
+        <View className="size-9 items-center justify-center rounded-full bg-neutral-soft">
+          <SocialIcon name={CLOSE} size={18} color={ink} />
+        </View>
       </Pressable>
     </View>
   );
@@ -269,6 +271,10 @@ function InputContent() {
       </View>
       <Text className="text-center font-maru text-meta text-ink-secondary">
         Instagram・YouTube・TikTokの動画に対応しています
+      </Text>
+      {/* Fetching posts waits on each service's terms and the poster's permission. */}
+      <Text className="text-center font-maru text-meta text-ink-secondary">
+        いまは投稿を読み取らず、見本のレシピを表示します
       </Text>
       <View className="gap-2">
         <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
