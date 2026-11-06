@@ -20,7 +20,7 @@ COPY apps/emulate/package.json apps/emulate/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN bun install --frozen-lockfile --production --filter @starter/api --ignore-scripts
 
-FROM node:24.19.0-bookworm-slim
+FROM node:26.12.1-bookworm-slim
 ENV NODE_ENV=production PORT=8080
 WORKDIR /app/apps/api
 COPY --from=dependencies --chown=node:node /app/node_modules /app/node_modules
