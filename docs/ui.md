@@ -67,7 +67,7 @@ Fallowはスターターが提供するText／Buttonだけを明示的な公開�
 
 ## 検証
 
-`uniwind-types.d.ts` はUniwindが生成した宣言をそのまま追跡する。設定変更後に `bun run --cwd apps/mobile styles:generate` を実行する。CIは再生成して差分がないことを確認してから通常チェックを実行するので、型検査のためにMetroを起動する必要はない。
+`uniwind-types.d.ts` はUniwindが生成した宣言をそのまま追跡する。設定変更後に `bun run --cwd apps/mobile styles:generate` を実行する。CSS import用の公式 `expo/types` はtsconfigから明示的に読み込み、未追跡の `expo-env.d.ts` に依存しない。CIはUniwindの型を再生成して差分がないことを確認してから通常チェックを実行するので、型検査のためにMetroを起動する必要はない。
 
 ```bash
 bun run check
