@@ -44,12 +44,12 @@ const CART = Icon.select({
 });
 const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 
-// Hero layout from Plan A ⑤ (390×480 frame).
+// Hero layout from Plan A ⑤ (390×540 frame). The guides and pins were drawn on its top 480pt.
 const heroCrop: PhotoCrop = {
   width: '120.64%',
-  height: '174.16%',
+  height: '154.82%',
   left: '-12.18%',
-  top: '-15.62%',
+  top: '-13.89%',
 };
 const pins = [
   { x: 251, y: 177 },
@@ -68,7 +68,7 @@ const pinLabels = [
   { x: 236, y: 404 },
 ];
 const atFrame = (x: number, y: number) =>
-  ({ left: `${(x / 390) * 100}%`, top: `${(y / 480) * 100}%` }) as const;
+  ({ left: `${(x / 390) * 100}%`, top: `${(y / 540) * 100}%` }) as const;
 
 // Plan A ⑤ レシピ詳細.
 export function RecipeDetail({ id }: { id: string }) {
@@ -231,7 +231,7 @@ export function RecipeDetail({ id }: { id: string }) {
 function Hero({ recipe }: { recipe: Recipe }) {
   const overview = recipe.detail?.overview ?? [];
   return (
-    <View className="aspect-[390/480] w-full overflow-hidden">
+    <View className="aspect-[390/540] w-full overflow-hidden">
       <CroppedPhoto source={arPhotos.finished} crop={heroCrop} />
       {[guideFace, guideCheek, guideShading, guideBrow].map((guide, index) => (
         <Image
@@ -240,7 +240,7 @@ function Hero({ recipe }: { recipe: Recipe }) {
           accessible={false}
           source={guide}
           contentFit="fill"
-          style={{ position: 'absolute', width: '100%', height: '100%' }}
+          style={{ position: 'absolute', width: '100%', height: `${(480 / 540) * 100}%` }}
         />
       ))}
       {pins.map((pin, index) => (
