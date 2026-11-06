@@ -98,9 +98,11 @@ test('stays on the login screen when the OS login browser is dismissed', async (
   mockGetSession.mockResolvedValueOnce({ data: null });
   await renderAccount();
   await fireEvent.press(await screen.findByRole('button', { name: 'Googleで続ける' }));
+  // Wait for the login attempt to settle so its state update happens inside the test.
   await waitFor(() => {
-    expect(mockSocial).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Googleで続ける' })).toBeEnabled();
   });
+  expect(mockSocial).toHaveBeenCalled();
   expect(router.back).not.toHaveBeenCalled();
   expect(router.replace).not.toHaveBeenCalled();
 });
