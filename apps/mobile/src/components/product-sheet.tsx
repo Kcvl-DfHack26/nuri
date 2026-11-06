@@ -1,0 +1,201 @@
+import { Icon } from '@expo/ui';
+import { Image } from 'expo-image';
+import { useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import type { ProductInfo } from '@/components/recipes';
+
+import { findProduct } from '@/components/recipes';
+import { SocialIcon } from '@/components/social-icon';
+import { Text } from '@/components/ui/text';
+import { backOrHome } from '@/lib/navigation';
+import { cn } from '@/lib/utils';
+import { useTokenColor } from '@/theme/tokens';
+
+const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
+const CAMERA = Icon.select({
+  ios: 'camera',
+  android: import('@expo/material-symbols/photo_camera.xml'),
+});
+const FLASK = Icon.select({ ios: 'flask', android: import('@expo/material-symbols/science.xml') });
+const CHECK = Icon.select({
+  ios: 'checkmark',
+  android: import('@expo/material-symbols/check.xml'),
+});
+const CART = Icon.select({
+  ios: 'cart',
+  android: import('@expo/material-symbols/shopping_cart.xml'),
+});
+
+// Plan A ⑥ 商品詳細ポップアップ, presented as a native form sheet over ⑤. The header and the
+// purchase action stay put; the colors and ingredients scroll between them.
+export function ProductSheet({ id }: { id: string }) {
+  const insets = useSafeAreaInsets();
+  const product = findProduct(id);
+  if (!product?.info) {
+    return (
+      <View className="flex-1 items-center justify-center gap-4 bg-white px-6">
+        <Text className="font-maru-bold text-heading text-ink-primary">商品が見つかりません</Text>
+        <CloseButton />
+      </View>
+    );
+  }
+  const { info } = product;
+  return (
+    <View className="flex-1 bg-white px-5 pt-[30px]">
+      <View className="flex-row items-center gap-3.5">
+        <Image
+          accessible={false}
+          source={product.image}
+          style={{ width: 64, height: 64, borderRadius: 20 }}
+        />
+        <View className="flex-1 gap-0.5">
+          <Text className="font-maru text-meta text-ink-secondary">{info.brand}</Text>
+          <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
+            {info.title}
+          </Text>
+          <Text className="font-maru-bold text-label text-accent-rose">{info.price}</Text>
+        </View>
+        <CloseButton />
+      </View>
+      <ScrollView
+        className="mt-4 flex-1"
+        contentInsetAdjustmentBehavior="never"
+        contentContainerClassName="gap-4 pb-4"
+      >
+        <ProductDetails info={info} />
+      </ScrollView>
+      <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
+        <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="購入先を見る（準備中）"
+          accessibilityState={{ disabled: true }}
+          className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px]"
+          style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
+        >
+          <SocialIcon name={CART} size={20} color="white" />
+          <Text className="font-maru-bold text-action text-white">購入先を見る</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+function CloseButton() {
+  const ink = useTokenColor('--color-ink-primary');
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="閉じる"
+      // The 36pt circle keeps Plan A's look; hitSlop extends the target to 48pt.
+      hitSlop={6}
+      onPress={() => {
+        backOrHome();
+      }}
+      className="size-9 items-center justify-center rounded-full bg-neutral-soft active:opacity-70"
+    >
+      <SocialIcon name={CLOSE} size={18} color={ink} />
+    </Pressable>
+  );
+}
+
+function ProductDetails({ info }: { info: ProductInfo }) {
+  const ink = useTokenColor('--color-ink-primary');
+  const rose = useTokenColor('--color-accent-rose');
+  const [colorIndex, setColorIndex] = useState(info.initialColor);
+  return (
+    <>
+      <View className="flex-row items-center justify-between gap-2">
+        <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
+          色
+        </Text>
+        <Text className="flex-1 text-right font-maru text-meta text-ink-secondary">
+          {info.colors[colorIndex]?.name}
+        </Text>
+      </View>
+      <View accessibilityRole="radiogroup" className="flex-row flex-wrap gap-3">
+        {info.colors.map((color, index) => {
+          const selected = index === colorIndex;
+          return (
+            <Pressable
+              key={color.name}
+              accessibilityRole="radio"
+              accessibilityLabel={color.name}
+              accessibilityState={{ checked: selected }}
+              hitSlop={4}
+              onPress={() => {
+                setColorIndex(index);
+              }}
+              className={cn(
+                'size-10 items-center justify-center rounded-full',
+                selected && 'border-[2.5px] border-accent-rose',
+              )}
+            >
+              <View className="size-[30px] rounded-full" style={{ backgroundColor: color.hex }} />
+            </Pressable>
+          );
+        })}
+      </View>
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel="自分の顔で色味を見る（準備中）"
+        accessibilityState={{ disabled: true }}
+        className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-pastel-pink px-[18px]"
+      >
+        <SocialIcon name={CAMERA} size={20} color={rose} />
+        <Text className="font-maru-bold text-label text-accent-rose">自分の顔で色味を見る</Text>
+      </View>
+      <View className="h-px bg-line-soft" />
+      <View className="flex-row items-center justify-between gap-2">
+        <View className="flex-row items-center gap-1.5">
+          <SocialIcon name={FLASK} size={20} color={ink} />
+          <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
+            成分
+          </Text>
+        </View>
+        <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel={`全${info.ingredientCount}成分を見る（準備中）`}
+          accessibilityState={{ disabled: true }}
+          className="shrink"
+        >
+          <Text className="font-maru-bold text-label text-accent-rose">
+            全{info.ingredientCount}成分を見る
+          </Text>
+        </View>
+      </View>
+      <View className="flex-row flex-wrap gap-1.5">
+        {info.freeFrom.map((label) => (
+          <View
+            key={label}
+            className="min-h-[26px] flex-row items-center gap-1 rounded-[13px] bg-pastel-mint px-2.5"
+          >
+            <SocialIcon name={CHECK} size={12} color={ink} />
+            <Text className="font-maru-bold text-micro text-ink-primary">{label}</Text>
+          </View>
+        ))}
+      </View>
+      <View className="overflow-hidden rounded-2xl border border-line-soft bg-bg-surface">
+        {info.ingredients.map((ingredient, index) => (
+          <View
+            key={ingredient.name}
+            className={cn(
+              'flex-row items-center gap-2.5 px-3.5 py-3',
+              index < info.ingredients.length - 1 && 'border-b border-line-soft',
+            )}
+          >
+            <View className={cn('size-2.5 rounded-full', ingredient.dot)} />
+            <Text className="flex-1 font-maru-bold text-label text-ink-primary">
+              {ingredient.name}
+            </Text>
+            <Text className="shrink font-maru text-meta text-ink-secondary">{ingredient.role}</Text>
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
