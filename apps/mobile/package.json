@@ -4,18 +4,18 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "bun ../../scripts/dev.ts metro",
-    "start": "bun ../../scripts/dev.ts metro",
-    "tunnel": "bun ../../scripts/dev.ts metro --tunnel",
-    "android": "bun ../../scripts/dev.ts metro --android",
-    "ios": "bun ../../scripts/dev.ts metro --ios",
-    "web": "bun ../../scripts/dev.ts metro --web",
+    "dev": "expo start --port 8081 --lan",
+    "start": "expo start --port 8081 --lan",
+    "tunnel": "expo start --port 8081 --tunnel ngrok",
+    "android": "expo start --port 8081 --android",
+    "ios": "expo start --port 8081 --ios",
+    "web": "expo start --port 8081 --web",
     "typecheck": "tsc --noEmit",
     "styles:generate": "uniwind generate-artifacts --css ./global.css --dts ./uniwind-types.d.ts",
     "test": "jest --ci --runInBand",
     "export": "expo export --platform ios --platform android",
     "doctor": "expo-doctor",
-    "go": "bun ../../scripts/dev.ts metro --go --tunnel"
+    "go": "expo start --port 8081 --go --tunnel ngrok"
   },
   "dependencies": {
     "@babel/runtime": "7.29.13",

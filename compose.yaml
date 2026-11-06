@@ -1,43 +1,104 @@
 name: ${COMPOSE_PROJECT_NAME:?Run sh scripts/worktree-init.sh first}
+
+x-runtime: &runtime
+  image: ${COMPOSE_PROJECT_NAME}-dev
+  build:
+    context: .
+    dockerfile: .devcontainer/Dockerfile
+  init: true
+  user: node
+  working_dir: ${WORKTREE_ROOT:?Run sh scripts/worktree-init.sh first}
+  environment: &environment
+    NODE_ENV: development
+    DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@postgres:5432/expo-hono-opentofu-starter
+    DEV_API_ORIGIN: https://api.${COMPOSE_PROJECT_NAME}.localhost
+    DEV_METRO_ORIGIN: https://metro.${COMPOSE_PROJECT_NAME}.localhost
+    BUN_INSTALL_CACHE_DIR: ${WORKTREE_ROOT}/node_modules/.cache/bun
+  volumes:
+    - type: bind
+      source: ${WORKTREE_ROOT}
+      target: ${WORKTREE_ROOT}
+    - type: bind
+      source: ${WORKTREE_GIT_COMMON_DIR:?Run sh scripts/worktree-init.sh first}
+      target: ${WORKTREE_GIT_COMMON_DIR}
+    - root-modules:${WORKTREE_ROOT}/node_modules
+    - mobile-modules:${WORKTREE_ROOT}/apps/mobile/node_modules
+    - api-modules:${WORKTREE_ROOT}/apps/api/node_modules
+    - shared-modules:${WORKTREE_ROOT}/packages/shared/node_modules
+    - gcloud-config:/home/node/.config/gcloud
+    - expo-config:/home/node/.expo
+
 services:
-  workspace:
-    build:
-      context: .
-      dockerfile: .devcontainer/Dockerfile
-    init: true
-    user: node
-    working_dir: ${WORKTREE_ROOT:?Run sh scripts/worktree-init.sh first}
-    command: sleep infinity
-    environment:
-      DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@postgres:5432/expo-hono-opentofu-starter
-      NODE_ENV: development
-      STARTER_CONTAINER: '1'
-      PORT: '8080'
-    ports:
-      - '127.0.0.1::8080'
-      - '127.0.0.1::8081'
-    volumes:
-      - type: bind
-        source: ${WORKTREE_ROOT}
-        target: ${WORKTREE_ROOT}
-      - type: bind
-        source: ${WORKTREE_GIT_COMMON_DIR:?Run sh scripts/worktree-init.sh first}
-        target: ${WORKTREE_GIT_COMMON_DIR}
-      - root-modules:${WORKTREE_ROOT}/node_modules
-      - mobile-modules:${WORKTREE_ROOT}/apps/mobile/node_modules
-      - api-modules:${WORKTREE_ROOT}/apps/api/node_modules
-      - shared-modules:${WORKTREE_ROOT}/packages/shared/node_modules
-      - bun-cache:/home/node/.bun
-      - gcloud-config:/home/node/.config/gcloud
-      - expo-config:/home/node/.expo
+  setup:
+    <<: *runtime
+    user: root
+    command:
+      - sh
+      - -ec
+      - |
+        chown -R node:node node_modules apps/mobile/node_modules apps/api/node_modules packages/shared/node_modules /home/node/.expo /home/node/.config/gcloud
+        exec sudo -u node -H sh -ec 'bun install --frozen-lockfile --ignore-scripts && bun run setup'
+  migrate:
+    <<: *runtime
+    command: bun run --cwd apps/api db:migrate
     depends_on:
+      setup:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
+  api:
+    <<: *runtime
+    environment:
+      <<: *environment
+      PORT: '8080'
+    command: bun run --cwd apps/api dev
+    stop_signal: SIGINT
+    ports: ['127.0.0.1:8080:8080']
+    labels:
+      portless.ports: '8080'
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', '--silent', 'http://localhost:8080/ready']
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  metro:
+    <<: *runtime
+    tty: true
+    stdin_open: true
+    environment:
+      <<: *environment
+      EXPO_PACKAGER_PROXY_URL: https://metro.${COMPOSE_PROJECT_NAME}.localhost
+    command: bun run --cwd apps/mobile dev
+    stop_signal: SIGINT
+    ports: ['127.0.0.1:8081:8081']
+    labels:
+      portless.ports: '8081'
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', '--silent', 'http://localhost:8081/status']
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+  workspace:
+    <<: *runtime
+    image: ${COMPOSE_PROJECT_NAME}-workspace
+    profiles: [editor]
+    command: sleep infinity
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
   api-tunnel:
     profiles: [tunnel]
     image: cloudflare/cloudflared:2026.10.7
-    command: tunnel --no-autoupdate --protocol http2 --url http://workspace:8080
-    depends_on: [workspace]
+    command: tunnel --no-autoupdate --protocol http2 --url http://api:8080
+    depends_on:
+      api:
+        condition: service_healthy
   postgres:
     image: postgres:17.7-bookworm
     environment:
@@ -47,16 +108,19 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter']
-      interval: 5s
-      timeout: 5s
-      retries: 12
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -h 127.0.0.1 -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter',
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
 volumes:
   root-modules:
   mobile-modules:
   api-modules:
   shared-modules:
-  bun-cache:
   gcloud-config:
   expo-config:
   postgres-data:

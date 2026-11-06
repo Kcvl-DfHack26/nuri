@@ -11,25 +11,30 @@ Google Cloudなしでも、習慣・お気に入り・設定を端末内に保�
 
 ## 開発を始める
 
-DockerとDev Containers対応エディタを用意し、**Reopen in Container**を実行する。依存関係のインストール、ローカル環境ファイルの作成、DB migrationが自動で行われる。
+ローカルサーバーはDocker Composeで起動する。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless 0.16.0を用意する。Bunはコンテナに含まれる。
 
 ```sh
-bun run dev
+npm install --global portless@0.16.0
+sh scripts/worktree-init.sh
+# ホストで一度だけ。既存のHTTPS/443 proxyは再利用する。
+portless proxy start --https --port 443
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-worktreeごとにAPI・MetroのポートとPostgreSQLを分離する。ホスト起動ではPortless、コンテナ起動ではDockerの自動割当を使う。初回の依存導入はcheckoutごとに順に実行する。
+依存導入・未作成の環境ファイル生成・DB migrationが自動で行われる。PortlessがAPI・Metroの空きポートと `https://<service>.expo-hono-opentofu-starter-<ID>.localhost` を割り当て、PostgreSQLとvolumeはworktreeごとに分離する。DBポートはホストへ公開しない。
 
-iPhoneのExpo Goから、ホストのOSやLAN構成に依存せず開く場合:
+Expo GoでiPhone・Androidから開く場合は、上の起動をCtrl+Cで止めてトンネル用構成を使う。
 
 ```sh
-# apps/mobile の Metro を止めてから、同じコンテナ内で実行
-cd apps/mobile
-bun run go
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose \
+  -f compose.yaml -f compose.go.yaml up --build api metro
 ```
 
-表示されたQRコードをiPhoneのカメラで読み取る。AndroidはExpo Goから開く。Expo GoはSDK 58対応版を使う。サーバー用の秘密情報は不要。
+MetroログのQRコードをSDK 58対応のExpo Goで開く。API未設定でもショーケースを試せる。実機の認証には別途HTTPS APIトンネルを設定する。
 
-**エディタを使わないCompose起動、APIトンネル、Google Cloud・GitHub・EASの初期設定は [docs/setup.md](docs/setup.md) にまとめている。**
+Dev Containers対応エディタでは **Reopen in Container** で編集・検査環境へ入れる。アプリの起動・停止はホストのPortlessで行う。終了時は `PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down` を使う。自worktreeのrouteとコンテナだけを終了し、volumeを保持する。
+
+**Bunの短縮コマンド、APIトンネル、Google Cloud・GitHub・EASの初期設定は [docs/setup.md](docs/setup.md) にまとめている。**
 
 ## 構成
 
@@ -45,17 +50,20 @@ bun run go
 
 ## よく使うコマンド
 
+ホストにBun 1.4.4を入れて `bun install --frozen-lockfile && bun run setup` すると、以下の短縮コマンドを使える。`dev*`、`services:*`、`db:migrate`、`test:integration` はホストからComposeを操作する。それ以外の検査はDev Container内でも実行できる。
+
 | コマンド                                        | 内容                                             |
 | ----------------------------------------------- | ------------------------------------------------ |
 | `bun run setup`                                 | worktree設定と未作成のアプリenvを生成            |
-| `bun run dev`                                   | 自worktreeのDB・API・Metroを起動                 |
+| `bun run dev`                                   | ホストからComposeのDB・API・Metroを起動          |
+| `bun run dev:go`                                | Expo Go用のMetroトンネル付きで起動               |
 | `bun run check`                                 | 整形、型付きlint、型検査、Bun/Jestテスト、Fallow |
 | `bun run test:integration`                      | PostgreSQLを使った認証・認可テスト               |
 | `bun run db:generate` / `bun run db:migrate`    | migration生成 / 適用                             |
 | `bun run doctor`                                | Expoの互換性確認                                 |
 | `bun run export:mobile`                         | iOS・Androidのbundle生成                         |
 | `bun run build:api`                             | Node.js向けAPI build                             |
-| `bun run services:up` / `bun run services:down` | 自worktreeのDB起動 / Compose停止（volume保持）   |
+| `bun run services:up` / `bun run services:down` | DB・API・Metroをバックグラウンド起動 / 停止      |
 
 ## 文書
 
