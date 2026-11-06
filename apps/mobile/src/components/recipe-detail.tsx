@@ -93,7 +93,7 @@ export function RecipeDetail({ id }: { id: string }) {
     );
   }
   const { detail } = recipe;
-  // Plan A keeps the face fixed; only the sheet scrolls up over it.
+  // Plan A keeps the face and the sheet in place; only the sheet's content scrolls.
   const heroHeight = (window.width * 540) / 390;
   return (
     <View className="flex-1 bg-white">
@@ -101,16 +101,15 @@ export function RecipeDetail({ id }: { id: string }) {
       <View className="absolute inset-x-0 top-0">
         <Hero recipe={recipe} />
       </View>
-      <ScrollView
-        contentInsetAdjustmentBehavior="never"
-        contentContainerStyle={{ paddingTop: heroHeight - 50, paddingBottom: insets.bottom + 96 }}
+      <View
+        className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white"
+        style={{ top: heroHeight - 50, boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)' }}
       >
-        <View
-          className="gap-3 rounded-t-[28px] bg-white px-5 pt-5"
-          style={{
-            minHeight: window.height,
-            boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)',
-          }}
+        <ScrollView
+          className="rounded-t-[28px]"
+          contentInsetAdjustmentBehavior="never"
+          contentContainerClassName="gap-3 px-5 pt-5"
+          contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
         >
           <View className="gap-2">
             <Text
@@ -198,8 +197,8 @@ export function RecipeDetail({ id }: { id: string }) {
           {detail.products.map((product) => (
             <ProductRow key={product.name} product={product} />
           ))}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
       <View
         pointerEvents="none"
         className="absolute inset-x-0 top-0 h-[110px]"
