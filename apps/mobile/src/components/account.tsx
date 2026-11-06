@@ -76,7 +76,7 @@ export function Account() {
       // Dismissing the OS login browser is cancellation, not a successful login.
       if (current.data) {
         client.clear();
-        router.replace('/');
+        router.replace('/timeline');
       }
     },
   });

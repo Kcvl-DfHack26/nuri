@@ -95,6 +95,8 @@ export function RecipeDetail({ id }: { id: string }) {
   const { detail } = recipe;
   // Plan A keeps the face and the sheet in place; only the sheet's content scrolls.
   const heroHeight = (window.width * 540) / 390;
+  // Wide or short windows (iPad, landscape) keep Plan A's share of the screen for the sheet.
+  const sheetTop = Math.min(heroHeight - 50, window.height * (490 / 844));
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
@@ -103,7 +105,7 @@ export function RecipeDetail({ id }: { id: string }) {
       </View>
       <View
         className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white"
-        style={{ top: heroHeight - 50, boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)' }}
+        style={{ top: sheetTop, boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)' }}
       >
         <ScrollView
           className="rounded-t-[28px]"
@@ -225,7 +227,7 @@ export function RecipeDetail({ id }: { id: string }) {
           onPress={() => {
             void Share.share({
               message: `${recipe.title}（${recipe.author}）をnuriで見つけました`,
-            });
+            }).catch(() => undefined);
           }}
         />
         <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />

@@ -1,6 +1,6 @@
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
@@ -28,13 +28,15 @@ type Scope = 'whole' | 'parts';
 export function Home() {
   const insets = useSafeAreaInsets();
   const [scope, setScope] = useState<Scope>('whole');
+  // The make tab stays mounted under other tabs; only claim the status bar while it is shown.
+  const focused = useIsFocused();
   // The header and segment float over the grid; measure them so larger text never overlaps it.
   const [headerHeight, setHeaderHeight] = useState(48);
   const [segmentHeight, setSegmentHeight] = useState(52);
   const contentTop = insets.top + 16 + headerHeight;
   return (
     <View className="flex-1 bg-white">
-      <StatusBar style="dark" />
+      {focused ? <StatusBar style="dark" /> : null}
       {scope === 'whole' ? (
         <RecipeGrid top={contentTop} />
       ) : (

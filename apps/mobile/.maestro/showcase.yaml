@@ -2,8 +2,17 @@ appId: com.kcvl.nuri
 ---
 - launchApp:
     clearState: true
-- assertVisible: 'ホーム'
-- tapOn: 'マイページ'
+- assertVisible: 'nuri'
+- tapOn: '狐メイク、mio'
+- assertVisible: 'メイクをはじめる'
+- tapOn: 'メイクをはじめる'
+- assertVisible: '眉尻を濃く、眉頭は淡く'
+- tapOn: '5 チーク'
+- tapOn: '次へ'
+- assertVisible: 'Finish!'
+- tapOn: '次のメイクを試す？'
+- assertVisible: 'nuri'
+- tapOn: 'マイ'
 - assertVisible: '自分の投稿を確認するにはログインしてください'
 - tapOn: 'ログイン'
 - assertVisible: 'Googleでログイン'
