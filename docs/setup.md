@@ -1,131 +1,116 @@
 # 開発環境と外部サービスの設定
 
-2026年11月5日。GitHubは [ReoHakase/expo-hono-opentofu-starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)、Expoは [@reohakase/expo-hono-opentofu-starter](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter)。Expo project IDは `1f2d3048-c03b-4d7e-8220-7385b3875389`。
+2026年11月6日。GitHubは [ReoHakase/expo-hono-opentofu-starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)、Expoは [@reohakase/expo-hono-opentofu-starter](https://expo.dev/accounts/reohakase/projects/expo-hono-opentofu-starter)。Expo project IDは `1f2d3048-c03b-4d7e-8220-7385b3875389`。
 
 Google CloudのAPIキーはローカル開発・ショーケースに不要。クラウドの初期構築にはログイン済みのGoogleアカウントと課金を有効化したプロジェクト、CIにはWorkload Identity Federationを使う。長期のサービスアカウントJSONキーは作らない。
 
 ## 1. cloneとworktreeの準備
 
-GitとDocker Engine + Compose v2を用意する。Dev ContainerはホストのNode/Bunを必要としない。WindowsではWSL2のLinuxファイルシステムを使う。
+ローカルのAPI・Metro・PostgreSQLはすべてDocker Composeで動かす。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。ホストのBunは任意。WindowsではWSL2のLinuxファイルシステムを使う。
 
 ```sh
+npm install --global portless@0.16.0
 git worktree add -b codex/my-change ../my-change HEAD
 cd ../my-change
-```
-
-各checkoutを初期化する。同じGitリポジトリの `bun install` / Dev Containerの初回作成は順に実行する。Lefthookが共有 `.git/hooks` を更新するため、初回インストール同士を同時に実行すると競合する。準備後の開発サーバーは並列起動できる。`node_modules`、ルートの生成 `.env`、DB volumeはコピーしない。アプリの環境ファイルは各worktreeで生成する。
-
-### Dev Container（推奨）
-
-worktreeをエディタで開いて **Reopen in Container** を実行する。ホストの `initializeCommand` が `sh scripts/worktree-init.sh` を実行し、実パス由来のID・Compose名・mount先をルートの生成 `.env` へ保存する。branch変更やdetached HEADでもIDは変わらない。checkoutとGit共通ディレクトリをホストと同じ絶対パスでmountするため、linked worktreeでもGitが動く。
-
-postCreateCommandがvolumeの所有者を整え、依存導入・アプリenv生成・migrationを実行する。
-
-```sh
-bun run dev
-```
-
-コンテナ内はAPI 8080、Metro 8081、DB 5432。ホスト公開先はDockerの自動割当で、loopback限定。エディタの追加port forwardは使わない。ホストから確認するには:
-
-```sh
-docker compose port workspace 8080
-docker compose port workspace 8081
-```
-
-### エディタなしでComposeを使う
-
-ホストのNode/Bunは不要。初回は以下を実行する。
-
-```sh
 sh scripts/worktree-init.sh
-docker compose up -d --build
-docker compose exec --user root workspace chown -R node:node \
-  node_modules apps/mobile/node_modules apps/api/node_modules packages/shared/node_modules \
-  /home/node/.bun /home/node/.expo /home/node/.config/gcloud
-docker compose exec workspace bun install --frozen-lockfile
-docker compose exec workspace bun run setup
-docker compose exec workspace bun run dev
 ```
 
-### ホストのBunで開発する
+POSIXの初期化処理が実パス由来のID・Compose名・mount先をルートのGit管理外 `.env` へ保存する。branch変更やdetached HEADでもIDは変わらない。checkoutとGit共通ディレクトリをホストと同じ絶対パスでmountするため、linked worktreeでもGitが動く。`node_modules`、ルートの生成 `.env`、DB volumeは他worktreeからコピーしない。
 
-Node 24とBun 1.4.4を用意する。同じworktreeのコンテナ開発から切り替える場合は、先に `docker compose stop workspace api-tunnel` を実行する。
+### 起動・接続・停止
+
+ホストで共有HTTP/80 proxyを一度起動する。tablecast-poc等の既存のproxyは再利用する。初回に管理者認証が必要な場合は、ホストの対話ターミナルで実行する。
+
+```sh
+portless proxy start --no-tls --port 80
+PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose up --build api metro
+```
+
+Composeが依存導入・未作成のアプリenv生成・PostgreSQLのhealthcheck・migrationを行う。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432。PostgreSQLはホストへ公開せず、PortlessがHTTPサービスにloopback上の空きポートを割り当てる。
+
+| サービス    | ホストからのURL                                          |
+| ----------- | -------------------------------------------------------- |
+| API         | `http://api.expo-hono-opentofu-starter-<ID>.localhost`   |
+| Metro / Web | `http://metro.expo-hono-opentofu-starter-<ID>.localhost` |
+
+実際のURLはPortlessが表示する。ホスト公開ポートは `portless compose port api 8080` / `portless compose port metro 8081` で確認できる。Portlessはprojectごとに割当を保持し、複数worktree間の衝突を避ける。開発では `.env` の空の `BETTER_AUTH_URL` をComposeのAPI originで補い、Metro originも許可originへ追加する。
+
+```sh
+# バックグラウンド起動
+PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose up -d --build api metro
+# 自worktreeだけを終了。DBや認証設定のvolumeは保持する。
+PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose --profile '*' down
+```
+
+foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存サービスも終了するには `portless compose --profile '*' down` を使う。detachedのrouteは `portless compose --profile '*' down` まで残る。同一worktreeへの `up` はCompose標準の再利用・更新となるため、既存コンテナへ接続する。別のworktreeは別projectとして起動する。
+
+**API・Metroをplainな `docker compose up` で作り直すとPortlessのポート割当が失われるため、起動・再作成・終了は `portless compose` を使う。** `logs`、`exec`、`ps`、`restart` は通常のComposeでも使える。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。
+
+`setup` は既存アプリenvとsecretを保持する。ルート `.env` はCompose用の生成設定専用。トンネルURL等は `apps/api/.env` / `apps/mobile/.env` に置く。ローカルDBの `DATABASE_URL` はComposeが注入する。CI/Cloud Runでは明示した `DATABASE_URL` を使い、`bun run --cwd apps/api db:migrate` / `bun run --cwd apps/api test:integration` を直接実行する。
+
+### Dev Containerで編集・検査する
+
+worktreeをエディタで開いて **Reopen in Container** を実行する。`initializeCommand` がホストのPOSIX初期化を行い、Composeの `workspace` サービスとそのsetup・DB依存を起動する。API・Metroの公開ポートをエディタが再作成しないよう、`runServices` は編集用 `workspace` だけに限定する。
+
+コンテナ内では `bun run check`、`bun run doctor`、`bun run export:mobile` 等を実行できる。Docker socketは渡していないため、Portlessの起動・停止コマンドはホストで実行する。エディタのport forwardは使わない。エディタを閉じてもサービスは停止しないので、作業終了時はホストで `portless compose --profile '*' down` を実行する。
+
+自動依存導入は `--ignore-scripts` で共有Git hookを変更しない。Dev Containerの初回作成、またはホストの `bun install` / `bun run hooks:install` は同じGitリポジトリで順に行う。Lefthookが共有 `.git/hooks` を更新するためで、準備後のサーバーは並列起動できる。
+
+### ホストのBunで短縮コマンドを使う
+
+ホストにBun 1.4.4があれば以下のaliasを使える。サーバー本体は引き続きCompose内で動く。共通の `bun run compose <args>` がHTTP/80設定をまとめ、BunとComposeのdotenv解釈の違いによるパスの変形を避けるため、生成したパス変数をCompose自身に読み直させる。
 
 ```sh
 bun install --frozen-lockfile
 bun run setup
-# ホストで一度だけ。tablecast-poc等の既存のHTTP/80 proxyは再利用する。
-bunx --no-install portless proxy start --no-tls --port 80
-bun run dev
-```
-
-Portless 0.15.8がAPIとMetroに別の空きポートとworktree別ホスト名を割り当てる。APIは `http://api.<ID>.expo-hono-opentofu-starter.localhost`、Webは `http://metro.<ID>.expo-hono-opentofu-starter.localhost`。ExpoのQRには標準のLAN/トンネル接続先を使い、端末に `.localhost` を設定しない。共有proxyの初回起動に管理者認証が必要な環境では、上記コマンドをホストの対話ターミナルで実行する。
-
-`dev` / `dev:api` は自worktreeのPostgreSQLを起動してhealthcheck・migration後にAPIを開始する。ホストのDB公開先もDockerが自動割当する。`dev:mobile` はDBなしで起動できる。`db:migrate` と `test:integration` も同じDBを解決する。CIやAPIの環境ファイルに明示した `DATABASE_URL` があれば、その接続先を使う。
-
-```sh
-bun run dev:api
-bun run dev:mobile
-bun run services:up
+bun run dev          # API・Metro（依存DBとmigrationを含む）
+bun run dev:api      # APIとDB
+bun run dev:mobile   # Metroのみ。DB不要
+bun run dev:go       # API・DBとExpo Go用トンネル付きMetro
+bun run services:up  # API・DB・Metroをバックグラウンド起動
+bun run db:migrate
+bun run test:integration
 bun run services:down
 ```
 
-Ctrl+Cは開発プロセスとそのPortless routeを終了する。`services:down`、またはホストの `docker compose down` は自worktreeのComposeだけを停止し、volumeを保持する。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。同一worktreeのAPIまたはMetroの二重起動は既存プロセスを奪わず失敗する。
-
-`setup` は既存アプリenvとsecretを保持する。APIの `DATABASE_URL` と `BETTER_AUTH_URL` は空でローカル自動設定になり、実機認証ではHTTPSトンネルURLを明示する。ルート `.env` はCompose用の生成設定専用。自分の環境値は `apps/api/.env` / `apps/mobile/.env` に置く。
-
-旧構成からは新しいDB・volume・保存namespaceで開始する。データ移行や旧スキームの互換処理はない。旧Composeの稼働を止めたい場合は、その旧設定・project名で通常停止する。旧volumeは新環境へ自動接続しない。
+旧来のホスト実行モードと `compose.host.yaml`、独自のポート解決・プロセス監視スクリプトは廃止した。同じcheckoutのCompose project名・DB volume名は維持する。旧ホストプロセスが残っている場合は、そのターミナルでCtrl+Cしてから切り替える。
 
 ## 2. iPhone / Android から開く
 
 ### まずExpo Goでショーケース
 
-同じworktreeのMetroが起動していれば止め、worktreeルートから実行する。
+同じworktreeで起動中のMetroがあればCtrl+Cで止め、ホストのworktreeルートから実行する。
 
 ```sh
-cd apps/mobile
-bun run go
+PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose \
+  -f compose.yaml -f compose.go.yaml up --build api metro
 ```
 
-ホスト開発なら `cd apps/mobile && bun run go`。表示されたQRコードをiPhoneのカメラで読み取るか、Expo Goの開発サーバーとして開く。Androidも同じサーバーへ接続できる。トンネルを使うのでPCと端末が同じLANでなくてもよい。URLは実行中だけ有効。
+`compose.go.yaml` はMetroのコマンドだけを `expo start --go --tunnel ngrok --port 8081` へ変更する。表示されたQRコードをSDK 58対応のExpo Goで開く。iPhone・AndroidともPCと同じLANでなくても接続できる。SDK 58の既定ExpoトンネルはExpoログインを要求するため、ここでは導入済みの `@expo/ngrok` を明示して使う。URLは実行中だけ有効。
 
-`EXPO_PUBLIC_API_URL`が空ならオフラインモード。検索、保存、完了、設定は利用でき、Accountには未接続の案内を表示する。
+標準構成のMetroは `--lan`、`apps/mobile` には `tunnel` / `go` コマンドも残す。コンテナのLANアドレスは実機から直接到達できないため、実機はトンネル構成を使う。ホストブラウザではPortlessのMetro URLを開く。端末に `.localhost` を設定しない。
+
+`EXPO_PUBLIC_API_URL` が空ならオフラインモード。検索、保存、完了、設定は利用でき、Accountには未接続の案内を表示する。
 
 ### ローカルAPIも実機から使う
 
-別ターミナルでAPIを起動する。
+Expo GoトンネルはMetro専用なので、APIには別のworktree別HTTPSトンネルを使う。起動中のAPIに対してホストで実行する。
 
 ```sh
-docker compose exec workspace bun run dev:api
-# ホスト開発なら bun run dev:api
+PORTLESS_HTTPS=0 PORTLESS_PORT=80 portless compose --profile tunnel up -d api-tunnel
+portless compose logs api-tunnel
 ```
 
-**コンテナ開発時**のHTTPSトンネル:
-
-```sh
-docker compose --profile tunnel up -d api-tunnel
-docker compose logs api-tunnel
-```
-
-ログに表示された `https://....trycloudflare.com` を使い、次の2ファイルを編集する。
+ログの `https://....trycloudflare.com` を使い、次の2ファイルを編集する。
 
 | ファイル           | 値                                                  |
 | ------------------ | --------------------------------------------------- |
 | `apps/api/.env`    | `BETTER_AUTH_URL=https://....trycloudflare.com`     |
 | `apps/mobile/.env` | `EXPO_PUBLIC_API_URL=https://....trycloudflare.com` |
 
-APIとMetroを再起動する。APIの `.env.example` には開発専用の `exp://**` originが含まれている。共有の本番APIにこのワイルドカードを入れない。実機の `localhost` はPCではなく端末自身なので、localhost URLをモバイルへ設定しない。
+`portless compose restart api metro` で環境ファイルを読み直す。APIの `.env.example` には開発専用の `exp://**` originが含まれている。共有の本番APIにこのワイルドカードを入れない。実機の `localhost` は端末自身を指すため、localhost URLをモバイルへ設定しない。
 
-ホスト開発時は、API起動ログの実ポートで `API_PORT` を置き換えて以下を使える（Docker Desktop/OrbStack）。Linuxでは `--add-host=host.docker.internal:host-gateway` も付ける。
-
-```sh
-docker run --rm cloudflare/cloudflared:2026.10.7 tunnel \
-  --no-autoupdate --protocol http2 --url http://host.docker.internal:API_PORT
-```
-
-Cloudflareトンネルは外向きTCP 7844が必要。今回のホストではこの通信がタイムアウトしたため、公開API経由の実機認証は未確認。利用できるネットワーク、別のHTTPSトンネル、またはstaging Cloud Runを使う。
-
-`curl https://....trycloudflare.com/ready` が `{"status":"ready"}` になれば、SettingsのCheck connection、Accountの登録・ログインを試せる。トンネルを再作成するとURLが変わる。普段は安定したstaging Cloud Run URLへ切り替える。
+Cloudflareトンネルは外向きTCP 7844が必要。`curl https://....trycloudflare.com/ready` が `{"status":"ready"}` になれば、SettingsのCheck connection、Accountの登録・ログインを試せる。トンネルを作り直すとURLが変わる。普段は安定したstaging Cloud Run URLも使える。実機・公開トンネルの確認範囲は [docs/testing.md](testing.md) に記録する。
 
 ### Development BuildとPRプレビュー
 

@@ -27,8 +27,9 @@
 
 ## Development and validation
 
-- Follow [docs/setup.md](docs/setup.md). Standard environment: Linux Dev Container and Docker Compose. Mac/Xcode/Android Studio are optional; use Expo Go or EAS builds for iPhone checks.
-- `bun run setup` generates worktree-specific Compose settings and missing app env files without overwriting app values. `bun run dev` starts an isolated DB/API/Metro through Turborepo. Host ports are assigned by Portless/Docker; container-internal API/Metro ports are 8080/8081.
+- Follow [docs/setup.md](docs/setup.md). Local servers require Docker Compose and host Portless 0.16.0 (Node.js 24+). The Linux Dev Container is an optional editor/check environment. Mac/Xcode/Android Studio are optional; use Expo Go or EAS builds for iPhone checks.
+- Run `sh scripts/worktree-init.sh` before Compose; `setup` creates missing app env files without overwriting values. Host `bun run dev` wraps `portless compose up --build api metro`. Compose installs dependencies and migrates the isolated DB before API startup; Metro can start alone. Internal API/Metro ports are 8080/8081, Portless assigns loopback host ports, and PostgreSQL stays unpublished. Use `portless compose --profile '*' down` / `services:down` to remove routes and retain volumes. Do not recreate API/Metro with plain `docker compose up`.
+- Dev Container starts only the `workspace` editor and its setup/DB dependencies. Run Portless commands on the host; no Docker socket is mounted in the editor. Initial hook installation must be serialized across worktrees because Git hooks are shared; automatic Compose installs skip lifecycle scripts.
 - `bun run check`: formatting, type-aware lint, strict typecheck, Bun/Jest tests and Fallow. `bun run test:integration` requires a migrated PostgreSQL database.
 - `bun run doctor` and `bun run export:mobile` check Expo dependencies and bundle iOS/Android.
 - `tofu fmt -check -recursive infra`, `tofu -chdir=infra init -backend=false`, `tofu -chdir=infra validate`, `tflint --chdir=infra`: credential-free IaC checks. Also validate `infra/bootstrap`.

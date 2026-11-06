@@ -1,5 +1,0 @@
-# Optional override only when running Bun on the host instead of in the container.
-services:
-  postgres:
-    ports:
-      - '127.0.0.1::5432'

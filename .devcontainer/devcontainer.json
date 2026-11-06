@@ -5,9 +5,9 @@
   "workspaceFolder": "${localWorkspaceFolder}",
   "remoteUser": "node",
   "updateRemoteUserUID": true,
-  "shutdownAction": "stopCompose",
+  "shutdownAction": "none",
   "forwardPorts": [],
-  "postCreateCommand": "sudo chown -R node:node node_modules apps/mobile/node_modules apps/api/node_modules packages/shared/node_modules /home/node/.bun /home/node/.expo /home/node/.config/gcloud && bun install --frozen-lockfile && bun run setup && bun run db:migrate",
+  "postCreateCommand": "bun run hooks:install",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -26,5 +26,6 @@
     "sh",
     "${localWorkspaceFolder}/scripts/worktree-init.sh",
     "${localWorkspaceFolder}"
-  ]
+  ],
+  "runServices": ["workspace"]
 }

@@ -3,13 +3,6 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 export async function setup(root = fileURLToPath(new URL('../', import.meta.url))) {
-  const init = Bun.spawn(['sh', `${root}scripts/worktree-init.sh`, root], {
-    stdout: 'inherit',
-    stderr: 'inherit',
-  });
-  if ((await init.exited) !== 0) {
-    throw new Error('Worktree initialization failed');
-  }
   for (const app of ['api', 'mobile']) {
     const target = `${root}apps/${app}/.env`;
     const example = await readFile(`${root}apps/${app}/.env.example`, 'utf8');

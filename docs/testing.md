@@ -70,3 +70,20 @@ iPhone実機とAndroid端末での操作、日次目標スライダー、文字�
 初回の依存導入を3つ同時に実行するとLefthookの共有hook更新が競合したため、初回install/コンテナ作成は順に実行する手順とした。Portless 0.15.8の同時route登録中に一度JSON読取警告を観測したが、登録後の全routeは正常に応答した。Dockerの容量上限により1台のReact Native DevTools取得がfallbackになった。検証専用コンテナ・volume・worktreeは終了後に削除し、通常の開発用DBと既存の旧DBは保持した。
 
 Androidのネイティブ実行、iPhone/Android実機、公開HTTPSトンネルを通した端末認証、新アプリIDのビルド/インストールは未実施。改名前のビルド成功記録は、新しい識別子のネイティブ検証には含めない。
+
+## 2026-11-06のPortless Compose連携の検証
+
+- Portless 0.16.0でAPI・MetroをComposeサービスとして起動し、`/ready` / `/status` が応答した。APIはDBのTCP healthcheckとmigration完了を待つ。Metro単独起動ではDBコンテナが作られないことを確認した。
+- 3 linked worktreeでAPI・Metroが同時に応答し、6つの公開ポートがすべて異なり、loopback限定であることを確認した。PostgreSQLは3つともホスト公開なし。各DBに異なる値を保存し、他worktreeの値が見えないことを確認した。
+- 1つのprojectをdownしても残りのAPIが応答し、停止対象のDB volumeは保持された。再起動後も検証値を保持した。foregroundのCtrl+CでAPI・Metroとrouteが終了し、他projectと共有proxyの既存routeは保持された。`services:down` はeditorを含む全profileを終了する。
+- 空白・引用符・ドル記号を含むcheckoutでComposeのmountとAPI起動が成功し、Bunの共通Compose aliasでもパスを保持できることを確認した。BunテストではIDの安定性、branch変更、detached HEAD、symlink、同時setup、secretと既存アプリenvの保持を検証した。
+- API環境のBunテストで開発originの補完、明示HTTPS URLの優先、本番への開発設定の混入防止、secretを含まないエラーを検証した。通常MetroのmanifestとJavaScript bundleをPortless経由で取得し、内部8081が公開bundle URLへ混ざらないことを確認した。実APIのCORSでもMetro originが許可された。
+- `compose.go.yaml` でExpo GoのQRと匿名ngrokトンネルを生成し、公開トンネルからiOS manifestを取得した。SDK 58の既定Expoトンネルはログインを要求するため、開発用コマンドは `--tunnel ngrok` を明示する。
+- `bun run check`、Compose経由の認証統合テストとmigration、Expo Doctor（20/20）、iOS・Android export、通常/editor/tunnel/Expo GoのCompose設定検証が成功した。
+- 既存イメージから起動した編集用workspaceでlinked worktreeのGit操作・型検査が成功し、API・MetroのPortless公開ポートも維持された。
+
+Dockerの容量上限により、3 worktreeそれぞれへの依存の新規導入は完了しなかった。並列サービス検証ではGit管理外のoverrideで導入済みの依存volumeのみを共有し、ソース・アプリenv・DB・ネットワーク・公開ポートは分離した。標準Compose設定は依存volumeもprojectごとに分離する。
+
+Dev Container CLI 0.90.0 / Docker Compose 5.5.0による新規buildは未完了。最初はBakeが生成Dockerfileの外部パスへのread許可を要求し、Git管理外のcheckout内をTMPDIRにして再試行した後はGoogle Cloud CLI導入中に容量不足で停止した。既存イメージでのworkspace検証と新規build成功は区別する。
+
+iPhone/Android実機での接続・認証、新しいDev Containerイメージの初回作成、3 worktreeの完全に独立した依存導入は未確認。UIやネイティブ依存・アプリIDを変更しておらず、今回ネイティブビルド・配信・IaC applyは実行していない。
