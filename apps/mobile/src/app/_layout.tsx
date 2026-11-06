@@ -26,6 +26,21 @@ function Navigation() {
         <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/steps" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/finish" options={{ headerShown: false }} />
+        {/* Plan A ④ draws its own sheet header; ④-4 covers the sheet so back returns to it. */}
+        <Stack.Screen
+          name="import/index"
+          options={{
+            headerShown: false,
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.65, 1],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 28,
+          }}
+        />
+        <Stack.Screen
+          name="import/steps"
+          options={{ headerShown: false, presentation: 'fullScreenModal' }}
+        />
         <Stack.Screen
           name="compose"
           options={{

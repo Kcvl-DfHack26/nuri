@@ -77,21 +77,32 @@ function Header({ top, onHeight }: { top: number; onHeight: (height: number) => 
       }}
     >
       <Text className="font-maru-black text-display text-accent-rose">nuri</Text>
-      {/* Search and SNS import arrive with ③④; keep the Plan A entry point visible but inactive. */}
-      <View
-        accessible
-        accessibilityLabel="メイクを検索（準備中）"
-        accessibilityState={{ disabled: true }}
-        className="min-h-12 flex-1 flex-row items-center gap-2 rounded-full border border-black bg-white/55 py-1.5 pl-3.5 pr-1.5"
-      >
-        <SocialIcon name={SEARCH} size={22} color={ink} />
-        <Text className="flex-1 font-maru text-ui text-ink-secondary" numberOfLines={1}>
-          メイクを検索
-        </Text>
-        <View className="min-h-9 flex-row items-center gap-1 rounded-full bg-neutral-soft pl-2.5 pr-3">
+      <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-full border border-black bg-white/55 py-1.5 pl-3.5 pr-1.5">
+        {/* Search arrives with ③; keep the Plan A field visible but inactive. */}
+        <View
+          accessible
+          accessibilityLabel="メイクを検索（準備中）"
+          accessibilityState={{ disabled: true }}
+          className="flex-1 flex-row items-center gap-2"
+        >
+          <SocialIcon name={SEARCH} size={22} color={ink} />
+          <Text className="flex-1 font-maru text-ui text-ink-secondary" numberOfLines={1}>
+            メイクを検索
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="動画URLからレシピを作る"
+          // The 36pt chip keeps Plan A's look; the slop extends the hit area to 48pt.
+          hitSlop={6}
+          onPress={() => {
+            router.push('/import');
+          }}
+          className="min-h-9 flex-row items-center gap-1 rounded-full bg-neutral-soft pl-2.5 pr-3 active:opacity-70"
+        >
           <SocialIcon name={LINK} size={16} color={secondary} />
           <Text className="font-maru-bold text-label text-ink-primary">動画URL</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
