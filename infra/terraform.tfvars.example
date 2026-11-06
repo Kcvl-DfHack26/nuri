@@ -1,0 +1,9 @@
+project_id           = "your-billing-enabled-project"
+github_repository_id = "replace-with-gh-api-numeric-id"
+region               = "asia-northeast1"
+name                 = "expo-hono-opentofu-starter-staging"
+deploy_application   = false
+# Export TF_VAR_database_password in your shell; never put it in this file.
+# After secrets and the first image exist:
+# deploy_application = true
+# image = "asia-northeast1-docker.pkg.dev/PROJECT/expo-hono-opentofu-starter-staging/api@sha256:..."

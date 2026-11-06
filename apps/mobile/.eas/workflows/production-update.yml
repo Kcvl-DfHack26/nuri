@@ -1,0 +1,15 @@
+# Invoked by GitHub Actions only after migration, deployment and readiness succeed.
+name: Production update
+defaults:
+  tools:
+    node: '24.19.0'
+    bun: '1.4.4'
+on:
+  workflow_dispatch: {}
+jobs:
+  update:
+    type: update
+    environment: production
+    params:
+      channel: production
+      platform: all

@@ -1,0 +1,140 @@
+name: Publish preview
+on:
+  issue_comment:
+    types: [edited]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Open pull request number
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: publish-preview-${{ github.event.issue.number || inputs.pr }}
+  cancel-in-progress: false
+jobs:
+  request:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.issue.pull_request && github.event.sender.type == 'User' &&
+      contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      pr: ${{ steps.request.outputs.pr }}
+      sha: ${{ steps.request.outputs.sha }}
+      comment: ${{ steps.request.outputs.comment }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v9.0.0
+        id: request
+        env:
+          REQUEST_PR: ${{ inputs.pr }}
+        with:
+          script: |
+            const { assertPreviewTarget, parsePreviewRequest, previewMarker, previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
+            const isComment = context.eventName === 'issue_comment';
+            const payload = context.payload;
+            const requestedSha = isComment ? parsePreviewRequest({ author: payload.comment.user.login, body: payload.comment.body, before: payload.changes?.body?.from }) : undefined;
+            if (isComment && !requestedSha) return;
+            const number = isComment ? String(payload.issue.number) : process.env.REQUEST_PR;
+            if (!/^[1-9]\d{0,8}$/.test(number ?? '')) throw new Error('PR番号が不正です');
+            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: context.actor });
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
+            assertPreviewTarget({ actorType: payload.sender?.type, permission: permission.permission, repository: `${context.repo.owner}/${context.repo.repo}`, headRepository: pr.head.repo?.full_name, state: pr.state, base: pr.base.ref, sha: pr.head.sha, requestedSha });
+            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number });
+            let comment = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(`${previewMarker}\n`));
+            if (isComment && (!comment || comment.id !== payload.comment.id || comment.body !== payload.comment.body || previewSha(comment.body) !== pr.head.sha)) throw new Error('最新のpreviewコメントから実行してください');
+            const body = renderPreviewComment({ sha: pr.head.sha, status: '⏳ previewを配信中です。', runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });
+            if (comment) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });
+            } else {
+              ({ data: comment } = await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body }));
+            }
+            core.setOutput('pr', String(pr.number));
+            core.setOutput('sha', pr.head.sha);
+            core.setOutput('comment', String(comment.id));
+
+  publish:
+    needs: request
+    if: needs.request.outputs.pr != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      comment: ${{ steps.preview.outputs.comment }}
+    steps:
+      # Only the authorized, same-repository commit reaches this job.
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.request.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
+      - name: Use the repository EAS CLI
+        run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Check the PR is still current
+        uses: actions/github-script@v9.0.0
+        env:
+          PREVIEW_PR: ${{ needs.request.outputs.pr }}
+          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PREVIEW_PR) });
+            if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA) throw new Error('PRが更新・終了されたため配信を中止します');
+      - name: Publish iOS and Android updates
+        id: preview
+        uses: expo/expo-github-action/preview@9.0.1
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        with:
+          working-directory: apps/mobile
+          command: eas update --branch pr-${{ needs.request.outputs.pr }} --environment preview --platform all --message "PR ${{ needs.request.outputs.pr }} @ ${{ needs.request.outputs.sha }}" --non-interactive
+          comment: false
+
+  report:
+    needs: [request, publish]
+    if: always() && needs.request.outputs.comment != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # Render from the trusted workflow revision, not from the published PR.
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v9.0.0
+        env:
+          PREVIEW_PR: ${{ needs.request.outputs.pr }}
+          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+          PREVIEW_COMMENT: ${{ needs.request.outputs.comment }}
+          PREVIEW_RESULT: ${{ needs.publish.result }}
+          PREVIEW_UPDATE_COMMENT: ${{ needs.publish.outputs.comment }}
+        with:
+          script: |
+            const { previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
+            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PREVIEW_PR) });
+            const { data: comment } = await github.rest.issues.getComment({ ...context.repo, comment_id: Number(process.env.PREVIEW_COMMENT) });
+            if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA || previewSha(comment.body) !== pr.head.sha) return;
+            const success = process.env.PREVIEW_RESULT === 'success';
+            const body = renderPreviewComment({ sha: pr.head.sha, status: success ? '✅ このコミットのpreviewを配信しました。' : '❌ previewを配信できませんでした。ログを確認して再実行できます。', runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`, updateComment: success ? process.env.PREVIEW_UPDATE_COMMENT : undefined });
+            await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });

@@ -1,0 +1,28 @@
+name: Native smoke tests
+on:
+  workflow_dispatch: {}
+jobs:
+  ios_build:
+    type: build
+    environment: preview
+    params:
+      platform: ios
+      profile: simulator
+  android_build:
+    type: build
+    environment: preview
+    params:
+      platform: android
+      profile: simulator
+  ios_test:
+    needs: [ios_build]
+    type: maestro
+    params:
+      build_id: ${{ needs.ios_build.outputs.build_id }}
+      flow_path: [.maestro/showcase.yaml]
+  android_test:
+    needs: [android_build]
+    type: maestro
+    params:
+      build_id: ${{ needs.android_build.outputs.build_id }}
+      flow_path: [.maestro/showcase.yaml]

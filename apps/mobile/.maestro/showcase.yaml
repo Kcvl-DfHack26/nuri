@@ -1,0 +1,12 @@
+appId: dev.reohakase.expohonopentofustarter
+---
+- launchApp:
+    clearState: true
+- assertVisible: 'ホーム'
+- tapOn: 'マイページ'
+- assertVisible: '自分の投稿を確認するにはログインしてください'
+- tapOn: 'ログイン'
+- assertVisible: 'Googleでログイン'
+- back
+- tapOn: '設定'
+- assertVisible: '外観'

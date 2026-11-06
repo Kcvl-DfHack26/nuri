@@ -1,0 +1,24 @@
+output "workload_identity_provider" {
+  description = "GitHub environment variable GCP_WORKLOAD_IDENTITY_PROVIDER."
+  value       = google_iam_workload_identity_pool_provider.github.name
+}
+output "deploy_service_account" {
+  description = "GitHub environment variable GCP_SERVICE_ACCOUNT."
+  value       = google_service_account.deployer.email
+}
+output "registry" {
+  description = "Docker repository base URI."
+  value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.api.repository_id}"
+}
+output "sql_connection_name" {
+  description = "Cloud SQL connection name for the DATABASE_URL socket."
+  value       = google_sql_database_instance.postgres.connection_name
+}
+output "api_origin" {
+  description = "Expected API origin; verify against the service URI after deployment."
+  value       = local.api_origin
+}
+output "service_uri" {
+  description = "Cloud Run service URI when enabled."
+  value       = try(google_cloud_run_v2_service.api[0].uri, null)
+}

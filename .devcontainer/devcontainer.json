@@ -1,0 +1,31 @@
+{
+  "name": "expo-hono-opentofu-starter",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "workspace",
+  "workspaceFolder": "${localWorkspaceFolder}",
+  "remoteUser": "node",
+  "updateRemoteUserUID": true,
+  "shutdownAction": "none",
+  "forwardPorts": [],
+  "postCreateCommand": "bun run hooks:install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "expo.vscode-expo-tools",
+        "oxc.oxc-vscode",
+        "opentofu.vscode-opentofu",
+        "openai.chatgpt"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "oxc.oxc-vscode"
+      }
+    }
+  },
+  "initializeCommand": [
+    "sh",
+    "${localWorkspaceFolder}/scripts/worktree-init.sh",
+    "${localWorkspaceFolder}"
+  ],
+  "runServices": ["workspace"]
+}

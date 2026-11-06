@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "singleQuote": true,
+  "ignorePatterns": [
+    ".agents/**",
+    "skills-lock.json",
+    "bun.lock",
+    "apps/mobile/uniwind-types.d.ts",
+    "**/drizzle/**",
+    "**/.expo/**",
+    "**/dist/**",
+    ".artifacts/**"
+  ]
+}

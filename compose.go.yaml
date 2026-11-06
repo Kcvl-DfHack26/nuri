@@ -1,0 +1,5 @@
+services:
+  metro:
+    environment:
+      EXPO_PACKAGER_PROXY_URL: ''
+    command: bun run --cwd apps/mobile go
