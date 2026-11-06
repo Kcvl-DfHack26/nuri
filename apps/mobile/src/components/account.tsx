@@ -76,7 +76,7 @@ export function Account() {
       // Dismissing the OS login browser is cancellation, not a successful login.
       if (current.data) {
         client.clear();
-        router.replace('/');
+        router.replace('/timeline');
       }
     },
   });
@@ -119,7 +119,7 @@ export function Account() {
           <Button
             label="タイムラインに戻る"
             onPress={() => {
-              router.replace('/');
+              router.replace('/timeline');
             }}
           />
         </NativeHost>
@@ -218,7 +218,7 @@ export function Account() {
           label="タイムラインを見る"
           variant="outlined"
           onPress={() => {
-            router.replace('/');
+            router.replace('/timeline');
           }}
         />
       </NativeHost>

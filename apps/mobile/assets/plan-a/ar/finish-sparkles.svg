@@ -1,0 +1,33 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="390" height="844" viewBox="0 0 390 844" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Sparkles">
+<g id="icon/sparkle">
+<path id="Vector" d="M51 182.75L52.65 187.517L57.4167 189.167L52.65 190.817L51 195.583L49.35 190.817L44.5833 189.167L49.35 187.517L51 182.75Z" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" stroke="#B52F63"/>
+<path id="Vector_2" d="M57.4167 194.667V196.5M57.4167 196.5V198.333M57.4167 196.5H55.5833M57.4167 196.5H59.25" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" stroke="#B52F63"/>
+</g>
+<g id="icon/sparkle_2">
+<path id="Vector_3" d="M343 153.25L344.95 158.883L350.583 160.833L344.95 162.783L343 168.417L341.05 162.783L335.417 160.833L341.05 158.883L343 153.25Z" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round" stroke="#F5B84A"/>
+<path id="Vector_4" d="M350.583 167.333V169.5M350.583 169.5V171.667M350.583 169.5H348.417M350.583 169.5H352.75" stroke-width="1.95" stroke-linecap="round" stroke-linejoin="round" stroke="#F5B84A"/>
+</g>
+<g id="icon/sparkle_3">
+<path id="Vector_5" d="M360 332L361.2 335.467L364.667 336.667L361.2 337.867L360 341.333L358.8 337.867L355.333 336.667L358.8 335.467L360 332Z" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke="#FFA9C4"/>
+<path id="Vector_6" d="M364.667 340.667V342M364.667 342V343.333M364.667 342H363.333M364.667 342H366" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke="#FFA9C4"/>
+</g>
+<g id="icon/sparkle_4">
+<path id="Vector_7" d="M33 381.75L34.05 384.783L37.0833 385.833L34.05 386.883L33 389.917L31.95 386.883L28.9167 385.833L31.95 384.783L33 381.75Z" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round" stroke="#F5B84A"/>
+<path id="Vector_8" d="M37.0833 389.333V390.5M37.0833 390.5V391.667M37.0833 390.5H35.9167M37.0833 390.5H38.25" stroke-width="1.05" stroke-linecap="round" stroke-linejoin="round" stroke="#F5B84A"/>
+</g>
+<g id="icon/sparkle_5">
+<path id="Vector_9" d="M310 422.5L311.5 426.833L315.833 428.333L311.5 429.833L310 434.167L308.5 429.833L304.167 428.333L308.5 426.833L310 422.5Z" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke="#B52F63"/>
+<path id="Vector_10" d="M315.833 433.333V435M315.833 435V436.667M315.833 435H314.167M315.833 435H317.5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke="#B52F63"/>
+</g>
+<g id="icon/sparkle_6">
+<path id="Vector_11" d="M78 452L79.2 455.467L82.6667 456.667L79.2 457.867L78 461.333L76.8 457.867L73.3333 456.667L76.8 455.467L78 452Z" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke="#FFA9C4"/>
+<path id="Vector_12" d="M82.6667 460.667V462M82.6667 462V463.333M82.6667 462H81.3333M82.6667 462H84" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke="#FFA9C4"/>
+</g>
+<circle id="Rect" cx="114" cy="144" r="4" fill="#FFA9C4"/>
+<circle id="Rect_2" cx="284" cy="204" r="4" fill="#CFF1E3"/>
+<circle id="Rect_3" cx="54" cy="304" r="4" fill="#E3D6FF"/>
+<circle id="Rect_4" cx="344" cy="254" r="4" fill="#F5B84A"/>
+<circle id="Rect_5" cx="254" cy="114" r="4" fill="#B52F63"/>
+</g>
+</svg>

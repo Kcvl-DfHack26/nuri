@@ -14,6 +14,50 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
   --radius-xl: 1.025rem;
+
+  /* nuri Foundations from Figma Plan A. Plan A defines a light theme only. */
+  --color-bg-base: #ffe6ee;
+  --color-bg-surface: #fffbfd;
+  --color-pastel-pink: #ffd3e0;
+  --color-pastel-peach: #ffdfcf;
+  --color-pastel-butter: #fff1c4;
+  --color-pastel-mint: #cff1e3;
+  --color-pastel-sky: #d3e8ff;
+  --color-pastel-lilac: #e3d6ff;
+  --color-accent-pink: #ffa9c4;
+  --color-accent-rose: #b52f63;
+  --color-ink-primary: #43304b;
+  --color-ink-secondary: #6f5d76;
+  --color-line-soft: #f3dce6;
+  --color-base-lilac: #eee6ff;
+  --color-base-mint: #dff6ec;
+  --color-base-butter: #fff6d6;
+  --color-base-sky: #e2efff;
+  --color-base-peach: #ffebe0;
+  --color-neutral-soft: #e8e8ec;
+
+  /* Zen Maru Gothic ships one family per weight on native platforms. */
+  --font-maru: ZenMaruGothic_500Medium;
+  --font-maru-bold: ZenMaruGothic_700Bold;
+  --font-maru-black: ZenMaruGothic_900Black;
+
+  /* Plan A type styles: Micro, Caption, Label, Body, Button, Heading, Title, Display. */
+  --text-micro: 10px;
+  --text-micro--line-height: 13px;
+  --text-meta: 12px;
+  --text-meta--line-height: 17px;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-ui: 14px;
+  --text-ui--line-height: 21px;
+  --text-action: 15px;
+  --text-action--line-height: 21px;
+  --text-heading: 17px;
+  --text-heading--line-height: 24px;
+  --text-headline: 22px;
+  --text-headline--line-height: 30px;
+  --text-display: 28px;
+  --text-display--line-height: 36px;
 }
 
 @layer theme {

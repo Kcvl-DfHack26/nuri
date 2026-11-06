@@ -41,7 +41,7 @@ export function AuthCallback() {
       }
       if (active) {
         client.clear();
-        router.replace('/');
+        router.replace('/timeline');
       }
     }
     void finish().catch((cause: unknown) => {
