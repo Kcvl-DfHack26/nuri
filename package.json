@@ -30,7 +30,8 @@
     "services:down": "bun run compose --profile '*' down",
     "dev:go": "bun run compose -f compose.yaml -f compose.go.yaml up --build api metro",
     "hooks:install": "lefthook install",
-    "compose": "env -u WORKTREE_ROOT -u WORKTREE_GIT_COMMON_DIR PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose"
+    "compose": "env -u WORKTREE_ROOT -u WORKTREE_GIT_COMMON_DIR PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose",
+    "db:seed": "bun run compose exec api bun run --cwd apps/api db:seed"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
@@ -40,6 +41,8 @@
     "@types/node": "24.19.2",
     "eas-cli": "27.4.1",
     "eslint": "10.14.0",
+    "eslint-import-resolver-typescript": "4.4.4",
+    "eslint-plugin-boundaries": "7.4.2",
     "eslint-plugin-drizzle": "0.2.3",
     "eslint-plugin-hono": "1.2.1",
     "eslint-plugin-perfectionist": "5.13.0",

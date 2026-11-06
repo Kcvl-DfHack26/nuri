@@ -2,20 +2,11 @@ appId: dev.reohakase.expohonopentofustarter
 ---
 - launchApp:
     clearState: true
-- assertVisible: 'Today'
-- tapOn:
-    id: start-morning
-- assertVisible: 'A simple place to begin'
-- scrollUntilVisible:
-    element:
-      id: save-ritual
-    direction: DOWN
-- tapOn:
-    id: save-ritual
-- assertVisible: 'Remove from saved'
-- tapOn:
-    id: complete-ritual
-- assertVisible: 'A little time, well spent.'
-- tapOn:
-    id: dismiss-completion
-- assertVisible: 'Completed today'
+- assertVisible: 'ホーム'
+- tapOn: 'マイページ'
+- assertVisible: '自分の投稿を確認するにはログインしてください'
+- tapOn: 'ログイン'
+- assertVisible: 'Googleでログイン'
+- back
+- tapOn: '設定'
+- assertVisible: '外観'

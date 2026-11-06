@@ -1,21 +1,29 @@
+import { usePathname } from 'expo-router';
 import { NativeTabs } from 'expo-router/native-tabs';
+import { Platform } from 'react-native';
 
-import { colors } from '@/theme/colors';
+import { ComposeShortcut } from '@/components/compose-shortcut';
 
 export default function TabsLayout() {
+  const pathname = usePathname();
   return (
-    <NativeTabs tintColor={colors.accent}>
-      <NativeTabs.Trigger name="(today)">
-        <NativeTabs.Trigger.Icon sf="sun.max.fill" md="sunny" />
-        <NativeTabs.Trigger.Label>Today</NativeTabs.Trigger.Label>
+    <NativeTabs>
+      {Platform.OS === 'ios' && Number(Platform.Version) >= 26 && pathname !== '/settings' ? (
+        <NativeTabs.BottomAccessory>
+          <ComposeShortcut />
+        </NativeTabs.BottomAccessory>
+      ) : null}
+      <NativeTabs.Trigger name="(feed)">
+        <NativeTabs.Trigger.Icon sf="text.bubble.fill" md="chat" />
+        <NativeTabs.Trigger.Label>ホーム</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(library)">
-        <NativeTabs.Trigger.Icon sf="square.grid.2x2.fill" md="grid_view" />
-        <NativeTabs.Trigger.Label>Library</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="(profile)">
+        <NativeTabs.Trigger.Icon sf="person.crop.circle.fill" md="account_circle" />
+        <NativeTabs.Trigger.Label>マイページ</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="(settings)">
         <NativeTabs.Trigger.Icon sf="gearshape.fill" md="settings" />
-        <NativeTabs.Trigger.Label>Settings</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>設定</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

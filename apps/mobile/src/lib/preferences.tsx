@@ -2,7 +2,6 @@ import type { Preferences } from '@starter/shared';
 import type { ReactNode } from 'react';
 
 import { preferencesSchema } from '@starter/shared';
-import * as Haptics from 'expo-haptics';
 import Storage from 'expo-sqlite/kv-store';
 import { createContext, use, useEffect, useState } from 'react';
 import { Uniwind } from 'uniwind';
@@ -19,16 +18,10 @@ function readPreferences(): Preferences {
 type PreferencesContext = {
   preferences: Preferences;
   update: (patch: Partial<Preferences>) => void;
-  toggleFavorite: (id: string) => void;
-  complete: (id: string) => void;
   storageError: string | null;
 };
 
 const Context = createContext<PreferencesContext | null>(null);
-
-export function todayKey(date = new Date()): string {
-  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-}
 
 export function PreferencesProvider({ children }: { children: ReactNode }) {
   const [preferences, setPreferences] = useState(readPreferences);
@@ -44,39 +37,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
       setPreferences(next);
       setStorageError(null);
     } catch {
-      setStorageError('Your changes could not be saved. Please try again.');
+      setStorageError('設定を保存できませんでした。もう一度お試しください。');
     }
   }
 
-  function feedback() {
-    if (preferences.haptics) {
-      void Haptics.selectionAsync().catch(() => {
-        /* Haptics are optional on unsupported devices. */
-      });
-    }
-  }
-
-  function toggleFavorite(id: string) {
-    update({
-      favorites: preferences.favorites.includes(id)
-        ? preferences.favorites.filter((value) => value !== id)
-        : [...preferences.favorites, id],
-    });
-    feedback();
-  }
-
-  function complete(id: string) {
-    const day = todayKey();
-    const completed = preferences.completed[day] ?? [];
-    update({ completed: { ...preferences.completed, [day]: [...new Set([...completed, id])] } });
-    feedback();
-  }
-
-  return (
-    <Context value={{ preferences, update, toggleFavorite, complete, storageError }}>
-      {children}
-    </Context>
-  );
+  return <Context value={{ preferences, update, storageError }}>{children}</Context>;
 }
 
 export function usePreferences() {

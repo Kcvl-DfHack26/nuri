@@ -33,5 +33,27 @@
       "outputs": ["dist/**"]
     }
   },
-  "cacheDir": ".turbo/cache"
+  "cacheDir": ".turbo/cache",
+  "globalEnv": [
+    "AUTH_EMULATE",
+    "GOOGLE_EMULATOR_URL",
+    "APPLE_EMULATOR_URL",
+    "GOOGLE_EMULATOR_PUBLIC_URL",
+    "APPLE_EMULATOR_PUBLIC_URL",
+    "RESEND_API_URL",
+    "RESEND_API_KEY",
+    "EMAIL_FROM",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "APPLE_CLIENT_ID",
+    "APPLE_CLIENT_SECRET",
+    "PASSKEY_RP_ID",
+    "PASSKEY_ORIGINS",
+    "APPLE_APP_ID",
+    "ANDROID_SHA256_CERT_FINGERPRINTS",
+    "EMULATE_SERVICE",
+    "EMULATE_PUBLIC_URL",
+    "EMULATE_HOST",
+    "EXPO_PUBLIC_PASSKEY_RP_ID"
+  ]
 }

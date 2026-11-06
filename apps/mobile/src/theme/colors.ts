@@ -15,19 +15,16 @@ export const colors = {
   text: Platform.select({
     ios: Color.ios.label,
     android: Color.android.dynamic.onSurface,
-    default: '#18251e',
+    default: '#1c1c1e',
   }),
   secondary: Platform.select({
     ios: Color.ios.secondaryLabel,
     android: Color.android.dynamic.onSurfaceVariant,
-    default: '#657269',
+    default: '#636366',
   }),
-  separator: Platform.select({
-    ios: Color.ios.separator,
-    android: Color.android.dynamic.outlineVariant,
-    default: '#d9ded9',
+  destructive: Platform.select({
+    ios: Color.ios.systemRed,
+    android: Color.android.dynamic.error,
+    default: '#b3261e',
   }),
-  accent: '#31745c',
-  hero: '#e5eee4',
-  heroText: '#214e3d',
 };

@@ -24,6 +24,7 @@ x-runtime: &runtime
     - root-modules:${WORKTREE_ROOT}/node_modules
     - mobile-modules:${WORKTREE_ROOT}/apps/mobile/node_modules
     - api-modules:${WORKTREE_ROOT}/apps/api/node_modules
+    - emulate-modules:${WORKTREE_ROOT}/apps/emulate/node_modules
     - shared-modules:${WORKTREE_ROOT}/packages/shared/node_modules
     - gcloud-config:/home/node/.config/gcloud
     - expo-config:/home/node/.expo
@@ -36,7 +37,7 @@ services:
       - sh
       - -ec
       - |
-        chown -R node:node node_modules apps/mobile/node_modules apps/api/node_modules packages/shared/node_modules /home/node/.expo /home/node/.config/gcloud
+        chown -R node:node node_modules apps/mobile/node_modules apps/api/node_modules apps/emulate/node_modules packages/shared/node_modules /home/node/.expo /home/node/.config/gcloud
         exec sudo -u node -H sh -ec 'bun install --frozen-lockfile --ignore-scripts && bun run setup'
   migrate:
     <<: *runtime
@@ -51,6 +52,14 @@ services:
     environment:
       <<: *environment
       PORT: '8080'
+      AUTH_EMULATE: 'true'
+      GOOGLE_EMULATOR_URL: http://google:4002
+      APPLE_EMULATOR_URL: http://apple:4004
+      GOOGLE_EMULATOR_PUBLIC_URL: https://google.${COMPOSE_PROJECT_NAME}.localhost
+      APPLE_EMULATOR_PUBLIC_URL: https://apple.${COMPOSE_PROJECT_NAME}.localhost
+      RESEND_API_URL: http://mail:4005
+      PASSKEY_RP_ID: ${COMPOSE_PROJECT_NAME}.localhost
+      PASSKEY_ORIGINS: https://metro.${COMPOSE_PROJECT_NAME}.localhost
     command: bun run --cwd apps/api dev
     stop_signal: SIGINT
     ports: ['127.0.0.1:8080:8080']
@@ -63,6 +72,54 @@ services:
       retries: 40
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      google:
+        condition: service_started
+      apple:
+        condition: service_started
+      mail:
+        condition: service_started
+  google:
+    <<: *runtime
+    environment:
+      <<: *environment
+      EMULATE_SERVICE: google
+      EMULATE_HOST: 0.0.0.0
+      EMULATE_PUBLIC_URL: https://google.${COMPOSE_PROJECT_NAME}.localhost
+      PORT: '4002'
+    command: bun run --cwd apps/emulate dev
+    ports: ['127.0.0.1:4002:4002']
+    labels: { portless.ports: '4002' }
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+  apple:
+    <<: *runtime
+    environment:
+      <<: *environment
+      EMULATE_SERVICE: apple
+      EMULATE_HOST: 0.0.0.0
+      EMULATE_PUBLIC_URL: https://apple.${COMPOSE_PROJECT_NAME}.localhost
+      PORT: '4004'
+    command: bun run --cwd apps/emulate dev
+    ports: ['127.0.0.1:4004:4004']
+    labels: { portless.ports: '4004' }
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+  mail:
+    <<: *runtime
+    environment:
+      <<: *environment
+      EMULATE_SERVICE: resend
+      EMULATE_HOST: 0.0.0.0
+      EMULATE_PUBLIC_URL: https://mail.${COMPOSE_PROJECT_NAME}.localhost
+      PORT: '4005'
+    command: bun run --cwd apps/emulate dev
+    ports: ['127.0.0.1:4005:4005']
+    labels: { portless.ports: '4005' }
+    depends_on:
+      setup:
         condition: service_completed_successfully
   metro:
     <<: *runtime
@@ -120,6 +177,7 @@ volumes:
   root-modules:
   mobile-modules:
   api-modules:
+  emulate-modules:
   shared-modules:
   gcloud-config:
   expo-config:
