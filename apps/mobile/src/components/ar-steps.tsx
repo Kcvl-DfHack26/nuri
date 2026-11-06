@@ -1,6 +1,7 @@
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +13,7 @@ import { GlassIconButton } from '@/components/glass-icon-button';
 import { arPhotos, findRecipe, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { backOrHome } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -51,7 +53,7 @@ export function ArSteps({ id }: { id: string }) {
           icon={BACK}
           label="戻る"
           onPress={() => {
-            router.back();
+            backOrHome();
           }}
         />
       </View>
@@ -68,6 +70,7 @@ export function ArSteps({ id }: { id: string }) {
   };
   return (
     <View className="flex-1 bg-white">
+      <StatusBar style="dark" />
       <FaceScene photo={arPhotos.camera}>
         {overlayVisible ? (
           <Image
@@ -91,7 +94,7 @@ export function ArSteps({ id }: { id: string }) {
             icon={CLOSE}
             label="閉じる"
             onPress={() => {
-              router.back();
+              backOrHome();
             }}
           />
           <View className="min-h-9 flex-row items-center gap-1.5 rounded-[18px] border border-white bg-white/70 px-3.5">

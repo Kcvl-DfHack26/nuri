@@ -1,6 +1,7 @@
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,10 +28,18 @@ type Scope = 'whole' | 'parts';
 export function Home() {
   const insets = useSafeAreaInsets();
   const [scope, setScope] = useState<Scope>('whole');
-  const contentTop = insets.top + 64;
+  // The header and segment float over the grid; measure them so larger text never overlaps it.
+  const [headerHeight, setHeaderHeight] = useState(48);
+  const [segmentHeight, setSegmentHeight] = useState(52);
+  const contentTop = insets.top + 16 + headerHeight;
   return (
     <View className="flex-1 bg-white">
-      {scope === 'whole' ? <RecipeGrid top={contentTop} /> : <PartGrid top={contentTop + 79} />}
+      <StatusBar style="dark" />
+      {scope === 'whole' ? (
+        <RecipeGrid top={contentTop} />
+      ) : (
+        <PartGrid top={contentTop + segmentHeight + 27} />
+      )}
       <View
         pointerEvents="none"
         className="absolute inset-x-0 top-0"
@@ -40,19 +49,31 @@ export function Home() {
             'linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0.96) 72%, rgba(255,255,255,0) 100%)',
         }}
       />
-      <Header top={insets.top} />
-      <View className="absolute inset-x-0 items-center" style={{ top: contentTop }}>
+      <Header top={insets.top} onHeight={setHeaderHeight} />
+      <View
+        className="absolute inset-x-0 items-center"
+        style={{ top: contentTop }}
+        onLayout={(event) => {
+          setSegmentHeight(event.nativeEvent.layout.height);
+        }}
+      >
         <ScopeSegment value={scope} onChange={setScope} />
       </View>
     </View>
   );
 }
 
-function Header({ top }: { top: number }) {
+function Header({ top, onHeight }: { top: number; onHeight: (height: number) => void }) {
   const secondary = useTokenColor('--color-ink-secondary');
   const ink = useTokenColor('--color-ink-primary');
   return (
-    <View className="absolute inset-x-0 flex-row items-center gap-3 px-4" style={{ top: top + 6 }}>
+    <View
+      className="absolute inset-x-0 flex-row items-center gap-3 px-4"
+      style={{ top: top + 6 }}
+      onLayout={(event) => {
+        onHeight(event.nativeEvent.layout.height);
+      }}
+    >
       <Text className="font-maru-black text-display text-accent-rose">nuri</Text>
       {/* Search and SNS import arrive with ③④; keep the Plan A entry point visible but inactive. */}
       <View
@@ -92,6 +113,8 @@ function ScopeSegment({ value, onChange }: { value: Scope; onChange: (value: Sco
             key={option.value}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
+            // The 44pt pill keeps Plan A's look; the segment padding extends the hit area to 52pt.
+            hitSlop={4}
             onPress={() => {
               onChange(option.value);
             }}

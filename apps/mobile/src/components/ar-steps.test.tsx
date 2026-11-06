@@ -11,7 +11,7 @@ jest.mock('@/components/native-host', () => ({
 }));
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), replace: jest.fn() },
+  router: { back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
 }));
 jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
 jest.mock('react-native-safe-area-context', () => ({

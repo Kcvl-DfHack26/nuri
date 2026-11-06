@@ -1,6 +1,7 @@
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, Share, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,6 +12,7 @@ import { GlassIconButton } from '@/components/glass-icon-button';
 import { arPhotos, findRecipe, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { backOrHome } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -83,7 +85,7 @@ export function RecipeDetail({ id }: { id: string }) {
           icon={BACK}
           label="戻る"
           onPress={() => {
-            router.back();
+            backOrHome();
           }}
         />
       </View>
@@ -92,6 +94,7 @@ export function RecipeDetail({ id }: { id: string }) {
   const { detail } = recipe;
   return (
     <View className="flex-1 bg-white">
+      <StatusBar style="dark" />
       <ScrollView
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
@@ -205,7 +208,7 @@ export function RecipeDetail({ id }: { id: string }) {
           icon={BACK}
           label="戻る"
           onPress={() => {
-            router.back();
+            backOrHome();
           }}
         />
         <View className="flex-1" />

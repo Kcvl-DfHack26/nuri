@@ -1,6 +1,7 @@
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,6 +9,7 @@ import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { arPhotos, findRecipe } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
+import { backOrHome } from '@/lib/navigation';
 
 import finishSparkles from '../../assets/plan-a/ar/finish-sparkles.svg';
 import sparkleInk from '../../assets/plan-a/icons/sparkle-ink.svg';
@@ -24,6 +26,7 @@ export function MakeFinish({ id }: { id: string }) {
   const recipe = findRecipe(id);
   return (
     <View className="flex-1 bg-white">
+      <StatusBar style="dark" />
       <FaceScene photo={arPhotos.finished}>
         <View
           className="absolute inset-x-0 bottom-0 h-[45.4%]"
@@ -44,7 +47,7 @@ export function MakeFinish({ id }: { id: string }) {
           icon={CLOSE}
           label="閉じる"
           onPress={() => {
-            router.back();
+            backOrHome();
           }}
         />
         <GlassIconButton icon={DOWNLOAD} label="写真を保存（準備中）" />

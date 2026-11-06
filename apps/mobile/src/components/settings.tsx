@@ -54,7 +54,7 @@ export function Settings() {
     onSuccess: async (_data, value) => {
       if (value.kind === 'logout') {
         client.clear();
-        router.replace('/');
+        router.dismissTo('/');
       } else {
         await client.invalidateQueries({ queryKey: ['passkeys'] });
       }
