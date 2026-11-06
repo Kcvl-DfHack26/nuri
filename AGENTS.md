@@ -5,6 +5,7 @@
 - This is an Expo UI showcase named expo-hono-opentofu-starter, backed by an independently deployed Hono API.
 - **主にiOS向けにUXを最適化するが、Androidでも全機能が動作する必要がある。** iOSの典型的なアプリとして、Native Tabs、Stack、標準の戻る操作、シート、設定フォーム、Dynamic Type、ダークモードを優先する。Androidでは同じ機能をMaterialのネイティブUIと戻る操作で提供する。
 - Use universal `@expo/ui` first. Isolate iOS-only imports in platform files and provide working Android equivalents. Every icon needs an Android source. Every enabled control must perform its advertised behavior.
+- For intentionally custom UI, use the local React Native Reusables components with Uniwind; follow [docs/ui.md](docs/ui.md). Native controls keep their OS appearance. Custom UI uses the neutral light/dark tokens in `apps/mobile/global.css`; do not copy these tokens into a second JS palette.
 - The showcase must work without Google Cloud credentials. Favorites, completion and preferences are device-local; do not imply account synchronization.
 - Decision history: [Expo技術選定検討](chatgpt-conversation://6aec01ec-6938-83e8-94df-24f41ae3ad55). Record implementation decisions and differences in [docs/architecture.md](docs/architecture.md).
 
@@ -17,11 +18,21 @@
 - Validate external input with Zod. Better Auth authenticates; protected Hono routes authorize. Store sessions with `expo-secure-store` through `@better-auth/expo`.
 - Strict TypeScript: no `any`, unsafe casts or unhandled promises. Reuse library features and existing boundaries; no speculative services or wrappers.
 
+## Issue → branch → PR
+
+- Start every implementation, fix, or documentation/harness change with a GitHub Issue. Read-only investigation may come first; creating the working branch, editing files, and installing dependencies must follow Issue creation or confirmation of an existing Issue.
+- Read `github-issue-pr-ops`, check existing Issues/PRs to avoid duplicates, record the goal, acceptance criteria and validation plan, and assign yourself before implementation. Incorporate scope changes into that Issue before continuing dependent work.
+- Use **1 implementation Issue → 1 `codex/<issue>-<topic>` branch → 1 PR**. Link the branch to the Issue with `gh issue develop` and reference that Issue in commits and the PR. Keep unrelated work separate.
+- An implementation request includes completing this workflow: implement, validate, commit, push and create or update a Draft PR. Do not stop at local edits or ask again whether to create the Issue/PR.
+- Keep the PR description aligned with the final diff and latest tested SHA, include evidence and remaining blockers, and use `Closes #<issue>` for the corresponding implementation Issue. Report the Issue and PR links when handing back the work.
+- Mark ready or merge only within the user's authorization, after required checks pass. Respect branch protection, and confirm the PR/Issue state after merging; creating a PR is not evidence that it has merged.
+
 ## Skills and harness
 
 - Read `.agents/skills/expo-overview/SKILL.md` first for Expo work, then the relevant `expo-ui`, `expo-router`, `expo-native-ui`, `expo-data-fetching`, `eas-workflows` or `eas-update` skill.
 - Use `minimum-impl` for code changes, `github-issue-pr-ops` for Issue/PR work and `conventional-commit` for commits. Repository commitlint requires Conventional Commits, with no mandatory Gitmoji or Issue number.
 - Verify APIs against installed SDK 58 types and versioned Expo docs. Install native dependencies with `bunx expo install` from `apps/mobile`.
+- Add Reusables components from the **Uniwind** registry through the existing `components.json`. Keep source under `apps/mobile/src/components/ui`; preserve its upstream license and adapt it to strict types, scalable text and 48pt/dp native touch targets. Add only dependencies used by the selected components.
 - `.codex/config.toml` configures Expo MCP; authenticate with `codex mcp login expo`. Never commit credentials or machine-specific settings.
 - Preserve vendored `.agents/skills` and `skills-lock.json`; do not modify them incidentally.
 
@@ -31,6 +42,7 @@
 - `bun run setup` generates worktree-specific Compose settings and missing app env files without overwriting app values. `bun run dev` starts an isolated DB/API/Metro through Turborepo. Host ports are assigned by Portless/Docker; container-internal API/Metro ports are 8080/8081.
 - `bun run check`: formatting, type-aware lint, strict typecheck, Bun/Jest tests and Fallow. `bun run test:integration` requires a migrated PostgreSQL database.
 - `bun run doctor` and `bun run export:mobile` check Expo dependencies and bundle iOS/Android.
+- After changing Uniwind configuration, run `bun run --cwd apps/mobile styles:generate` and commit `uniwind-types.d.ts` with the configuration. Do not edit or format this generated file. The persisted appearance setting drives `Uniwind.setTheme`; do not add a second theme store or competing `Appearance.setColorScheme` calls.
 - `tofu fmt -check -recursive infra`, `tofu -chdir=infra init -backend=false`, `tofu -chdir=infra validate`, `tflint --chdir=infra`: credential-free IaC checks. Also validate `infra/bootstrap`.
 - Use the lowest sufficient test layer: Bun for server/pure logic, Jest + jest-expo + Testing Library for mobile, Maestro for final native flows. No Vitest or Storybook.
 - Exercise loading/error/empty/content states, failure recovery, keyboard access, large text, dark mode, back and sheet dismissal. Bundling is not proof of native runtime behavior; report device checks that could not run.
