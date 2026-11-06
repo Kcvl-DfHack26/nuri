@@ -11,7 +11,7 @@ const env = readEnv({
   DATABASE_URL: 'unused',
   BETTER_AUTH_SECRET: 'unit-test-secret-not-for-real-deployments',
   BETTER_AUTH_URL: 'http://localhost:8080',
-  TRUSTED_ORIGINS: 'http://localhost:8081,nuri://',
+  TRUSTED_ORIGINS: 'http://localhost:8081,com.kcvl.nuri://',
 });
 const auth = createAuth(db, env);
 const app = createApp(db, auth, env, () => Promise.resolve());

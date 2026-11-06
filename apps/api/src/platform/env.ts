@@ -6,7 +6,7 @@ const schema = z.object({
   DATABASE_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
-  TRUSTED_ORIGINS: z.string().default('nuri://'),
+  TRUSTED_ORIGINS: z.string().default('com.kcvl.nuri://'),
   AUTH_EMULATE: z
     .enum(['true', 'false'])
     .default('false')
@@ -35,7 +35,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env) {
     BETTER_AUTH_URL:
       development && !env.BETTER_AUTH_URL?.trim() ? env.DEV_API_ORIGIN : env.BETTER_AUTH_URL,
     TRUSTED_ORIGINS: development
-      ? [env.TRUSTED_ORIGINS ?? 'nuri://', env.DEV_METRO_ORIGIN].filter(Boolean).join(',')
+      ? [env.TRUSTED_ORIGINS ?? 'com.kcvl.nuri://', env.DEV_METRO_ORIGIN].filter(Boolean).join(',')
       : env.TRUSTED_ORIGINS,
   });
   if (!result.success) {

@@ -45,7 +45,7 @@ Google／AppleのEmulate issuer・JWKS・token endpointを使うgenericOAuthを�
 
 ## worktreeと開発プロセス
 
-アプリの表示名、URLスキーム、保存prefix、Better AuthのアプリIDは `nuri`。両OSのアプリIDは `com.kcvl.nuri`。スターターの識別子（`expo-hono-opentofu-starter`、`dev.reohakase.expohonopentofustarter`）との互換処理・端末データの移行は設けず、新しいビルドと保存領域を使う。Expoはowner `kcvlb4`・slug `nuri` のprojectへ接続し、fingerprintでネイティブ互換性を管理する。workspaceのpackage名（`@starter/*`）、ローカル・CI・Cloud SQLのDB名とユーザー名、Compose project名は利用者に見えない内部名なので、スターターの名前のまま残す。
+アプリの表示名、保存prefix、Better AuthのアプリIDは `nuri`。両OSのアプリIDは `com.kcvl.nuri`。URLスキームもアプリIDと同じ `com.kcvl.nuri` にする。ログインの戻り先のdeep linkはセッションを含むため、他のアプリと重なりにくい逆ドメイン形式（RFC 8252 §7.1）を使う。スターターの識別子（`expo-hono-opentofu-starter`、`dev.reohakase.expohonopentofustarter`）との互換処理・端末データの移行は設けず、新しいビルドと保存領域を使う。Expoはowner `kcvlb4`・slug `nuri` のprojectへ接続し、fingerprintでネイティブ互換性を管理する。workspaceのpackage名（`@starter/*`）、ローカル・CI・Cloud SQLのDB名とユーザー名、Compose project名は利用者に見えない内部名なので、スターターの名前のまま残す。
 
 worktreeの実パスをGitのhash-objectでハッシュ化した先頭12桁をIDとする。branch名やcommitに依存せず、symlinkは実パスへ正規化する。POSIXの初期化処理がルートのGit管理外 `.env` を生成する。アプリenvとsecretは各checkoutに置く。
 

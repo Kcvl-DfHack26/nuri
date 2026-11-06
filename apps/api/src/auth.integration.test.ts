@@ -61,7 +61,7 @@ const env = readEnv({
   DATABASE_URL: databaseUrl,
   BETTER_AUTH_SECRET: 'integration-test-secret-never-use-in-production',
   BETTER_AUTH_URL: baseURL,
-  TRUSTED_ORIGINS: `${origin},nuri://`,
+  TRUSTED_ORIGINS: `${origin},com.kcvl.nuri://`,
   AUTH_EMULATE: 'true',
   GOOGLE_EMULATOR_URL: google.url,
   APPLE_EMULATOR_URL: apple.url,
@@ -123,7 +123,7 @@ async function oauth(provider: 'google' | 'apple') {
 }
 
 async function emailLink(recipient: string, native = false) {
-  const callbackURL = native ? 'nuri://auth-callback?state=bound-device-state' : origin;
+  const callbackURL = native ? 'com.kcvl.nuri://auth-callback?state=bound-device-state' : origin;
   const sent = await request('/api/auth/sign-in/magic-link', {
     email: recipient,
     name: 'メールのユーザー',
@@ -150,7 +150,7 @@ async function emailLink(recipient: string, native = false) {
   );
   const link = delivered.text
     .split('\n')
-    .find((line) => line.startsWith(native ? 'nuri://' : 'http://'));
+    .find((line) => line.startsWith(native ? 'com.kcvl.nuri://' : 'http://'));
   if (!link) {
     throw new Error('Missing email link');
   }

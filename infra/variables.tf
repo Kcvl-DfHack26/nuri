@@ -63,5 +63,5 @@ variable "api_origin" {
 variable "trusted_origins" {
   description = "Explicit browser/app origins accepted by Better Auth. No exp:// wildcards in production."
   type        = list(string)
-  default     = ["nuri://"]
+  default     = ["com.kcvl.nuri://"]
 }

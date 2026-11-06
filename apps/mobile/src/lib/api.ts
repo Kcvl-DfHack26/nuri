@@ -14,7 +14,7 @@ export const authClient = createAuthClient({
   baseURL: apiUrl ?? 'http://localhost:8080',
   plugins: [
     expoClient({
-      scheme: 'nuri',
+      scheme: 'com.kcvl.nuri',
       storagePrefix: 'nuri',
       storage: SecureStore,
     }),
