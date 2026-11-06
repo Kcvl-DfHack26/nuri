@@ -6,7 +6,7 @@ import { Account } from './account';
 
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  router: { back: jest.fn(), replace: jest.fn(), canGoBack: () => mockCanGoBack() },
 }));
 jest.mock('expo-crypto', () => ({ randomUUID: () => 'state' }));
 jest.mock('expo-linking', () => ({ createURL: (path: string) => `com.kcvl.nuri://${path}` }));
@@ -33,7 +33,7 @@ jest.mock('@/lib/api', () => ({
   apiUrl: 'http://localhost:8080',
   authClient: {
     useSession: () => ({ data: null, isPending: false, error: null }),
-    getSession: async () => ({ data: { user: { id: 'viewer' } } }),
+    getSession: () => mockGetSession(),
     signIn: { social: () => mockSocial(), magicLink: () => mockMagicLink() },
   },
   api: {
@@ -48,6 +48,10 @@ jest.mock('@/lib/api', () => ({
   },
 }));
 const mockSocial = jest.fn(async () => ({ error: null }));
+const mockCanGoBack = jest.fn(() => true);
+const mockGetSession = jest.fn(async (): Promise<{ data: { user: { id: string } } | null }> => ({
+  data: { user: { id: 'viewer' } },
+}));
 const mockMagicLink = jest.fn(async () => ({ error: null }));
 
 function renderAccount() {
@@ -88,4 +92,23 @@ test('continues as a guest by going back', async () => {
   await renderAccount();
   await fireEvent.press(await screen.findByRole('button', { name: 'ゲストで参加' }));
   expect(router.back).toHaveBeenCalled();
+});
+
+test('stays on the login screen when the OS login browser is dismissed', async () => {
+  mockGetSession.mockResolvedValueOnce({ data: null });
+  await renderAccount();
+  await fireEvent.press(await screen.findByRole('button', { name: 'Googleで続ける' }));
+  await waitFor(() => {
+    expect(mockSocial).toHaveBeenCalled();
+  });
+  expect(router.back).not.toHaveBeenCalled();
+  expect(router.replace).not.toHaveBeenCalled();
+});
+
+test('goes to the make home when the login screen has no history', async () => {
+  mockCanGoBack.mockReturnValueOnce(false);
+  await renderAccount();
+  await fireEvent.press(await screen.findByRole('button', { name: 'ゲストで参加' }));
+  expect(router.replace).toHaveBeenCalledWith('/');
+  expect(router.back).not.toHaveBeenCalled();
 });

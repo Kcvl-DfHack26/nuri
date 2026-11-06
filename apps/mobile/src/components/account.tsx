@@ -124,7 +124,8 @@ export function Account() {
         <View className="mt-[27px] gap-2.5">
           {actions}
           {session.data ? null : (
-            <LinkButton label="ゲストで参加" className="text-[#72a5ff]" onPress={backOrHome} />
+            // Plan A draws this link in light blue; ink-secondary keeps it readable (WCAG AA) on white.
+            <LinkButton label="ゲストで参加" className="text-ink-secondary" onPress={backOrHome} />
           )}
         </View>
       </ScrollView>
