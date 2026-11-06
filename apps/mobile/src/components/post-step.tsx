@@ -276,7 +276,7 @@ function AreaPreview({ step }: { step: PostStep }) {
       </View>
       {zone ? (
         <Text className="font-maru text-meta text-ink-secondary">
-          丸い点をドラッグして形を直せます
+          塗る範囲は見本です。形の調整は準備中です
         </Text>
       ) : null}
     </View>
@@ -317,7 +317,6 @@ export function PostCosmeticPicker({ index }: { index: string }) {
   const { step, position, updateStep } = useStep(index);
   const insets = useSafeAreaInsets();
   const ink = useTokenColor('--color-ink-primary');
-  const secondary = useTokenColor('--color-ink-secondary');
   const candidates = (step && cosmeticCandidates[step.part]) ?? [];
   const [selected, setSelected] = useState(
     () => new Set(step?.cosmetics.map((cosmetic) => cosmetic.id)),
@@ -438,8 +437,6 @@ export function PostCosmeticPicker({ index }: { index: string }) {
       ) : (
         <PrimaryButton label="コスメを選んでください" />
       )}
-      {/* Keep the secondary ink read next to the other token reads for the empty state. */}
-      {secondary ? null : null}
     </ScrollView>
   );
 }

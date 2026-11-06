@@ -16,23 +16,9 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('@/components/native-host', () => ({
   NativeHost: jest.requireActual<typeof import('react-native')>('react-native').View,
 }));
-jest.mock('@expo/ui', () => {
-  const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
-  return {
-    Icon: Object.assign(() => null, { select: () => 'icon' }),
-    Switch: ({
-      label,
-      value,
-      onValueChange,
-    }: {
-      label: string;
-      value: boolean;
-      onValueChange: (value: boolean) => void;
-    }) => (
-      <reactNative.Switch accessibilityLabel={label} value={value} onValueChange={onValueChange} />
-    ),
-  };
-});
+jest.mock('@expo/ui', () => ({
+  Icon: Object.assign(() => null, { select: () => 'icon' }),
+}));
 
 function renderInDraft(screenElement: React.ReactElement) {
   return render(<PostDraftProvider>{screenElement}</PostDraftProvider>);
@@ -67,6 +53,7 @@ test('opens the sample recipe or goes home after posting', async () => {
 
   await fireEvent.press(screen.getByRole('button', { name: '投稿を見る' }));
   expect(router.replace).toHaveBeenCalledWith('/recipes/fox');
+  expect(screen.getByRole('button', { name: '友だちに共有（準備中）' })).toBeDisabled();
 
   await fireEvent.press(screen.getByRole('button', { name: 'ホームに戻る' }));
   expect(router.dismissTo).toHaveBeenCalledWith('/');

@@ -30,6 +30,8 @@ const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/a
 export function PostReview() {
   const { draft } = usePostDraft();
   const ink = useTokenColor('--color-ink-primary');
+  const pink = useTokenColor('--color-pastel-pink');
+  const peach = useTokenColor('--color-pastel-peach');
   const addIcon = <SocialIcon name={ADD} size={20} color={ink} />;
   return (
     <View className="flex-1 bg-white">
@@ -42,7 +44,7 @@ export function PostReview() {
       >
         <View
           className="flex-row items-center gap-3 rounded-[20px] p-3.5"
-          style={{ backgroundImage: 'linear-gradient(to right, #ffd4e0, #ffe0cf)' }}
+          style={{ backgroundImage: `linear-gradient(to right, ${pink}, ${peach})` }}
         >
           <View className="size-10 items-center justify-center rounded-full bg-bg-surface">
             <Image accessible={false} source={sparkleRose} style={{ width: 22, height: 22 }} />
@@ -52,7 +54,7 @@ export function PostReview() {
               動画から{draft.steps.length}つの手順を作りました
             </Text>
             <Text className="font-maru text-meta text-ink-secondary">
-              タップして、文章や区間を直せます
+              タップして、文章やコスメを直せます
             </Text>
           </View>
         </View>

@@ -75,9 +75,19 @@ const atFrame = (x: number, y: number) =>
   ({ left: `${(x / 390) * 100}%`, top: `${(y / 540) * 100}%` }) as const;
 
 // Plan A ⑤ レシピ詳細.
-// ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top and a single
-// 投稿 action instead of share, save and the make actions.
-export function RecipeDetail({ id, onPost }: { id: string; onPost?: () => void }) {
+// ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top, a single 投稿
+// action, and the draft's cosmetics (null when the post does not publish them).
+export type PostedCosmetic = { id: string; name: string; detail: string; color: string };
+
+export function RecipeDetail({
+  id,
+  onPost,
+  postedCosmetics,
+}: {
+  id: string;
+  onPost?: () => void;
+  postedCosmetics?: PostedCosmetic[] | null;
+}) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const recipe = findRecipe(id);
@@ -193,18 +203,59 @@ export function RecipeDetail({ id, onPost }: { id: string; onPost?: () => void }
               );
             })}
           </View>
-          <View className="flex-row items-center justify-between">
-            <Text
-              accessibilityRole="header"
-              className="font-maru-bold text-heading text-ink-primary"
-            >
-              使うメイク品
-            </Text>
-            <Text className="font-maru text-meta text-ink-secondary">{detail.productCount}点</Text>
-          </View>
-          {detail.products.map((product) => (
-            <ProductRow key={product.name} product={product} />
-          ))}
+          {postedCosmetics === undefined ? (
+            <>
+              <View className="flex-row items-center justify-between">
+                <Text
+                  accessibilityRole="header"
+                  className="font-maru-bold text-heading text-ink-primary"
+                >
+                  使うメイク品
+                </Text>
+                <Text className="font-maru text-meta text-ink-secondary">
+                  {detail.productCount}点
+                </Text>
+              </View>
+              {detail.products.map((product) => (
+                <ProductRow key={product.name} product={product} />
+              ))}
+            </>
+          ) : postedCosmetics === null ? null : (
+            <>
+              <View className="flex-row items-center justify-between">
+                <Text
+                  accessibilityRole="header"
+                  className="font-maru-bold text-heading text-ink-primary"
+                >
+                  使うメイク品
+                </Text>
+                <Text className="font-maru text-meta text-ink-secondary">
+                  {postedCosmetics.length}点
+                </Text>
+              </View>
+              {postedCosmetics.map((cosmetic) => (
+                <View
+                  key={cosmetic.id}
+                  accessible
+                  accessibilityLabel={`${cosmetic.name}、${cosmetic.detail}`}
+                  className="flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5"
+                >
+                  <View
+                    className="size-[52px] rounded-[14px]"
+                    style={{ backgroundColor: cosmetic.color }}
+                  />
+                  <View className="flex-1 gap-0.5">
+                    <Text className="font-maru-bold text-label text-ink-primary">
+                      {cosmetic.name}
+                    </Text>
+                    <Text className="font-maru text-meta text-ink-secondary">
+                      {cosmetic.detail}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
         </ScrollView>
       </View>
       <View

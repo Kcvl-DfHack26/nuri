@@ -91,7 +91,7 @@ export function PostCreating() {
           ))}
         </View>
         <Text className="font-maru text-meta text-ink-secondary">
-          閉じても作成は続きます。できたらお知らせします。
+          見本の手順書を作っています。閉じると作成をやめます
         </Text>
       </View>
     </View>

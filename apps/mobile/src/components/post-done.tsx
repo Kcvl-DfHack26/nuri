@@ -1,7 +1,7 @@
 import { Icon } from '@expo/ui';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, Share, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
@@ -79,18 +79,17 @@ export function PostDone() {
               router.replace('/recipes/fox');
             }}
           />
-          <Pressable
+          {/* Nothing is posted yet, so sharing stays inactive instead of announcing a post. */}
+          <View
+            accessible
             accessibilityRole="button"
-            onPress={() => {
-              void Share.share({ message: '狐メイクの手順をnuriに投稿しました' }).catch(
-                () => undefined,
-              );
-            }}
-            className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full border border-black bg-white px-[18px] active:opacity-70"
+            accessibilityLabel="友だちに共有（準備中）"
+            accessibilityState={{ disabled: true }}
+            className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full border border-black bg-white px-[18px]"
           >
             <SocialIcon name={SHARE} size={20} color={ink} />
             <Text className="font-maru-bold text-action text-ink-primary">友だちに共有</Text>
-          </Pressable>
+          </View>
           <Pressable
             accessibilityRole="button"
             onPress={() => {

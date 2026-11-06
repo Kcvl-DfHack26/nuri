@@ -1,14 +1,13 @@
-import { Icon, Switch } from '@expo/ui';
+import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PhotoCrop } from '@/components/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
-import { NativeHost } from '@/components/native-host';
 import { PostHeader, PrimaryButton } from '@/components/post-chrome';
 import { sampleVideoLength, usePostDraft } from '@/components/post-draft';
 import { arPhotos, parts } from '@/components/recipes';
@@ -198,16 +197,22 @@ function PublishOption({
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
+  const rose = useTokenColor('--color-accent-rose');
   return (
     <View className="min-h-12 flex-row items-center gap-3 px-3.5 py-3">
       <View className="flex-1 gap-px">
         <Text className="font-maru-bold text-label text-ink-primary">{title}</Text>
         <Text className="font-maru text-meta text-ink-secondary">{detail}</Text>
       </View>
-      {/* A native switch keeps the OS toggle behavior and accessibility on both platforms. */}
-      <NativeHost matchContents>
-        <Switch label={title} value={value} onValueChange={onChange} />
-      </NativeHost>
+      {/* React Native's OS switch: @expo/ui's Switch always draws its label beside the toggle,
+          which would repeat the Plan A title, and follows the device's dark appearance. */}
+      <Switch
+        accessibilityLabel={title}
+        accessibilityHint={detail}
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: rose }}
+      />
     </View>
   );
 }
