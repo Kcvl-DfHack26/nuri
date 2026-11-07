@@ -11,7 +11,7 @@ import {
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Platform, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PhotoCrop } from '@/components/recipes';
@@ -95,8 +95,8 @@ export function Suggest() {
   const insets = useSafeAreaInsets();
   // The suggest tab stays mounted under other tabs; only claim the status bar while it is shown.
   const focused = useIsFocused();
-  // On iOS the tab's safe area includes the tab bar; Android tabs already pad their content.
-  const bottom = Platform.OS === 'ios' ? insets.bottom : 0;
+  // The tab's bottom safe-area inset includes the tab bar on both platforms.
+  const bottom = insets.bottom;
   const rose = useTokenColor('--color-accent-rose');
   const [photo, setPhoto] = useState<string>();
   const [analyzing, setAnalyzing] = useState(false);

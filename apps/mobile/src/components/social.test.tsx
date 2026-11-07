@@ -58,6 +58,9 @@ jest.mock('expo-router', () => ({
 jest.mock('@/theme/colors', () => ({
   colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
 }));
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('@/lib/preferences', () => ({
   usePreferences: () => ({ preferences: { haptics: false } }),

@@ -36,13 +36,15 @@ export function Home() {
   const [headerHeight, setHeaderHeight] = useState(48);
   const [segmentHeight, setSegmentHeight] = useState(52);
   const contentTop = insets.top + 16 + headerHeight;
+  // The grids scroll under the tab bar, which the bottom safe-area inset includes.
+  const contentBottom = insets.bottom + 24;
   return (
     <View className="flex-1 bg-white">
       {focused ? <StatusBar style="dark" /> : null}
       {scope === 'whole' ? (
-        <RecipeGrid top={contentTop} />
+        <RecipeGrid top={contentTop} bottom={contentBottom} />
       ) : (
-        <PartGrid top={contentTop + segmentHeight + 27} />
+        <PartGrid top={contentTop + segmentHeight + 27} bottom={contentBottom} />
       )}
       <View
         pointerEvents="none"
@@ -158,7 +160,7 @@ function ScopeSegment({ value, onChange }: { value: Scope; onChange: (value: Sco
   );
 }
 
-function RecipeGrid({ top }: { top: number }) {
+function RecipeGrid({ top, bottom }: { top: number; bottom: number }) {
   const list = useInfiniteQuery({ ...recipeListOptions(), enabled: Boolean(apiUrl) });
   const items = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
   const status = !apiUrl ? (
@@ -179,7 +181,7 @@ function RecipeGrid({ top }: { top: number }) {
       keyExtractor={(recipe) => recipe.id}
       numColumns={2}
       columnWrapperStyle={{ gap: 6 }}
-      contentContainerStyle={{ paddingTop: top, paddingBottom: 24, gap: 14 }}
+      contentContainerStyle={{ paddingTop: top, paddingBottom: bottom, gap: 14 }}
       contentInsetAdjustmentBehavior="never"
       // A failed next page keeps the loaded cards and shows the retry above them.
       ListHeaderComponent={status ? <View className="px-4">{status}</View> : undefined}
@@ -200,12 +202,12 @@ function RecipeGrid({ top }: { top: number }) {
   );
 }
 
-function PartGrid({ top }: { top: number }) {
+function PartGrid({ top, bottom }: { top: number; bottom: number }) {
   const counts = useQuery({ ...recipePartsOptions, enabled: Boolean(apiUrl) });
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="never"
-      contentContainerStyle={{ paddingTop: top, paddingBottom: 24, paddingHorizontal: 16 }}
+      contentContainerStyle={{ paddingTop: top, paddingBottom: bottom, paddingHorizontal: 16 }}
     >
       <View className="flex-row flex-wrap gap-3">
         {partCards.map((card) => (

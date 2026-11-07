@@ -8,7 +8,7 @@ import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useIsFocused, useNavigation, usePreventRemove } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassIconButton } from '@/components/glass-icon-button';
@@ -124,9 +124,8 @@ export function PostCamera() {
       router.push('/post/recording');
     }
   }, [opening]);
-  // iOS lays tab content under the tab bar and reports it as a safe-area inset; Android already
-  // places the content above the tab bar.
-  const bottom = (Platform.OS === 'ios' ? insets.bottom : 0) + 24;
+  // Tab content lies under the tab bar, which both platforms report as the bottom safe-area inset.
+  const bottom = insets.bottom + 24;
   return (
     <View className="flex-1 bg-white">
       {focused ? <StatusBar style="dark" /> : null}
