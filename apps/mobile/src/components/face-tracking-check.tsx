@@ -1,5 +1,5 @@
 import { Icon } from '@expo/ui';
-import { Canvas, Points } from '@shopify/react-native-skia';
+import { Canvas, Points, useImage } from '@shopify/react-native-skia';
 import { useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
@@ -16,9 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Point, Size } from '@/lib/face-landmarks';
 
+import { FaceTexture } from '@/components/face-texture';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { Text } from '@/components/ui/text';
 import { toViewPoints } from '@/lib/face-landmarks';
+import { canonicalFaceMesh } from '@/lib/face-mesh';
 import { backOrHome } from '@/lib/navigation';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -27,6 +29,7 @@ import type {
   FaceTrackerStatusEvent,
 } from '../../modules/face-tracker/src/FaceTracker.types';
 
+import browTexture from '../../assets/textures/brow.png';
 import FaceTracker from '../../modules/face-tracker/src/FaceTrackerModule';
 import FaceTrackerView from '../../modules/face-tracker/src/FaceTrackerView';
 
@@ -35,14 +38,21 @@ const BACK = Icon.select({
   android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
 });
 
+// The sample recipe's brow color (`foxSteps` in recipes.ts). The overlay stays partly transparent so
+// bangs over the brows show through until hair is cut out of it (requirements 11).
+const BROW_COLOR = '#79513A';
+const BROW_OPACITY = 0.7;
+
 type Stats = { fps: number; latencyMs: number; maxLatencyMs: number; count: number };
 
-// Development check for #25 (PoC-1): the front camera with MediaPipe's landmarks drawn over it,
-// plus the measured frame rate and delay. It is replaced by ⑦ once the AR steps use the tracker.
+// Development check for #25 (PoC-1) and #26: the front camera with the brow texture of the canonical
+// face mesh and the iris landmarks drawn over it, plus the measured frame rate and delay. It is
+// replaced by ⑦ once the AR steps use the tracker.
 export function FaceTrackingCheck() {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const rose = useTokenColor('--color-accent-rose');
+  const brow = useImage(browTexture);
   const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [status, setStatus] = useState<FaceTrackerStatusEvent>();
   const [view, setView] = useState<Size>({ width: 0, height: 0 });
@@ -139,7 +149,17 @@ export function FaceTrackingCheck() {
       ) : null}
       {tracking ? (
         <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-          <Points points={points} mode="points" color={rose} strokeWidth={3} strokeCap="round" />
+          {brow ? (
+            <FaceTexture points={points} texture={brow} color={BROW_COLOR} opacity={BROW_OPACITY} />
+          ) : null}
+          {/* MediaPipe's landmarks after the mesh's 468 vertices are the two irises. */}
+          <Points
+            points={points.slice(canonicalFaceMesh.textureCoordinates.length)}
+            mode="points"
+            color={rose}
+            strokeWidth={4}
+            strokeCap="round"
+          />
         </Canvas>
       ) : null}
       <View
