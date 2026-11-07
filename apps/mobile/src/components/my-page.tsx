@@ -20,6 +20,10 @@ const SETTINGS = Icon.select({
   android: import('@expo/material-symbols/settings.xml'),
 });
 const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
+const PERSON = Icon.select({
+  ios: 'person.fill',
+  android: import('@expo/material-symbols/person.xml'),
+});
 
 // Plan A sample profile numbers and posts until profiles and posts come from the API.
 const stats = [
@@ -58,7 +62,7 @@ export function MyPage() {
       >
         <View className="flex-row items-center gap-3.5">
           <View className="size-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-accent-pink">
-            <Avatar size={58} image={user?.image} />
+            <ProfilePhoto size={58} image={user?.image} />
           </View>
           <View className="flex-1 gap-0.5">
             {isPending ? (
@@ -140,6 +144,22 @@ export function MyPage() {
             'linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0.92) 70%, rgba(255,255,255,0) 100%)',
         }}
       />
+    </View>
+  );
+}
+
+/** The session's photo, or a centered person symbol when there is none (also for guests). */
+export function ProfilePhoto({ size, image }: { size: number; image?: string | null | undefined }) {
+  const secondary = useTokenColor('--color-ink-secondary');
+  if (image) {
+    return <Avatar size={size} image={image} />;
+  }
+  return (
+    <View
+      className="items-center justify-center rounded-full bg-neutral-soft"
+      style={{ width: size, height: size }}
+    >
+      <SocialIcon name={PERSON} size={Math.round(size * 0.5)} color={secondary} />
     </View>
   );
 }

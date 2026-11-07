@@ -9,8 +9,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar } from '@/components/avatar';
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { ProfilePhoto } from '@/components/my-page';
 import { BottomCta, PrimaryButton } from '@/components/post-chrome';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
@@ -170,7 +170,7 @@ function Editor({
       >
         <View className="items-center gap-2">
           <View className="size-24">
-            <Avatar size={96} image={image} />
+            <ProfilePhoto size={96} image={image} />
             <View className="absolute left-[66px] top-[66px] size-8 items-center justify-center rounded-full border-2 border-bg-surface bg-accent-rose">
               <SocialIcon name={CAMERA} size={18} color="white" />
             </View>
