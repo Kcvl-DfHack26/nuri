@@ -6,7 +6,7 @@
 
 Native Tabs・Stack・戻る操作・共有シートはOS標準。設定はネイティブのForm／Picker／Switchを使う。投稿シートは65%、プロフィール編集は40%の高さから開く。iOS 26の投稿導線は投稿タブを開いている間だけタブ直上のBottomAccessory、それ以前とAndroidはツールバー。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②⑤⑦⑩）はFigma Plan AのFoundationsに従い、Plan Aがライトのみを定義するため、ダーク外観でも明るい配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
 
-Googleは公式の多色ロゴ付き白ボタン、AppleはiOSの公式AppleAuthenticationButton（ライトで黒、ダークで白）を使う。AndroidのAppleボタンも公式生成画像。出典は `apps/mobile/assets/auth/README.md` にある。
+Googleは公式の多色ロゴ付き白ボタン、AppleはiOSの公式AppleAuthenticationButton（黒）を使う。AndroidのAppleボタンも公式生成画像。ログイン（⑱）はPlan Aに合わせてライト配色だけで表示し、両ボタンを「続ける」表記の角丸ピルにする。出典は `apps/mobile/assets/auth/README.md` にある。
 
 ## 構成
 
