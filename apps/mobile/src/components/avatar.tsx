@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Image } from 'react-native';
 
 import { NativeHost } from '@/components/native-host';
-import { apiUrl } from '@/lib/api';
+import { apiAssetUrl } from '@/lib/api';
 import { colors } from '@/theme/colors';
 import { avatarSize } from '@/theme/metrics';
 
@@ -15,7 +15,7 @@ export function Avatar({
   image?: string | null | undefined;
 }) {
   const [failedUri, setFailedUri] = useState<string>();
-  const uri = image?.startsWith('/') && apiUrl ? `${apiUrl}${image}` : image;
+  const uri = image ? apiAssetUrl(image) : image;
   if (uri && uri !== failedUri) {
     return (
       <Image

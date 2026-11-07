@@ -1,6 +1,13 @@
 import { expect, test } from 'bun:test';
 
-import { feedQuerySchema, postInputSchema, preferencesSchema, profileInputSchema } from './index';
+import {
+  feedQuerySchema,
+  postInputSchema,
+  preferencesSchema,
+  profileInputSchema,
+  recipeListQuerySchema,
+  recipeParamsSchema,
+} from './index';
 
 test('trims posts and rejects empty or unbounded content', () => {
   expect(postInputSchema.parse({ body: '  こんにちは  ' }).body).toBe('こんにちは');
@@ -23,4 +30,12 @@ test('preserves appearance preferences while removing obsolete ritual data', () 
     haptics: true,
   });
   expect(preferencesSchema.safeParse({ appearance: 'unknown' }).success).toBe(false);
+});
+test('accepts only slug recipe IDs and bounded recipe pages', () => {
+  expect(recipeParamsSchema.parse({ id: 'fox' }).id).toBe('fox');
+  for (const id of ['', 'Fox', 'a b', '../fox', 'a'.repeat(65)]) {
+    expect(recipeParamsSchema.safeParse({ id }).success).toBe(false);
+  }
+  expect(recipeListQuerySchema.parse({})).toEqual({ offset: 0 });
+  expect(recipeListQuerySchema.safeParse({ offset: '-1' }).success).toBe(false);
 });

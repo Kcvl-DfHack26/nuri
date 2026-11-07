@@ -21,3 +21,9 @@ export const feedQuerySchema = z.object({
   author: z.string().min(1).max(128).optional(),
 });
 export const profileInputSchema = z.object({ name: z.string().trim().min(1).max(40) });
+
+// Recipe IDs are readable slugs (e.g. fox) so seeded recipes keep stable URLs.
+export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,64}$/) });
+export const recipeListQuerySchema = feedQuerySchema.pick({ offset: true });
+/** Where an imported recipe came from; null means it was made in nuri. */
+export const recipeSources = ['instagram', 'tiktok', 'youtube'] as const;

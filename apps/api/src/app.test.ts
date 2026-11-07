@@ -31,6 +31,8 @@ describe('HTTP contract', () => {
   });
   test('validates pagination and protects writes before touching the database', async () => {
     expect((await app.request('/api/posts?offset=-1')).status).toBe(400);
+    expect((await app.request('/api/recipes?offset=-1')).status).toBe(400);
+    expect((await app.request('/api/recipes/Not%20a%20slug')).status).toBe(400);
     expect((await app.request('/api/me')).status).toBe(401);
     expect(
       (

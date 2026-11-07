@@ -1,0 +1,1 @@
+export { recipeRoutes } from './routes';

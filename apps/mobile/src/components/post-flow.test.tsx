@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { PostDone } from './post-done';
 import { PostDraftProvider } from './post-draft';
 import { PostMessage } from './post-message';
+import { PostPreview } from './post-preview';
 
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-router', () => ({
@@ -19,6 +20,13 @@ jest.mock('@/components/native-host', () => ({
 jest.mock('@expo/ui', () => ({
   Icon: Object.assign(() => null, { select: () => 'icon' }),
 }));
+jest.mock('@/theme/colors', () => ({
+  colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
+}));
+jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+jest.mock('@/components/avatar', () => ({ Avatar: () => null }));
+// The preview must not need the API: the post exists only on the device.
+jest.mock('@/lib/api', () => ({ apiUrl: null, apiAssetUrl: (path: string) => path, api: {} }));
 
 function renderInDraft(screenElement: React.ReactElement) {
   return render(<PostDraftProvider>{screenElement}</PostDraftProvider>);
@@ -57,4 +65,12 @@ test('opens the sample recipe or goes home after posting', async () => {
 
   await fireEvent.press(screen.getByRole('button', { name: 'ホームに戻る' }));
   expect(router.dismissTo).toHaveBeenCalledWith('/');
+});
+
+test('previews the post without the API and posts it', async () => {
+  await renderInDraft(<PostPreview />);
+  expect(screen.getByText('狐メイク')).toBeOnTheScreen();
+  expect(screen.getByText('プレビュー')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
+  expect(router.push).toHaveBeenCalledWith('/post/done');
 });

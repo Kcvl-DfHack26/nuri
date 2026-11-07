@@ -27,9 +27,11 @@ Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v
 
 ## UIと端末内データ
 
-下のタブはPlan Aのメイク・提案・投稿・マイをNative Tabsで構成し、マイはPlan Aの⑰マイページで、歯車から⑰-2プロフィール設定を開き、アプリの設定（外観・触覚・パスキー）は⑰-2の「アプリの設定」から開く。メイクの流れ（①②③⑤⑥⑦⑩⑪）はFigma Plan Aの見た目を再現し、レシピはAPIを作るまで `src/components/recipes.ts` の固定データで持つ。画像を含むため、`src/lib` ではなくUIと同じ層に置く。色と文字はFoundationsの値を `global.css` へ追加し、ネイティブのアイコン色は `useTokenColor` で同じCSS変数から読む。投稿タブはPlan Aの⑫-1（動画を撮る）を開き、⑫-2〜⑫-9は `src/app/post` のStackで進む。撮影・手順書の作成・投稿の送信は作らず、下書きは `PostDraftProvider` が端末内の画面状態として持ち、流れを抜けると捨てる。既存のSNSサンプルのタイムラインは同じタブのStackの `/timeline` に残し、ログイン後の「タイムラインに戻る」から開く。X型のFlatList、投稿、反応はReusables Text／Button + Uniwind Free 1.13.2／Tailwind CSS 4.3.4、設定とOS操作は共通 `@expo/ui`。SF SymbolsとMaterialの両ソースを指定する。
+下のタブはPlan Aのメイク・提案・投稿・マイをNative Tabsで構成し、マイはPlan Aの⑰マイページで、歯車から⑰-2プロフィール設定を開き、アプリの設定（外観・触覚・パスキー）は⑰-2の「アプリの設定」から開く。メイクの流れ（①②③⑤⑥⑦⑩⑪）はFigma Plan Aの見た目を再現し、①⑤のレシピはAPIから読む（下記）。手順・ARの重ね表示・⑥の商品詳細と、まだAPIを読まない画面（⑦⑩⑪・提案・マイ）のレシピは `src/components/recipes.ts` の固定データで持つ。画像を含むため、`src/lib` ではなくUIと同じ層に置く。色と文字はFoundationsの値を `global.css` へ追加し、ネイティブのアイコン色は `useTokenColor` で同じCSS変数から読む。投稿タブはPlan Aの⑫-1（動画を撮る）を開き、⑫-2〜⑫-9は `src/app/post` のStackで進む。撮影・手順書の作成・投稿の送信は作らず、下書きは `PostDraftProvider` が端末内の画面状態として持ち、流れを抜けると捨てる。既存のSNSサンプルのタイムラインは同じタブのStackの `/timeline` に残し、ログイン後の「タイムラインに戻る」から開く。X型のFlatList、投稿、反応はReusables Text／Button + Uniwind Free 1.13.2／Tailwind CSS 4.3.4、設定とOS操作は共通 `@expo/ui`。SF SymbolsとMaterialの両ソースを指定する。
 
 起動画面（⓪）は、フォントの読み込み中にRoot Layoutがアプリ内の画面として表示する。ネイティブのスプラッシュは新しいビルドが必要なため変えない。ロゴの文字はフォントの読み込み前なのでシステムフォントで描く。ログイン（⑱）はPlan Aのライト配色で、ログイン成功後と「ゲストで参加」ではログインを求めた元の画面へ戻り、履歴がなければメイクへ移る。メールのリンクから戻る場合は従来どおり投稿タブを開く。
+
+レシピはAPIの `recipe`・`product`・`recipe_product` 表に置き、未ログインでも `GET /api/recipes`（20件ずつのoffsetページング）と `GET /api/recipes/:id` で読める。レシピのIDは `fox` のような英小文字・数字・ハイフンのslugで、固定データの手順と同じIDで結び付く。⑤は手順の固定データがあるレシピだけPlan Aの注釈付きの写真・手順・「メイクをはじめる」を出し、ないレシピは完成写真を出して開始を準備中にする。⑥はPlan Aの商品詳細データがある商品だけ開く。いいね数はお気に入りを作るまで表示用の列で持つ。画像はAPIが `/sample-recipes/*` で配り、DBにはAPI上のパスか絶対URLを保存する。
 
 SNS取り込み（④）は、ホームの「動画URL」からルートStackのformSheet `/import` を開き、入力・読み取り中・完了・失敗・保存完了を一つのシート内の状態で切り替える。取得方法と権利条件が未決のため、URLは端末内で対応サービス（Instagram・YouTube・TikTok）の投稿URLかを判定するだけで、通信せず固定の見本（`src/components/sns-import-sample.ts`）を表示し、何も保存しない。④-4はシートの上に `fullScreenModal` で重ねる。iOSのネイティブStackはモーダルの後に通常のpush画面を置くとシートの下へ積むため、戻るとシートへ帰れるようにモーダルを重ねる。④-4の保存は `dismissTo` で `saved=1` を渡し、シートを④-5にする。
 

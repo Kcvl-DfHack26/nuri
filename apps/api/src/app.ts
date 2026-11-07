@@ -10,6 +10,7 @@ import type { Auth } from './modules/auth';
 import type { Environment } from './platform/env';
 
 import { authCapabilities, authRoutes } from './modules/auth';
+import { recipeRoutes } from './modules/recipes';
 import { socialRoutes } from './modules/social';
 
 export function createApp(db: Database, auth: Auth, env: Environment, ready: () => Promise<void>) {
@@ -22,6 +23,10 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
     .use('*', secureHeaders())
     .get(
       '/sample-avatars/*',
+      serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
+    )
+    .get(
+      '/sample-recipes/*',
       serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
     )
     .use('/api/*', bodyLimit({ maxSize: 64 * 1024 }))
@@ -69,5 +74,6 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
     .get('/api/auth-capabilities', (c) => c.json(authCapabilities(env)))
     .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
     .route('/api', socialRoutes(db, auth))
+    .route('/api', recipeRoutes(db))
     .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500));
 }

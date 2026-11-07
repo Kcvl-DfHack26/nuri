@@ -1,7 +1,23 @@
 import { router } from 'expo-router';
 
+import type { RecipeDetail } from '@/lib/recipes';
+
 import { usedCosmetics, usePostDraft } from '@/components/post-draft';
-import { RecipeDetail } from '@/components/recipe-detail';
+import { RecipeContent } from '@/components/recipe-detail';
+import { findRecipe } from '@/components/recipes';
+
+// The post is not saved anywhere yet, so the preview shows a local sample instead of the API.
+const sample: RecipeDetail = {
+  id: 'fox',
+  title: '狐メイク',
+  image: '',
+  tags: ['丸顔向け'],
+  durationMinutes: 15,
+  likeCount: 1200,
+  source: 'instagram',
+  author: { id: 'preview', name: 'mio', image: null },
+  products: [],
+};
 
 // Plan A ⑫-8 投稿のプレビュー: the sample recipe screen with the draft's cosmetics, hidden
 // when the post does not publish them.
@@ -16,8 +32,9 @@ export function PostPreview() {
       }))
     : null;
   return (
-    <RecipeDetail
-      id="fox"
+    <RecipeContent
+      recipe={sample}
+      steps={findRecipe(sample.id)?.detail}
       postedCosmetics={cosmetics}
       onPost={() => {
         router.push('/post/done');
