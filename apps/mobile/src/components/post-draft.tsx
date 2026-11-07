@@ -35,6 +35,8 @@ export type PostStep = {
 };
 
 type PostDraft = {
+  /** Video chosen with 動画から, kept on the device; null while recording is not built. */
+  video: { uri: string } | null;
   steps: PostStep[];
   message: string;
   publishCosmetics: boolean;
@@ -74,6 +76,7 @@ export const cosmeticCandidates: Partial<Record<PartId, Cosmetic[]>> = {
 };
 
 const sampleDraft: PostDraft = {
+  video: null,
   steps: [
     {
       part: 'brow',
@@ -158,8 +161,18 @@ type PostDraftContextValue = {
 const PostDraftContext = createContext<PostDraftContextValue | null>(null);
 
 // Mounted by the post flow's layout, so leaving the flow discards the draft.
-export function PostDraftProvider({ children }: { children: ReactNode }) {
-  const [draft, setDraft] = useState(sampleDraft);
+export function PostDraftProvider({
+  videoUri,
+  children,
+}: {
+  /** The video chosen on ⑫-1, read once when the flow opens. */
+  videoUri?: string | undefined;
+  children: ReactNode;
+}) {
+  const [draft, setDraft] = useState<PostDraft>(() => ({
+    ...sampleDraft,
+    video: videoUri ? { uri: videoUri } : null,
+  }));
   const updateStep = (index: number, change: Partial<PostStep>) => {
     setDraft((current) => ({
       ...current,
