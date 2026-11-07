@@ -9,11 +9,15 @@ type PartId = (typeof makeupParts)[number];
 
 /**
  * Whole-face recipes (①); with `part`, the recipes for that part (③); with `author`, the recipes
- * that user wrote (⑰).
+ * that user wrote (⑰); with `q`, the recipes of every kind whose title or a tag contains it.
  */
-export function recipeListOptions({ part, author }: { part?: PartId; author?: string } = {}) {
+export function recipeListOptions({
+  part,
+  author,
+  q,
+}: { part?: PartId; author?: string; q?: string } = {}) {
   return infiniteQueryOptions({
-    queryKey: ['recipes', 'list', part ?? 'whole', author],
+    queryKey: ['recipes', 'list', part ?? 'whole', author, q],
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }) => {
       const response = await api.api.recipes.$get(
@@ -22,6 +26,7 @@ export function recipeListOptions({ part, author }: { part?: PartId; author?: st
             offset: String(pageParam),
             ...(part ? { part } : {}),
             ...(author ? { author } : {}),
+            ...(q ? { q } : {}),
           },
         },
         { init: { signal } },

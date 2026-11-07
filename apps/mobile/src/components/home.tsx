@@ -80,18 +80,22 @@ function Header({ top, onHeight }: { top: number; onHeight: (height: number) => 
     >
       <Text className="font-maru-black text-display text-accent-rose">nuri</Text>
       <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-full border border-black bg-white/55 py-1.5 pl-3.5 pr-1.5">
-        {/* Search arrives with ③; keep the Plan A field visible but inactive. */}
-        <View
-          accessible
-          accessibilityLabel="メイクを検索（準備中）"
-          accessibilityState={{ disabled: true }}
-          className="flex-1 flex-row items-center gap-2"
+        {/* The field opens the search screen, which owns the text input. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="メイクを検索"
+          // The pill's padding extends the hit area to its 48pt height.
+          hitSlop={6}
+          onPress={() => {
+            router.push('/search');
+          }}
+          className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
         >
           <SocialIcon name={SEARCH} size={22} color={ink} />
           <Text className="flex-1 font-maru text-ui text-ink-secondary" numberOfLines={1}>
             メイクを検索
           </Text>
-        </View>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="動画URLからレシピを作る"
