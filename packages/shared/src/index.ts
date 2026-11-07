@@ -30,6 +30,9 @@ export const profileInputSchema = z.object({
   bio: z.string().trim().max(42, '自己紹介は42文字以内で入力してください'),
   isPublic: z.boolean(),
 });
+export const profilePatchSchema = profileInputSchema
+  .partial()
+  .refine((fields) => Object.keys(fields).length > 0);
 
 // Recipe IDs are readable slugs (e.g. fox) so seeded recipes keep stable URLs.
 export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,64}$/) });

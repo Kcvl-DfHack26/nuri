@@ -159,18 +159,31 @@ function Editor({
   refreshError: boolean;
   onRetry: () => void;
 }) {
-  const [name, setName] = useState(profile.name);
-  const [handle, setHandle] = useState(profile.handle ?? '');
-  const [bio, setBio] = useState(profile.bio);
-  const [isPublic, setIsPublic] = useState(profile.isPublic);
+  const [form, setForm] = useState(() => ({ base: profile, draft: profile }));
+  const current = {
+    name: form.draft.name === form.base.name ? profile.name : form.draft.name,
+    handle: form.draft.handle === form.base.handle ? profile.handle : form.draft.handle,
+    bio: form.draft.bio === form.base.bio ? profile.bio : form.draft.bio,
+    isPublic: form.draft.isPublic === form.base.isPublic ? profile.isPublic : form.draft.isPublic,
+  };
+  const change = (patch: Partial<typeof current>) => {
+    setForm({ base: profile, draft: { ...current, ...patch } });
+  };
   const client = useQueryClient();
   const secondary = useTokenColor('--color-ink-secondary');
-  const input = { name, handle: handle.trim() || null, bio, isPublic };
+  const trimmedHandle = current.handle?.trim();
+  const input = { ...current, handle: trimmedHandle === '' ? null : (trimmedHandle ?? null) };
+  const changes = {
+    ...(input.name !== profile.name ? { name: input.name } : {}),
+    ...(input.handle !== profile.handle ? { handle: input.handle } : {}),
+    ...(input.bio !== profile.bio ? { bio: input.bio } : {}),
+    ...(input.isPublic !== profile.isPublic ? { isPublic: input.isPublic } : {}),
+  };
   const handleInvalid =
     input.handle !== null && !profileInputSchema.shape.handle.safeParse(input.handle).success;
   const save = useMutation({
     mutationFn: async () => {
-      const response = await api.api.me.profile.$put({ json: profileInputSchema.parse(input) });
+      const response = await api.api.me.profile.$patch({ json: changes });
       if (response.status === 409) {
         throw new Error('このユーザーIDは既に使われています。');
       }
@@ -200,12 +213,11 @@ function Editor({
       router.dismissTo('/');
     },
   });
-  const changed =
-    name !== profile.name ||
-    input.handle !== profile.handle ||
-    bio !== profile.bio ||
-    isPublic !== profile.isPublic;
-  const canSave = changed && profileInputSchema.safeParse(input).success && !save.isPending;
+  const canSave =
+    Object.keys(changes).length > 0 &&
+    profileInputSchema.safeParse(input).success &&
+    !save.isPending &&
+    !refreshError;
   const error = save.error ?? logout.error;
   return (
     <>
@@ -247,8 +259,10 @@ function Editor({
           <Field label="表示名">
             <TextInput
               accessibilityLabel="表示名"
-              value={name}
-              onChangeText={setName}
+              value={current.name}
+              onChangeText={(name) => {
+                change({ name });
+              }}
               editable={!save.isPending}
               autoComplete="name"
               maxLength={40}
@@ -266,8 +280,10 @@ function Editor({
           >
             <TextInput
               accessibilityLabel="ユーザーID"
-              value={handle}
-              onChangeText={setHandle}
+              value={current.handle ?? ''}
+              onChangeText={(handle) => {
+                change({ handle });
+              }}
               editable={!save.isPending}
               autoCapitalize="none"
               autoCorrect={false}
@@ -280,8 +296,10 @@ function Editor({
           <Field label="自己紹介" caption="42文字まで">
             <TextInput
               accessibilityLabel="自己紹介"
-              value={bio}
-              onChangeText={setBio}
+              value={current.bio}
+              onChangeText={(bio) => {
+                change({ bio });
+              }}
               editable={!save.isPending}
               maxLength={42}
               placeholder="丸顔さん向けのメイクを投稿しています"
@@ -297,8 +315,10 @@ function Editor({
           <SwitchRow
             title="プロフィールを公開"
             detail="オフならプロフィール画面は本人のみ。公開投稿・レシピの名前と写真は表示されます"
-            value={isPublic}
-            onValueChange={setIsPublic}
+            value={current.isPublic}
+            onValueChange={(isPublic) => {
+              change({ isPublic });
+            }}
             disabled={save.isPending}
           />
           <Divider />

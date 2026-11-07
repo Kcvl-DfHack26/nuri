@@ -3,7 +3,7 @@ import {
   feedQuerySchema,
   postInputSchema,
   postParamsSchema,
-  profileInputSchema,
+  profilePatchSchema,
   userParamsSchema,
 } from '@starter/shared';
 import { and, desc, eq, sql } from 'drizzle-orm';
@@ -50,21 +50,26 @@ export function socialRoutes(db: Database, auth: Auth) {
       }
       return c.json({ profile });
     })
-    .put('/me/profile', requireSession(auth), zValidator('json', profileInputSchema), async (c) => {
-      try {
-        await db
-          .update(user)
-          .set({ ...c.req.valid('json'), updatedAt: new Date() })
-          .where(eq(user.id, c.get('currentUser').id));
-        return c.json({ success: true });
-      } catch (error) {
-        const cause = error instanceof Error && 'cause' in error ? error.cause : error;
-        if (cause instanceof Error && 'code' in cause && cause.code === '23505') {
-          return c.json({ error: 'handle_taken' as const }, 409);
+    .patch(
+      '/me/profile',
+      requireSession(auth),
+      zValidator('json', profilePatchSchema),
+      async (c) => {
+        try {
+          await db
+            .update(user)
+            .set({ ...c.req.valid('json'), updatedAt: new Date() })
+            .where(eq(user.id, c.get('currentUser').id));
+          return c.json({ success: true });
+        } catch (error) {
+          const cause = error instanceof Error && 'cause' in error ? error.cause : error;
+          if (cause instanceof Error && 'code' in cause && cause.code === '23505') {
+            return c.json({ error: 'handle_taken' as const }, 409);
+          }
+          throw error;
         }
-        throw error;
-      }
-    })
+      },
+    )
     .get('/posts', zValidator('query', feedQuerySchema), async (c) => {
       const { offset, author } = c.req.valid('query');
       const session = await auth.api.getSession({ headers: c.req.raw.headers });

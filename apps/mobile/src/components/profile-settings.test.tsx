@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import { ProfileSettings } from './profile-settings';
@@ -62,7 +62,7 @@ jest.mock('@/lib/api', () => ({
       me: {
         profile: {
           $get: () => mockGetProfile(),
-          $put: (input: { json: unknown }) => mockPutProfile(input),
+          $patch: (input: { json: unknown }) => mockPutProfile(input),
         },
       },
     },
@@ -101,14 +101,17 @@ const mockSignOut = jest.fn(async (): Promise<{ error: { message: string } | nul
   error: null,
 }));
 
-function renderWithClient(element: React.ReactElement) {
-  const client = new QueryClient({
+function createTestClient() {
+  return new QueryClient({
     // No garbage-collection timers, so Jest can exit after the run.
     defaultOptions: {
       queries: { retry: false, gcTime: Infinity },
       mutations: { retry: false, gcTime: Infinity },
     },
   });
+}
+
+function renderWithClient(element: React.ReactElement, client = createTestClient()) {
   return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
 }
 
@@ -157,6 +160,49 @@ test('explains invalid user IDs before saving', async () => {
     screen.getByText('ユーザーIDは半角英小文字・数字・_で3〜20文字にしてください'),
   ).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
+});
+
+test('keeps a remote privacy change when saving only an edited name', async () => {
+  const client = createTestClient();
+  await renderWithClient(<ProfileSettings />, client);
+  await screen.findByLabelText('表示名');
+  await act(async () => {
+    client.setQueryData(['my-profile', 'viewer'], {
+      name: 'はなこ',
+      handle: null,
+      bio: '',
+      isPublic: false,
+    });
+  });
+  await waitFor(() => {
+    expect(screen.getByLabelText('プロフィールを公開')).toHaveProp('value', false);
+  });
+  await fireEvent.changeText(screen.getByLabelText('表示名'), '更新した名前');
+  await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
+  await waitFor(() => {
+    expect(mockPutProfile).toHaveBeenLastCalledWith({ json: { name: '更新した名前' } });
+  });
+});
+
+test('blocks saving a draft until a failed refresh is retried', async () => {
+  const client = createTestClient();
+  await renderWithClient(<ProfileSettings />, client);
+  await screen.findByLabelText('表示名');
+  await fireEvent.changeText(screen.getByLabelText('表示名'), '編集中');
+  mockGetProfile.mockRejectedValueOnce(new Error('offline'));
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ['my-profile'] });
+  });
+  const retry = await screen.findByRole('button', {
+    name: '最新のプロフィールを読み込めませんでした。再試行',
+  });
+  expect(screen.getByLabelText('表示名')).toHaveProp('value', '編集中');
+  expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
+  await fireEvent.press(retry);
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '保存する' })).toBeEnabled();
+  });
+  expect(screen.getByLabelText('表示名')).toHaveProp('value', '編集中');
 });
 
 test('lets a guest log in or open the app settings from the profile settings', async () => {

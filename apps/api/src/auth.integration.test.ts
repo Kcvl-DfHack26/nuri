@@ -231,7 +231,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
         '/api/me/profile',
         { name: 'はな', handle: 'Bad ID', bio: '', isPublic: false },
         cookie,
-        'PUT',
+        'PATCH',
       )
     ).status,
   ).toBe(400);
@@ -241,7 +241,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
         '/api/me/profile',
         { name: 'はな', handle, bio: 'よろしく', isPublic: false },
         cookie,
-        'PUT',
+        'PATCH',
       )
     ).status,
   ).toBe(200);
@@ -249,6 +249,11 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
   expect(privateProfile.status).toBe(200);
   expect(await privateProfile.json()).toEqual({
     user: { ...author, name: 'はな', handle, bio: 'よろしく', isPublic: false },
+  });
+  expect((await request('/api/me/profile', { name: '更新後' }, cookie, 'PATCH')).status).toBe(200);
+  const afterPartialUpdate = await app.request(`/api/users/${author?.id}`, { headers: { cookie } });
+  expect(await afterPartialUpdate.json()).toEqual({
+    user: { ...author, name: '更新後', handle, bio: 'よろしく', isPublic: false },
   });
   expect((await app.request(`/api/users/${author?.id}`)).status).toBe(404);
   expect(
@@ -260,7 +265,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
         '/api/me/profile',
         { name: '別の人', handle, bio: '', isPublic: true },
         other,
-        'PUT',
+        'PATCH',
       )
     ).status,
   ).toBe(409);

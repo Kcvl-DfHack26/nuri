@@ -5,6 +5,7 @@ import {
   postInputSchema,
   preferencesSchema,
   profileInputSchema,
+  profilePatchSchema,
   recipeListQuerySchema,
   recipeParamsSchema,
 } from './index';
@@ -26,6 +27,8 @@ test('bounds pagination and profile input', () => {
   expect(profileInputSchema.parse(valid).name).toBe('はなこ');
   expect(profileInputSchema.safeParse({ ...valid, handle: 'Hana' }).success).toBe(false);
   expect(profileInputSchema.safeParse({ ...valid, bio: 'あ'.repeat(43) }).success).toBe(false);
+  expect(profilePatchSchema.safeParse({}).success).toBe(false);
+  expect(profilePatchSchema.safeParse({ name: '更新' }).success).toBe(true);
 });
 test('preserves appearance preferences while removing obsolete ritual data', () => {
   expect(preferencesSchema.parse({ appearance: 'dark', favorites: ['old'] })).toEqual({
