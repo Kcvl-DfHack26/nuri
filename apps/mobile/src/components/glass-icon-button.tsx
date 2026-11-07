@@ -19,6 +19,7 @@ export function GlassIconButton({
   icon: IconName;
   label: string;
   onPress?: () => void;
+  /** Overrides the glass surface, e.g. a solid button on a white screen. */
   className?: string;
 }) {
   const disabled = !onPress;
