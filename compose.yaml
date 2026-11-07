@@ -1,5 +1,3 @@
-name: ${COMPOSE_PROJECT_NAME:?Run sh scripts/worktree-init.sh first}
-
 x-runtime: &runtime
   image: ${COMPOSE_PROJECT_NAME}-dev
   build:

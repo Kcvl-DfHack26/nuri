@@ -32,7 +32,7 @@ export default [
     },
   },
   {
-    files: ['apps/*/src/**/*.{ts,tsx}', 'packages/shared/src/**/*.ts'],
+    files: ['apps/*/src/**/*.{ts,tsx}', 'packages/shared/src/**/*.{ts,tsx}'],
     plugins: { boundaries },
     settings: {
       'import/resolver': {
@@ -71,7 +71,25 @@ export default [
         'error',
         {
           default: 'disallow',
+          checkAllOrigins: true,
+          checkInternals: true,
           policies: [
+            {
+              allow: { to: { module: { origin: ['core', 'external'] } } },
+            },
+            {
+              from: { element: { type: 'shared' } },
+              disallow: { to: { module: { origin: ['core', 'external'] } } },
+              message: 'Only explicitly approved dependencies may enter the shared package.',
+            },
+            {
+              from: { element: { type: 'shared' } },
+              allow: { to: { module: { source: 'zod' } } },
+            },
+            {
+              from: { element: { type: 'shared' }, file: { categories: 'test' } },
+              allow: { to: { module: { source: 'bun:test' } } },
+            },
             {
               from: { element: { type: 'api-root' } },
               allow: {
@@ -126,11 +144,22 @@ export default [
             },
             {
               from: { element: { type: 'mobile-lib' } },
-              allow: { to: { file: { categories: 'contract' } }, dependency: { kind: 'type' } },
+              allow: {
+                to: { file: { categories: 'contract' } },
+                dependency: {
+                  kind: 'type',
+                  nodeKind: 'import',
+                  source: '@starter/api/contract',
+                  specifiers: 'AppType',
+                },
+              },
             },
             {
               disallow: { to: { element: { type: 'api-module', fileInternalPath: '!index.ts' } } },
               message: 'Import API modules through their index.ts public entry.',
+            },
+            {
+              allow: { dependency: { relationship: { to: 'internal' } } },
             },
             {
               from: { file: { categories: { noneOf: ['test'] } } },
@@ -160,8 +189,13 @@ export default [
           paths: [
             {
               name: '@starter/api/contract',
-              allowTypeImports: true,
+              allowImportNames: ['AppType'],
               message: 'Only AppType may cross the server boundary.',
+            },
+            {
+              name: '@starter/api/contract',
+              allowTypeImports: true,
+              message: 'Import AppType with import type.',
             },
           ],
           patterns: [
@@ -175,20 +209,13 @@ export default [
     },
   },
   {
-    files: ['packages/shared/**/*.ts'],
+    files: ['packages/shared/src/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': [
+      'no-restricted-globals': [
         'error',
         {
-          patterns: [
-            '**/apps/**',
-            '@starter/api*',
-            '@starter/mobile*',
-            'react-native',
-            'expo-*',
-            'pg',
-            'drizzle-orm*',
-          ],
+          globals: ['process', 'Bun'],
+          checkGlobalObject: true,
         },
       ],
     },

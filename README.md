@@ -10,7 +10,7 @@ nuriは、メイクの手順をレシピとして選び、インカメラに映�
 
 ## 開発の出発点
 
-[Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を `starter/main` から取り込んでいます。アプリのコードは、まだスターターのSNSサンプル（タイムライン・投稿・いいね）のままです。nuriの画面へ順に置き換えます。
+[Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を土台に、Figma「Plan A」に沿ったnuriの画面を追加しています。認証・タイムライン・投稿・いいねにはスターター由来の実装が残っています。
 
 機能範囲、PoCの順序、未決事項は[概要](docs/overview.md)を参照してください。
 
@@ -26,7 +26,7 @@ portless proxy start --https --port 443
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-依存導入・未作成の環境ファイル生成・DB migrationが自動で行われる。PortlessがAPI・Metroの空きポートと `https://<service>.expo-hono-opentofu-starter-<ID>.localhost` を割り当て、PostgreSQLとvolumeはworktreeごとに分離する。DBポートはホストへ公開しない。
+依存導入・未作成の環境ファイル生成・DB migrationが自動で行われる。PortlessがAPI・Metroの空きポートと `https://<service>.nuri-<issue>-<topic>.localhost` を割り当てる。メインのcheckout名が `nuri` の場合は `https://<service>.nuri.localhost` になる。PostgreSQLとvolumeはworktreeごとに分離し、DBポートはホストへ公開しない。
 
 Expo GoでiPhone・Androidから開く場合は、上の起動をCtrl+Cで止めてトンネル用構成を使う。
 
@@ -35,7 +35,7 @@ PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose \
   -f compose.yaml -f compose.go.yaml up --build api metro
 ```
 
-MetroログのQRコードをSDK 58対応のExpo Goで開く。実機には到達できるHTTPS APIが必要。ローカルOAuthエミュレータはホスト／iOS Simulator用で、Metroトンネルだけでは実機から接続できない。
+MetroログのQRコードをSDK 58対応のExpo Goで開く。実機には到達できるHTTPS APIが必要。MetroのトンネルだけではローカルOAuthに接続できない。
 
 Dev Containers対応エディタでは **Reopen in Container** で編集・検査環境へ入れる。アプリの起動・停止はホストのPortlessで行う。終了時は `PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down` を使う。自worktreeのrouteとコンテナだけを終了し、volumeを保持する。
 
