@@ -224,10 +224,10 @@ resource "google_cloud_run_v2_service" "api" {
     }
   }
   lifecycle {
-    ignore_changes = [template[0].containers[0].image, template[0].revision, traffic, client, client_version]
+    ignore_changes = [template[0].containers[0].image, traffic, client, client_version]
     precondition {
       condition     = !var.email_login_enabled || can(regex("@", var.email_from))
-      error_message = "email_from must be a verified Resend sender when email_login_enabled is true."
+      error_message = "email_from must be a configured Resend sender when email_login_enabled is true."
     }
   }
   depends_on = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.runtime]

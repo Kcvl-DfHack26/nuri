@@ -70,10 +70,11 @@ jobs:
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
         run: |
-          gcloud run deploy "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --no-traffic --tag=candidate --quiet
+          gcloud run deploy "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --no-traffic --quiet
+          revision=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format='value(status.latestReadyRevisionName)')
+          gcloud run services update-traffic "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --update-tags="candidate=$revision" --quiet
           candidate_url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format=json | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')
           curl --fail --retry 6 --retry-all-errors --retry-delay 5 "$candidate_url/ready"
-          revision=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format='value(status.latestReadyRevisionName)')
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
       - name: Promote tested revision
         env:

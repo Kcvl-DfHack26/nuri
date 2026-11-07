@@ -84,7 +84,7 @@ variable "email_login_enabled" {
 }
 
 variable "email_from" {
-  description = "Verified Resend sender used for login links when email_login_enabled is true."
+  description = "Resend sender used for login links when email_login_enabled is true. Verify its domain before sending to users."
   type        = string
   default     = ""
 }

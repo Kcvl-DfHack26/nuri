@@ -104,7 +104,7 @@ OpenTofuはAPI有効化、Artifact Registry、Cloud SQL、DB、DBユーザー、
 
 DBパスワードはOpenTofuのephemeral変数とGoogle providerのwrite-only引数を使用する。Secret Managerの**値**は手動投入し、コードやstateへ複製しない。bootstrap用GCS bucketはversioning、public access prevention、削除防止付き。
 
-GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする。コンテナをdigestで指定し、migration Jobを完了させ、トラフィックなしのcandidate revisionで `/ready` を確認してから切り替える。イメージ・revision名・トラフィックはCIが管理し、OpenTofuの差分対象から外す。その後に同じSHAのExpo Workflowを呼ぶ。本番配信には別途有効化フラグが必要。
+GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする。コンテナをdigestで指定し、migration Jobを完了させ、トラフィックなしでrevisionを作る。その後candidateタグを付けて `/ready` を確認してから切り替える。イメージ・トラフィックはCIが管理し、OpenTofuの差分対象から外す。revision名はOpenTofuの設定変更時に再生成できるよう差分対象に残す。CIでrevisionを作るときにタグも同時指定すると、OpenTofuの次回planに不要なrevision差分が出るため、タグ付けを別の操作にする。その後に同じSHAのExpo Workflowを呼ぶ。本番配信には別途有効化フラグが必要。
 
 Cloud Runのstartup probeは `/ready`、liveness probeは `/health` を使う。DBへ接続できないrevisionはトラフィックを受けず、DBの一時的な停止でインスタンスを再起動しない。最初の適用だけはmigrationのjobを `-target` で先に作って実行し、それからサービスを作る。初回はCloud Runの実URLが未確定なので `api_origin` は暫定値になる。サービス作成後、`service_uri` を `api_origin` に設定して再適用し、Better Authの公開URLを合わせる。Cloud SQL・Cloud Runのサービス・migrationのjobの削除防止は `deletion_protection` 変数にまとめる。Cloud SQLではGCP側の `deletion_protection_enabled` も同じ変数で設定し、止めるときは先に解除してからdestroyする。DBとDBユーザーはインスタンスと一緒に消えるため、`deletion_policy = "ABANDON"` でdestroyの失敗を避ける。
 
