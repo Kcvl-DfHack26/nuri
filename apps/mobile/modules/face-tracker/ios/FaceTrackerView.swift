@@ -23,7 +23,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
 
   // Shared between the video queue and MediaPipe's callback thread.
   private let lock = NSLock()
-  private var captureTimes: [Int: CFTimeInterval] = [:]
+  private var sessionGeneration = 0
+  private var acceptingFrames = false
+  private var captureTimes: [Int: (at: CFTimeInterval, generation: Int)] = [:]
   private var frameSize = CGSize.zero
   private var lastTimestamp = -1
 
@@ -68,6 +70,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       emitStatus("permissionDenied")
       return
     }
+    lock.lock()
+    let generation = sessionGeneration
+    lock.unlock()
     sessionQueue.async {
       if !self.configured && !self.configure() {
         return
@@ -75,10 +80,23 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       if !self.session.isRunning {
         self.session.startRunning()
       }
+      self.lock.lock()
+      if self.sessionGeneration == generation {
+        self.acceptingFrames = true
+      }
+      self.lock.unlock()
     }
   }
 
   private func stop() {
+    lock.lock()
+    acceptingFrames = false
+    sessionGeneration += 1
+    captureTimes.removeAll()
+    lock.unlock()
+    // A resumed camera must report its first state even when it matches the previous session.
+    lastStatus = nil
+    lastMessage = nil
     sessionQueue.async {
       if self.session.isRunning {
         self.session.stopRunning()
@@ -169,15 +187,20 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       return
     }
     lock.lock()
+    guard acceptingFrames else {
+      lock.unlock()
+      return
+    }
     // LIVE_STREAM needs strictly increasing timestamps.
     guard timestamp > lastTimestamp else {
       lock.unlock()
       return
     }
     lastTimestamp = timestamp
+    let generation = sessionGeneration
     frameSize = CGSize(
       width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
-    captureTimes[timestamp] = CACurrentMediaTime()
+    captureTimes[timestamp] = (CACurrentMediaTime(), generation)
     if captureTimes.count > 30 {
       captureTimes = captureTimes.filter { $0.key > timestamp - 2000 }
     }
@@ -185,7 +208,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     do {
       try landmarker.detectAsync(image: image, timestampInMilliseconds: timestamp)
     } catch {
-      emitStatus("error", message: error.localizedDescription)
+      emitStatus("error", message: error.localizedDescription, generation: generation)
     }
   }
 
@@ -196,15 +219,18 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     timestampInMilliseconds: Int, error: Error?
   ) {
     lock.lock()
-    let capturedAt = captureTimes.removeValue(forKey: timestampInMilliseconds)
+    let capture = captureTimes.removeValue(forKey: timestampInMilliseconds)
     let size = frameSize
     lock.unlock()
+    guard let capture else {
+      return
+    }
     if let error {
-      emitStatus("error", message: error.localizedDescription)
+      emitStatus("error", message: error.localizedDescription, generation: capture.generation)
       return
     }
     guard let face = result?.faceLandmarks.first, !face.isEmpty else {
-      emitStatus("noFace")
+      emitStatus("noFace", generation: capture.generation)
       return
     }
     var points: [Double] = []
@@ -213,8 +239,11 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       points.append(Double(landmark.x))
       points.append(Double(landmark.y))
     }
-    let latencyMs = capturedAt.map { (CACurrentMediaTime() - $0) * 1000 } ?? -1
+    let latencyMs = (CACurrentMediaTime() - capture.at) * 1000
     DispatchQueue.main.async {
+      guard self.active, self.window != nil, self.isCurrentSession(capture.generation) else {
+        return
+      }
       self.setStatus("tracking", message: nil)
       self.onLandmarks([
         "points": points,
@@ -227,14 +256,26 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
 
   // MARK: Status
 
-  private func emitStatus(_ status: String, message: String? = nil) {
+  private func emitStatus(_ status: String, message: String? = nil, generation: Int? = nil) {
     DispatchQueue.main.async {
+      if let generation, !self.isCurrentSession(generation) {
+        return
+      }
       self.setStatus(status, message: message)
     }
   }
 
+  private func isCurrentSession(_ generation: Int) -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return sessionGeneration == generation
+  }
+
   // Main thread. Only sends changes, so a steady state does not flood JavaScript.
   private func setStatus(_ status: String, message: String?) {
+    guard active, window != nil else {
+      return
+    }
     guard status != lastStatus || message != lastMessage else {
       return
     }

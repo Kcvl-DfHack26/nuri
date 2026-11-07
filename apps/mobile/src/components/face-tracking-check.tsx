@@ -71,6 +71,9 @@ export function FaceTrackingCheck() {
   const [shownParts, setShownParts] = useState<ReadonlySet<OverlayPart>>(
     () => new Set(OVERLAYS.map((overlay) => overlay.part)),
   );
+  const [appActive, setAppActive] = useState(
+    () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive',
+  );
   const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [status, setStatus] = useState<FaceTrackerStatusEvent>();
   const [view, setView] = useState<Size>({ width: 0, height: 0 });
@@ -78,6 +81,27 @@ export function FaceTrackingCheck() {
   const [stats, setStats] = useState<Stats>();
   // Arrival times and delays of the last second of results.
   const samples = useRef<{ at: number; latencyMs: number }[]>([]);
+  const active = permission === 'granted' && focused && appActive;
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (active) {
+      return () => {
+        setStatus(undefined);
+        setPoints([]);
+        setStats(undefined);
+        samples.current = [];
+      };
+    }
+  }, [active]);
 
   useEffect(() => {
     if (!FaceTracker) {
@@ -126,6 +150,11 @@ export function FaceTrackingCheck() {
   }, [permission]);
 
   function handleLandmarks(event: FaceLandmarksEvent) {
+    // Native status events are deduplicated across camera pauses. A fresh landmark result is also
+    // proof that tracking has resumed, even if native does not emit another "tracking" status.
+    if (status?.status !== 'tracking') {
+      setStatus({ status: 'tracking' });
+    }
     const now = performance.now();
     const recent = samples.current.filter((sample) => now - sample.at < 1000);
     recent.push({ at: now, latencyMs: event.latencyMs });
@@ -142,7 +171,7 @@ export function FaceTrackingCheck() {
 
   const cameraDenied = permission === 'denied' || status?.status === 'permissionDenied';
   const message = guidanceMessage(status, cameraDenied);
-  const tracking = status?.status === 'tracking';
+  const tracking = active && status?.status === 'tracking';
 
   return (
     <View
@@ -155,13 +184,22 @@ export function FaceTrackingCheck() {
       <StatusBar style="light" />
       {FaceTracker ? (
         <FaceTrackerView
-          active={permission === 'granted' && focused}
+          active={active}
           style={StyleSheet.absoluteFill}
           onLandmarks={(event) => {
-            handleLandmarks(event.nativeEvent);
+            if (active) {
+              handleLandmarks(event.nativeEvent);
+            }
           }}
           onStatus={(event) => {
-            setStatus(event.nativeEvent);
+            if (active) {
+              setStatus(event.nativeEvent);
+              if (event.nativeEvent.status !== 'tracking') {
+                setPoints([]);
+                setStats(undefined);
+                samples.current = [];
+              }
+            }
           }}
         />
       ) : null}
@@ -215,7 +253,7 @@ export function FaceTrackingCheck() {
         style={{ bottom: Math.max(insets.bottom, 12) + 8 }}
       >
         {/* Without the tracker or the camera nothing is drawn, so the switches would do nothing. */}
-        {FaceTracker && !cameraDenied ? (
+        {FaceTracker && tracking ? (
           <View className="flex-row flex-wrap gap-2">
             {OVERLAYS.map(({ part, label }) => (
               <OverlayToggle
