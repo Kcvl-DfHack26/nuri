@@ -1,6 +1,6 @@
 import { zValidator } from '@hono/zod-validator';
 import { feedQuerySchema, recipeListQuerySchema, recipeParamsSchema } from '@starter/shared';
-import { and, asc, count, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
@@ -32,13 +32,22 @@ export function recipeRoutes(db: Database, auth: Auth) {
   return (
     new Hono<AuthenticatedEnv>()
       .get('/recipes', zValidator('query', recipeListQuerySchema), async (c) => {
-        const { offset, author, part } = c.req.valid('query');
-        // One author's recipes of every kind (⑰); otherwise a part's recipes (③) or whole-face ones (①).
-        const where = author
-          ? and(eq(recipe.authorId, author), part ? eq(recipe.part, part) : undefined)
-          : part
-            ? eq(recipe.part, part)
-            : isNull(recipe.part);
+        const { offset, author, part, q } = c.req.valid('query');
+        // A search term matches part of the title or of one tag, case-insensitively. Escape LIKE's
+        // wildcards (and its escape character) so they match literally.
+        const pattern = q && `%${q.replace(/[\\%_]/g, '\\$&')}%`;
+        // One author's recipes (⑰) and search results are of every kind; otherwise a part's
+        // recipes (③) or whole-face ones (①).
+        const where = and(
+          author ? eq(recipe.authorId, author) : undefined,
+          part ? eq(recipe.part, part) : author || pattern ? undefined : isNull(recipe.part),
+          pattern
+            ? or(
+                ilike(recipe.title, pattern),
+                sql`exists (select 1 from unnest(${recipe.tags}) as tag where tag ilike ${pattern})`,
+              )
+            : undefined,
+        );
         const items = await db
           .select(summaryFields)
           .from(recipe)

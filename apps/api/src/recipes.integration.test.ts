@@ -141,3 +141,66 @@ test('lists whole-face recipes by default and part recipes by part', async () =>
     .parse(await (await app.request('/api/recipe-parts')).json());
   expect(counts.items.find((item) => item.part === 'brow')?.count).toBeGreaterThanOrEqual(6);
 });
+
+test('searches recipes of every kind by title and tag with paging', async () => {
+  const schema = z.object({
+    items: z.array(z.object({ id: z.string() })),
+    nextOffset: z.number().nullable(),
+  });
+  const search = async (query: string) => {
+    const response = await app.request(`/api/recipes?${query}`);
+    expect(response.status).toBe(200);
+    return schema.parse(await response.json());
+  };
+  // 丸顔向け tags whole-face recipes and a brow recipe; 猫 is in a title only.
+  const round = (await search(`q=${encodeURIComponent('丸顔')}`)).items.map((item) => item.id);
+  expect(round).toEqual(expect.arrayContaining(['fox', 'round', 'brow-arch']));
+  expect(round).not.toContain('cat');
+  expect((await search(`q=${encodeURIComponent(' 猫 ')}`)).items.map((item) => item.id)).toEqual([
+    'cat',
+  ]);
+  const brows = await search(`q=${encodeURIComponent('初心者')}&part=brow`);
+  expect(brows.items.map((item) => item.id)).toContain('brow-soft-arch');
+  expect(brows.items.map((item) => item.id)).not.toContain('fox');
+
+  const searchUserId = `recipe-search-${unique}`;
+  const token = `token${unique.slice(0, 8)}`;
+  await db
+    .insert(user)
+    .values({ id: searchUserId, name: 'けんさく', email: `${searchUserId}@example.com` });
+  try {
+    await db.insert(recipe).values([
+      ...Array.from({ length: 20 }, (_, index) => ({
+        id: `search-${unique}-${index}`,
+        authorId: searchUserId,
+        title: `検索用${index}`,
+        image: 'https://example.com/search.jpg',
+        tags: [token.toUpperCase()],
+        durationMinutes: 3,
+      })),
+      {
+        id: `search-${unique}-wild`,
+        authorId: searchUserId,
+        title: `100%_${token}`,
+        image: 'https://example.com/search.jpg',
+        part: 'lip' as const,
+        durationMinutes: 3,
+      },
+    ]);
+    // Case-insensitive, across whole-face and part recipes, 20 per page.
+    const first = await search(`q=${token}`);
+    expect(first.items).toHaveLength(20);
+    expect(first.nextOffset).toBe(20);
+    const second = await search(`q=${token}&offset=20`);
+    expect(second.items).toHaveLength(1);
+    expect(second.nextOffset).toBeNull();
+    // LIKE wildcards in the term match literally.
+    expect((await search(`q=${encodeURIComponent(`0%_${token}`)}`)).items).toHaveLength(1);
+    expect((await search(`q=${encodeURIComponent(`1_0%_${token}`)}`)).items).toHaveLength(0);
+    expect((await search(`q=${encodeURIComponent(`${token}%`)}`)).items).toHaveLength(0);
+  } finally {
+    await db.delete(user).where(eq(user.id, searchUserId));
+  }
+  expect((await app.request('/api/recipes?q=%20')).status).toBe(400);
+  expect((await app.request(`/api/recipes?q=${'a'.repeat(51)}`)).status).toBe(400);
+});
