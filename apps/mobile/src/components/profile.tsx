@@ -85,7 +85,7 @@ export function Profile({ id }: { id?: string }) {
                   label="プロフィールを編集"
                   variant="outlined"
                   onPress={() => {
-                    router.push('/profile-edit');
+                    router.push('/profile-settings');
                   }}
                 />
               </NativeHost>
