@@ -11,7 +11,8 @@
       "bundleIdentifier": "com.kcvl.nuri",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "メイクの範囲をあなたの顔に重ねるためにカメラを使います。映像は端末の中だけで処理し、送信しません。"
+        "NSCameraUsageDescription": "メイクの範囲をあなたの顔に重ねるためと、メイク動画を撮るためにカメラを使います。顔に重ねる映像は端末の中だけで処理し、撮った動画は送信に同意したときだけ送信します。",
+        "NSMicrophoneUsageDescription": "メイク動画の音声を録音するためにマイクを使います。"
       }
     },
     "android": {
@@ -41,7 +42,8 @@
       "expo-secure-store",
       "expo-sqlite",
       "expo-font",
-      "expo-image"
+      "expo-image",
+      "expo-camera"
     ],
     "experiments": {
       "typedRoutes": true,

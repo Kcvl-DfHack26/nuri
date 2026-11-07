@@ -1,15 +1,51 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { File } from 'expo-file-system';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router } from 'expo-router';
-import { Alert, Text } from 'react-native';
+import { Alert, Linking, Text } from 'react-native';
 
-import { PostCamera } from './post-camera';
+import { PostCamera, PostRecording } from './post-camera';
 import { PostDraftProvider, usePostDraft } from './post-draft';
+
+type Recording = { resolve: (result: { uri: string }) => void };
+const mockRecording: { current: Recording | null; ready: (() => void) | null } = {
+  current: null,
+  ready: null,
+};
+const mockStopRecording = jest.fn();
+
+jest.mock('expo-camera', () => {
+  const { useImperativeHandle } = jest.requireActual<typeof import('react')>('react');
+  return {
+    useCameraPermissions: jest.fn(),
+    useMicrophonePermissions: jest.fn(),
+    // Records until stopRecording, like the native view, and lets the test fire onCameraReady.
+    CameraView: ({
+      ref,
+      onCameraReady,
+    }: {
+      ref?: React.Ref<unknown>;
+      onCameraReady?: () => void;
+    }) => {
+      mockRecording.ready = onCameraReady ?? null;
+      useImperativeHandle(ref, () => ({
+        recordAsync: () =>
+          new Promise((resolve) => {
+            mockRecording.current = { resolve };
+          }),
+        stopRecording: mockStopRecording,
+      }));
+      return null;
+    },
+  };
+});
+jest.mock('expo-file-system', () => ({ File: jest.fn(() => ({ delete: jest.fn() })) }));
 
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn() },
+  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useIsFocused: () => true,
 }));
 jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
@@ -30,9 +66,34 @@ let mockSignedIn = true;
 
 const pick = jest.mocked(launchImageLibraryAsync);
 const alert = jest.spyOn(Alert, 'alert');
+const cameraPermission = jest.mocked(useCameraPermissions);
+const microphonePermission = jest.mocked(useMicrophonePermissions);
+const requestCamera = jest.fn();
+const requestMicrophone = jest.fn();
+
+function permission(granted: boolean, canAskAgain = true) {
+  return {
+    granted,
+    canAskAgain,
+    status: granted ? 'granted' : 'denied',
+    expires: 'never',
+  } as never;
+}
+
+function allow(camera: boolean, microphone: boolean, canAskAgain = true) {
+  cameraPermission.mockReturnValue([permission(camera, canAskAgain), requestCamera, jest.fn()]);
+  microphonePermission.mockReturnValue([
+    permission(microphone, canAskAgain),
+    requestMicrophone,
+    jest.fn(),
+  ]);
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockRecording.current = null;
+  mockRecording.ready = null;
+  allow(true, true);
 });
 
 test('opens ⑫-2 without asking when recording starts', async () => {
@@ -71,7 +132,9 @@ test('stays on ⑫-1 when the picker is canceled', async () => {
 
 function DraftVideo() {
   const { draft } = usePostDraft();
-  return <Text>{draft.video?.uri ?? '動画なし'}</Text>;
+  return (
+    <Text>{draft.video ? [draft.video.uri, ...draft.video.marks].join(' ') : '動画なし'}</Text>
+  );
 }
 
 test('sends a guest to log in before recording or choosing a video', async () => {
@@ -100,5 +163,81 @@ test('starts without a video when the post is recorded', async () => {
       <DraftVideo />
     </PostDraftProvider>,
   );
+  expect(screen.getByText('動画なし')).toBeOnTheScreen();
+});
+
+test('asks for the camera and the microphone together when ⑫-1 opens', async () => {
+  allow(false, false);
+  await render(<PostCamera />);
+  await waitFor(() => {
+    expect(requestMicrophone).toHaveBeenCalled();
+  });
+  expect(requestCamera).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('動画を撮るには、カメラとマイクの許可が必要です')).toBeOnTheScreen();
+});
+
+test('asks nothing when both are already allowed', async () => {
+  await render(<PostCamera />);
+  expect(requestCamera).not.toHaveBeenCalled();
+  expect(requestMicrophone).not.toHaveBeenCalled();
+  expect(screen.queryByText('動画を撮るには、カメラとマイクの許可が必要です')).toBeNull();
+});
+
+test('opens the Settings app once the OS will not ask again', async () => {
+  allow(true, false, false);
+  const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
+  await render(<PostCamera />);
+  await fireEvent.press(screen.getByRole('button', { name: '設定を開く' }));
+  expect(openSettings).toHaveBeenCalled();
+  await fireEvent.press(screen.getByRole('button', { name: '録画をはじめる' }));
+  expect(alert).not.toHaveBeenCalled();
+  expect(openSettings).toHaveBeenCalledTimes(2);
+});
+
+function renderRecording() {
+  return render(
+    <PostDraftProvider>
+      <PostRecording />
+      <DraftVideo />
+    </PostDraftProvider>,
+  );
+}
+
+test('records with the marks of 手順を区切る and opens ⑫-3', async () => {
+  jest.useFakeTimers({ now: 0 });
+  await renderRecording();
+  await act(() => {
+    mockRecording.ready?.();
+  });
+  await act(() => {
+    jest.advanceTimersByTime(2000);
+  });
+  expect(screen.getByLabelText('録画時間 0分2秒')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '手順を区切る' }));
+  expect(screen.getByText('手順2 を撮影中')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '撮影を終える' }));
+  expect(mockStopRecording).toHaveBeenCalled();
+  await act(async () => {
+    mockRecording.current?.resolve({ uri: 'file:///recorded.mov' });
+    await Promise.resolve();
+  });
+  expect(screen.getByText('file:///recorded.mov 2000')).toBeOnTheScreen();
+  expect(router.replace).toHaveBeenCalledWith('/post/creating');
+  jest.useRealTimers();
+});
+
+test('deletes the video when the recording is closed', async () => {
+  await renderRecording();
+  await act(() => {
+    mockRecording.ready?.();
+  });
+  await fireEvent.press(screen.getByRole('button', { name: '閉じる' }));
+  expect(mockStopRecording).toHaveBeenCalled();
+  await act(async () => {
+    mockRecording.current?.resolve({ uri: 'file:///recorded.mov' });
+    await Promise.resolve();
+  });
+  expect(File).toHaveBeenCalledWith('file:///recorded.mov');
+  expect(router.replace).not.toHaveBeenCalled();
   expect(screen.getByText('動画なし')).toBeOnTheScreen();
 });

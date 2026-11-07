@@ -1,27 +1,29 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, Pressable, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { arPhotos } from '@/components/recipes';
+import { usePostDraft } from '@/components/post-draft';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
+import { formatElapsed, spokenElapsed, stepLengths } from '@/lib/recording';
 import { useTokenColor } from '@/theme/tokens';
 
 import drafts from '../../assets/plan-a/post/drafts.png';
 
 const IMAGE = Icon.select({ ios: 'photo', android: import('@expo/material-symbols/image.xml') });
 const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
-const MIC = Icon.select({ ios: 'mic', android: import('@expo/material-symbols/mic.xml') });
 const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/add.xml') });
 
 // The system picker hands over only the chosen video, so no photo library permission is asked.
@@ -36,13 +38,68 @@ async function pickVideo() {
   router.push({ pathname: '/post/creating', params: { video: video.uri } });
 }
 
-// Plan A ⑫-1 動画を撮る. The camera is not built; Plan A's still frame stands in and no
-// image leaves the device.
+/**
+ * Asks for the camera and the microphone together the first time ⑫-1 is shown, and rereads them
+ * when the app returns from the Settings app.
+ */
+function useRecordingAccess(enabled: boolean) {
+  const [camera, requestCamera, getCamera] = useCameraPermissions();
+  const [microphone, requestMicrophone, getMicrophone] = useMicrophonePermissions();
+  const asked = useRef(false);
+  const request = async () => {
+    if (camera && !camera.granted && camera.canAskAgain) {
+      await requestCamera();
+    }
+    if (microphone && !microphone.granted && microphone.canAskAgain) {
+      await requestMicrophone();
+    }
+  };
+  useEffect(() => {
+    if (!enabled || !camera || !microphone || asked.current) {
+      return;
+    }
+    asked.current = true;
+    void request();
+  });
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void getCamera();
+        void getMicrophone();
+      }
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [getCamera, getMicrophone]);
+  const granted = Boolean(camera?.granted && microphone?.granted);
+  // A denial the OS will not ask about again can only be changed in the Settings app.
+  const askable = (permission: typeof camera) =>
+    permission ? !permission.granted && permission.canAskAgain : false;
+  const canAsk = askable(camera) || askable(microphone);
+  return {
+    loaded: Boolean(camera && microphone),
+    granted,
+    retry: () => {
+      if (canAsk) {
+        void request();
+      } else {
+        void Linking.openSettings();
+      }
+    },
+    retryLabel: canAsk ? '許可する' : '設定を開く',
+  };
+}
+
+// Plan A ⑫-1 動画を撮る. The front camera is shown only while the tab is in front, and nothing
+// leaves the device here.
 export function PostCamera() {
   const insets = useSafeAreaInsets();
   // The post tab stays mounted under other tabs; only claim the status bar while it is shown.
   const focused = useIsFocused();
   const { data: session } = authClient.useSession();
+  // Guests log in before recording, so only a signed-in user is asked for the camera.
+  const access = useRecordingAccess(focused && Boolean(session));
   const ink = useTokenColor('--color-ink-primary');
   // Posting belongs to an account, so guests log in before recording or choosing a video (#42).
   const signedIn = (start: () => void) => () => {
@@ -58,8 +115,10 @@ export function PostCamera() {
   return (
     <View className="flex-1 bg-white">
       {focused ? <StatusBar style="dark" /> : null}
-      <View className="flex-1 overflow-hidden rounded-b-[36px]">
-        <FaceScene photo={arPhotos.camera} />
+      <View className="flex-1 overflow-hidden rounded-b-[36px] bg-bg-surface">
+        {focused && access.granted ? (
+          <CameraView facing="front" mode="video" style={StyleSheet.absoluteFill} />
+        ) : null}
         <View
           pointerEvents="none"
           className="absolute inset-x-0 top-0"
@@ -85,6 +144,22 @@ export function PostCamera() {
             </Text>
           </View>
         </View>
+        {access.loaded && !access.granted ? (
+          <View className="flex-1 items-center justify-center gap-4 px-8">
+            <Text className="text-center font-maru text-label text-ink-primary">
+              動画を撮るには、カメラとマイクの許可が必要です
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={access.retry}
+              className="min-h-12 items-center justify-center rounded-full bg-white px-6 active:opacity-70"
+            >
+              <Text className="font-maru-bold text-label text-ink-primary">
+                {access.retryLabel}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
       </View>
       <View
         className="-mt-6 flex-row items-end justify-center gap-[11px] px-4"
@@ -103,6 +178,10 @@ export function PostCamera() {
         <CameraAction
           label="録画をはじめる"
           onPress={signedIn(() => {
+            if (!access.granted) {
+              access.retry();
+              return;
+            }
             router.push('/post/recording');
           })}
         >
@@ -127,7 +206,7 @@ function CameraAction({
   children,
 }: {
   label: string;
-  onPress?: () => void;
+  onPress?: (() => void) | undefined;
   children: ReactNode;
 }) {
   const disabled = !onPress;
@@ -146,14 +225,69 @@ function CameraAction({
   );
 }
 
-// Plan A ⑫-2 録画中. The timer, step and segments show Plan A's sample; nothing records.
+/** How a recording ends: kept for ⑫-3 with its marks, or deleted from the device. */
+type Ending = { kind: 'finish'; marks: number[] } | { kind: 'discard' };
+
+// Plan A ⑫-2 録画中. Recording starts once the camera is ready. 撮影を終える keeps the video and
+// its marks in the post's data; closing or leaving deletes the video, so nothing is sent.
 export function PostRecording() {
   const insets = useSafeAreaInsets();
-  const secondary = useTokenColor('--color-ink-secondary');
+  const { setDraft } = usePostDraft();
+  const camera = useRef<CameraView>(null);
+  const ending = useRef<Ending | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [marks, setMarks] = useState<number[]>([]);
+  useEffect(() => {
+    if (startedAt === null) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 250);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [startedAt]);
+  const elapsed = startedAt === null ? 0 : Math.max(now - startedAt, 0);
+  const steps = stepLengths(marks, elapsed);
+
+  const start = () => {
+    if (startedAt !== null || !camera.current) {
+      return;
+    }
+    setStartedAt(Date.now());
+    setNow(Date.now());
+    camera.current
+      .recordAsync()
+      .then((result) => {
+        const end = ending.current;
+        if (!result) {
+          return;
+        }
+        if (end?.kind === 'finish') {
+          setDraft((current) => ({ ...current, video: { uri: result.uri, marks: end.marks } }));
+          router.replace('/post/creating');
+        } else {
+          new File(result.uri).delete();
+        }
+      })
+      .catch(() => {
+        Alert.alert('録画できませんでした', 'もう一度お試しください。');
+        backOrHome();
+      });
+  };
+
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
-      <FaceScene photo={arPhotos.camera} />
+      <CameraView
+        ref={camera}
+        facing="front"
+        mode="video"
+        style={StyleSheet.absoluteFill}
+        onCameraReady={start}
+      />
       <View
         pointerEvents="none"
         className="absolute inset-x-0 top-0"
@@ -167,6 +301,8 @@ export function PostRecording() {
           icon={CLOSE}
           label="閉じる"
           onPress={() => {
+            ending.current = { kind: 'discard' };
+            camera.current?.stopRecording();
             backOrHome();
           }}
         />
@@ -179,14 +315,14 @@ export function PostRecording() {
         <View className="flex-row items-center gap-2 rounded-[20px] bg-bg-surface py-2 pl-3 pr-3.5">
           <View className="size-2.5 rounded-full bg-accent-rose" />
           <Text
-            accessibilityLabel="録画時間 3分24秒"
+            accessibilityLabel={`録画時間 ${spokenElapsed(elapsed)}`}
             className="font-maru-bold text-action text-ink-primary"
           >
-            03:24
+            {formatElapsed(elapsed)}
           </Text>
         </View>
         <View className="rounded-2xl bg-bg-surface px-3 py-1.5">
-          <Text className="font-maru text-meta text-ink-primary">手順3 を撮影中</Text>
+          <Text className="font-maru text-meta text-ink-primary">手順{steps.length} を撮影中</Text>
         </View>
       </View>
       <View
@@ -194,16 +330,15 @@ export function PostRecording() {
         style={{ paddingBottom: Math.max(insets.bottom, 12) }}
       >
         <View className="h-2 flex-row gap-[3px]" accessible={false}>
-          <View className="flex-[56] rounded bg-accent-rose" />
-          <View className="flex-[92] rounded bg-accent-rose" />
-          <View className="flex-[46] rounded bg-accent-rose/45" />
-          <View className="flex-[147] rounded bg-ink-primary/15" />
-        </View>
-        <View className="flex-row items-center gap-1.5">
-          <SocialIcon name={MIC} size={16} color={secondary} />
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">
-            「次」と言っても区切れます
-          </Text>
+          {steps.map((length, index) => (
+            <View
+              key={index}
+              className={
+                index === steps.length - 1 ? 'rounded bg-accent-rose/45' : 'rounded bg-accent-rose'
+              }
+              style={{ flex: Math.max(length, 1) }}
+            />
+          ))}
         </View>
         <View className="flex-row items-center justify-between">
           <CameraAction label="一時停止">
@@ -214,15 +349,29 @@ export function PostRecording() {
           </CameraAction>
           <CameraAction
             label="撮影を終える"
-            onPress={() => {
-              router.replace('/post/creating');
-            }}
+            onPress={
+              startedAt === null
+                ? undefined
+                : () => {
+                    ending.current = { kind: 'finish', marks };
+                    camera.current?.stopRecording();
+                  }
+            }
           >
             <View className="size-[72px] items-center justify-center rounded-full bg-bg-surface">
               <View className="size-[26px] rounded-md bg-accent-rose" />
             </View>
           </CameraAction>
-          <CameraAction label="手順を区切る">
+          <CameraAction
+            label="手順を区切る"
+            onPress={
+              startedAt === null
+                ? undefined
+                : () => {
+                    setMarks((current) => [...current, Date.now() - startedAt]);
+                  }
+            }
+          >
             <View className="size-[52px] items-center justify-center rounded-full bg-accent-rose">
               <SocialIcon name={ADD} size={26} color="white" />
             </View>

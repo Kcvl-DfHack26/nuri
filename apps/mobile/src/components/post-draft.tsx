@@ -34,9 +34,15 @@ export type PostStep = {
   thumbCrop: PhotoCrop;
 };
 
+type PostVideo = {
+  uri: string;
+  /** Times of 手順を区切る from the start of the recording, in ms; empty for a chosen video. */
+  marks: number[];
+};
+
 type PostDraft = {
-  /** Video chosen with 動画から, kept on the device; null while recording is not built. */
-  video: { uri: string } | null;
+  /** The recorded or chosen video, kept on the device until the post is sent. */
+  video: PostVideo | null;
   steps: PostStep[];
   message: string;
   publishCosmetics: boolean;
@@ -171,7 +177,7 @@ export function PostDraftProvider({
 }) {
   const [draft, setDraft] = useState<PostDraft>(() => ({
     ...sampleDraft,
-    video: videoUri ? { uri: videoUri } : null,
+    video: videoUri ? { uri: videoUri, marks: [] } : null,
   }));
   const updateStep = (index: number, change: Partial<PostStep>) => {
     setDraft((current) => ({
