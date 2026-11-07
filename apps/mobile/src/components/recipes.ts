@@ -172,7 +172,7 @@ type Product = {
   info: ProductInfo;
 };
 
-export type Recipe = {
+type Recipe = {
   id: string;
   title: string;
   author: string;
