@@ -1,7 +1,7 @@
 # nuri 作業の入口
 
 - 最初に[アプリ概要](docs/overview.md)を読み、技術候補と検証済みの事実を区別する。
-- このリポジトリは[Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を取り込んだもの。モバイルはPlan Aの画面へ順に置き換えており、APIと一部の画面にはスターターのSNSサンプルが残っている。
+- このリポジトリは[Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を取り込んだもの。アプリのコードはまだスターターのSNSサンプルで、nuriの画面へ順に置き換える。
 - 画面のデザインはFigmaの「Plan A」を正とする。色・文字はFigmaのFoundationsに従う。
 - 最初の技術検証はP1（端末上の顔追跡）とP2（顔に合う範囲の重ね表示）を優先する。
 - 顔の映像をサーバーへ送らない。写真の送信は利用者が保存・投稿を明示的に選んだ場合に限る。
