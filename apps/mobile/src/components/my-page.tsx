@@ -201,14 +201,6 @@ function PostCard({ post }: { post: Post }) {
       </View>
     </>
   );
-  // Only recipes with Plan A detail screens open ⑤; the rest are catalog previews.
-  if (!recipe.detail) {
-    return (
-      <View accessible accessibilityLabel={label} className="flex-1 gap-[5px]">
-        {content}
-      </View>
-    );
-  }
   return (
     <Pressable
       accessibilityRole="button"

@@ -1,3 +1,5 @@
+import type { makeupParts } from '@starter/shared';
+
 import arOverlay1 from '../../assets/plan-a/ar/overlay-1.png';
 import arOverlay2 from '../../assets/plan-a/ar/overlay-2.png';
 import arOverlay3 from '../../assets/plan-a/ar/overlay-3.png';
@@ -23,10 +25,11 @@ import recipesLong from '../../assets/plan-a/recipes/long.jpg';
 import recipesOffice from '../../assets/plan-a/recipes/office.jpg';
 import recipesRound from '../../assets/plan-a/recipes/round.jpg';
 
-// Fixed Plan A sample data for the screens that do not read recipes from the API yet (① and ⑤
-// do). It lives with the UI because it bundles image assets, which src/lib may not import.
+// Fixed Plan A sample data for the screens that do not read recipes from the API yet (①, ⑤ and
+// the steps of ⑦ do). It lives with the UI because it bundles image assets, which src/lib may not
+// import.
 
-export type PartId = 'base' | 'brow' | 'eye' | 'lash' | 'cheek' | 'shading' | 'highlight' | 'lip';
+export type PartId = (typeof makeupParts)[number];
 
 /** Percent crop of a photo inside its frame, copied from the Figma image fill. */
 export type PhotoCrop = {
@@ -145,17 +148,16 @@ export const partCards: {
   },
 ];
 
-export type MakeupStep = {
-  part: PartId;
-  /** Short label in the step list, e.g. シャドウ. */
-  label: string;
-  title: string;
-  hint: string;
-  product: string;
-  /** Recommended colors shown in the swatch and caption. */
-  colors: string[];
-  /** Plan A AR overlay drawn over the camera frame (390×844). */
-  overlay: number;
+/**
+ * Plan A's AR overlays for the fox recipe, drawn over the camera frame (390×844) by the step's part.
+ * They stand in for every recipe until ⑦ draws each step's texture on the tracked face (#31).
+ */
+export const arOverlays: Partial<Record<PartId, number>> = {
+  brow: arOverlay1,
+  eye: arOverlay2,
+  lash: arOverlay3,
+  shading: arOverlay4,
+  cheek: arOverlay5,
 };
 
 /** ⑥ 商品詳細: the sheet opened from a product row on ⑤. */
@@ -186,61 +188,7 @@ export type Recipe = {
   author: string;
   likes: string;
   thumbnail: number;
-  /** Plan A step data; recipes without it cannot start ⑦ yet. */
-  detail?: {
-    /** Steps shown on ⑤ as pins and icons, including ones without an AR screen yet. */
-    overview: PartId[];
-    steps: MakeupStep[];
-  };
 };
-
-const foxSteps: MakeupStep[] = [
-  {
-    part: 'brow',
-    label: '眉',
-    title: '眉尻を濃く、眉頭は淡く',
-    hint: 'スクリューブラシで眉頭の毛を立てる',
-    product: 'アイブロウ（微アーチ眉）',
-    colors: ['#79513A'],
-    overlay: arOverlay1,
-  },
-  {
-    part: 'eye',
-    label: 'シャドウ',
-    title: '目尻側から横長にぼかす',
-    hint: '中間・締め色は目頭側へ薄く',
-    product: 'アイシャドウ（ベース・中間・締め）',
-    colors: ['#E5B58A', '#C56D42', '#713E2C'],
-    overlay: arOverlay2,
-  },
-  {
-    part: 'lash',
-    label: 'ライン',
-    title: '黒目の外側から徐々に太く',
-    hint: '目尻は斜め上に跳ね上げ三角を埋める',
-    product: 'アイライン',
-    colors: ['#38251D'],
-    overlay: arOverlay3,
-  },
-  {
-    part: 'shading',
-    label: 'シェード',
-    title: '骨の凹みに沿って滑らせる',
-    hint: '外側から内側へ境目を馴染ませる',
-    product: 'シェーディング',
-    colors: ['#A17B60'],
-    overlay: arOverlay4,
-  },
-  {
-    part: 'cheek',
-    label: 'チーク',
-    title: 'こめかみへ斜め上に滑らせる',
-    hint: '頬骨の高い位置から丸く広げない',
-    product: 'チーク',
-    colors: ['#B8754F'],
-    overlay: arOverlay5,
-  },
-];
 
 /** ① ホーム（全体メイク）: cards in reading order (left, right, left, …). */
 const recipes: Recipe[] = [
@@ -250,10 +198,6 @@ const recipes: Recipe[] = [
     author: 'mio',
     likes: '1.2k',
     thumbnail: recipesFox,
-    detail: {
-      overview: ['brow', 'eye', 'lash', 'shading', 'cheek', 'lip'],
-      steps: foxSteps,
-    },
   },
   {
     id: 'round',

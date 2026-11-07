@@ -47,7 +47,8 @@ test('folds the brow finding and opens a recommended recipe', async () => {
 
   await fireEvent.press(screen.getByRole('button', { name: '狐メイク、mio、相性94%' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
-  expect(screen.queryByRole('button', { name: /丸顔メイク/ })).not.toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: /^丸顔メイク、/ }));
+  expect(router.push).toHaveBeenCalledWith('/recipes/round');
 });
 
 test('goes back from the result', async () => {

@@ -1,4 +1,5 @@
 import { Icon } from '@expo/ui';
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -6,14 +7,17 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { MakeupStep, PartId } from '@/components/recipes';
+import type { RecipeStep } from '@/lib/recipes';
 
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { arPhotos, findRecipe, parts } from '@/components/recipes';
+import { RecipeStatus } from '@/components/recipe-detail';
+import { arOverlays, arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
+import { recipeOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -34,48 +38,90 @@ const NEXT = Icon.select({
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
 
-// Plan A ⑦ AR手順. The camera and face tracking come later; Plan A's frame and overlays stand in.
+// Plan A ⑦ AR手順, walking through the recipe's steps from the API. The camera and face tracking
+// come later (#31); Plan A's frame and overlays stand in.
 export function ArSteps({ id }: { id: string }) {
+  const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
+  const recipe = query.data;
+  if (recipe && recipe.steps.length > 0) {
+    return <StepsContent recipeId={recipe.id} title={recipe.title} steps={recipe.steps} />;
+  }
+  return (
+    <RecipeStatus
+      loading={query.isPending && Boolean(apiUrl)}
+      message={statusMessage({
+        hasApi: Boolean(apiUrl),
+        isMissing: recipe !== undefined,
+        isError: query.isError,
+      })}
+      onRetry={
+        query.isError
+          ? () => {
+              void query.refetch();
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+function statusMessage({
+  hasApi,
+  isMissing,
+  isError,
+}: {
+  hasApi: boolean;
+  /** The recipe does not exist or has no steps. */
+  isMissing: boolean;
+  isError: boolean;
+}) {
+  if (!hasApi) {
+    return '接続先が未設定です。セットアップ後に手順を表示できます。';
+  }
+  if (isMissing) {
+    return '手順が見つかりません';
+  }
+  if (isError) {
+    return '手順を読み込めませんでした。通信状況を確認してお試しください。';
+  }
+  return '手順を読み込んでいます';
+}
+
+function StepsContent({
+  recipeId,
+  title,
+  steps,
+}: {
+  recipeId: string;
+  title: string;
+  steps: RecipeStep[];
+}) {
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
   const [overlayVisible, setOverlayVisible] = useState(true);
-  const recipe = findRecipe(id);
-  const detail = recipe?.detail;
-  const step = detail?.steps[index];
-  if (!recipe || !detail || !step) {
-    return (
-      <View
-        className="flex-1 items-center justify-center gap-4 bg-white px-6"
-        style={{ paddingTop: insets.top }}
-      >
-        <Text className="font-maru-bold text-heading text-ink-primary">手順が見つかりません</Text>
-        <GlassIconButton
-          icon={BACK}
-          label="戻る"
-          onPress={() => {
-            backOrHome();
-          }}
-        />
-      </View>
-    );
+  // A refetch may return fewer steps than the one on screen.
+  const current = Math.min(index, steps.length - 1);
+  const step = steps[current];
+  if (!step) {
+    return null;
   }
-  const { steps, overview } = detail;
-  const isLast = index === steps.length - 1;
+  const overlay = arOverlays[step.part];
+  const isLast = current === steps.length - 1;
   const goNext = () => {
     if (isLast) {
-      router.replace(`/recipes/${recipe.id}/finish`);
+      router.replace(`/recipes/${recipeId}/finish`);
       return;
     }
-    setIndex(index + 1);
+    setIndex(current + 1);
   };
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
       <FaceScene photo={arPhotos.camera}>
-        {overlayVisible ? (
+        {overlayVisible && overlay !== undefined ? (
           <Image
             accessible={false}
-            source={step.overlay}
+            source={overlay}
             contentFit="fill"
             style={{ position: 'absolute', width: '100%', height: '100%' }}
           />
@@ -98,9 +144,9 @@ export function ArSteps({ id }: { id: string }) {
             }}
           />
           <View className="min-h-9 flex-row items-center gap-1.5 rounded-[18px] border border-white bg-white/70 px-3.5">
-            <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
+            <Text className="font-maru-bold text-label text-ink-primary">{title}</Text>
             <Text className="font-maru text-meta text-ink-secondary">
-              {index + 1}/{overview.length}
+              {current + 1}/{steps.length}
             </Text>
           </View>
           <GlassIconButton
@@ -112,17 +158,18 @@ export function ArSteps({ id }: { id: string }) {
           />
         </View>
         <View className="flex-row gap-1">
-          {overview.map((partId, position) => (
+          {steps.map((_, position) => (
             <View
-              key={partId}
+              // Steps are identified by their position; a part may appear twice.
+              key={position}
               className={cn(
                 'h-1 flex-1 rounded-sm',
-                position <= index ? 'bg-accent-pink' : 'bg-white/70',
+                position <= current ? 'bg-accent-pink' : 'bg-white/70',
               )}
             />
           ))}
         </View>
-        <Instruction step={step} number={index + 1} />
+        <Instruction step={step} number={current + 1} />
       </View>
       <View
         className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-[28px] bg-white/80 px-4 pt-4"
@@ -132,11 +179,11 @@ export function ArSteps({ id }: { id: string }) {
         }}
       >
         <ProductRow step={step} />
-        <StepList overview={overview} steps={steps} current={index} onSelect={setIndex} />
+        <StepList steps={steps} current={current} onSelect={setIndex} />
         <Controls
-          isFirst={index === 0}
+          isFirst={current === 0}
           onPrevious={() => {
-            setIndex(index - 1);
+            setIndex(current - 1);
           }}
           onNext={goNext}
         />
@@ -145,7 +192,7 @@ export function ArSteps({ id }: { id: string }) {
   );
 }
 
-function Instruction({ step, number }: { step: MakeupStep; number: number }) {
+function Instruction({ step, number }: { step: RecipeStep; number: number }) {
   const ink = useTokenColor('--color-ink-primary');
   return (
     <View
@@ -170,7 +217,7 @@ function Instruction({ step, number }: { step: MakeupStep; number: number }) {
   );
 }
 
-function ProductRow({ step }: { step: MakeupStep }) {
+function ProductRow({ step }: { step: RecipeStep }) {
   const ink = useTokenColor('--color-ink-primary');
   return (
     <View className="flex-row items-center gap-3">
@@ -205,31 +252,24 @@ function ProductRow({ step }: { step: MakeupStep }) {
 }
 
 function StepList({
-  overview,
   steps,
   current,
   onSelect,
 }: {
-  overview: PartId[];
-  steps: MakeupStep[];
+  steps: RecipeStep[];
   current: number;
   onSelect: (index: number) => void;
 }) {
   return (
     <View className="flex-row justify-between">
-      {overview.map((partId, position) => {
-        const step = steps[position];
+      {steps.map((step, position) => {
         const active = position === current;
-        const label = step?.label ?? parts[partId].label;
         return (
           <Pressable
-            key={partId}
+            key={position}
             accessibilityRole="button"
-            accessibilityLabel={
-              step ? `${position + 1} ${label}` : `${position + 1} ${label}（準備中）`
-            }
-            accessibilityState={{ selected: active, disabled: !step }}
-            disabled={!step}
+            accessibilityLabel={`${position + 1} ${step.label}`}
+            accessibilityState={{ selected: active }}
             onPress={() => {
               onSelect(position);
             }}
@@ -243,7 +283,7 @@ function StepList({
             >
               <Image
                 accessible={false}
-                source={parts[partId].icon}
+                source={parts[step.part].icon}
                 style={{ width: 18, height: 18 }}
               />
             </View>
@@ -253,7 +293,7 @@ function StepList({
                 active ? 'text-accent-rose' : 'text-ink-secondary',
               )}
             >
-              {label}
+              {step.label}
             </Text>
           </Pressable>
         );
