@@ -210,3 +210,21 @@ export const recipeStep = pgTable(
   },
   (table) => [primaryKey({ columns: [table.recipeId, table.position] })],
 );
+
+/** Recipes a user keeps as favorites (⑤ and ⑰). */
+export const recipeFavorite = pgTable(
+  'recipe_favorite',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    recipeId: text('recipe_id')
+      .notNull()
+      .references(() => recipe.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.recipeId] }),
+    index('recipe_favorite_recipe_id_idx').on(table.recipeId),
+  ],
+);

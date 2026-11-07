@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
-import { user } from './db/schema';
+import { recipe, user } from './db/schema';
 import { createAuth } from './modules/auth';
 import { softwareAuthenticator } from './passkey-fixture';
 import { readEnv } from './platform/env';
@@ -18,6 +18,7 @@ const { db, pool } = connectDatabase(databaseUrl);
 const unique = crypto.randomUUID();
 const email = `auth-${unique}@example.com`;
 const secondEmail = `other-${unique}@example.com`;
+const favoriteEmail = `favorite-${unique}@example.com`;
 const baseURL = 'http://localhost:8080';
 const origin = 'http://localhost:8081';
 const google = await createEmulator({
@@ -86,7 +87,7 @@ function request(path: string, body: unknown, cookie = '', method = 'POST') {
   });
 }
 afterAll(async () => {
-  await db.delete(user).where(inArray(user.email, [email, secondEmail]));
+  await db.delete(user).where(inArray(user.email, [email, secondEmail, favoriteEmail]));
   await Promise.all([pool.end(), google.close(), apple.close(), mail.close()]);
 });
 
@@ -352,4 +353,52 @@ test('passkeys require a session to register, verify signatures/origin, and can 
       )
     ).status,
   ).not.toBe(200);
+}, 20000);
+
+test('favorites need a session, are idempotent and list only the owner’s recipes', async () => {
+  const signedIn = await app.request((await emailLink(favoriteEmail)).href);
+  const cookie = cookies(signedIn);
+  const { user: me } = z
+    .object({ user: z.object({ id: z.string() }) })
+    .parse(await (await app.request('/api/me', { headers: { cookie } })).json());
+  const recipeId = `favorite-${unique}`;
+  await db.insert(recipe).values({
+    id: recipeId,
+    authorId: me.id,
+    title: 'お気に入りのテスト',
+    image: 'https://example.com/favorite.jpg',
+    durationMinutes: 5,
+  });
+  expect((await request(`/api/recipes/${recipeId}/favorite`, {}, '', 'PUT')).status).toBe(401);
+  expect((await app.request('/api/me/favorites')).status).toBe(401);
+  expect((await request('/api/recipes/missing-recipe/favorite', {}, cookie, 'PUT')).status).toBe(
+    404,
+  );
+  const added = await Promise.all([
+    request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'PUT'),
+    request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'PUT'),
+  ]);
+  expect(added.map((response) => response.status)).toEqual([200, 200]);
+  const detail = z
+    .object({ recipe: z.object({ favorited: z.boolean() }) })
+    .parse(await (await app.request(`/api/recipes/${recipeId}`, { headers: { cookie } })).json());
+  expect(detail.recipe.favorited).toBe(true);
+  const guestDetail = z
+    .object({ recipe: z.object({ favorited: z.boolean() }) })
+    .parse(await (await app.request(`/api/recipes/${recipeId}`)).json());
+  expect(guestDetail.recipe.favorited).toBe(false);
+  const list = z.object({ items: z.array(z.object({ id: z.string() })) });
+  const favorites = list.parse(
+    await (await app.request('/api/me/favorites', { headers: { cookie } })).json(),
+  );
+  expect(favorites.items.map((item) => item.id)).toEqual([recipeId]);
+  const authored = list.parse(await (await app.request(`/api/recipes?author=${me.id}`)).json());
+  expect(authored.items.map((item) => item.id)).toEqual([recipeId]);
+  expect((await request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'DELETE')).status).toBe(
+    200,
+  );
+  expect(
+    list.parse(await (await app.request('/api/me/favorites', { headers: { cookie } })).json())
+      .items,
+  ).toEqual([]);
 }, 20000);
