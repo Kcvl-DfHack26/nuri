@@ -1,7 +1,7 @@
 # nuri 作業の入口
 
 - 最初に[アプリ概要](docs/overview.md)を読み、技術候補と検証済みの事実を区別する。
-- このリポジトリは[Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を取り込んだもの。アプリのコードはまだスターターのSNSサンプルで、nuriの画面へ順に置き換える。
+- このリポジトリは[Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を取り込んだもの。モバイルはPlan Aの画面へ順に置き換えており、APIと一部の画面にはスターターのSNSサンプルが残っている。
 - 画面のデザインはFigmaの「Plan A」を正とする。色・文字はFigmaのFoundationsに従う。
 - 最初の技術検証はP1（端末上の顔追跡）とP2（顔に合う範囲の重ね表示）を優先する。
 - 顔の映像をサーバーへ送らない。写真の送信は利用者が保存・投稿を明示的に選んだ場合に限る。
@@ -36,6 +36,7 @@
 - Start every implementation, fix, or documentation/harness change with a GitHub Issue. Read-only investigation may come first; creating the working branch, editing files, and installing dependencies must follow Issue creation or confirmation of an existing Issue.
 - Read `github-issue-pr-ops`, check existing Issues/PRs to avoid duplicates, record the goal, acceptance criteria and validation plan, and assign yourself before implementation. Incorporate scope changes into that Issue before continuing dependent work.
 - Use **1 implementation Issue → 1 `codex/<issue>-<topic>` branch → 1 PR**. Link the branch to the Issue with `gh issue develop` and reference that Issue in commits and the PR. Keep unrelated work separate.
+- Name the corresponding worktree directory `nuri-<issue>-<topic>`. Compose uses this basename to isolate projects, so keep it unique on the host. Use lowercase letters, digits, and hyphens, start and end with a letter or digit, and stay within 63 characters.
 - An implementation request includes completing this workflow: implement, validate, commit, push and create or update a Draft PR. Do not stop at local edits or ask again whether to create the Issue/PR.
 - Keep the PR description aligned with the final diff and latest tested SHA, include evidence and remaining blockers, and use `Closes #<issue>` for the corresponding implementation Issue. Report the Issue and PR links when handing back the work.
 - Mark ready or merge only within the user's authorization, after required checks pass. Respect branch protection, and confirm the PR/Issue state after merging; creating a PR is not evidence that it has merged.
@@ -52,9 +53,10 @@
 ## Development and validation
 
 - Follow [docs/setup.md](docs/setup.md). Local servers require Docker Compose and host Portless 0.16.0 (Node.js 24+). The Linux Dev Container is an optional editor/check environment. Mac/Xcode/Android Studio are optional; use Expo Go or EAS builds for iPhone checks.
-- Run `sh scripts/worktree-init.sh` before Compose; `setup` creates missing app env files without overwriting values. Host `bun run dev` wraps `portless compose up --build api metro`. Compose installs dependencies and migrates the isolated DB before API startup; Metro can start alone. Use the shared HTTPS/443 proxy and trust its local CA on the host. Internal API/Metro ports are 8080/8081, Portless assigns loopback host ports, and PostgreSQL stays unpublished. Use `portless compose --profile '*' down` / `services:down` to remove routes and retain volumes. Do not recreate API/Metro with plain `docker compose up`.
+- Run `sh scripts/worktree-init.sh` before Compose to generate the mount paths; `setup` creates missing app env files without overwriting values. Host `bun run dev` wraps `portless compose up --build api metro`. Compose installs dependencies and migrates the isolated DB before API startup; Metro can start alone. Use the shared HTTPS/443 proxy and trust its local CA on the host. Internal API/Metro ports are 8080/8081, Portless assigns loopback host ports, and PostgreSQL stays unpublished. Use `portless compose --profile '*' down` / `services:down` to remove routes and retain volumes. Do not recreate API/Metro with plain `docker compose up`.
+- For Simulator/Emulator use `bun run dev:devices` and a Development Build. Run `bun run devices` on the host with Xcode or the Android SDK. Follow [docs/setup.md](docs/setup.md) for public CA trust, Android hosts and serial-specific ADB forwarding; never commit generated connection settings.
 - Dev Container starts only the `workspace` editor and its setup/DB dependencies. Run Portless commands on the host; no Docker socket is mounted in the editor. Initial hook installation must be serialized across worktrees because Git hooks are shared; automatic Compose installs skip lifecycle scripts.
-- `bun run check`: formatting, type-aware lint, strict typecheck, Bun/Jest tests and Fallow. `bun run test:integration` requires a migrated PostgreSQL database.
+- `bun run check`: formatting, type-aware lint, strict typecheck, Bun/Jest tests and Fallow. `bun run test:integration` uses an already running, migrated PostgreSQL database. See [docs/testing.md](docs/testing.md) for test layers and evidence.
 - `bun run doctor` and `bun run export:mobile` check Expo dependencies and bundle iOS/Android.
 - After changing Uniwind configuration, run `bun run --cwd apps/mobile styles:generate` and commit `uniwind-types.d.ts` with the configuration. Do not edit or format this generated file. The persisted appearance setting drives `Uniwind.setTheme`; do not add a second theme store or competing `Appearance.setColorScheme` calls.
 - `tofu fmt -check -recursive infra`, `tofu -chdir=infra init -backend=false`, `tofu -chdir=infra validate`, `tflint --chdir=infra`: credential-free IaC checks. Also validate `infra/bootstrap`.
