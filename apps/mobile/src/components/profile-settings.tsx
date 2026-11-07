@@ -1,20 +1,21 @@
 import type { ReactNode } from 'react';
 
-import { Icon } from '@expo/ui';
-import { profileInputSchema } from '@starter/shared';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Host, Icon, Switch as NativeSwitch } from '@expo/ui';
+import { profileInputSchema, profilePatchSchema } from '@starter/shared';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
 import { BottomCta, PrimaryButton } from '@/components/post-chrome';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { authClient } from '@/lib/api';
+import { api, apiUrl, authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -31,31 +32,54 @@ const NEXT = Icon.select({
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
 
-// Plan A ⑰-2 プロフィール設定. The display name saves through Better Auth like the old profile
-// editor; the other profile fields, the face type and the switches are Plan A samples shown as
-// not built yet. The app's own settings (appearance, haptics, passkeys) open from the bottom.
+// Plan A ⑰-2 プロフィール設定. Face type, photo and notifications remain samples.
 export function ProfileSettings() {
   const insets = useSafeAreaInsets();
   const session = authClient.useSession();
-  // The screen stays mounted under the app settings; only claim the status bar while shown.
-  const focused = useIsFocused();
   // The header floats over the form; measure it so larger text never covers the first field.
   const [headerHeight, setHeaderHeight] = useState(44);
   const user = session.data?.user;
+  const profile = useQuery({
+    queryKey: ['my-profile', user?.id],
+    enabled: Boolean(user && apiUrl),
+    queryFn: async () => {
+      const response = await api.api.me.profile.$get();
+      if (response.status !== 200) {
+        throw new Error('プロフィールを読み込めませんでした。');
+      }
+      return (await response.json()).profile;
+    },
+  });
   return (
     <View className="flex-1 bg-white">
-      {focused ? <StatusBar style="dark" /> : null}
+      <ProfileStatusBar />
       {session.isPending ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator accessibilityLabel="読み込み中" />
         </View>
-      ) : user ? (
+      ) : user && !apiUrl ? (
+        <Feedback fullScreen message="接続先が未設定です。" />
+      ) : user && profile.isPending ? (
+        <Feedback fullScreen loading message="プロフィールを読み込んでいます" />
+      ) : user && profile.isError && !profile.data ? (
+        <Feedback
+          fullScreen
+          message={profile.error.message}
+          onRetry={() => {
+            void profile.refetch();
+          }}
+        />
+      ) : user && profile.data ? (
         <Editor
           key={user.id}
-          name={user.name}
+          profile={profile.data}
           email={user.email}
           image={user.image}
           top={insets.top + headerHeight + 16}
+          refreshError={profile.isError}
+          onRetry={() => {
+            void profile.refetch();
+          }}
         />
       ) : (
         <ScrollView
@@ -115,31 +139,64 @@ export function ProfileSettings() {
   );
 }
 
+function ProfileStatusBar() {
+  // The screen stays mounted under the app settings; only claim the status bar while shown.
+  return useIsFocused() ? <StatusBar style="dark" /> : null;
+}
+
 function Editor({
-  name: initialName,
+  profile,
   email,
   image,
   top,
+  refreshError,
+  onRetry,
 }: {
-  name: string;
+  profile: { name: string; handle: string | null; bio: string; isPublic: boolean };
   email: string;
   image: string | null | undefined;
   top: number;
+  refreshError: boolean;
+  onRetry: () => void;
 }) {
-  const [name, setName] = useState(initialName);
+  const [form, setForm] = useState(() => ({ base: profile, draft: profile }));
+  const current = {
+    name: form.draft.name === form.base.name ? profile.name : form.draft.name,
+    handle: form.draft.handle === form.base.handle ? profile.handle : form.draft.handle,
+    bio: form.draft.bio === form.base.bio ? profile.bio : form.draft.bio,
+    isPublic: form.draft.isPublic === form.base.isPublic ? profile.isPublic : form.draft.isPublic,
+  };
+  const change = (patch: Partial<typeof current>) => {
+    setForm({ base: profile, draft: { ...current, ...patch } });
+  };
   const client = useQueryClient();
   const secondary = useTokenColor('--color-ink-secondary');
+  const trimmedHandle = current.handle?.trim();
+  const input = { ...current, handle: trimmedHandle === '' ? null : (trimmedHandle ?? null) };
+  const changes = {
+    ...(input.name !== profile.name ? { name: input.name } : {}),
+    ...(input.handle !== profile.handle ? { handle: input.handle } : {}),
+    ...(input.bio !== profile.bio ? { bio: input.bio } : {}),
+    ...(input.isPublic !== profile.isPublic ? { isPublic: input.isPublic } : {}),
+  };
+  const handleInvalid =
+    input.handle !== null && !profileInputSchema.shape.handle.safeParse(input.handle).success;
   const save = useMutation({
     mutationFn: async () => {
-      const result = await authClient.updateUser(profileInputSchema.parse({ name }));
-      if (result.error) {
+      const response = await api.api.me.profile.$patch({ json: changes });
+      if (response.status === 409) {
+        throw new Error('このユーザーIDは既に使われています。');
+      }
+      if (response.status !== 200) {
         throw new Error('変更を保存できませんでした。もう一度お試しください。');
       }
     },
     onSuccess: async () => {
+      authClient.$store.notify('$sessionSignal');
       await Promise.all([
         client.invalidateQueries({ queryKey: ['posts'] }),
         client.invalidateQueries({ queryKey: ['user'] }),
+        client.invalidateQueries({ queryKey: ['my-profile'] }),
       ]);
       backOrHome();
     },
@@ -156,8 +213,7 @@ function Editor({
       router.dismissTo('/');
     },
   });
-  const canSave =
-    name !== initialName && profileInputSchema.safeParse({ name }).success && !save.isPending;
+  const canSave = profilePatchSchema.safeParse(changes).success && !save.isPending && !refreshError;
   const error = save.error ?? logout.error;
   return (
     <>
@@ -168,6 +224,17 @@ function Editor({
         contentContainerClassName="gap-5 px-4"
         contentContainerStyle={{ paddingTop: top, paddingBottom: 24 }}
       >
+        {refreshError ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRetry}
+            className="min-h-12 justify-center"
+          >
+            <Text className="font-maru text-meta text-accent-rose">
+              最新のプロフィールを読み込めませんでした。再試行
+            </Text>
+          </Pressable>
+        ) : null}
         <View className="items-center gap-2">
           <View className="size-24">
             <ProfilePhoto size={96} image={image} />
@@ -188,27 +255,49 @@ function Editor({
           <Field label="表示名">
             <TextInput
               accessibilityLabel="表示名"
-              value={name}
-              onChangeText={setName}
+              value={current.name}
+              onChangeText={(name) => {
+                change({ name });
+              }}
               editable={!save.isPending}
               autoComplete="name"
               maxLength={40}
               className="p-0 font-maru text-ui text-ink-primary"
             />
           </Field>
-          <Field label="ユーザーID">
+          <Field
+            label="ユーザーID"
+            caption={
+              handleInvalid
+                ? 'ユーザーIDは半角英小文字・数字・_で3〜20文字にしてください'
+                : '半角英小文字・数字・_で3〜20文字。空欄も可'
+            }
+            error={handleInvalid}
+          >
             <TextInput
-              accessibilityLabel="ユーザーID（準備中）"
-              editable={false}
-              placeholder="@hana_makeup"
+              accessibilityLabel="ユーザーID"
+              value={current.handle ?? ''}
+              onChangeText={(handle) => {
+                change({ handle });
+              }}
+              editable={!save.isPending}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={20}
+              placeholder="hana_makeup"
               placeholderTextColor={secondary}
               className="p-0 font-maru text-ui text-ink-primary"
             />
           </Field>
           <Field label="自己紹介" caption="42文字まで">
             <TextInput
-              accessibilityLabel="自己紹介（準備中）"
-              editable={false}
+              accessibilityLabel="自己紹介"
+              value={current.bio}
+              onChangeText={(bio) => {
+                change({ bio });
+              }}
+              editable={!save.isPending}
+              maxLength={42}
               placeholder="丸顔さん向けのメイクを投稿しています"
               placeholderTextColor={secondary}
               className="p-0 font-maru text-ui text-ink-primary"
@@ -219,7 +308,15 @@ function Editor({
           <Row label="顔タイプ" value="丸顔×イエベ" />
         </Section>
         <Section title="公開と通知">
-          <SwitchRow title="プロフィールを公開" detail="オフならフォロワーだけに表示します" />
+          <SwitchRow
+            title="プロフィールを公開"
+            detail="オフならプロフィール画面は本人のみ。公開投稿・レシピの名前と写真は表示されます"
+            value={current.isPublic}
+            onValueChange={(isPublic) => {
+              change({ isPublic });
+            }}
+            disabled={save.isPending}
+          />
           <Divider />
           <SwitchRow title="新着の通知" detail="フォロー中の人の投稿をお知らせします" />
         </Section>
@@ -263,7 +360,7 @@ function Editor({
             {error.message}
           </Text>
         ) : null}
-        {/* Inactive until the name changes, and while saving. */}
+        {/* Inactive until a valid field changes, and while saving. */}
         <PrimaryButton
           label={save.isPending ? '保存中' : '保存する'}
           disabled={!canSave}
@@ -280,10 +377,12 @@ function Editor({
 function Field({
   label,
   caption,
+  error,
   children,
 }: {
   label: string;
   caption?: string;
+  error?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -292,7 +391,17 @@ function Field({
       <View className="min-h-12 justify-center rounded-2xl border border-black bg-bg-surface px-3.5 py-[13px]">
         {children}
       </View>
-      {caption ? <Text className="font-maru text-meta text-ink-secondary">{caption}</Text> : null}
+      {caption ? (
+        <Text
+          className={
+            error
+              ? 'font-maru text-meta text-accent-rose'
+              : 'font-maru text-meta text-ink-secondary'
+          }
+        >
+          {caption}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -337,24 +446,30 @@ function Row({ label, value, onPress }: { label: string; value?: string; onPress
   );
 }
 
-function SwitchRow({ title, detail }: { title: string; detail: string }) {
-  const rose = useTokenColor('--color-accent-rose');
+function SwitchRow({
+  title,
+  detail,
+  value = true,
+  onValueChange,
+  disabled = false,
+}: {
+  title: string;
+  detail: string;
+  value?: boolean;
+  onValueChange?: (value: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
-    <View className="min-h-[62px] flex-row items-center gap-2 py-3 pl-3.5 pr-3">
-      <View className="flex-1 gap-px">
-        <Text className="font-maru-bold text-label text-ink-primary">{title}</Text>
-        <Text className="font-maru text-meta text-ink-secondary">{detail}</Text>
-      </View>
-      {/* Shown on as in Plan A; publishing and notifications are not built yet. */}
-      <Switch
-        accessibilityLabel={`${title}（準備中）`}
-        accessibilityHint={detail}
-        // RN's Switch does not report a disabled state to screen readers on its own.
-        accessibilityState={{ disabled: true, checked: true }}
-        disabled
-        value
-        trackColor={{ true: rose }}
-      />
+    <View className="min-h-[62px] gap-px py-2 pl-3.5 pr-3">
+      <Host matchContents={{ vertical: true }} style={{ minHeight: 48 }}>
+        <NativeSwitch
+          label={onValueChange ? title : `${title}（準備中）`}
+          disabled={!onValueChange || disabled}
+          value={value}
+          onValueChange={onValueChange ?? (() => {})}
+        />
+      </Host>
+      <Text className="font-maru text-meta text-ink-secondary">{detail}</Text>
     </View>
   );
 }

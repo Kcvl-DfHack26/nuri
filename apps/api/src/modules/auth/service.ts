@@ -42,7 +42,7 @@ export function createAuth(db: Database, env: Environment) {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === '/update-user') {
-          const parsed = profileInputSchema.safeParse(ctx.body);
+          const parsed = profileInputSchema.pick({ name: true }).safeParse(ctx.body);
           if (!parsed.success) {
             throw new APIError('BAD_REQUEST', {
               message: 'Display name must contain 1 to 40 characters',
