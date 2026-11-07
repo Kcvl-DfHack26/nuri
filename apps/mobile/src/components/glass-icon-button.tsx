@@ -9,6 +9,7 @@ import { useTokenColor } from '@/theme/tokens';
 type IconName = ComponentProps<typeof SocialIcon>['name'];
 
 // Plan A round translucent button over photos. The 40pt circle gets a 48pt hit area.
+// Screens over a plain background pass a solid surface through className.
 export function GlassIconButton({
   icon,
   label,
