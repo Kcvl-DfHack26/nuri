@@ -214,24 +214,27 @@ export function FaceTrackingCheck() {
         className="absolute inset-x-4 gap-2 rounded-2xl bg-black/60 p-4"
         style={{ bottom: Math.max(insets.bottom, 12) + 8 }}
       >
-        <View className="flex-row flex-wrap gap-2">
-          {OVERLAYS.map(({ part, label }) => (
-            <OverlayToggle
-              key={part}
-              label={label}
-              checked={shownParts.has(part)}
-              onPress={() => {
-                const next = new Set(shownParts);
-                if (next.has(part)) {
-                  next.delete(part);
-                } else {
-                  next.add(part);
-                }
-                setShownParts(next);
-              }}
-            />
-          ))}
-        </View>
+        {/* Without the tracker or the camera nothing is drawn, so the switches would do nothing. */}
+        {FaceTracker && !cameraDenied ? (
+          <View className="flex-row flex-wrap gap-2">
+            {OVERLAYS.map(({ part, label }) => (
+              <OverlayToggle
+                key={part}
+                label={label}
+                checked={shownParts.has(part)}
+                onPress={() => {
+                  const next = new Set(shownParts);
+                  if (next.has(part)) {
+                    next.delete(part);
+                  } else {
+                    next.add(part);
+                  }
+                  setShownParts(next);
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
         {message ? (
           <Text accessibilityLiveRegion="polite" className="font-maru-bold text-label text-white">
             {message}
