@@ -5,8 +5,23 @@ import { router } from 'expo-router';
 import { MakeCompare } from './make-compare';
 import { MakeFinish } from './make-finish';
 
-jest.mock('@expo/ui', () => ({
-  Icon: Object.assign(() => null, { select: () => 'icon' }),
+jest.mock('@expo/ui', () => {
+  const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    Icon: Object.assign(() => null, { select: () => 'icon' }),
+    Button: ({ label, onPress }: { label: string; onPress: () => void }) => (
+      <reactNative.Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        onPress={onPress}
+      >
+        <reactNative.Text>{label}</reactNative.Text>
+      </reactNative.Pressable>
+    ),
+  };
+});
+jest.mock('@/theme/colors', () => ({
+  colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
 }));
 jest.mock('@/components/native-host', () => ({
   NativeHost: jest.requireActual<typeof import('react-native')>('react-native').View,
@@ -24,24 +39,25 @@ jest.mock('@/lib/api', () => ({
   api: {
     api: {
       recipes: {
-        ':id': {
-          $get: async () => ({
-            ok: true,
-            status: 200,
-            json: async () => ({
-              recipe: {
-                id: 'fox',
-                steps: [
-                  { part: 'brow', label: '眉' },
-                  { part: 'shading', label: 'シェード' },
-                ],
-              },
-            }),
-          }),
-        },
+        ':id': { $get: () => mockGetRecipe() },
       },
     },
   },
+}));
+
+type Response = { ok: boolean; status: number; json: () => Promise<unknown> };
+const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
+  ok: true,
+  status: 200,
+  json: async () => ({
+    recipe: {
+      id: 'fox',
+      steps: [
+        { part: 'brow', label: '眉' },
+        { part: 'shading', label: 'シェード' },
+      ],
+    },
+  }),
 }));
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -77,4 +93,14 @@ test('shows unbuilt actions and layer toggles as disabled', async () => {
   expect(screen.getByRole('button', { name: 'レシピを投稿する（準備中）' })).toBeDisabled();
   expect(await screen.findByRole('checkbox', { name: '眉（準備中）' })).toBeChecked();
   expect(screen.getByRole('checkbox', { name: 'シェード（準備中）' })).not.toBeChecked();
+});
+
+test('retries the step layers when they fail to load', async () => {
+  mockGetRecipe.mockRejectedValueOnce(new Error('通信エラー'));
+  await render(<MakeCompare id="fox" />, { wrapper });
+  expect(
+    await screen.findByText('手順を読み込めませんでした。通信状況を確認してお試しください。'),
+  ).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
+  expect(await screen.findByRole('checkbox', { name: '眉（準備中）' })).toBeChecked();
 });
