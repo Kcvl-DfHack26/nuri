@@ -55,6 +55,7 @@ function Navigation() {
           name="import/steps"
           options={{ headerShown: false, presentation: 'fullScreenModal' }}
         />
+        <Stack.Screen name="recipes/[id]/compare" options={{ headerShown: false }} />
         <Stack.Screen
           name="compose"
           options={{
