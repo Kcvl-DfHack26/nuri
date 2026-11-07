@@ -368,6 +368,8 @@ openssl rand -hex 32 | tr -d '\n' | \
 
 値はstdoutへ出さずstdinで渡す。`.tfvars`、GitHub、ExpoへDBパスワードを転記しない。
 
+Google・メールのログインは、Google OAuthクライアントとResendの送信設定を用意した後に有効にする。OpenTofuでsecretの器を作り、各値をSecret Managerのバージョンへ入れてから、`google_oauth_enabled`・`email_login_enabled`と`email_from`を設定して再適用する。Android仮想端末での手順、戻り先リンクの制約は[認証の設定と検証](auth.md#android仮想端末でgoogleとメールを試す51)を参照する。
+
 ### 初回イメージ・サービス・migration
 
 Docker操作はDockerを使えるホストで行う。Dev Container内にはホストのDocker socketを渡していない。

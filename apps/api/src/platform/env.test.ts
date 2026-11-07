@@ -49,6 +49,29 @@ describe('API environment', () => {
       expect(String(error)).not.toContain('private');
     }
   });
+
+  test('requires both Google OAuth credentials when using a real provider', () => {
+    expect(() => readEnv({ ...base, GOOGLE_CLIENT_ID: 'client-id' })).toThrow(
+      'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET',
+    );
+    expect(() => readEnv({ ...base, GOOGLE_CLIENT_SECRET: 'private-secret' })).toThrow(
+      'GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET',
+    );
+    expect(() =>
+      readEnv({ ...base, GOOGLE_CLIENT_ID: 'client-id', GOOGLE_CLIENT_SECRET: 'private-secret' }),
+    ).not.toThrow();
+  });
+
+  test('requires a configured sender when production email login is enabled', () => {
+    const production = {
+      ...base,
+      NODE_ENV: 'production',
+      BETTER_AUTH_URL: 'https://api.example.com',
+      RESEND_API_KEY: 'private-key',
+    };
+    expect(() => readEnv(production)).toThrow('EMAIL_FROM');
+    expect(() => readEnv({ ...production, EMAIL_FROM: 'nuri <login@nuri.example>' })).not.toThrow();
+  });
 });
 
 test('emulation cannot be enabled in production or point to public services', () => {

@@ -41,7 +41,23 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 
 実OAuthのcallbackは `<BETTER_AUTH_URL>/api/auth/callback/google` と `/apple`。ローカルは別provider IDの `/emulate-google` と `/emulate-apple` で、実プロバイダのidentityと混在させない。キー未設定のログイン方法はcapabilitiesに従って利用不可にする。認証バイパス・organization・パスワードログインは設けない。
 
-本番では `AUTH_EMULATE=false`、HTTPS、限定したoriginを使う。Google／Apple／Resendのsecret値はSecret Managerに置き、Cloud Runへsecret参照として渡す。現在のIaCはDB URLとBetter Auth secretの器まで管理しており、追加プロバイダのSecret Manager／Cloud Run参照の配線は本番設定時に追加する。今回クラウドへのapplyや本番設定変更は行っていない。`EXPO_PUBLIC_*` へsecretを入れない。
+## Android仮想端末でGoogleとメールを試す（#51）
+
+今回使う方法は、スターターにあるBetter AuthのGoogle OAuthと、Resendで送る10分・単回利用のマジックリンク。Apple、パスキー、iOSとスマートフォン実機は今回の確認範囲外。両方ともAndroid Studio仮想端末のDevelopment Buildから、公開済みのHTTPS APIへ接続する。Expo GoではDevelopment Buildのネイティブ設定を確認できない。
+
+1. Google Cloudの `kcvlb4` にある [Google Auth Platform](https://console.cloud.google.com/auth/overview?project=kcvlb4) で、アプリ名とサポート用メールを設定し、外部向けのテスト利用者を登録する。Google OAuthクライアントは**ウェブアプリケーション**型で作り、承認済みリダイレクトURIを `https://nuri-staging-v3kjfarita-an.a.run.app/api/auth/callback/google` にする。これはAPIがGoogleの認可コードを受け取るURIで、Androidアプリのカスタムスキームではない。[Googleの設定手順](https://developers.google.com/identity/protocols/oauth2/web-server#creatingcred)。
+2. Resendで送信元を用意し、送信用APIキーを発行する。任意のメールアドレスへ送る場合はドメインを検証する。送信元を `nuri <login@検証済みドメイン>` の形で決める。Resendのテスト送信先だけでは実際の受信箱でログインリンクを開く確認にならない。[Resendの送信ドメイン](https://resend.com/docs/dashboard/domains/introduction)。
+3. OpenTofuを初期設定のまま適用し、Secret Managerに `nuri-staging-google-client-id`、`nuri-staging-google-client-secret`、`nuri-staging-resend-api-key` の器を作る。GoogleのID・secretとResendのキーをそれぞれのsecretへ**バージョンとして**登録する。値をリポジトリ、Issue、PR、`terraform.tfvars`、Expoの環境変数に書かない。
+4. `infra/terraform.tfvars` に `google_oauth_enabled = true`、`email_login_enabled = true`、`email_from = "nuri <login@検証済みドメイン>"` を設定してOpenTofuを再適用する。Cloud Runの新revisionで `GET /api/auth-capabilities` の `google` と `email` がtrueになり、`emulated` がfalseであることを確認する。secretの値そのものは表示しない。
+5. `EXPO_PUBLIC_API_URL` が上の公開API URLであるDevelopment BuildをAndroid仮想端末へ入れる。Googleでログインし、アプリへ戻り、アカウント表示とログアウト、再起動後のセッションを確認する。メールでは仮想端末からリンク送信後、**同じ仮想端末**の受信箱でリンクを開いて同じ確認をする。リンクの再利用・期限切れ・ブラウザを閉じた場合の案内も確認する。
+
+GoogleとResendの設定がない間は、公開APIのログイン方法として表示されない。Googleだけ、またはメールだけ準備できた場合は対応するフラグだけを有効にできる。片方のGoogle OAuth credentialだけが設定された場合、APIは起動時に拒否する。
+
+### 戻り先リンクの扱い
+
+現行のExpo clientはGoogle OAuthからアプリへ戻るカスタムスキームのURLへセッションcookieを載せる。メールのリンクも同じスキームに単回利用tokenを載せる。同じスキームを登録した別アプリがこれらを受け取る可能性がある。メールの端末内state照合は誤操作を防ぐが、リンクを横取りした別アプリがtokenを直接交換することまでは防げない。このため今回の採用は管理下のAndroid仮想端末とテストアカウントによる検証に限る。一般向けビルドを配る前に、所有を検証したHTTPSドメインのAndroid App Links／iOS Universal Links、またはtokenをURLへ載せない方式へ移す必要がある。これは#51の仮想端末での動作確認と区別して扱う。
+
+本番では `AUTH_EMULATE=false`、HTTPS、限定したoriginを使う。Google・Resendのsecret値はSecret Managerに置き、Cloud Runへsecret参照として渡す。OpenTofuはGoogle・Resendのsecretの器と有効化フラグを管理する。Appleの実サービス接続は今回扱わない。`EXPO_PUBLIC_*` へsecretを入れない。
 
 ## パスキーの端末設定
 

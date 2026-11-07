@@ -115,7 +115,7 @@ resource "google_sql_user" "app" {
   deletion_policy     = "ABANDON"
 }
 resource "google_secret_manager_secret" "app" {
-  for_each  = toset(["database-url", "auth-secret"])
+  for_each  = toset(["database-url", "auth-secret", "google-client-id", "google-client-secret", "resend-api-key"])
   secret_id = "${var.name}-${each.key}"
   replication {
     auto {}
@@ -162,7 +162,18 @@ resource "google_cloud_run_v2_service" "api" {
         value = join(",", var.trusted_origins)
       }
       dynamic "env" {
-        for_each = { DATABASE_URL = "database-url", BETTER_AUTH_SECRET = "auth-secret" }
+        for_each = var.email_login_enabled ? { EMAIL_FROM = var.email_from } : {}
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = merge(
+          { DATABASE_URL = "database-url", BETTER_AUTH_SECRET = "auth-secret" },
+          var.google_oauth_enabled ? { GOOGLE_CLIENT_ID = "google-client-id", GOOGLE_CLIENT_SECRET = "google-client-secret" } : {},
+          var.email_login_enabled ? { RESEND_API_KEY = "resend-api-key" } : {}
+        )
         content {
           name = env.key
           value_source {
@@ -188,7 +199,13 @@ resource "google_cloud_run_v2_service" "api" {
       }
     }
   }
-  lifecycle { ignore_changes = [template[0].containers[0].image, template[0].revision, traffic, client, client_version] }
+  lifecycle {
+    ignore_changes = [template[0].containers[0].image, template[0].revision, traffic, client, client_version]
+    precondition {
+      condition     = !var.email_login_enabled || can(regex("@", var.email_from))
+      error_message = "email_from must be a verified Resend sender when email_login_enabled is true."
+    }
+  }
   depends_on = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.runtime]
 }
 resource "google_cloud_run_v2_service_iam_member" "public" {

@@ -70,3 +70,21 @@ variable "trusted_origins" {
   type        = list(string)
   default     = ["com.kcvl.nuri://"]
 }
+
+variable "google_oauth_enabled" {
+  description = "Reference Google OAuth client ID and secret versions in Cloud Run only after adding both Secret Manager versions."
+  type        = bool
+  default     = false
+}
+
+variable "email_login_enabled" {
+  description = "Reference the Resend API key in Cloud Run only after adding its Secret Manager version and setting email_from."
+  type        = bool
+  default     = false
+}
+
+variable "email_from" {
+  description = "Verified Resend sender used for login links when email_login_enabled is true."
+  type        = string
+  default     = ""
+}

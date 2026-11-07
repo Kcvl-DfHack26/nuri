@@ -50,6 +50,16 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env) {
     throw new Error('BETTER_AUTH_URL must use HTTPS in production');
   }
   validateEmulation(result.data);
+  if (Boolean(result.data.GOOGLE_CLIENT_ID) !== Boolean(result.data.GOOGLE_CLIENT_SECRET)) {
+    throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together');
+  }
+  if (
+    result.data.NODE_ENV === 'production' &&
+    result.data.RESEND_API_KEY &&
+    result.data.EMAIL_FROM === 'nuri <login@example.com>'
+  ) {
+    throw new Error('EMAIL_FROM must use the configured Resend sender in production');
+  }
   return result.data;
 }
 
