@@ -24,12 +24,12 @@ jobs:
           --health-cmd "pg_isready -h 127.0.0.1 -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
-      DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
       CI: '1'
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
@@ -42,7 +42,10 @@ jobs:
           bun run --cwd apps/mobile styles:generate
           git diff --exit-code -- apps/mobile/uniwind-types.d.ts
       - run: bun run check
-      - run: bun run --cwd apps/api db:migrate && bun run --cwd apps/api test:integration
+      - name: Test the API against PostgreSQL
+        env:
+          DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
+        run: bun run --cwd apps/api db:migrate && bun run --cwd apps/api test:integration
       - run: bun run doctor
       - run: bun run export:mobile
       - name: Commit conventions
@@ -60,6 +63,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - uses: opentofu/setup-opentofu@v2.0.2
         with:
           tofu_version: 1.13.8
@@ -78,11 +83,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - name: Validate local Compose configurations
+        env:
+          DEVICE_API_ORIGIN: https://api.nuri.localhost
+          DEVICE_METRO_ORIGIN: https://metro.nuri.localhost
+          DEVICE_EXPO_ORIGIN: exps://metro.nuri.localhost
+          DEVICE_GOOGLE_ORIGIN: https://google.nuri.localhost
+          DEVICE_APPLE_ORIGIN: https://apple.nuri.localhost
+          DEVICE_MAIL_ORIGIN: https://mail.nuri.localhost
         run: |
           sh scripts/worktree-init.sh
+          docker compose config --quiet
           docker compose --profile editor --profile tunnel config --quiet
           docker compose -f compose.yaml -f compose.go.yaml config --quiet
+          docker compose -f compose.yaml -f compose.devices.yaml config --quiet
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
       - name: Run Node.js container smoke test
         run: |

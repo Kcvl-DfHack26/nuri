@@ -12,11 +12,11 @@ bun run db:seed
 
 seedは画像付き4ユーザー、8投稿、20件のいいねを固定IDで作る。`NODE_ENV=development` かつ `AUTH_EMULATE=true` に限定し、再実行しても重複せず、アプリから作ったユーザー・投稿・いいねは削除しない。サンプル画像はAPIに同梱し、外部の画像サーバーへ実行時に接続しない。写真の出典は `apps/api/assets/sample-avatars/README.md`。サンプル著者とログインアカウントは別である。
 
-| サービス       | PortlessのURL                                              |
-| -------------- | ---------------------------------------------------------- |
-| Google         | `https://google.expo-hono-opentofu-starter-<ID>.localhost` |
-| Apple          | `https://apple.expo-hono-opentofu-starter-<ID>.localhost`  |
-| メールの受信箱 | `https://mail.expo-hono-opentofu-starter-<ID>.localhost`   |
+| サービス       | PortlessのURL                                   |
+| -------------- | ----------------------------------------------- |
+| Google         | `https://google.nuri-<issue>-<topic>.localhost` |
+| Apple          | `https://apple.nuri-<issue>-<topic>.localhost`  |
+| メールの受信箱 | `https://mail.nuri-<issue>-<topic>.localhost`   |
 
 ログイン画面のGoogle／AppleボタンでEmulateの同意画面を開き、`hanako@example.com` または `taro@example.com` を選ぶ。実際のBetter Authセッションが発行される。実アカウントのパスワードは入力しない。email magic linkは任意のテスト用メールアドレスへ送信し、ローカル受信箱で開く。
 
