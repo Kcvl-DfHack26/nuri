@@ -113,8 +113,13 @@ test('lists and shows recipes without a session', async () => {
       source: 'instagram',
       author: { name: 'mio', image: '/sample-avatars/mio.png' },
       products: [
-        { id: 'celane-brow-pencil', usage: '眉・モカブラウン', purchasable: false },
-        { id: 'mousse-cheek', usage: 'チーク・コーラル', purchasable: true },
+        { id: 'celane-brow-pencil', usage: '眉・モカブラウン', purchaseUrl: null },
+        {
+          id: 'mousse-cheek',
+          usage: 'チーク・コーラル',
+          purchaseUrl:
+            'https://www.amazon.co.jp/s?k=%E3%83%A0%E3%83%BC%E3%82%B9%E3%83%81%E3%83%BC%E3%82%AF',
+        },
       ],
     },
   });

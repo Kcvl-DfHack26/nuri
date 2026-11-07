@@ -167,7 +167,10 @@ export const product = pgTable('product', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   image: text('image'),
+  // Superseded by purchaseUrl and no longer read. Drop it once no running API revision selects it.
   purchasable: boolean('purchasable').default(false).notNull(),
+  /** Where ⑤'s 買う opens the product, always https; null when there is nowhere to buy it. */
+  purchaseUrl: text('purchase_url'),
 });
 
 /** The cosmetics a recipe uses, in the order ⑤ lists them. */

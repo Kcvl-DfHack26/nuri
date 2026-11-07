@@ -6,6 +6,7 @@ import {
   preferencesSchema,
   profileInputSchema,
   profilePatchSchema,
+  purchaseUrlSchema,
   recipeListQuerySchema,
   recipeParamsSchema,
 } from './index';
@@ -44,4 +45,10 @@ test('accepts only slug recipe IDs and bounded recipe pages', () => {
   }
   expect(recipeListQuerySchema.parse({})).toEqual({ offset: 0 });
   expect(recipeListQuerySchema.safeParse({ offset: '-1' }).success).toBe(false);
+});
+test('accepts only https shop links', () => {
+  expect(purchaseUrlSchema.safeParse('https://www.amazon.co.jp/s?k=cheek').success).toBe(true);
+  for (const url of ['http://shop.example.com', 'data:text/html,shop', 'https://localhost/']) {
+    expect(purchaseUrlSchema.safeParse(url).success).toBe(false);
+  }
 });

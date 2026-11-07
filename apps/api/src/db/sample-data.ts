@@ -1,3 +1,4 @@
+import { purchaseUrlSchema } from '@starter/shared';
 import { eq } from 'drizzle-orm';
 
 import type { Database } from './client';
@@ -64,13 +65,17 @@ const products = [
     id: 'celane-brow-pencil',
     name: 'CELANE 極細アイブロウペンシル',
     image: '/sample-recipes/product-brow-pencil.jpg',
-    purchasable: false,
+    purchaseUrl: null,
   },
   {
     id: 'mousse-cheek',
     name: 'ムースチーク',
     image: '/sample-recipes/product-cheek.jpg',
-    purchasable: true,
+    // The products are fictional, so the link searches a real shop for the name instead of
+    // pointing at a made-up product page. Plan A shows 買う only on this one.
+    purchaseUrl: purchaseUrlSchema.parse(
+      `https://www.amazon.co.jp/s?k=${encodeURIComponent('ムースチーク')}`,
+    ),
   },
 ];
 type SeedStep = Omit<typeof recipeStep.$inferInsert, 'recipeId' | 'position'>;

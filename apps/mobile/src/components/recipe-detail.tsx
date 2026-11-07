@@ -1,8 +1,11 @@
+import type { AccessibilityActionEvent } from 'react-native';
+
 import { Icon } from '@expo/ui';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { openBrowserAsync } from 'expo-web-browser';
 import { Fragment } from 'react';
 import { Alert, Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -456,6 +459,15 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
 function ProductRow({ product }: { product: RecipeData['products'][number] }) {
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
+  const { purchaseUrl } = product;
+  // The shop opens in the in-app browser (Safari View Controller or Custom Tabs).
+  const openShop = purchaseUrl
+    ? () => {
+        void openBrowserAsync(purchaseUrl).catch(() => {
+          Alert.alert('購入先を開けませんでした');
+        });
+      }
+    : undefined;
   const content = (
     <>
       <View className="size-[52px] overflow-hidden rounded-[14px] bg-neutral-soft">
@@ -471,17 +483,35 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
         <Text className="font-maru-bold text-label text-ink-primary">{product.name}</Text>
         <Text className="font-maru text-meta text-ink-secondary">{product.usage}</Text>
       </View>
-      {product.purchasable ? (
-        <View className="min-h-6 flex-row items-center gap-1 rounded-xl bg-base-peach px-2.5">
+      {openShop ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="購入先を見る"
+          // The 24pt chip keeps Plan A's look; hitSlop extends the target to 48pt.
+          hitSlop={12}
+          onPress={openShop}
+          className="min-h-6 flex-row items-center gap-1 rounded-xl bg-base-peach px-2.5 active:opacity-70"
+        >
           <SocialIcon name={CART} size={12} color={ink} />
           <Text className="font-maru-bold text-micro text-ink-primary">買う</Text>
-        </View>
+        </Pressable>
       ) : null}
       <SocialIcon name={NEXT} size={18} color={secondary} />
     </>
   );
   const className =
     'flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5';
+  // VoiceOver reads the row as one element, so 買う is also offered as an action on the row.
+  const purchase = openShop
+    ? {
+        accessibilityActions: [{ name: 'purchase', label: '購入先を見る' }],
+        onAccessibilityAction: (event: AccessibilityActionEvent) => {
+          if (event.nativeEvent.actionName === 'purchase') {
+            openShop();
+          }
+        },
+      }
+    : {};
   // Only products with Plan A detail data open ⑥ until product details come from the API.
   if (!findProduct(product.id)) {
     return (
@@ -491,6 +521,7 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
         accessibilityLabel={`${product.name}、${product.usage}（準備中）`}
         accessibilityState={{ disabled: true }}
         className={className}
+        {...purchase}
       >
         {content}
       </View>
@@ -504,6 +535,7 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
       onPress={() => {
         router.push(`/products/${product.id}`);
       }}
+      {...purchase}
     >
       {content}
     </Pressable>

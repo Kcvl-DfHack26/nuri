@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { openBrowserAsync } from 'expo-web-browser';
 import { Alert } from 'react-native';
 
 import { RecipeDetail } from './recipe-detail';
@@ -32,6 +33,7 @@ jest.mock('@/theme/colors', () => ({
   colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
 }));
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+jest.mock('expo-web-browser', () => ({ openBrowserAsync: jest.fn(async () => ({})) }));
 jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
@@ -68,14 +70,14 @@ const fox = {
       id: 'celane-brow-pencil',
       name: 'CELANE 極細アイブロウペンシル',
       image: null,
-      purchasable: false,
+      purchaseUrl: null,
       usage: '眉・モカブラウン',
     },
     {
       id: 'mousse-cheek',
       name: 'ムースチーク',
       image: null,
-      purchasable: true,
+      purchaseUrl: 'https://www.amazon.co.jp/s?k=cheek',
       usage: 'チーク・コーラル',
     },
   ],
@@ -121,6 +123,10 @@ test('shows the recipe from the API and opens the product sheet from a product r
   expect(
     screen.getByRole('button', { name: 'ムースチーク、チーク・コーラル（準備中）' }),
   ).toBeDisabled();
+  // Only the product with a shop link offers 買う, and it opens the link in the browser.
+  expect(screen.getAllByText('買う')).toHaveLength(1);
+  await fireEvent.press(screen.getByRole('button', { name: '購入先を見る' }));
+  expect(openBrowserAsync).toHaveBeenCalledWith('https://www.amazon.co.jp/s?k=cheek');
   await fireEvent.press(screen.getByRole('button', { name: 'メイクをはじめる' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox/steps');
 });
