@@ -265,6 +265,27 @@ gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleap
 
 認証済みGCPプロジェクトへの変更はこの手順以降で発生し、Cloud SQL等に料金がかかる。今回はここ以降の実リソース作成は実行していない。
 
+### 適用の時期・規模・費用
+
+nuriは作成済みのプロジェクト（クレジット約$40）を使う。
+
+- 時期：11月8〜9日に適用する。P0はレシピをサーバーのデータで出すため、11月10日19:00の提出時点でCloud RunのAPIが動いている必要がある。最初は `deploy_application=false` でCloud SQL等を作り、APIのイメージができたら `true` にする。
+- 規模：`infra/` の既定値のまま使う。Cloud SQLは `db-f1-micro`（共有コア、ZONAL、SSD 10GB）、Cloud Runは1 vCPU・512MiB・0〜3台。APIの接続プールは1台あたり5本なので、3台でも15本で `db-f1-micro` の上限25本に収まる。`db-f1-micro` はCloud SQLのSLAの対象外だが、審査のデモには足りる。
+- 止める時期：11月14日（Regional Day）の後。決勝に進んだら11月27日（Demo Day）の後。Cloud SQLは停止中もストレージとIPv4アドレスに課金されるため、残す必要がなければ削除する。Cloud SQL・Cloud Run・migrationのjobは `deletion_protection = true` なので、`false` にしてapplyしてから `tofu destroy` する。クレジットの有効期限が先に来る場合は、その前に止める。
+
+費用はasia-northeast1の料金表（2026年11月7日確認）で見積もった。合計は1日約$0.41で、11月8日から動かすと11月14日までで約$3、11月27日までで約$8。
+
+| 項目                    | 単価・無料枠                                                                | 1日あたり         |
+| ----------------------- | --------------------------------------------------------------------------- | ----------------- |
+| Cloud SQL `db-f1-micro` | $0.014/時                                                                   | $0.34             |
+| Cloud SQL SSD 10GB      | $0.00030274/GiB・時                                                         | $0.07             |
+| Cloud SQLのバックアップ | $0.000142466/GiB・時（1GB未満の見込み）                                     | $0.01未満         |
+| Cloud Run               | 毎月18万vCPU秒・36万GiB秒・200万リクエストまで無料（課金アカウント単位）    | 0（無料枠の範囲） |
+| Artifact Registry       | 0.5GBまで無料、超えた分は$0.000136986/GiB・時。同じリージョンへの転送は無料 | 数セント          |
+| Secret Manager          | 有効なバージョン6個・アクセス1万回まで無料                                  | 0                 |
+
+料金表：[Cloud SQL](https://cloud.google.com/sql/pricing)、[Cloud Run](https://cloud.google.com/run/pricing)、[Artifact Registry](https://cloud.google.com/artifact-registry/pricing)、[Secret Manager](https://cloud.google.com/secret-manager/pricing)。
+
 ### State bucketのbootstrap
 
 ```sh
