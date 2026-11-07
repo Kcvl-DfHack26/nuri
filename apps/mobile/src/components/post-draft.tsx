@@ -36,9 +36,12 @@ export type PostStep = {
 
 type PostDraft = {
   /** Video chosen with 動画から, kept on the device; null while recording is not built. */
-  video: { uri: string } | null;
+  video: { uri: string; durationMs: number | null } | null;
   steps: PostStep[];
   message: string;
+  tags: string[];
+  /** Frame of the video shown on ①'s recipe card; null until one is chosen on ⑫-7. */
+  thumbnail: { uri: string; timeMs: number } | null;
   publishCosmetics: boolean;
   publishBefore: boolean;
 };
@@ -134,6 +137,8 @@ const sampleDraft: PostDraft = {
     },
   ],
   message: '丸顔でも目元がすっきり見える狐メイク。チークを高めに入れるのがポイント！',
+  tags: [],
+  thumbnail: null,
   publishCosmetics: true,
   publishBefore: false,
 };
@@ -163,15 +168,18 @@ const PostDraftContext = createContext<PostDraftContextValue | null>(null);
 // Mounted by the post flow's layout, so leaving the flow discards the draft.
 export function PostDraftProvider({
   videoUri,
+  videoDurationMs,
   children,
 }: {
   /** The video chosen on ⑫-1, read once when the flow opens. */
   videoUri?: string | undefined;
+  /** Its length in ms when the picker reports it. */
+  videoDurationMs?: number | undefined;
   children: ReactNode;
 }) {
   const [draft, setDraft] = useState<PostDraft>(() => ({
     ...sampleDraft,
-    video: videoUri ? { uri: videoUri } : null,
+    video: videoUri ? { uri: videoUri, durationMs: videoDurationMs ?? null } : null,
   }));
   const updateStep = (index: number, change: Partial<PostStep>) => {
     setDraft((current) => ({

@@ -40,7 +40,12 @@ async function pickVideo() {
   }
   // Choosing the video is the send action; the URI stays on the device in the post's data.
   confirmUpload(() => {
-    router.push({ pathname: '/post/creating', params: { video: video.uri } });
+    router.push({
+      pathname: '/post/creating',
+      params: video.duration
+        ? { video: video.uri, duration: String(video.duration) }
+        : { video: video.uri },
+    });
   });
 }
 

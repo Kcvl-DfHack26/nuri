@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { getThumbnailAsync } from 'expo-video-thumbnails';
 
 import { PostDone } from './post-done';
 import { PostDraftProvider } from './post-draft';
@@ -7,6 +8,11 @@ import { PostMessage } from './post-message';
 import { PostPreview } from './post-preview';
 
 jest.mock('expo-image', () => ({ Image: () => null }));
+jest.mock('expo-video-thumbnails', () => ({
+  getThumbnailAsync: jest.fn((_uri: string, { time }: { time: number }) =>
+    Promise.resolve({ uri: `file:///frame-${time}.jpg`, width: 1, height: 1 }),
+  ),
+}));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() },
 }));
@@ -17,9 +23,23 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('@/components/native-host', () => ({
   NativeHost: jest.requireActual<typeof import('react-native')>('react-native').View,
 }));
-jest.mock('@expo/ui', () => ({
-  Icon: Object.assign(() => null, { select: () => 'icon' }),
-}));
+jest.mock('@expo/ui', () => {
+  const { Pressable, View } = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    Icon: Object.assign(() => null, { select: () => 'icon' }),
+    Host: View,
+    // Pressing the stand-in moves the slider to 2 seconds.
+    Slider: ({ onValueChange }: { onValueChange: (value: number) => void }) => (
+      <Pressable
+        accessibilityRole="adjustable"
+        accessibilityLabel="サムネイルの時点"
+        onPress={() => {
+          onValueChange(2000);
+        }}
+      />
+    ),
+  };
+});
 jest.mock('@/theme/colors', () => ({
   colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
 }));
@@ -27,6 +47,10 @@ jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
 jest.mock('@/components/avatar', () => ({ Avatar: () => null }));
 // The preview must not need the API: the post exists only on the device.
 jest.mock('@/lib/api', () => ({ apiUrl: null, apiAssetUrl: (path: string) => path, api: {} }));
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 function renderInDraft(screenElement: React.ReactElement) {
   return render(<PostDraftProvider>{screenElement}</PostDraftProvider>);
@@ -38,14 +62,71 @@ test('edits the message and publish options in the draft before previewing', asy
   await fireEvent.changeText(message, 'チークを高めに');
   expect(screen.getByText('7/200')).toBeOnTheScreen();
 
-  const before = screen.getByLabelText('Before写真を公開');
-  expect(before).toHaveProp('value', false);
-  await fireEvent(before, 'valueChange', true);
-  expect(screen.getByLabelText('Before写真を公開')).toHaveProp('value', true);
+  const cosmetics = screen.getByLabelText('使ったコスメを公開');
+  expect(cosmetics).toHaveProp('value', true);
+  await fireEvent(cosmetics, 'valueChange', false);
+  expect(screen.getByLabelText('使ったコスメを公開')).toHaveProp('value', false);
+  // Before and After are not built, so their photos and publish option stay hidden.
+  expect(screen.queryByLabelText('Before写真を公開')).toBeNull();
+  expect(screen.queryByLabelText('Beforeの見本の写真')).toBeNull();
 
   await fireEvent.press(screen.getByRole('button', { name: 'プレビューを見る' }));
   expect(router.push).toHaveBeenCalledWith('/post/preview');
-  expect(screen.getByRole('button', { name: 'タグを追加（準備中）' })).toBeDisabled();
+});
+
+test('starts without tags, adds each tag once and removes it', async () => {
+  await renderInDraft(<PostMessage />);
+  expect(screen.queryByRole('button', { name: /を削除$/ })).toBeNull();
+  const input = screen.getByLabelText('タグ');
+  await fireEvent.changeText(input, '時短');
+  await fireEvent.press(screen.getByRole('button', { name: 'タグを追加' }));
+  expect(screen.getByRole('button', { name: '#時短を削除' })).toBeOnTheScreen();
+  expect(input).toHaveProp('value', '');
+
+  await fireEvent.changeText(input, '#時短');
+  await fireEvent(input, 'submitEditing');
+  expect(screen.getAllByRole('button', { name: '#時短を削除' })).toHaveLength(1);
+
+  await fireEvent.press(screen.getByRole('button', { name: '#時短を削除' }));
+  expect(screen.queryByRole('button', { name: '#時短を削除' })).toBeNull();
+});
+
+test('shows the sample photo as the thumbnail without a video', async () => {
+  await renderInDraft(<PostMessage />);
+  expect(screen.getByText('サムネイルの設定')).toBeOnTheScreen();
+  expect(screen.getByLabelText('サムネイルの見本の写真')).toBeOnTheScreen();
+  expect(getThumbnailAsync).not.toHaveBeenCalled();
+});
+
+function renderWithVideo() {
+  return render(
+    <PostDraftProvider videoUri="file:///video.mov" videoDurationMs={6100}>
+      <PostMessage />
+    </PostDraftProvider>,
+  );
+}
+
+test('defaults the thumbnail to the last frame and changes it on the timeline', async () => {
+  await renderWithVideo();
+  const thumbnail = await screen.findByRole('button', { name: 'サムネイル 0:06の場面' });
+  expect(getThumbnailAsync).toHaveBeenCalledWith('file:///video.mov', { time: 6000, quality: 0.7 });
+  expect(screen.queryByLabelText('サムネイルの時点')).toBeNull();
+
+  await fireEvent.press(thumbnail);
+  await fireEvent.press(screen.getByLabelText('サムネイルの時点'));
+  expect(await screen.findByLabelText('サムネイル 0:02の場面')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '決定' }));
+  expect(screen.queryByLabelText('サムネイルの時点')).toBeNull();
+  expect(screen.getByRole('button', { name: 'サムネイル 0:02の場面' })).toBeOnTheScreen();
+});
+
+test('keeps the thumbnail when the timeline is canceled', async () => {
+  await renderWithVideo();
+  await fireEvent.press(await screen.findByRole('button', { name: 'サムネイル 0:06の場面' }));
+  await fireEvent.press(screen.getByLabelText('サムネイルの時点'));
+  await screen.findByLabelText('サムネイル 0:02の場面');
+  await fireEvent.press(screen.getByRole('button', { name: 'キャンセル' }));
+  expect(screen.getByRole('button', { name: 'サムネイル 0:06の場面' })).toBeOnTheScreen();
 });
 
 test('returns to the step list from the guide summary', async () => {
