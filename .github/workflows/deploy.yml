@@ -71,7 +71,10 @@ jobs:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
         run: |
           gcloud run deploy "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --no-traffic --quiet
-          revision=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format='value(status.latestReadyRevisionName)')
+          # Pick the revision this deploy created by its image digest. latestReadyRevisionName kept
+          # naming an older revision after an OpenTofu apply reset revision numbers (#92).
+          revision=$(gcloud run revisions list --service="$SERVICE" --project="$PROJECT_ID" --region="$REGION" --filter="spec.containers.image=$IMAGE_URI" --sort-by=~metadata.creationTimestamp --limit=1 --format='value(metadata.name)')
+          test -n "$revision" || { echo "No revision runs $IMAGE_URI"; exit 1; }
           gcloud run services update-traffic "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --update-tags="candidate=$revision" --quiet
           candidate_url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format=json | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')
           curl --fail --retry 6 --retry-all-errors --retry-delay 5 "$candidate_url/ready"
