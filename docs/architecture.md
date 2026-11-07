@@ -96,6 +96,8 @@ DBパスワードはOpenTofuのephemeral変数とGoogle providerのwrite-only引
 
 GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする。コンテナをdigestで指定し、migration Jobを完了させ、トラフィックなしのcandidate revisionで `/ready` を確認してから切り替える。その後に同じSHAのExpo Workflowを呼ぶ。本番配信には別途有効化フラグが必要。
 
+Cloud Runのstartup probeは `/ready`、liveness probeは `/health` を使う。DBへ接続できないrevisionはトラフィックを受けず、DBの一時的な停止でインスタンスを再起動しない。最初の適用だけはmigrationのjobを `-target` で先に作って実行し、それからサービスを作る。Cloud SQL・Cloud Runのサービス・migrationのjobの削除防止は `deletion_protection` 変数にまとめ、止めるときにコードを書き換えずに外せるようにした。DBとDBユーザーはインスタンスと一緒に消えるため、`deletion_policy = "ABANDON"` でdestroyの失敗を避ける。
+
 WIFはGitHubの不変repository ID、リポジトリ名、main、`deploy.yml`に制限する。CIのサービスアカウントはインフラ管理者ではない。インフラ変更はADCでplanを確認して適用する。
 
 PRのExpo Updateは、tablecast-pocの手動カタログ配備と同じコメント内チェックボックス、またはGitHub Actionsの手動実行で公開する。PR更新時はコメントだけを更新する。Expo Workflowsの無料実行時間を消費しないよう、bundle生成と公開はGitHub ActionsとExpo公式preview actionが担当する。配信先はPRごとのbranchで、共有staging APIを使う。PR単位のDB/API環境は初期構成に含めない。OTAの互換性境界はfingerprint。ネイティブ依存・設定が変わると新しいビルドが必要になる。

@@ -6,6 +6,18 @@ output "deploy_service_account" {
   description = "GitHub environment variable GCP_SERVICE_ACCOUNT."
   value       = google_service_account.deployer.email
 }
+output "cloud_run_service" {
+  description = "GitHub environment variable CLOUD_RUN_SERVICE."
+  value       = var.name
+}
+output "artifact_repository" {
+  description = "GitHub environment variable ARTIFACT_REPOSITORY."
+  value       = google_artifact_registry_repository.api.repository_id
+}
+output "migration_job" {
+  description = "GitHub environment variable CLOUD_RUN_MIGRATION_JOB."
+  value       = "${var.name}-migrate"
+}
 output "registry" {
   description = "Docker repository base URI."
   value       = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.api.repository_id}"
