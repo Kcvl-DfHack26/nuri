@@ -1,5 +1,3 @@
-import type { AlertButton } from 'react-native';
-
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -33,32 +31,14 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-/** Presses the consent dialog's button with the given label. */
-function answer(label: 'はい' | 'いいえ') {
-  expect(alert).toHaveBeenCalledWith(
-    '動画をサーバーへ送信して解析します',
-    undefined,
-    expect.any(Array),
-  );
-  const buttons = alert.mock.calls[0]?.[2] as AlertButton[];
-  buttons.find((button) => button.text === label)?.onPress?.();
-}
-
-test('asks before recording and records only after consent', async () => {
+test('opens ⑫-2 without asking when recording starts', async () => {
   await render(<PostCamera />);
   await fireEvent.press(screen.getByRole('button', { name: '録画をはじめる' }));
-  answer('はい');
+  expect(alert).not.toHaveBeenCalled();
   expect(router.push).toHaveBeenCalledWith('/post/recording');
 });
 
-test('stays on ⑫-1 when recording is declined', async () => {
-  await render(<PostCamera />);
-  await fireEvent.press(screen.getByRole('button', { name: '録画をはじめる' }));
-  answer('いいえ');
-  expect(router.push).not.toHaveBeenCalled();
-});
-
-test('opens ⑫-3 with the chosen video after consent', async () => {
+test('opens ⑫-3 with the chosen video without asking', async () => {
   pick.mockResolvedValue({
     canceled: false,
     assets: [{ uri: 'file:///video.mov', width: 1080, height: 1920 }],
@@ -66,38 +46,22 @@ test('opens ⑫-3 with the chosen video after consent', async () => {
   await render(<PostCamera />);
   await fireEvent.press(screen.getByRole('button', { name: '動画から' }));
   await waitFor(() => {
-    expect(alert).toHaveBeenCalled();
+    expect(router.push).toHaveBeenCalledWith({
+      pathname: '/post/creating',
+      params: { video: 'file:///video.mov' },
+    });
   });
   expect(pick).toHaveBeenCalledWith({ mediaTypes: 'videos' });
-  answer('はい');
-  expect(router.push).toHaveBeenCalledWith({
-    pathname: '/post/creating',
-    params: { video: 'file:///video.mov' },
-  });
+  expect(alert).not.toHaveBeenCalled();
 });
 
-test('sends nothing when the chosen video is declined', async () => {
-  pick.mockResolvedValue({
-    canceled: false,
-    assets: [{ uri: 'file:///video.mov', width: 1080, height: 1920 }],
-  });
-  await render(<PostCamera />);
-  await fireEvent.press(screen.getByRole('button', { name: '動画から' }));
-  await waitFor(() => {
-    expect(alert).toHaveBeenCalled();
-  });
-  answer('いいえ');
-  expect(router.push).not.toHaveBeenCalled();
-});
-
-test('asks nothing when the picker is canceled', async () => {
+test('stays on ⑫-1 when the picker is canceled', async () => {
   pick.mockResolvedValue({ canceled: true, assets: null });
   await render(<PostCamera />);
   await fireEvent.press(screen.getByRole('button', { name: '動画から' }));
   await waitFor(() => {
     expect(pick).toHaveBeenCalled();
   });
-  expect(alert).not.toHaveBeenCalled();
   expect(router.push).not.toHaveBeenCalled();
 });
 
