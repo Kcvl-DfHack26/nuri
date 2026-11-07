@@ -27,6 +27,11 @@ resource "google_service_account" "runtime" {
   display_name = "nuri Cloud Run runtime"
   depends_on   = [google_project_service.enabled]
 }
+resource "google_service_account" "migration" {
+  account_id   = "${local.identity_prefix}-migration"
+  display_name = "nuri database migration"
+  depends_on   = [google_project_service.enabled]
+}
 resource "google_service_account" "deployer" {
   account_id   = "${local.identity_prefix}-deploy"
   display_name = "GitHub deployment (no infrastructure administration)"
@@ -37,6 +42,11 @@ resource "google_project_iam_member" "sql_client" {
   role    = "roles/cloudsql.client"
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
+resource "google_project_iam_member" "migration_sql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.migration.email}"
+}
 resource "google_project_iam_member" "run_developer" {
   project = var.project_id
   role    = "roles/run.developer"
@@ -44,6 +54,11 @@ resource "google_project_iam_member" "run_developer" {
 }
 resource "google_service_account_iam_member" "act_as_runtime" {
   service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${google_service_account.deployer.email}"
+}
+resource "google_service_account_iam_member" "act_as_migration" {
+  service_account_id = google_service_account.migration.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${google_service_account.deployer.email}"
 }
@@ -123,10 +138,19 @@ resource "google_secret_manager_secret" "app" {
   depends_on = [google_project_service.enabled]
 }
 resource "google_secret_manager_secret_iam_member" "runtime" {
-  for_each  = google_secret_manager_secret.app
-  secret_id = each.value.id
+  for_each = toset(concat(
+    ["database-url", "auth-secret"],
+    var.google_oauth_enabled ? ["google-client-id", "google-client-secret"] : [],
+    var.email_login_enabled ? ["resend-api-key"] : []
+  ))
+  secret_id = google_secret_manager_secret.app[each.key].id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
+}
+resource "google_secret_manager_secret_iam_member" "migration" {
+  secret_id = google_secret_manager_secret.app["database-url"].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.migration.email}"
 }
 
 resource "google_cloud_run_v2_service" "api" {
@@ -222,7 +246,7 @@ resource "google_cloud_run_v2_job" "migrate" {
   deletion_protection = var.deletion_protection
   template {
     template {
-      service_account = google_service_account.runtime.email
+      service_account = google_service_account.migration.email
       max_retries     = 0
       timeout         = "300s"
       volumes {
@@ -249,5 +273,5 @@ resource "google_cloud_run_v2_job" "migrate" {
     }
   }
   lifecycle { ignore_changes = [template[0].template[0].containers[0].image, client, client_version] }
-  depends_on = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.runtime]
+  depends_on = [google_project_iam_member.migration_sql_client, google_secret_manager_secret_iam_member.migration, google_service_account_iam_member.act_as_migration]
 }

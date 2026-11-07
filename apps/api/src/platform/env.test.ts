@@ -60,6 +60,9 @@ describe('API environment', () => {
     expect(() =>
       readEnv({ ...base, GOOGLE_CLIENT_ID: 'client-id', GOOGLE_CLIENT_SECRET: 'private-secret' }),
     ).not.toThrow();
+    expect(() =>
+      readEnv({ ...base, GOOGLE_CLIENT_ID: ' ', GOOGLE_CLIENT_SECRET: 'private-secret' }),
+    ).toThrow('GOOGLE_CLIENT_ID');
   });
 
   test('requires a configured sender when production email login is enabled', () => {
@@ -71,6 +74,8 @@ describe('API environment', () => {
     };
     expect(() => readEnv(production)).toThrow('EMAIL_FROM');
     expect(() => readEnv({ ...production, EMAIL_FROM: 'nuri <login@nuri.example>' })).not.toThrow();
+    expect(() => readEnv({ ...production, EMAIL_FROM: '  ' })).toThrow('EMAIL_FROM');
+    expect(() => readEnv({ ...production, RESEND_API_KEY: ' ' })).toThrow('RESEND_API_KEY');
   });
 });
 
