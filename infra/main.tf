@@ -28,7 +28,7 @@ resource "google_service_account" "runtime" {
   depends_on   = [google_project_service.enabled]
 }
 resource "google_service_account" "migration" {
-  account_id   = "${local.identity_prefix}-migration"
+  account_id   = "${local.identity_prefix}-migrate"
   display_name = "nuri database migration"
   depends_on   = [google_project_service.enabled]
 }
