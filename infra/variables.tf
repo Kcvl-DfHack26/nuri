@@ -46,6 +46,11 @@ variable "deploy_application" {
   type        = bool
   default     = false
 }
+variable "deletion_protection" {
+  description = "Guards Cloud SQL in OpenTofu and Google Cloud, plus the Cloud Run service and migration job in OpenTofu. Set false only to destroy them."
+  type        = bool
+  default     = true
+}
 variable "image" {
   description = "Initial immutable Artifact Registry image URI. Later revisions are owned by CI."
   type        = string
@@ -56,7 +61,7 @@ variable "image" {
   }
 }
 variable "api_origin" {
-  description = "Optional HTTPS custom domain; empty uses the deterministic Cloud Run URL."
+  description = "HTTPS origin for Better Auth. After first deployment, set this to service_uri (or a mapped custom domain); the empty fallback is provisional."
   type        = string
   default     = ""
 }

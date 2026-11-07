@@ -80,13 +80,14 @@ resource "google_sql_database_instance" "postgres" {
   name                = var.name
   region              = var.region
   database_version    = "POSTGRES_17"
-  deletion_protection = true
+  deletion_protection = var.deletion_protection
   settings {
-    tier              = var.database_tier
-    edition           = "ENTERPRISE"
-    disk_size         = 10
-    disk_autoresize   = true
-    availability_type = "ZONAL"
+    tier                        = var.database_tier
+    edition                     = "ENTERPRISE"
+    disk_size                   = 10
+    disk_autoresize             = true
+    availability_type           = "ZONAL"
+    deletion_protection_enabled = var.deletion_protection
     backup_configuration {
       enabled                        = true
       point_in_time_recovery_enabled = true
@@ -99,15 +100,19 @@ resource "google_sql_database_instance" "postgres" {
   }
   depends_on = [google_project_service.enabled]
 }
+# Deleting the instance removes the database and user with it. ABANDON keeps
+# destroy from failing on open connections or on objects the user owns.
 resource "google_sql_database" "app" {
-  name     = "expo-hono-opentofu-starter"
-  instance = google_sql_database_instance.postgres.name
+  name            = "expo-hono-opentofu-starter"
+  instance        = google_sql_database_instance.postgres.name
+  deletion_policy = "ABANDON"
 }
 resource "google_sql_user" "app" {
   name                = "expo-hono-opentofu-starter"
   instance            = google_sql_database_instance.postgres.name
   password_wo         = var.database_password
   password_wo_version = var.database_password_version
+  deletion_policy     = "ABANDON"
 }
 resource "google_secret_manager_secret" "app" {
   for_each  = toset(["database-url", "auth-secret"])
@@ -128,7 +133,7 @@ resource "google_cloud_run_v2_service" "api" {
   count               = var.deploy_application ? 1 : 0
   name                = var.name
   location            = var.region
-  deletion_protection = true
+  deletion_protection = var.deletion_protection
   ingress             = "INGRESS_TRAFFIC_ALL"
   template {
     service_account = google_service_account.runtime.email
@@ -168,15 +173,22 @@ resource "google_cloud_run_v2_service" "api" {
           }
         }
       }
+      # A revision takes traffic only after it can reach the database.
+      # Liveness stays on /health so a short database outage does not restart instances.
+      # The timeout matches the pool's 5 s connect timeout (apps/api/src/db/client.ts),
+      # and 12 tries give a cold db-f1-micro up to 120 s, under Cloud Run's 240 s cap.
       startup_probe {
-        http_get { path = "/health" }
+        http_get { path = "/ready" }
+        timeout_seconds   = 5
+        period_seconds    = 10
+        failure_threshold = 12
       }
       liveness_probe {
         http_get { path = "/health" }
       }
     }
   }
-  lifecycle { ignore_changes = [template[0].containers[0].image, traffic, client, client_version] }
+  lifecycle { ignore_changes = [template[0].containers[0].image, template[0].revision, traffic, client, client_version] }
   depends_on = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.runtime]
 }
 resource "google_cloud_run_v2_service_iam_member" "public" {
@@ -190,7 +202,7 @@ resource "google_cloud_run_v2_job" "migrate" {
   count               = var.deploy_application ? 1 : 0
   name                = "${var.name}-migrate"
   location            = var.region
-  deletion_protection = true
+  deletion_protection = var.deletion_protection
   template {
     template {
       service_account = google_service_account.runtime.email
