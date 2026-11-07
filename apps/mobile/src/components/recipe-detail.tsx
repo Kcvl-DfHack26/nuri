@@ -6,14 +6,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PhotoCrop, Recipe } from '@/components/recipes';
-import type { RecipeDetail as RecipeData } from '@/lib/recipes';
+import type { PhotoCrop } from '@/components/recipes';
+import type { RecipeDetail as RecipeData, RecipeStep } from '@/lib/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
-import { arPhotos, findProduct, findRecipe, parts } from '@/components/recipes';
+import { arPhotos, findProduct, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
@@ -81,7 +81,8 @@ const atFrame = (x: number, y: number) =>
 // Plan A colors the tags in this order.
 const tagBackgrounds = ['bg-base-peach', 'bg-base-lilac', 'bg-base-mint'];
 
-type Steps = NonNullable<Recipe['detail']>;
+/** What ⑤ shows of each step: its part icon and short name. */
+type StepSummary = Pick<RecipeStep, 'part' | 'label'>;
 
 // Plan A ⑤ レシピ詳細.
 // ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top, a single 投稿
@@ -102,8 +103,7 @@ export function RecipeDetail({
     return (
       <RecipeContent
         recipe={query.data}
-        // Steps stay fixed Plan A data until they come from the API too.
-        steps={findRecipe(id)?.detail}
+        steps={query.data.steps}
         onPost={onPost}
         postedCosmetics={postedCosmetics}
       />
@@ -132,7 +132,8 @@ export function RecipeDetail({
   );
 }
 
-function RecipeStatus({
+/** A full-screen loading, error or not-found state with a way back. */
+export function RecipeStatus({
   message,
   loading,
   onRetry,
@@ -169,7 +170,8 @@ export function RecipeContent({
   postedCosmetics,
 }: {
   recipe: RecipeData;
-  steps: Steps | undefined;
+  /** Empty for a recipe without steps yet; it cannot start ⑦. */
+  steps: StepSummary[];
   onPost: (() => void) | undefined;
   postedCosmetics: PostedCosmetic[] | null | undefined;
 }) {
@@ -179,7 +181,7 @@ export function RecipeContent({
   const tags = [
     ...recipe.tags.map((tag) => `＃${tag}`),
     `＃${recipe.durationMinutes}分`,
-    ...(steps ? [`${steps.overview.length}ステップ`] : []),
+    ...(steps.length > 0 ? [`${steps.length}ステップ`] : []),
   ];
   // Plan A keeps the face and the sheet in place; only the sheet's content scrolls.
   const heroHeight = (window.width * 540) / 390;
@@ -243,7 +245,7 @@ export function RecipeContent({
               <Text className="font-maru-bold text-label text-accent-rose">フォロー</Text>
             </View>
           </View>
-          {steps ? (
+          {steps.length > 0 ? (
             <>
               <Text
                 accessibilityRole="header"
@@ -252,10 +254,11 @@ export function RecipeContent({
                 手順
               </Text>
               <View className="flex-row justify-between">
-                {steps.overview.map((partId, index) => {
-                  const part = parts[partId];
+                {steps.map((step, index) => {
+                  const part = parts[step.part];
                   return (
-                    <View key={partId} className="items-center gap-1">
+                    // A recipe may work on the same part twice, so the position is the key.
+                    <View key={index} className="items-center gap-1">
                       <View
                         className={cn(
                           'size-[46px] items-center justify-center rounded-full',
@@ -272,13 +275,7 @@ export function RecipeContent({
                         </View>
                       </View>
                       <Text className="font-maru-bold text-micro text-ink-primary">
-                        {partId === 'eye'
-                          ? 'シャドウ'
-                          : partId === 'lash'
-                            ? 'ライン'
-                            : partId === 'shading'
-                              ? 'シェード'
-                              : part.label}
+                        {step.label}
                       </Text>
                     </View>
                   );
@@ -393,7 +390,7 @@ export function RecipeContent({
         <StartBar
           bottom={insets.bottom}
           onStart={
-            steps
+            steps.length > 0
               ? () => {
                   router.push(`/recipes/${recipe.id}/steps`);
                 }
@@ -405,10 +402,10 @@ export function RecipeContent({
   );
 }
 
-function Hero({ recipe, steps }: { recipe: RecipeData; steps: Steps | undefined }) {
-  // Plan A's guides and pins are drawn on its own face photo, so only recipes with Plan A
-  // steps show them; the others show their finished photo.
-  if (!steps) {
+function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
+  // Plan A's guides and pins are drawn on its own face photo of the fox recipe, the only recipe
+  // with steps so far; recipes without steps show their finished photo.
+  if (steps.length === 0) {
     return (
       <View className="aspect-[390/540] w-full overflow-hidden bg-neutral-soft">
         <Image
@@ -442,14 +439,14 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: Steps | undefined 
           <View className="size-2.5 rounded-full bg-accent-rose" />
         </View>
       ))}
-      {steps.overview.map((partId, index) => {
+      {steps.map((step, index) => {
         const label = pinLabels[index];
         if (!label) {
           return null;
         }
         return (
           <View
-            key={partId}
+            key={index}
             className="absolute flex-row items-center gap-[5px] rounded-[14px] border border-white bg-white/80 py-[3px] pl-[3px] pr-2.5"
             style={{
               ...atFrame(label.x, label.y),
@@ -459,9 +456,7 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: Steps | undefined 
             <View className="size-5 items-center justify-center rounded-full bg-accent-rose">
               <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
             </View>
-            <Text className="font-maru-bold text-micro text-ink-primary">
-              {steps.steps[index]?.label ?? parts[partId].label}
-            </Text>
+            <Text className="font-maru-bold text-micro text-ink-primary">{step.label}</Text>
           </View>
         );
       })}
