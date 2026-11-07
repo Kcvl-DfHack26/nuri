@@ -11,18 +11,21 @@ import type { MakeupLayer } from '@/components/face-makeup-camera';
 import { canTrackFace, FaceMakeupCamera, paintColor } from '@/components/face-makeup-camera';
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { COMPARE } from '@/components/make-compare';
 import { RecipeStatus } from '@/components/recipe-detail';
 import { arPhotos } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
-import { recipeOptions } from '@/lib/recipes';
+import { recipeOptions, shareRecipe } from '@/lib/recipes';
 
 import finishSparkles from '../../assets/plan-a/ar/finish-sparkles.svg';
 import sparkleInk from '../../assets/plan-a/icons/sparkle-ink.svg';
 
 const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
+const SHARE = Icon.select({
+  ios: 'square.and.arrow.up',
+  android: import('@expo/material-symbols/ios_share.xml'),
+});
 const DOWNLOAD = Icon.select({
   ios: 'arrow.down.to.line',
   android: import('@expo/material-symbols/download.xml'),
@@ -96,19 +99,20 @@ export function MakeFinish({ id }: { id: string }) {
             backOrHome();
           }}
         />
+        {/* Plan A ⑩ has only 保存 here and no way to ⑪, which Plan A hides. 共有 is added
+            beside it (#95) and shares text only, never the camera image. */}
         <View className="flex-row gap-2">
-          {canTrackFace ? (
-            // ⑪ compares Plan A's sample photos, not the camera; it waits for a photo of the user.
-            <GlassIconButton icon={COMPARE} label="メイク前と比べる（準備中）" />
-          ) : (
-            <GlassIconButton
-              icon={COMPARE}
-              label="メイク前と比べる"
-              onPress={() => {
-                router.push(`/recipes/${id}/compare`);
-              }}
-            />
-          )}
+          <GlassIconButton
+            icon={SHARE}
+            label="共有"
+            {...(recipe
+              ? {
+                  onPress: () => {
+                    shareRecipe(recipe, '試しました');
+                  },
+                }
+              : {})}
+          />
           <GlassIconButton icon={DOWNLOAD} label="写真を保存（準備中）" />
         </View>
       </View>

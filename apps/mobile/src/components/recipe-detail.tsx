@@ -7,7 +7,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { openBrowserAsync } from 'expo-web-browser';
 import { Fragment } from 'react';
-import { Alert, Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
@@ -23,7 +23,13 @@ import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
-import { changeFavorite, formatCount, recipeOptions, sourceLabels } from '@/lib/recipes';
+import {
+  changeFavorite,
+  formatCount,
+  recipeOptions,
+  shareRecipe,
+  sourceLabels,
+} from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -388,9 +394,7 @@ export function RecipeContent({
               icon={SHARE}
               label="共有"
               onPress={() => {
-                void Share.share({
-                  message: `${recipe.title}（${recipe.author.name}）をnuriで見つけました`,
-                }).catch(() => undefined);
+                shareRecipe(recipe, '見つけました');
               }}
             />
             <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />

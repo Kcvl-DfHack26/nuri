@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { Share } from 'react-native';
 
 import { MakeCompare } from './make-compare';
 import { MakeFinish } from './make-finish';
@@ -58,6 +59,8 @@ const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
   json: async () => ({
     recipe: {
       id: 'fox',
+      title: '狐メイク',
+      author: { id: 'sample-mio', name: 'mio', image: null },
       steps: [
         { part: 'brow', label: '眉', colors: ['#79513A'] },
         { part: 'shading', label: 'シェード', colors: ['#A17B60'] },
@@ -71,10 +74,15 @@ function wrapper({ children }: { children: React.ReactNode }) {
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
 
-test('opens the comparison from the finish screen', async () => {
+test('shares the recipe as text from the finish screen, as Plan A has no way to ⑪', async () => {
+  const share = jest
+    .spyOn(Share, 'share')
+    .mockResolvedValue({ action: 'sharedAction', activityType: undefined });
   await render(<MakeFinish id="fox" />, { wrapper });
-  await fireEvent.press(screen.getByRole('button', { name: 'メイク前と比べる' }));
-  expect(router.push).toHaveBeenCalledWith('/recipes/fox/compare');
+  expect(screen.queryByRole('button', { name: /メイク前と比べる/ })).toBeNull();
+  expect(screen.getByRole('button', { name: '写真を保存（準備中）' })).toBeDisabled();
+  await fireEvent.press(await screen.findByRole('button', { name: '共有', disabled: false }));
+  expect(share).toHaveBeenCalledWith({ message: '狐メイク（mio）をnuriで試しました' });
 });
 
 test('moves the divider with accessibility actions and goes back', async () => {
