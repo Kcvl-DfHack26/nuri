@@ -20,7 +20,16 @@ export const feedQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(10000).default(0),
   author: z.string().min(1).max(128).optional(),
 });
-export const profileInputSchema = z.object({ name: z.string().trim().min(1).max(40) });
+export const profileInputSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  handle: z
+    .string()
+    .trim()
+    .regex(/^[a-z0-9_]{3,20}$/, 'ユーザーIDは半角英小文字・数字・_で3〜20文字にしてください')
+    .nullable(),
+  bio: z.string().trim().max(42, '自己紹介は42文字以内で入力してください'),
+  isPublic: z.boolean(),
+});
 
 // Recipe IDs are readable slugs (e.g. fox) so seeded recipes keep stable URLs.
 export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,64}$/) });

@@ -220,7 +220,49 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
   expect(author).toBeDefined();
   const publicProfile = await app.request(`/api/users/${author?.id}`);
   expect(publicProfile.status).toBe(200);
-  expect(await publicProfile.json()).toEqual({ user: author });
+  expect(await publicProfile.json()).toEqual({
+    user: { ...author, handle: null, bio: '', isPublic: true },
+  });
+  expect((await app.request('/api/me/profile')).status).toBe(401);
+  expect(
+    (
+      await request(
+        '/api/me/profile',
+        { name: 'はな', handle: 'Bad ID', bio: '', isPublic: false },
+        cookie,
+        'PUT',
+      )
+    ).status,
+  ).toBe(400);
+  expect(
+    (
+      await request(
+        '/api/me/profile',
+        { name: 'はな', handle: 'hanako_1', bio: 'よろしく', isPublic: false },
+        cookie,
+        'PUT',
+      )
+    ).status,
+  ).toBe(200);
+  const privateProfile = await app.request(`/api/users/${author?.id}`, { headers: { cookie } });
+  expect(privateProfile.status).toBe(200);
+  expect(await privateProfile.json()).toEqual({
+    user: { ...author, name: 'はな', handle: 'hanako_1', bio: 'よろしく', isPublic: false },
+  });
+  expect((await app.request(`/api/users/${author?.id}`)).status).toBe(404);
+  expect(
+    (await app.request(`/api/users/${author?.id}`, { headers: { cookie: other } })).status,
+  ).toBe(404);
+  expect(
+    (
+      await request(
+        '/api/me/profile',
+        { name: '別の人', handle: 'hanako_1', bio: '', isPublic: true },
+        other,
+        'PUT',
+      )
+    ).status,
+  ).toBe(409);
   expect((await app.request('/api/users/missing-sample-user')).status).toBe(404);
   expect((await request('/api/posts', { body: ' '.repeat(5) }, cookie)).status).toBe(400);
   expect((await request('/api/auth/update-user', { name: 'x'.repeat(41) }, cookie)).status).toBe(

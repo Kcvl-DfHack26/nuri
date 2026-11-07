@@ -63,6 +63,8 @@ export function Profile({ id }: { id: string }) {
             <Text variant="h3" className="text-center font-bold">
               {person.name}
             </Text>
+            {person.handle ? <Text className="text-muted-foreground">@{person.handle}</Text> : null}
+            {person.bio ? <Text className="text-center">{person.bio}</Text> : null}
             {session?.user.id === person.id ? (
               <NativeHost matchContents={{ vertical: true }} style={{ alignSelf: 'stretch' }}>
                 <NativeButton

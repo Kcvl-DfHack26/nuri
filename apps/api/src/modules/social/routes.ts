@@ -3,6 +3,7 @@ import {
   feedQuerySchema,
   postInputSchema,
   postParamsSchema,
+  profileInputSchema,
   userParamsSchema,
 } from '@starter/shared';
 import { and, desc, eq, sql } from 'drizzle-orm';
@@ -17,14 +18,52 @@ import { requireSession } from '../auth';
 export function socialRoutes(db: Database, auth: Auth) {
   return new Hono<AuthenticatedEnv>()
     .get('/users/:id', zValidator('param', userParamsSchema), async (c) => {
+      const session = await auth.api.getSession({ headers: c.req.raw.headers });
       const [profile] = await db
-        .select({ id: user.id, name: user.name, image: user.image })
+        .select({
+          id: user.id,
+          name: user.name,
+          image: user.image,
+          handle: user.handle,
+          bio: user.bio,
+          isPublic: user.isPublic,
+        })
         .from(user)
-        .where(eq(user.id, c.req.valid('param').id));
+        .where(
+          and(
+            eq(user.id, c.req.valid('param').id),
+            session?.user.id === c.req.valid('param').id ? undefined : eq(user.isPublic, true),
+          ),
+        );
       if (!profile) {
         return c.json({ error: 'not_found' as const }, 404);
       }
       return c.json({ user: profile });
+    })
+    .get('/me/profile', requireSession(auth), async (c) => {
+      const [profile] = await db
+        .select({ name: user.name, handle: user.handle, bio: user.bio, isPublic: user.isPublic })
+        .from(user)
+        .where(eq(user.id, c.get('currentUser').id));
+      if (!profile) {
+        return c.json({ error: 'not_found' as const }, 404);
+      }
+      return c.json({ profile });
+    })
+    .put('/me/profile', requireSession(auth), zValidator('json', profileInputSchema), async (c) => {
+      try {
+        await db
+          .update(user)
+          .set({ ...c.req.valid('json'), updatedAt: new Date() })
+          .where(eq(user.id, c.get('currentUser').id));
+        return c.json({ success: true });
+      } catch (error) {
+        const cause = error instanceof Error && 'cause' in error ? error.cause : error;
+        if (cause instanceof Error && 'code' in cause && cause.code === '23505') {
+          return c.json({ error: 'handle_taken' as const }, 409);
+        }
+        throw error;
+      }
     })
     .get('/posts', zValidator('query', feedQuerySchema), async (c) => {
       const { offset, author } = c.req.valid('query');
