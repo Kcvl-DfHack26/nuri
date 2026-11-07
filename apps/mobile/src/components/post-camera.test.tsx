@@ -40,7 +40,10 @@ jest.mock('expo-camera', () => {
     },
   };
 });
-jest.mock('expo-file-system', () => ({ File: jest.fn(() => ({ delete: jest.fn() })) }));
+const mockDelete = jest.fn();
+jest.mock('expo-file-system', () => ({
+  File: jest.fn(() => ({ exists: true, delete: mockDelete })),
+}));
 
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
@@ -154,12 +157,15 @@ test('sends a guest to log in before recording or choosing a video', async () =>
 });
 
 test('keeps the chosen video in the post being prepared', async () => {
-  await render(
+  const { unmount } = await render(
     <PostDraftProvider videoUri="file:///video.mov">
       <DraftVideo />
     </PostDraftProvider>,
   );
   expect(screen.getByText('file:///video.mov')).toBeOnTheScreen();
+  // The chosen video is not the draft's own file, so leaving the flow keeps it.
+  await unmount();
+  expect(File).not.toHaveBeenCalled();
 });
 
 test('starts without a video when the post is recorded', async () => {
@@ -260,4 +266,20 @@ test('deletes the video and leaves ⑫-2 when the OS stops the recording', async
   expect(alert).toHaveBeenCalledWith('録画が中断されました', 'もう一度お試しください。');
   expect(router.back).toHaveBeenCalled();
   expect(screen.getByText('動画なし')).toBeOnTheScreen();
+});
+
+test('deletes the finished recording when the post flow closes', async () => {
+  const { unmount } = await renderRecording();
+  await act(() => {
+    mockRecording.ready?.();
+  });
+  await fireEvent.press(screen.getByRole('button', { name: '撮影を終える' }));
+  await act(async () => {
+    mockRecording.current?.resolve({ uri: 'file:///recorded.mov' });
+    await Promise.resolve();
+  });
+  expect(File).not.toHaveBeenCalled();
+  await unmount();
+  expect(File).toHaveBeenCalledWith('file:///recorded.mov');
+  expect(mockDelete).toHaveBeenCalledTimes(1);
 });

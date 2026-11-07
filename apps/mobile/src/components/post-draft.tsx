@@ -1,6 +1,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
-import { createContext, use, useState } from 'react';
+import { File } from 'expo-file-system';
+import { createContext, use, useEffect, useState } from 'react';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
 
@@ -179,6 +180,20 @@ export function PostDraftProvider({
     ...sampleDraft,
     video: videoUri ? { uri: videoUri, marks: [] } : null,
   }));
+  // A video recorded on ⑫-2 holds the user's face and voice, so it is deleted once the draft lets
+  // go of it (the flow closes or another video replaces it). A chosen video is left alone.
+  const recordedUri = draft.video && draft.video.uri !== videoUri ? draft.video.uri : null;
+  useEffect(() => {
+    if (!recordedUri) {
+      return;
+    }
+    return () => {
+      const file = new File(recordedUri);
+      if (file.exists) {
+        file.delete();
+      }
+    };
+  }, [recordedUri]);
   const updateStep = (index: number, change: Partial<PostStep>) => {
     setDraft((current) => ({
       ...current,
