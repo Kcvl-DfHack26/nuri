@@ -48,7 +48,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
     .build()
   private var cameraProvider: ProcessCameraProvider? = null
-  private var landmarker: FaceLandmarker? = null
+  // Written on the main thread and read on the analysis thread.
+  @Volatile private var landmarker: FaceLandmarker? = null
   private var active = false
   private var lastStatus: String? = null
 
@@ -71,8 +72,10 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
 
   override fun onDetachedFromWindow() {
     stop()
-    landmarker?.close()
+    // Close on the analysis thread so a frame that is still being analyzed finishes first.
+    val closing = landmarker
     landmarker = null
+    analysisExecutor.execute { closing?.close() }
     super.onDetachedFromWindow()
   }
 
