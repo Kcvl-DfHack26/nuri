@@ -39,7 +39,17 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('@/lib/api', () => ({
   apiUrl: 'http://localhost:8080',
   apiAssetUrl: (path: string) => path,
-  api: { api: { recipes: { $get: () => mockGetRecipes() } } },
+  api: {
+    api: {
+      recipes: { $get: () => mockGetRecipes() },
+      'recipe-parts': {
+        $get: async () => ({
+          ok: true,
+          json: async () => ({ items: [{ part: 'brow', count: 6 }] }),
+        }),
+      },
+    },
+  },
 }));
 type Response = { ok: boolean; json: () => Promise<unknown> };
 const page = (items: unknown[]): Response => ({
@@ -90,7 +100,8 @@ test('opens the brow list from the part cards', async () => {
   await render(<Home />, { wrapper });
   await fireEvent.press(screen.getByRole('tab', { name: '部位 パーツ別' }));
 
-  await fireEvent.press(screen.getByRole('button', { name: '眉、96レシピ' }));
+  await fireEvent.press(await screen.findByRole('button', { name: '眉、6レシピ' }));
   expect(router.push).toHaveBeenCalledWith('/parts/brow');
-  expect(screen.getByRole('button', { name: 'リップ、187レシピ（準備中）' })).toBeDisabled();
+  // Parts the API does not count have no recipes yet.
+  expect(screen.getByRole('button', { name: 'リップ、0レシピ（準備中）' })).toBeDisabled();
 });

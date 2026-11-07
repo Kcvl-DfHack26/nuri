@@ -1,5 +1,5 @@
 import { Icon } from '@expo/ui';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,11 +11,11 @@ import type { RecipeSummary } from '@/lib/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
-import { partCards, parts, partStyles } from '@/components/recipes';
+import { partCards, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl } from '@/lib/api';
-import { formatCount, recipeListOptions } from '@/lib/recipes';
+import { formatCount, recipeListOptions, recipePartsOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -238,6 +238,7 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
 }
 
 function PartGrid({ top }: { top: number }) {
+  const counts = useQuery({ ...recipePartsOptions, enabled: Boolean(apiUrl) });
   return (
     <ScrollView
       contentInsetAdjustmentBehavior="never"
@@ -245,16 +246,32 @@ function PartGrid({ top }: { top: number }) {
     >
       <View className="flex-row flex-wrap gap-3">
         {partCards.map((card) => (
-          <PartCard key={card.part} card={card} />
+          <PartCard
+            key={card.part}
+            card={card}
+            // Unknown while loading or offline; the card still opens the list, which explains.
+            count={
+              counts.data
+                ? (counts.data.find((item) => item.part === card.part)?.count ?? 0)
+                : undefined
+            }
+          />
         ))}
       </View>
     </ScrollView>
   );
 }
 
-function PartCard({ card }: { card: (typeof partCards)[number] }) {
+function PartCard({
+  card,
+  count,
+}: {
+  card: (typeof partCards)[number];
+  count: number | undefined;
+}) {
   const part = parts[card.part];
-  const label = `${part.label}、${card.recipeCount}レシピ`;
+  const countLabel = count === undefined ? '' : `${count}レシピ`;
+  const label = countLabel ? `${part.label}、${countLabel}` : part.label;
   const className =
     'h-[124px] grow basis-[40%] justify-end overflow-hidden rounded-3xl border-2 border-white p-2';
   const style = { boxShadow: '0px 4px 14px rgba(196, 61, 112, 0.1)' };
@@ -279,15 +296,15 @@ function PartCard({ card }: { card: (typeof partCards)[number] }) {
         </View>
         <View>
           <Text className="font-maru-bold text-label text-ink-primary">{part.label}</Text>
-          <Text className="font-maru-bold text-micro text-ink-secondary">
-            {card.recipeCount}レシピ
-          </Text>
+          {countLabel ? (
+            <Text className="font-maru-bold text-micro text-ink-secondary">{countLabel}</Text>
+          ) : null}
         </View>
       </View>
     </>
   );
-  // Plan A designs ③ only for 眉; the other parts have no list to open yet.
-  if (!partStyles[card.part]) {
+  // A part without recipes has no list to open.
+  if (count === 0) {
     return (
       <View
         accessible

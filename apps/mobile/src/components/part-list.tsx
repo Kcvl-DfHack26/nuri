@@ -1,20 +1,23 @@
 import { Icon } from '@expo/ui';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PartStyle, StyleFilter } from '@/components/recipes';
+import type { RecipeSummary } from '@/lib/recipes';
 
-import { CroppedPhoto } from '@/components/cropped-photo';
+import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { isPartId, parts, partStyles, styleFilters } from '@/components/recipes';
+import { isPartId, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
+import { recipeListOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 
 import sparkleInk from '../../assets/plan-a/icons/sparkle-ink.svg';
@@ -36,16 +39,31 @@ const CHECK = Icon.select({
 // Plan A draws these header buttons solid because they sit on white, not on a photo.
 const solidButton = 'border-black/[0.08] bg-white';
 
-// Plan A ③ 部位別一覧. Plan A designs the brow list; other parts have no styles yet.
+type StyleFilter = 'round' | 'beginner' | 'natural';
+
+// ③'s filter chips, matched against the recipes' tags. 丸顔向け also marks the card with Plan A's
+// 丸顔におすすめ badge.
+const styleFilters: { value: StyleFilter; label: string; tag: string }[] = [
+  { value: 'round', label: '丸顔におすすめ', tag: '丸顔向け' },
+  { value: 'beginner', label: '初心者OK', tag: '初心者OK' },
+  { value: 'natural', label: 'ナチュラル', tag: 'ナチュラル' },
+];
+const roundTag = '丸顔向け';
+
+// Plan A ③ 部位別一覧: the part's recipes from the API. Choosing one and starting opens its ⑤.
 export function PartList({ part }: { part: string }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
-  const list = isPartId(part) ? partStyles[part] : undefined;
+  const partId = isPartId(part) ? part : undefined;
+  const list = useInfiniteQuery({
+    ...recipeListOptions(partId),
+    enabled: Boolean(apiUrl) && partId !== undefined,
+  });
+  const recipes = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
   const [filter, setFilter] = useState<StyleFilter | 'all'>('all');
-  // Plan A opens with the style that has a recipe (微アーチ眉) selected. The selection
-  // survives filter changes so the start button keeps acting on what the user chose.
-  const [selectedId, setSelectedId] = useState(list?.styles.find((style) => style.recipeId)?.id);
-  if (!isPartId(part) || !list) {
+  // The selection survives filter changes so the start button keeps acting on what was chosen.
+  const [chosenId, setChosenId] = useState<string>();
+  if (!partId) {
     return (
       <View
         className="flex-1 items-center justify-center gap-4 bg-white px-6"
@@ -64,9 +82,23 @@ export function PartList({ part }: { part: string }) {
       </View>
     );
   }
-  const visible =
-    filter === 'all' ? list.styles : list.styles.filter((style) => style.filters.includes(filter));
-  const recipeId = list.styles.find((style) => style.id === selectedId)?.recipeId;
+  const tag = styleFilters.find((option) => option.value === filter)?.tag;
+  const visible = tag ? recipes.filter((recipe) => recipe.tags.includes(tag)) : recipes;
+  const selectedId = chosenId ?? recipes[0]?.id;
+  const status = !apiUrl ? (
+    <Feedback message="接続先が未設定です。セットアップ後にレシピを表示できます。" />
+  ) : list.isPending ? (
+    <Feedback loading message="レシピを読み込んでいます" />
+  ) : list.isError ? (
+    <Feedback
+      message="レシピを読み込めませんでした。通信状況を確認してお試しください。"
+      onRetry={() => {
+        void list.refetch();
+      }}
+    />
+  ) : visible.length === 0 ? (
+    <Feedback message={`${parts[partId].label}のレシピはまだありません`} />
+  ) : null;
   return (
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top + 4 }}>
       <StatusBar style="dark" />
@@ -83,11 +115,11 @@ export function PartList({ part }: { part: string }) {
           accessibilityRole="header"
           className="flex-1 text-center font-maru-bold text-heading text-ink-primary"
         >
-          {parts[part].label}
+          {parts[partId].label}
         </Text>
         <GlassIconButton
           icon={SEARCH}
-          label={`${parts[part].label}のレシピを検索（準備中）`}
+          label={`${parts[partId].label}のレシピを検索（準備中）`}
           className={solidButton}
         />
       </View>
@@ -97,16 +129,16 @@ export function PartList({ part }: { part: string }) {
         contentContainerClassName="flex-row flex-wrap gap-x-2 gap-y-[21px] px-4"
         contentContainerStyle={{ paddingTop: 42, paddingBottom: insets.bottom + 96 }}
       >
-        {visible.map((style) => (
+        {status ? <View className="w-full">{status}</View> : null}
+        {visible.map((recipe) => (
           <StyleCard
-            key={style.id}
-            style={style}
-            photo={list.photo}
+            key={recipe.id}
+            recipe={recipe}
             // Two columns with an 8pt gutter; a lone filtered card keeps its column width.
             width={Math.floor((window.width - 40) / 2)}
-            selected={style.id === selectedId}
+            selected={recipe.id === selectedId}
             onSelect={() => {
-              setSelectedId(style.id);
+              setChosenId(recipe.id);
             }}
           />
         ))}
@@ -114,9 +146,9 @@ export function PartList({ part }: { part: string }) {
       <StartBar
         bottom={insets.bottom}
         onStart={
-          recipeId
+          selectedId
             ? () => {
-                router.push(`/recipes/${recipeId}`);
+                router.push(`/recipes/${selectedId}`);
               }
             : undefined
         }
@@ -134,7 +166,7 @@ function FilterChips({
 }) {
   const options: { value: StyleFilter | 'all'; label: string }[] = [
     { value: 'all', label: 'すべて' },
-    ...styleFilters,
+    ...styleFilters.map(({ value, label }) => ({ value, label })),
   ];
   return (
     <ScrollView
@@ -183,23 +215,21 @@ function FilterChips({
 }
 
 function StyleCard({
-  style,
-  photo,
+  recipe,
   width,
   selected,
   onSelect,
 }: {
-  style: PartStyle;
-  photo: number;
+  recipe: RecipeSummary;
   width: number;
   selected: boolean;
   onSelect: () => void;
 }) {
-  const recommended = style.filters.includes('round');
+  const recommended = recipe.tags.includes(roundTag);
   return (
     <Pressable
       accessibilityRole="radio"
-      accessibilityLabel={`${style.name}、${style.caption}${recommended ? '、丸顔におすすめ' : ''}`}
+      accessibilityLabel={`${recipe.title}${recipe.summary ? `、${recipe.summary}` : ''}${recommended ? '、丸顔におすすめ' : ''}`}
       accessibilityState={{ checked: selected }}
       onPress={onSelect}
       className="gap-1 active:opacity-80"
@@ -207,11 +237,16 @@ function StyleCard({
     >
       <View
         className={cn(
-          'aspect-[175/118] w-full overflow-hidden rounded-2xl',
+          'aspect-[175/118] w-full overflow-hidden rounded-2xl bg-neutral-soft',
           selected ? 'border-[3px] border-accent-rose' : 'border border-black/[0.06]',
         )}
       >
-        <CroppedPhoto source={photo} crop={style.crop} />
+        <Image
+          accessible={false}
+          source={{ uri: apiAssetUrl(recipe.image) }}
+          contentFit="cover"
+          style={{ width: '100%', height: '100%' }}
+        />
         {recommended ? (
           <View className="absolute bottom-[11px] left-1.5 flex-row items-center gap-[3px] rounded-xl bg-white/85 py-[3px] pl-1.5 pr-2">
             <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
@@ -225,8 +260,10 @@ function StyleCard({
         ) : null}
       </View>
       <View className="px-1 pt-1">
-        <Text className="font-maru-bold text-label text-ink-primary">{style.name}</Text>
-        <Text className="font-maru text-meta text-ink-secondary">{style.caption}</Text>
+        <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
+        {recipe.summary ? (
+          <Text className="font-maru text-meta text-ink-secondary">{recipe.summary}</Text>
+        ) : null}
       </View>
     </Pressable>
   );

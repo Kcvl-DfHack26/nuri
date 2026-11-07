@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Fragment } from 'react';
 import { Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PhotoCrop } from '@/components/recipes';
+import type { PartId, PhotoCrop } from '@/components/recipes';
 import type { RecipeDetail as RecipeData, RecipeStep } from '@/lib/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
@@ -60,22 +61,18 @@ const heroCrop: PhotoCrop = {
   left: '-12.18%',
   top: '-13.89%',
 };
-const pins = [
-  { x: 251, y: 177 },
-  { x: 101, y: 211 },
-  { x: 281, y: 227 },
-  { x: 75, y: 341 },
-  { x: 271, y: 281 },
-  { x: 203, y: 381 },
-];
-const pinLabels = [
-  { x: 272, y: 160 },
-  { x: 14, y: 186 },
-  { x: 302, y: 228 },
-  { x: 10, y: 370 },
-  { x: 290, y: 306 },
-  { x: 236, y: 404 },
-];
+// Where Plan A puts each part's pin and label on its annotated photo (390×540 frame).
+const planAPins: Partial<Record<PartId, { pin: FramePoint; label: FramePoint }>> = {
+  brow: { pin: { x: 251, y: 177 }, label: { x: 272, y: 160 } },
+  eye: { pin: { x: 101, y: 211 }, label: { x: 14, y: 186 } },
+  lash: { pin: { x: 281, y: 227 }, label: { x: 302, y: 228 } },
+  shading: { pin: { x: 75, y: 341 }, label: { x: 10, y: 370 } },
+  cheek: { pin: { x: 271, y: 281 }, label: { x: 290, y: 306 } },
+  lip: { pin: { x: 203, y: 381 }, label: { x: 236, y: 404 } },
+};
+// Plan A's annotated photo shows the fox recipe; other recipes show their own photo.
+const planARecipe = 'fox';
+type FramePoint = { x: number; y: number };
 const atFrame = (x: number, y: number) =>
   ({ left: `${(x / 390) * 100}%`, top: `${(y / 540) * 100}%` }) as const;
 // Plan A colors the tags in this order.
@@ -403,9 +400,8 @@ export function RecipeContent({
 }
 
 function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
-  // Plan A's guides and pins are drawn on its own face photo of the fox recipe, the only recipe
-  // with steps so far; recipes without steps show their finished photo.
-  if (steps.length === 0) {
+  // Plan A's guides and pins are drawn on its own photo of the fox recipe.
+  if (recipe.id !== planARecipe) {
     return (
       <View className="aspect-[390/540] w-full overflow-hidden bg-neutral-soft">
         <Image
@@ -430,34 +426,36 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
           style={{ position: 'absolute', width: '100%', height: `${(480 / 540) * 100}%` }}
         />
       ))}
-      {pins.map((pin, index) => (
-        <View
-          key={`pin-${pin.x}-${pin.y}`}
-          className="absolute size-[22px] items-center justify-center rounded-full bg-white/95"
-          style={{ ...atFrame(pin.x, pin.y), boxShadow: '0px 2px 6px rgba(196, 61, 112, 0.25)' }}
-        >
-          <View className="size-2.5 rounded-full bg-accent-rose" />
-        </View>
-      ))}
       {steps.map((step, index) => {
-        const label = pinLabels[index];
-        if (!label) {
+        const place = planAPins[step.part];
+        if (!place) {
           return null;
         }
         return (
-          <View
-            key={index}
-            className="absolute flex-row items-center gap-[5px] rounded-[14px] border border-white bg-white/80 py-[3px] pl-[3px] pr-2.5"
-            style={{
-              ...atFrame(label.x, label.y),
-              boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)',
-            }}
-          >
-            <View className="size-5 items-center justify-center rounded-full bg-accent-rose">
-              <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
+          // Steps are identified by their position; a part may appear twice.
+          <Fragment key={index}>
+            <View
+              className="absolute size-[22px] items-center justify-center rounded-full bg-white/95"
+              style={{
+                ...atFrame(place.pin.x, place.pin.y),
+                boxShadow: '0px 2px 6px rgba(196, 61, 112, 0.25)',
+              }}
+            >
+              <View className="size-2.5 rounded-full bg-accent-rose" />
             </View>
-            <Text className="font-maru-bold text-micro text-ink-primary">{step.label}</Text>
-          </View>
+            <View
+              className="absolute flex-row items-center gap-[5px] rounded-[14px] border border-white bg-white/80 py-[3px] pl-[3px] pr-2.5"
+              style={{
+                ...atFrame(place.label.x, place.label.y),
+                boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)',
+              }}
+            >
+              <View className="size-5 items-center justify-center rounded-full bg-accent-rose">
+                <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
+              </View>
+              <Text className="font-maru-bold text-micro text-ink-primary">{step.label}</Text>
+            </View>
+          </Fragment>
         );
       })}
     </View>

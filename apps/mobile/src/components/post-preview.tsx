@@ -14,6 +14,8 @@ const sample: RecipeDetail = {
   durationMinutes: 15,
   likeCount: 1200,
   source: 'instagram',
+  part: null,
+  summary: null,
   author: { id: 'preview', name: 'mio', image: null },
   products: [],
   steps: [],
