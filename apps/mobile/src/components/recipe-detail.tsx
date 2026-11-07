@@ -161,7 +161,8 @@ function RecipeStatus({
   );
 }
 
-function RecipeContent({
+/** ⑤ for recipe data already in hand, e.g. ⑫-8's sample of the post being made. */
+export function RecipeContent({
   recipe,
   steps,
   onPost,
@@ -210,7 +211,8 @@ function RecipeContent({
             <View className="flex-row flex-wrap gap-1.5">
               {tags.map((tag, index) => (
                 <View
-                  key={tag}
+                  // Tags may repeat, e.g. a 15分 tag on a 15-minute recipe.
+                  key={`${index}-${tag}`}
                   className={cn(
                     'min-h-6 justify-center rounded-xl px-2.5',
                     tagBackgrounds[index % tagBackgrounds.length],

@@ -1,3 +1,5 @@
+import { eq } from 'drizzle-orm';
+
 import type { Database } from './client';
 
 import { like, post, product, recipe, recipeProduct, user } from './schema';
@@ -165,10 +167,19 @@ export async function seedSampleData(db: Database) {
     }
     for (const [index, { products: used, ...item }] of recipes.entries()) {
       const values = { ...item, image: `/sample-recipes/${item.id}.jpg` };
-      await tx
+      const seeded = await tx
         .insert(recipe)
         .values({ ...values, createdAt: new Date(Date.now() - (index + 1) * 60 * 60 * 1000) })
-        .onConflictDoUpdate({ target: recipe.id, set: values });
+        // A recipe someone else made with the same slug is left untouched.
+        .onConflictDoUpdate({
+          target: recipe.id,
+          set: values,
+          setWhere: eq(recipe.authorId, item.authorId),
+        })
+        .returning({ id: recipe.id });
+      if (!seeded.length) {
+        continue;
+      }
       for (const [position, entry] of used.entries()) {
         await tx
           .insert(recipeProduct)

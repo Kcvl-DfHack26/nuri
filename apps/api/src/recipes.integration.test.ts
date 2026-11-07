@@ -27,7 +27,9 @@ const ownUserId = `recipe-test-${unique}`;
 const ownRecipeId = `own-${unique}`;
 
 afterAll(async () => {
+  // Deleting the test user also deletes its recipes, including the borrowed slug; reseed it.
   await db.delete(user).where(eq(user.id, ownUserId));
+  await seedSampleData(db);
   await pool.end();
 });
 
@@ -43,6 +45,11 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
     image: 'https://example.com/own.jpg',
     durationMinutes: 3,
   });
+  // Someone else's recipe that happens to use a seeded slug.
+  await db
+    .update(recipe)
+    .set({ authorId: ownUserId, title: '同じIDの自分のレシピ' })
+    .where(eq(recipe.id, 'round'));
   const before = await db.select({ value: count() }).from(recipe);
   const seededProducts = await db
     .select({ value: count() })
@@ -64,10 +71,12 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
       .from(recipe)
       .where(inArray(recipe.id, [ownRecipeId, 'fox'])),
   ).toHaveLength(2);
+  expect(
+    await db.select({ title: recipe.title }).from(recipe).where(eq(recipe.id, 'round')),
+  ).toEqual([{ title: '同じIDの自分のレシピ' }]);
 });
 
 test('lists and shows recipes without a session', async () => {
-  await seedSampleData(db);
   const list = await app.request('/api/recipes');
   expect(list.status).toBe(200);
   const { items } = z
