@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.SystemClock
+import android.util.Range
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -16,8 +17,10 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
+import com.google.mediapipe.framework.MediaPipeException
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
+import com.google.mediapipe.tasks.core.Delegate
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
@@ -26,6 +29,7 @@ import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 // Shows the front camera and runs MediaPipe Face Landmarker (LIVE_STREAM) on its frames on device.
 // Frames and landmarks never leave the device. Landmarks are sent to JavaScript normalized to the
@@ -39,8 +43,9 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
 
   private val previewView = PreviewView(context).apply {
     scaleType = PreviewView.ScaleType.FILL_CENTER
-    // A TextureView keeps the preview inside React Native's view hierarchy for clipping and overlays.
-    implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+    // A SurfaceView hands camera frames straight to the compositor. A TextureView made the app's
+    // render thread copy every frame, which made the whole screen stutter.
+    implementationMode = PreviewView.ImplementationMode.PERFORMANCE
   }
   private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
   // Preview and analysis share the aspect ratio so landmarks line up with the cropped preview.
@@ -50,6 +55,11 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private var cameraProvider: ProcessCameraProvider? = null
   // Written on the main thread and read on the analysis thread.
   @Volatile private var landmarker: FaceLandmarker? = null
+  // Written on the main thread and read on the analysis thread. Once the GPU fails, later
+  // landmarkers use the CPU.
+  @Volatile private var gpuFailed = false
+  // Frames sent since the last result: counted on the analysis thread, reset on MediaPipe's thread.
+  private val framesWithoutResult = AtomicInteger(0)
   private var active = false
   private var lastStatus: String? = null
 
@@ -72,10 +82,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
 
   override fun onDetachedFromWindow() {
     stop()
-    // Close on the analysis thread so a frame that is still being analyzed finishes first.
-    val closing = landmarker
+    landmarker?.let { closeLandmarker(it) }
     landmarker = null
-    analysisExecutor.execute { closing?.close() }
     super.onDetachedFromWindow()
   }
 
@@ -104,6 +112,9 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       cameraProvider = provider
       val preview = Preview.Builder()
         .setResolutionSelector(resolutionSelector)
+        // The frame rate applies to the whole camera, so analysis gets 30 fps too. Without it some
+        // cameras (the emulator's included) settle at 15 fps. CameraX picks the closest supported range.
+        .setTargetFrameRate(TARGET_FRAME_RATE)
         .build()
       preview.setSurfaceProvider(previewView.surfaceProvider)
       val analysis = ImageAnalysis.Builder()
@@ -126,15 +137,66 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     cameraProvider?.unbindAll()
   }
 
+  // The GPU keeps inference short enough to follow head movement; fall back to the CPU on devices
+  // whose GPU MediaPipe cannot use.
   private fun createLandmarker(): FaceLandmarker {
+    if (!gpuFailed) {
+      try {
+        return createLandmarker(Delegate.GPU)
+      } catch (error: Exception) {
+        gpuFailed = true
+      }
+    }
+    return createLandmarker(Delegate.CPU)
+  }
+
+  // Main thread. A GPU can open and still fail on every frame (the emulator's GL does), so the
+  // first error from a GPU landmarker switches to the CPU. Errors from a landmarker that has
+  // already been replaced are ignored.
+  private fun onLandmarkerError(failed: FaceLandmarker, error: RuntimeException) {
+    if (failed !== landmarker) {
+      return
+    }
+    if (gpuFailed) {
+      setStatus("error", error.message ?: "顔追跡に失敗しました")
+      return
+    }
+    gpuFailed = true
+    landmarker = try {
+      createLandmarker(Delegate.CPU)
+    } catch (cpuError: Exception) {
+      setStatus("error", cpuError.message ?: "顔追跡を始められませんでした")
+      null
+    }
+    closeLandmarker(failed)
+  }
+
+  // Closes on the analysis thread so a frame that is still being analyzed finishes first.
+  private fun closeLandmarker(closing: FaceLandmarker) {
+    analysisExecutor.execute {
+      try {
+        closing.close()
+      } catch (error: MediaPipeException) {
+        // Closing a graph that has failed throws its error again; the failure is already handled.
+      }
+    }
+  }
+
+  private fun createLandmarker(delegate: Delegate): FaceLandmarker {
+    val baseOptions = BaseOptions.builder()
+      .setModelAssetPath("face_landmarker.task")
+      .setDelegate(delegate)
+      .build()
+    // The error listener needs the landmarker it belongs to, which exists only after it is built.
+    var created: FaceLandmarker? = null
     val options = FaceLandmarker.FaceLandmarkerOptions.builder()
-      .setBaseOptions(BaseOptions.builder().setModelAssetPath("face_landmarker.task").build())
+      .setBaseOptions(baseOptions)
       .setRunningMode(RunningMode.LIVE_STREAM)
       .setNumFaces(1)
       .setResultListener { result, _ -> onResult(result) }
-      .setErrorListener { error -> post { setStatus("error", error.message ?: "顔追跡に失敗しました") } }
+      .setErrorListener { error -> post { created?.let { onLandmarkerError(it, error) } } }
       .build()
-    return FaceLandmarker.createFromOptions(context, options)
+    return FaceLandmarker.createFromOptions(context, options).also { created = it }
   }
 
   // Analysis thread.
@@ -157,11 +219,23 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     frameWidth = upright.width
     frameHeight = upright.height
-    current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
+    // MediaPipe only logs GPU graph errors that happen while frames are sent, so a GPU landmarker
+    // that returns nothing for many frames is treated as failed.
+    val gpuSilent = !gpuFailed && framesWithoutResult.incrementAndGet() > GPU_SILENT_FRAME_LIMIT
+    if (gpuSilent) {
+      framesWithoutResult.set(0)
+      post { onLandmarkerError(current, IllegalStateException("GPU returned no results")) }
+    }
+    try {
+      current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
+    } catch (error: MediaPipeException) {
+      post { onLandmarkerError(current, error) }
+    }
   }
 
   // MediaPipe's thread.
   private fun onResult(result: FaceLandmarkerResult) {
+    framesWithoutResult.set(0)
     val face = result.faceLandmarks().firstOrNull()
     if (face.isNullOrEmpty()) {
       post { setStatus("noFace") }
@@ -186,5 +260,13 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     if (status == lastStatus && message == null) return
     lastStatus = status
     onStatus(if (message == null) mapOf("status" to status) else mapOf("status" to status, "message" to message))
+  }
+
+  private companion object {
+    // PoC-1 target in docs/requirements.md (chapter 11).
+    val TARGET_FRAME_RATE = Range(30, 30)
+    // About 3 s at 30 fps. A slow but working GPU (the emulator's, about 0.5 s per result) answers
+    // within a dozen frames.
+    const val GPU_SILENT_FRAME_LIMIT = 90
   }
 }
