@@ -1,6 +1,8 @@
 package expo.modules.facetracker
 
 import android.Manifest
+import android.net.Uri
+import expo.modules.kotlin.exception.Exceptions
 import expo.modules.interfaces.permissions.PermissionsStatus
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
@@ -21,6 +23,12 @@ class FaceTrackerModule : Module() {
         { result -> promise.resolve(result[Manifest.permission.CAMERA]?.status == PermissionsStatus.GRANTED) },
         Manifest.permission.CAMERA
       )
+    }
+
+    // Landmarks of one face in a still photo, or null when there is no face.
+    AsyncFunction("detectFaceAsync") { uri: String ->
+      val context = appContext.reactContext ?: throw Exceptions.ReactContextLost()
+      detectFace(context, Uri.parse(uri))
     }
 
     View(FaceTrackerView::class) {

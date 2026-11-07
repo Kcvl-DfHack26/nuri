@@ -11,6 +11,15 @@ export type FaceLandmarksEvent = {
   latencyMs: number;
 };
 
+/** Landmarks of one face in a still photo, normalized to the upright photo. */
+export type FacePhotoLandmarks = {
+  /** Flat x, y pairs in 0–1 for MediaPipe's 478 landmarks. */
+  points: number[];
+  /** Size of the upright photo in pixels. */
+  width: number;
+  height: number;
+};
+
 export type FaceTrackerStatus = 'tracking' | 'noFace' | 'permissionDenied' | 'error';
 
 export type FaceTrackerStatusEvent = {
