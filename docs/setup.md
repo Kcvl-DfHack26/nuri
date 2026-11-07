@@ -386,6 +386,7 @@ gcloud artifacts docker images describe "$REGISTRY/api:bootstrap" \
 
 ```sh
 # 1. migrationのjobだけを作り、DBへmigrationを適用する
+#    DBとDBユーザーは deploy_application=false の適用で作成済みであることが前提
 tofu -chdir=infra plan -target='google_cloud_run_v2_job.migrate[0]'
 tofu -chdir=infra apply -target='google_cloud_run_v2_job.migrate[0]'
 gcloud run jobs execute nuri-staging-migrate --region=asia-northeast1 --wait
@@ -396,7 +397,7 @@ API_ORIGIN=$(tofu -chdir=infra output -raw service_uri)
 curl --fail "$API_ORIGIN/ready"
 ```
 
-サービスのstartup probeは `/ready`（DBへ `SELECT 1`）を使う。DB URLやsecretが誤っているとrevisionが起動せず、applyが失敗する。liveness probeは `/health` のままにし、DBが一時的に落ちてもインスタンスを再起動しない。
+サービスのstartup probeは `/ready`（DBへ `SELECT 1`）を使う。DB URLやsecretが誤っているとrevisionが起動せず、applyが失敗する。このときCloud Runのサービスだけが作られ、OpenTofuのstateには残らない。secretを直してから `gcloud run services delete nuri-staging --region=asia-northeast1` で消し、もう一度applyする（`deletion_protection` はOpenTofu側の設定なので、gcloudでは消せる）。liveness probeは `/health` のままにし、DBが一時的に落ちてもインスタンスを再起動しない。
 
 `api_origin`出力と`service_uri`が一致することを確認する。custom domainを使う場合はDNS/ドメインマッピングを別途設定し、`api_origin`にそのHTTPS URLを渡す。
 
@@ -444,7 +445,7 @@ curl --fail "$API_ORIGIN/api/recipes"  # アプリが読むレシピ一覧
 # どのrevisionがトラフィックを受けているか
 gcloud run services describe nuri-staging --region=asia-northeast1 --format='yaml(status.traffic)'
 # 直近のログとmigrationの実行結果
-gcloud run services logs read nuri-staging --region=asia-northeast1 --limit=50
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="nuri-staging"' --limit=50
 gcloud run jobs executions list --job=nuri-staging-migrate --region=asia-northeast1 --limit=5
 ```
 
@@ -456,13 +457,15 @@ GitHub Actionsの **Deploy API and mobile update** の実行結果でも、migra
 
 1. **CIからのデプロイだけ止める**：`gh variable set GCP_DEPLOY_ENABLED --body false`。動いているAPIはそのまま残る。
 2. **APIの公開を一時的に止める**：`gcloud run services update nuri-staging --region=asia-northeast1 --ingress=internal`。外部からのリクエストは届かなくなる。次の `tofu apply` で公開に戻る（`ingress` をOpenTofuが管理しているため）。
-3. **Cloud SQLを一時的に止める**：`gcloud sql instances patch nuri-staging --activation-policy=NEVER`。時間課金は止まるが、ストレージとIPv4アドレスの課金は続く。再開は `--activation-policy=ALWAYS`。次の `tofu apply` でも起動する。
+3. **Cloud SQLを一時的に止める**：`gcloud sql instances patch nuri-staging --activation-policy=NEVER`。APIもDBへ接続できなくなり、新しいインスタンスは `/ready` を通らないため、リクエストはすべて失敗する。時間課金は止まるが、ストレージとIPv4アドレスの課金は続く。再開は `--activation-policy=ALWAYS`。次の `tofu apply` でも起動する。
 4. **すべて削除する**（11月14日の後。決勝に進んだら11月27日の後）：DBのデータは戻せない。残す必要があれば先に書き出す。
 
 ```sh
 gh variable set GCP_DEPLOY_ENABLED --body false
-# plan/applyと同じDBパスワードを設定しておく
-export TF_VAR_database_password=...
+# plan/applyと同じDBパスワードを、shellの履歴に残さず入力する
+read -rs TF_VAR_database_password && export TF_VAR_database_password
+# deletion_protection 以外の変更が出ていないことをplanで確かめてからapplyする
+tofu -chdir=infra plan -var=deletion_protection=false
 tofu -chdir=infra apply -var=deletion_protection=false
 tofu -chdir=infra destroy -var=deletion_protection=false
 ```

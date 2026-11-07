@@ -174,10 +174,12 @@ resource "google_cloud_run_v2_service" "api" {
       }
       # A revision takes traffic only after it can reach the database.
       # Liveness stays on /health so a short database outage does not restart instances.
+      # The timeout matches the pool's 5 s connect timeout (apps/api/src/db/client.ts),
+      # and 12 tries give a cold db-f1-micro up to 120 s, under Cloud Run's 240 s cap.
       startup_probe {
         http_get { path = "/ready" }
-        timeout_seconds   = 3
-        period_seconds    = 5
+        timeout_seconds   = 5
+        period_seconds    = 10
         failure_threshold = 12
       }
       liveness_probe {
