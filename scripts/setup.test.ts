@@ -77,6 +77,8 @@ describe('Compose setup', () => {
         'user.name=Test',
         '-c',
         'user.email=test@example.com',
+        '-c',
+        'commit.gpgsign=false',
         'commit',
         '--allow-empty',
         '-m',
