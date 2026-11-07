@@ -120,9 +120,8 @@ test('shows the recipe from the API and opens the product sheet from a product r
     screen.getByRole('button', { name: 'CELANE 極細アイブロウペンシル、眉・モカブラウン' }),
   );
   expect(router.push).toHaveBeenCalledWith('/products/celane-brow-pencil');
-  expect(
-    screen.getByRole('button', { name: 'ムースチーク、チーク・コーラル（準備中）' }),
-  ).toBeDisabled();
+  // A product without ⑥ is not a button itself; its 買う stays a button of its own.
+  expect(screen.queryByRole('button', { name: /^ムースチーク/u })).toBeNull();
   // Only the product with a shop link offers 買う, and it opens the link in the browser.
   expect(screen.getAllByText('買う')).toHaveLength(1);
   await fireEvent.press(screen.getByRole('button', { name: '購入先を見る' }));

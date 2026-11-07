@@ -1,6 +1,7 @@
 import type { AccessibilityActionEvent } from 'react-native';
 
 import { Icon } from '@expo/ui';
+import { purchaseUrlSchema } from '@starter/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -476,7 +477,8 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
 function ProductRow({ product }: { product: RecipeData['products'][number] }) {
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
-  const { purchaseUrl } = product;
+  // Only an https shop opens, whatever the API returns.
+  const purchaseUrl = purchaseUrlSchema.safeParse(product.purchaseUrl).data;
   // The shop opens in the in-app browser (Safari View Controller or Custom Tabs).
   const openShop = purchaseUrl
     ? () => {
@@ -531,6 +533,10 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
     : {};
   // Only products with Plan A detail data open ⑥ until product details come from the API.
   if (!findProduct(product.id)) {
+    // The row itself does nothing yet; with a shop, 買う stays its own button for screen readers.
+    if (openShop) {
+      return <View className={className}>{content}</View>;
+    }
     return (
       <View
         accessible
@@ -538,7 +544,6 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
         accessibilityLabel={`${product.name}、${product.usage}（準備中）`}
         accessibilityState={{ disabled: true }}
         className={className}
-        {...purchase}
       >
         {content}
       </View>

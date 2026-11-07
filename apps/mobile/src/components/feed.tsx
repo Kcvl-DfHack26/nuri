@@ -39,10 +39,11 @@ export function Feed({ authorId, header }: { authorId?: string; header?: ReactEl
       />
     );
   }
-  if (feed.isPending) {
+  // A profile's header (its summary and recipes) stays on screen while its posts load or fail.
+  if (feed.isPending && !header) {
     return <Feedback fullScreen loading message="投稿を読み込んでいます" />;
   }
-  if (feed.isError && !feed.data) {
+  if (feed.isError && !feed.data && !header) {
     return (
       <Feedback
         fullScreen
@@ -87,7 +88,13 @@ export function Feed({ authorId, header }: { authorId?: string; header?: ReactEl
           ) : null}
         </>
       }
-      ListEmptyComponent=<Feedback message="まだ投稿がありません" />
+      ListEmptyComponent={
+        feed.isPending ? (
+          <Feedback loading message="投稿を読み込んでいます" />
+        ) : feed.isError ? undefined : (
+          <Feedback message="まだ投稿がありません" />
+        )
+      }
       renderItem={({ item }) => (
         <PostRow item={item} viewerId={session?.user.id} now={displayTime} />
       )}
