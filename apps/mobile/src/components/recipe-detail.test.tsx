@@ -65,6 +65,13 @@ const fox = {
       usage: 'チーク・コーラル',
     },
   ],
+  steps: [
+    { part: 'brow', label: '眉' },
+    { part: 'eye', label: 'シャドウ' },
+    { part: 'lash', label: 'ライン' },
+    { part: 'shading', label: 'シェード' },
+    { part: 'cheek', label: 'チーク' },
+  ],
 };
 type Response = { ok: boolean; status: number; json: () => Promise<unknown> };
 const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
@@ -89,7 +96,8 @@ test('shows the recipe from the API and opens the product sheet from a product r
   expect(await screen.findByText('狐メイク')).toBeOnTheScreen();
   expect(screen.getByText('＃丸顔向け')).toBeOnTheScreen();
   expect(screen.getByText('＃15分')).toBeOnTheScreen();
-  expect(screen.getByText('6ステップ')).toBeOnTheScreen();
+  expect(screen.getByText('5ステップ')).toBeOnTheScreen();
+  expect(screen.getAllByText('シェード').length).toBeGreaterThan(0);
   expect(screen.getByText('Instagramから取り込み・保存 1.2k')).toBeOnTheScreen();
   expect(screen.getByText('2点')).toBeOnTheScreen();
   await fireEvent.press(
@@ -103,15 +111,18 @@ test('shows the recipe from the API and opens the product sheet from a product r
   expect(router.push).toHaveBeenCalledWith('/recipes/fox/steps');
 });
 
-test('keeps the start action disabled for a recipe without Plan A steps', async () => {
+test('keeps the start action disabled for a recipe without steps', async () => {
   mockGetRecipe.mockResolvedValueOnce({
     ok: true,
     status: 200,
-    json: async () => ({ recipe: { ...fox, id: 'round', title: '丸顔メイク', products: [] } }),
+    json: async () => ({
+      recipe: { ...fox, id: 'round', title: '丸顔メイク', products: [], steps: [] },
+    }),
   });
   await render(<RecipeDetail id="round" />, { wrapper });
   expect(await screen.findByText('丸顔メイク')).toBeOnTheScreen();
   expect(screen.queryByText('使うメイク品')).toBeNull();
+  expect(screen.queryByText('手順')).toBeNull();
   expect(screen.getByRole('button', { name: 'メイクをはじめる（準備中）' })).toBeDisabled();
 });
 

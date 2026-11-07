@@ -51,8 +51,8 @@ test('shows the signed-in profile with sample numbers and opens the settings and
   expect(screen.getByLabelText('フォロワー 328')).toBeOnTheScreen();
   expect(screen.getByText('顔タイプ・数字・投稿は見本です')).toBeOnTheScreen();
 
-  // Only the recipe with a Plan A detail screen opens ⑤.
-  expect(screen.queryByRole('button', { name: '丸顔メイク、nana' })).not.toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '丸顔メイク、nana' }));
+  expect(router.push).toHaveBeenCalledWith('/recipes/round');
   await fireEvent.press(screen.getByRole('button', { name: '狐メイク、rina' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
 

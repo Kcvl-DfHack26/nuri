@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
@@ -8,13 +9,17 @@ import { PanResponder, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId } from '@/components/recipes';
+import type { RecipeStep } from '@/lib/recipes';
 
 import { FaceScene } from '@/components/face-scene';
+import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { arPhotos, findRecipe, parts } from '@/components/recipes';
+import { arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
+import { recipeOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -76,7 +81,8 @@ export function MakeCompare({ id }: { id: string }) {
   const shown = clamp(position);
   const x = shown * width;
   const percent = Math.round(shown * 100);
-  const steps = findRecipe(id)?.detail;
+  // The step chips come from the recipe that ⑦ already loaded; the photos do not need it.
+  const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
 
   return (
     <View className="flex-1 bg-white">
@@ -161,22 +167,58 @@ export function MakeCompare({ id }: { id: string }) {
           </Text>
           <Text className="font-maru text-meta text-ink-secondary">タップでオン・オフ</Text>
         </View>
-        {steps ? (
-          <View className="flex-row flex-wrap gap-2">
-            {steps.overview.map((partId, index) => (
-              <LayerChip
-                key={partId}
-                part={partId}
-                label={steps.steps[index]?.label ?? parts[partId].label}
-                visible={!SAMPLE_HIDDEN_PARTS.includes(partId)}
-              />
-            ))}
-          </View>
-        ) : null}
+        <StepLayers
+          steps={query.data?.steps ?? []}
+          isLoading={query.isPending && Boolean(apiUrl)}
+          isError={query.isError}
+          onRetry={() => {
+            void query.refetch();
+          }}
+        />
         <Controls />
       </View>
     </View>
   );
+}
+
+function StepLayers({
+  steps,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  steps: RecipeStep[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
+  if (steps.length > 0) {
+    return (
+      <View className="flex-row flex-wrap gap-2">
+        {steps.map((step, index) => (
+          <LayerChip
+            // A recipe may work on the same part twice, so the position is the key.
+            key={index}
+            part={step.part}
+            label={step.label}
+            visible={!SAMPLE_HIDDEN_PARTS.includes(step.part)}
+          />
+        ))}
+      </View>
+    );
+  }
+  if (isError) {
+    return (
+      <Feedback
+        message="手順を読み込めませんでした。通信状況を確認してお試しください。"
+        onRetry={onRetry}
+      />
+    );
+  }
+  if (isLoading) {
+    return <Feedback message="手順を読み込んでいます" loading />;
+  }
+  return null;
 }
 
 /** Shows the slice of a full-width layer between `from` and `to`, measured from the left edge. */

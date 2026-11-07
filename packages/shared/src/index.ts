@@ -39,3 +39,14 @@ export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,
 export const recipeListQuerySchema = feedQuerySchema.pick({ offset: true });
 /** Where an imported recipe came from; null means it was made in nuri. */
 export const recipeSources = ['instagram', 'tiktok', 'youtube'] as const;
+/** The face parts a makeup step works on, in Plan A's ② order. */
+export const makeupParts = [
+  'base',
+  'brow',
+  'eye',
+  'lash',
+  'cheek',
+  'shading',
+  'highlight',
+  'lip',
+] as const;
