@@ -47,20 +47,27 @@ export function PrimaryButton({
   label,
   onPress,
   icon,
+  disabled = false,
 }: {
   label: string;
+  /** Without a handler the action shows as not built yet. */
   onPress?: () => void;
   icon?: ReactNode;
+  /** A built action that cannot run right now, e.g. nothing to save. */
+  disabled?: boolean;
 }) {
-  const disabled = !onPress;
+  const unbuilt = !onPress;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={disabled ? `${label}（準備中）` : label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityLabel={unbuilt ? `${label}（準備中）` : label}
+      accessibilityState={{ disabled: unbuilt || disabled }}
+      disabled={unbuilt || disabled}
       onPress={onPress}
-      className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px] active:opacity-80"
+      className={cn(
+        'min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px] active:opacity-80',
+        disabled && 'opacity-50',
+      )}
       style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
     >
       {icon}

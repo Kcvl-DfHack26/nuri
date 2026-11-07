@@ -4,7 +4,8 @@ import { stackOptions } from '@/theme/navigation';
 export default function Layout() {
   return (
     <Stack screenOptions={stackOptions}>
-      <Stack.Screen name="profile" options={{ title: 'マイ', headerLargeTitleEnabled: true }} />
+      {/* Plan A ⑰ draws its own profile header. */}
+      <Stack.Screen name="profile" options={{ title: 'マイ', headerShown: false }} />
     </Stack>
   );
 }

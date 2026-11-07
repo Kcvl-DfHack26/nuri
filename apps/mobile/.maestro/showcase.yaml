@@ -13,9 +13,10 @@ appId: com.kcvl.nuri
 - tapOn: '次のメイクを試す？'
 - assertVisible: 'nuri'
 - tapOn: 'マイ'
-- assertVisible: '自分の投稿を確認するにはログインしてください'
+- assertVisible: 'ゲスト'
 - tapOn: 'ログイン'
-- assertVisible: 'Googleでログイン'
+- assertVisible: 'Googleで続ける'
 - back
-- tapOn: '設定'
+- tapOn: 'プロフィール設定'
+- tapOn: 'アプリの設定 外観・触覚・パスキー'
 - assertVisible: '外観'

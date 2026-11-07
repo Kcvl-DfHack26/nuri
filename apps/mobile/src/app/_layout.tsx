@@ -66,15 +66,7 @@ function Navigation() {
             sheetGrabberVisible: true,
           }}
         />
-        <Stack.Screen
-          name="profile-edit"
-          options={{
-            title: 'プロフィール',
-            presentation: 'formSheet',
-            sheetAllowedDetents: [0.4, 0.75],
-            sheetGrabberVisible: true,
-          }}
-        />
+        <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
         <Stack.Screen name="auth-callback" options={{ title: 'ログイン' }} />
       </Stack>
       <StatusBar style="auto" />

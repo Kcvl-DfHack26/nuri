@@ -107,36 +107,11 @@ export function Settings() {
           </FieldGroup.Section>
           <FieldGroup.Section title="アカウント">
             {session.data ? (
-              <>
-                <Column spacing={4} style={{ paddingVertical: 8 }}>
-                  <NativeText textStyle={{ fontWeight: '600' }}>
-                    {session.data.user.name}
-                  </NativeText>
-                  <NativeText style={{ opacity: 0.6 }}>{session.data.user.email}</NativeText>
-                </Column>
-                <ListItem
-                  onPress={() => {
-                    router.push('/profile-edit');
-                  }}
-                  leading=<Icon
-                    name={Icon.select({
-                      ios: 'person.crop.circle',
-                      android: import('@expo/material-symbols/account_circle.xml'),
-                    })}
-                    size={iconSize}
-                  />
-                  trailing=<Icon
-                    name={Icon.select({
-                      ios: 'chevron.right',
-                      android: import('@expo/material-symbols/chevron_right.xml'),
-                    })}
-                    size={16}
-                    color={colors.secondary}
-                  />
-                >
-                  <NativeText>プロフィールを編集</NativeText>
-                </ListItem>
-              </>
+              // The profile itself is edited on ⑰-2, which opens this screen.
+              <Column spacing={4} style={{ paddingVertical: 8 }}>
+                <NativeText textStyle={{ fontWeight: '600' }}>{session.data.user.name}</NativeText>
+                <NativeText style={{ opacity: 0.6 }}>{session.data.user.email}</NativeText>
+              </Column>
             ) : (
               <Button
                 label={session.isPending ? '確認中…' : 'ログイン・新規登録'}
