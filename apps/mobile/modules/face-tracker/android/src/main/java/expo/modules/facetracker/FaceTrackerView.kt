@@ -136,7 +136,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
         .build()
-      analysis.setAnalyzer(analysisExecutor) { image -> analyze(image) }
+      val generation = sessionGeneration
+      analysis.setAnalyzer(analysisExecutor) { image -> analyze(image, generation) }
       try {
         val provider = future.get()
         cameraProvider = provider
@@ -237,9 +238,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   // Analysis thread.
-  private fun analyze(image: ImageProxy) {
-    val generation = sessionGeneration
-    if (!active) {
+  private fun analyze(image: ImageProxy, generation: Int) {
+    if (!active || generation != sessionGeneration) {
       image.close()
       return
     }

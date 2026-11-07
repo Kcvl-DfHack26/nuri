@@ -24,6 +24,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   // Shared between the video queue and MediaPipe's callback thread.
   private let lock = NSLock()
   private var sessionGeneration = 0
+  private var acceptingFrames = false
   private var captureTimes: [Int: (at: CFTimeInterval, generation: Int)] = [:]
   private var frameSize = CGSize.zero
   private var lastTimestamp = -1
@@ -69,6 +70,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       emitStatus("permissionDenied")
       return
     }
+    lock.lock()
+    let generation = sessionGeneration
+    lock.unlock()
     sessionQueue.async {
       if !self.configured && !self.configure() {
         return
@@ -76,11 +80,17 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       if !self.session.isRunning {
         self.session.startRunning()
       }
+      self.lock.lock()
+      if self.sessionGeneration == generation {
+        self.acceptingFrames = true
+      }
+      self.lock.unlock()
     }
   }
 
   private func stop() {
     lock.lock()
+    acceptingFrames = false
     sessionGeneration += 1
     captureTimes.removeAll()
     lock.unlock()
@@ -177,6 +187,10 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       return
     }
     lock.lock()
+    guard acceptingFrames else {
+      lock.unlock()
+      return
+    }
     // LIVE_STREAM needs strictly increasing timestamps.
     guard timestamp > lastTimestamp else {
       lock.unlock()
