@@ -246,3 +246,18 @@ test('deletes the video when the recording is closed', async () => {
   expect(router.replace).not.toHaveBeenCalled();
   expect(screen.getByText('動画なし')).toBeOnTheScreen();
 });
+
+test('deletes the video and leaves ⑫-2 when the OS stops the recording', async () => {
+  await renderRecording();
+  await act(() => {
+    mockRecording.ready?.();
+  });
+  await act(async () => {
+    mockRecording.current?.resolve({ uri: 'file:///interrupted.mov' });
+    await Promise.resolve();
+  });
+  expect(File).toHaveBeenCalledWith('file:///interrupted.mov');
+  expect(alert).toHaveBeenCalledWith('録画が中断されました', 'もう一度お試しください。');
+  expect(router.back).toHaveBeenCalled();
+  expect(screen.getByText('動画なし')).toBeOnTheScreen();
+});

@@ -258,13 +258,18 @@ export function PostRecording() {
   const navigation = useNavigation();
   const [released, setReleased] = useState(false);
   const leave = useRef<(() => void) | null>(null);
+  // The recording in progress settles once it is stopped, after its file is kept or deleted.
+  const recording = useRef<Promise<void> | null>(null);
   usePreventRemove(!released, ({ data }) => {
     ending.current ??= { kind: 'discard' };
     camera.current?.stopRecording();
-    leave.current = () => {
-      navigation.dispatch(data.action);
-    };
-    setReleased(true);
+    // Unmounting the camera first could reject the recording before its file is deleted.
+    void (recording.current ?? Promise.resolve()).finally(() => {
+      leave.current = () => {
+        navigation.dispatch(data.action);
+      };
+      setReleased(true);
+    });
   });
   useEffect(() => {
     if (released) {
@@ -286,13 +291,19 @@ export function PostRecording() {
   const elapsed = startedAt === null ? 0 : Math.max(now - startedAt, 0);
   const steps = stepLengths(marks, elapsed);
 
+  const stopUnexpectedly = (title: string) => {
+    ending.current = { kind: 'discard' };
+    Alert.alert(title, 'もう一度お試しください。');
+    backOrHome();
+  };
+
   const start = () => {
     if (startedAt !== null || !camera.current) {
       return;
     }
     setStartedAt(Date.now());
     setNow(Date.now());
-    camera.current
+    recording.current = camera.current
       .recordAsync()
       .then((result) => {
         const end = ending.current;
@@ -302,17 +313,19 @@ export function PostRecording() {
         if (end?.kind === 'finish') {
           setDraft((current) => ({ ...current, video: { uri: result.uri, marks: end.marks } }));
           router.replace('/post/creating');
-        } else {
-          new File(result.uri).delete();
+          return;
+        }
+        new File(result.uri).delete();
+        if (!end) {
+          // The OS ended it, e.g. when the app went to the background.
+          stopUnexpectedly('録画が中断されました');
         }
       })
       .catch(() => {
         // Closing ⑫-2 may stop the recording with an error; there is nothing to report then.
-        if (ending.current?.kind === 'discard') {
-          return;
+        if (ending.current?.kind !== 'discard') {
+          stopUnexpectedly('録画できませんでした');
         }
-        Alert.alert('録画できませんでした', 'もう一度お試しください。');
-        backOrHome();
       });
   };
 
@@ -326,6 +339,9 @@ export function PostRecording() {
           mode="video"
           style={StyleSheet.absoluteFill}
           onCameraReady={start}
+          onMountError={() => {
+            stopUnexpectedly('カメラを開けませんでした');
+          }}
         />
       )}
       <View
