@@ -169,8 +169,11 @@ test('keeps a favorite at once and rolls it back when the server refuses', async
   const favorite = await screen.findByRole('button', { name: 'お気に入り' });
   expect(favorite).not.toBeSelected();
   await fireEvent.press(favorite);
+  // The optimistic update lands once the detail query is cancelled.
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
+  });
   expect(mockFavorite).toHaveBeenCalledTimes(1);
-  expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
 
   const alert = jest.spyOn(Alert, 'alert');
   mockFavorite.mockResolvedValueOnce({ ok: false, status: 500 });
