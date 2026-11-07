@@ -1,7 +1,7 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import { File } from 'expo-file-system';
-import { createContext, use, useEffect, useState } from 'react';
+import { createContext, use, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
 
@@ -170,6 +170,8 @@ type PostDraftContextValue = {
   draft: PostDraft;
   setDraft: Dispatch<SetStateAction<PostDraft>>;
   updateStep: (index: number, change: Partial<PostStep>) => void;
+  /** Registers a file cut from the video on the device, deleted when the flow closes. */
+  trackFile: (uri: string) => void;
 };
 
 const PostDraftContext = createContext<PostDraftContextValue | null>(null);
@@ -204,6 +206,23 @@ export function PostDraftProvider({
       }
     };
   }, [recordedUri]);
+  // Frames cut from the video can show the user's face, so none outlive the flow.
+  const files = useRef(new Set<string>());
+  useEffect(() => {
+    const owned = files.current;
+    return () => {
+      for (const uri of owned) {
+        const file = new File(uri);
+        if (file.exists) {
+          file.delete();
+        }
+      }
+      owned.clear();
+    };
+  }, []);
+  const trackFile = useCallback((uri: string) => {
+    files.current.add(uri);
+  }, []);
   const updateStep = (index: number, change: Partial<PostStep>) => {
     setDraft((current) => ({
       ...current,
@@ -212,7 +231,11 @@ export function PostDraftProvider({
       ),
     }));
   };
-  return <PostDraftContext value={{ draft, setDraft, updateStep }}>{children}</PostDraftContext>;
+  return (
+    <PostDraftContext value={{ draft, setDraft, updateStep, trackFile }}>
+      {children}
+    </PostDraftContext>
+  );
 }
 
 export function usePostDraft() {

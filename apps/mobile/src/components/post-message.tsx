@@ -138,7 +138,7 @@ export function PostMessage() {
             accessibilityRole="button"
             accessibilityLabel="タグを追加"
             onPress={submitTag}
-            className="min-h-11 flex-row items-center gap-1 rounded-full px-3 active:opacity-70"
+            className="min-h-12 flex-row items-center gap-1 rounded-full px-3 active:opacity-70"
           >
             <SocialIcon name={PLUS} size={14} color={ink} />
             <Text className="font-maru-bold text-label text-ink-primary">追加</Text>
@@ -175,9 +175,15 @@ function frameTime(ms: number) {
 
 type VideoFrame = { uri: string; timeMs: number };
 
-/** Cuts the frame at a time from the post's video on the device; a later request wins. */
+/**
+ * Cuts the frame at a time from the post's video on the device; a later request wins. While the
+ * slider moves, the last cut frame stays shown until the next one is ready. `failed` is set when
+ * the latest request could not be cut.
+ */
 function useVideoFrame(videoUri: string | null, timeMs: number | null) {
+  const { trackFile } = usePostDraft();
   const [frame, setFrame] = useState<VideoFrame | null>(null);
+  const [failedAt, setFailedAt] = useState<number | null>(null);
   useEffect(() => {
     if (!videoUri || timeMs === null) {
       return;
@@ -185,32 +191,65 @@ function useVideoFrame(videoUri: string | null, timeMs: number | null) {
     let active = true;
     getThumbnailAsync(videoUri, { time: timeMs, quality: 0.7 }).then(
       ({ uri }) => {
+        trackFile(uri);
         if (active) {
           setFrame({ uri, timeMs });
+          setFailedAt(null);
         }
       },
-      () => undefined,
+      () => {
+        if (active) {
+          setFailedAt(timeMs);
+        }
+      },
     );
     return () => {
       active = false;
     };
-  }, [videoUri, timeMs]);
-  // While the slider moves, the last cut frame stays shown until the next one is ready.
-  return timeMs === null ? null : frame;
+  }, [videoUri, timeMs, trackFile]);
+  return {
+    frame: timeMs === null ? null : frame,
+    failed: timeMs !== null && failedAt === timeMs,
+  };
+}
+
+/** The picked frame, the failure note when no frame could be cut, or Plan A's sample without a video. */
+function ThumbnailContent({
+  frame,
+  hasVideo,
+  failed,
+}: {
+  frame: VideoFrame | null;
+  hasVideo: boolean;
+  failed: boolean;
+}) {
+  if (frame) {
+    return <Image source={{ uri: frame.uri }} contentFit="cover" style={{ flex: 1 }} />;
+  }
+  if (!hasVideo) {
+    return <CroppedPhoto source={arPhotos.finished} crop={portraitCrop} />;
+  }
+  return failed ? (
+    <View className="flex-1 items-center justify-center px-6">
+      <Text className="text-center font-maru text-label text-ink-secondary">
+        場面を切り出せませんでした。タップして別の場面を選んでください
+      </Text>
+    </View>
+  ) : null;
 }
 
 // サムネイルの設定: ①'s recipe card photo. It defaults to the video's last frame. Tapping it shows
-// the video's timeline below; the frame under the slider is previewed and 決定 keeps it. Without a
-// video (recording is not built yet) Plan A's sample photo stands in.
+// the video's timeline below; the frame under the slider is previewed and 決定 keeps it once that
+// frame is ready. Without a video Plan A's sample photo stands in.
 function ThumbnailPicker() {
   const { draft, setDraft } = usePostDraft();
   const video = draft.video;
   const [editingAt, setEditingAt] = useState<number | null>(null);
-  const defaultFrame = useVideoFrame(
+  const { frame: defaultFrame, failed: defaultFailed } = useVideoFrame(
     video?.uri ?? null,
     video && !draft.thumbnail ? lastFrameTime(video.durationMs) : null,
   );
-  const preview = useVideoFrame(video?.uri ?? null, editingAt);
+  const { frame: preview, failed: previewFailed } = useVideoFrame(video?.uri ?? null, editingAt);
   useEffect(() => {
     if (defaultFrame && !draft.thumbnail) {
       setDraft((current) => ({ ...current, thumbnail: defaultFrame }));
@@ -218,7 +257,10 @@ function ThumbnailPicker() {
   }, [defaultFrame, draft.thumbnail, setDraft]);
   const thumbnail = draft.thumbnail;
   const shown = editingAt === null ? thumbnail : (preview ?? thumbnail);
-  const canEdit = Boolean(video?.durationMs && thumbnail);
+  // A failed default frame can still be replaced by picking another moment on the timeline.
+  const canEdit = Boolean(video?.durationMs) && (thumbnail !== null || defaultFailed);
+  // 決定 keeps only the frame of the moment under the slider, not one still being replaced.
+  const ready = preview?.timeMs === editingAt;
   return (
     <View className="gap-2">
       <Text className="font-maru-bold text-label text-ink-secondary">サムネイルの設定</Text>
@@ -234,11 +276,7 @@ function ThumbnailPicker() {
         }}
         className="h-[220px] overflow-hidden rounded-[20px] bg-bg-base active:opacity-90"
       >
-        {shown ? (
-          <Image source={{ uri: shown.uri }} contentFit="cover" style={{ flex: 1 }} />
-        ) : video ? null : (
-          <CroppedPhoto source={arPhotos.finished} crop={portraitCrop} />
-        )}
+        <ThumbnailContent frame={shown} hasVideo={Boolean(video)} failed={defaultFailed} />
         {canEdit && editingAt === null ? (
           <View className="absolute bottom-2.5 right-2.5 rounded-[15px] bg-white/85 px-3 py-[5px]">
             <Text className="font-maru-bold text-label text-ink-primary">タップして変更</Text>
@@ -271,6 +309,14 @@ function ThumbnailPicker() {
               {frameTime(video.durationMs)}
             </Text>
           </View>
+          {previewFailed ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              className="font-maru text-meta text-ink-secondary"
+            >
+              この場面は切り出せませんでした。別の時点を選んでください
+            </Text>
+          ) : null}
           <View className="flex-row justify-end gap-2">
             <Pressable
               accessibilityRole="button"
@@ -283,17 +329,17 @@ function ThumbnailPicker() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: !preview }}
-              disabled={!preview}
+              accessibilityState={{ disabled: !ready }}
+              disabled={!ready}
               onPress={() => {
-                if (preview) {
+                if (ready) {
                   setDraft((current) => ({ ...current, thumbnail: preview }));
                 }
                 setEditingAt(null);
               }}
               className={cn(
                 'min-h-12 justify-center rounded-full bg-accent-rose px-5 active:opacity-70',
-                !preview && 'opacity-50',
+                !ready && 'opacity-50',
               )}
             >
               <Text className="font-maru-bold text-label text-white">決定</Text>

@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { File } from 'expo-file-system';
 import { router } from 'expo-router';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
 
@@ -12,6 +13,10 @@ jest.mock('expo-video-thumbnails', () => ({
   getThumbnailAsync: jest.fn((_uri: string, { time }: { time: number }) =>
     Promise.resolve({ uri: `file:///frame-${time}.jpg`, width: 1, height: 1 }),
   ),
+}));
+const mockDelete = jest.fn();
+jest.mock('expo-file-system', () => ({
+  File: jest.fn(() => ({ exists: true, delete: mockDelete })),
 }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() },
@@ -50,6 +55,11 @@ jest.mock('@/lib/api', () => ({ apiUrl: null, apiAssetUrl: (path: string) => pat
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest
+    .mocked(getThumbnailAsync)
+    .mockImplementation((_uri, options) =>
+      Promise.resolve({ uri: `file:///frame-${options?.time ?? 0}.jpg`, width: 1, height: 1 }),
+    );
 });
 
 function renderInDraft(screenElement: React.ReactElement) {
@@ -118,6 +128,58 @@ test('defaults the thumbnail to the last frame and changes it on the timeline', 
   await fireEvent.press(screen.getByRole('button', { name: '決定' }));
   expect(screen.queryByLabelText('サムネイルの時点')).toBeNull();
   expect(screen.getByRole('button', { name: 'サムネイル 0:02の場面' })).toBeOnTheScreen();
+});
+
+test('keeps 決定 disabled until the frame under the slider is cut', async () => {
+  let finish: (() => void) | undefined;
+  jest.mocked(getThumbnailAsync).mockImplementation((_uri, options) => {
+    const time = options?.time ?? 0;
+    const result = { uri: `file:///frame-${time}.jpg`, width: 1, height: 1 };
+    if (time !== 2000) {
+      return Promise.resolve(result);
+    }
+    return new Promise((resolve) => {
+      finish = () => {
+        resolve(result);
+      };
+    });
+  });
+  await renderWithVideo();
+  await fireEvent.press(await screen.findByRole('button', { name: 'サムネイル 0:06の場面' }));
+  await fireEvent.press(screen.getByLabelText('サムネイルの時点'));
+  // The 0:06 frame is still shown while 0:02 is cut, so it must not be kept for 0:02.
+  expect(screen.getByRole('button', { name: '決定' })).toBeDisabled();
+  await act(async () => {
+    finish?.();
+    await Promise.resolve();
+  });
+  expect(screen.getByRole('button', { name: '決定' })).toBeEnabled();
+});
+
+test('lets another moment be chosen when the default frame cannot be cut', async () => {
+  jest.mocked(getThumbnailAsync).mockImplementation((_uri, options) => {
+    const time = options?.time ?? 0;
+    return time === 2000
+      ? Promise.resolve({ uri: 'file:///frame-2000.jpg', width: 1, height: 1 })
+      : Promise.reject(new Error('unreadable'));
+  });
+  await renderWithVideo();
+  expect(
+    await screen.findByText('場面を切り出せませんでした。タップして別の場面を選んでください'),
+  ).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'サムネイルの見本の写真' }));
+  await fireEvent.press(screen.getByLabelText('サムネイルの時点'));
+  await screen.findByLabelText('サムネイル 0:02の場面');
+  await fireEvent.press(screen.getByRole('button', { name: '決定' }));
+  expect(screen.getByRole('button', { name: 'サムネイル 0:02の場面' })).toBeOnTheScreen();
+});
+
+test('deletes the cut frames when the post flow closes', async () => {
+  const { unmount } = await renderWithVideo();
+  await screen.findByRole('button', { name: 'サムネイル 0:06の場面' });
+  await unmount();
+  expect(File).toHaveBeenCalledWith('file:///frame-6000.jpg');
+  expect(mockDelete).toHaveBeenCalled();
 });
 
 test('keeps the thumbnail when the timeline is canceled', async () => {
