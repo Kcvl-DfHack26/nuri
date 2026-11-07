@@ -27,7 +27,7 @@ Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v
 
 ## UIと端末内データ
 
-下のタブはPlan Aのメイク・提案・投稿・マイをNative Tabsで構成し、設定はマイの歯車からStackで開く。メイクの流れ（①②⑤⑦⑩）はFigma Plan Aの見た目を再現し、レシピはAPIを作るまで `src/components/recipes.ts` の固定データで持つ。画像を含むため、`src/lib` ではなくUIと同じ層に置く。色と文字はFoundationsの値を `global.css` へ追加し、ネイティブのアイコン色は `useTokenColor` で同じCSS変数から読む。投稿タブは既存のSNSサンプルを使う。X型のFlatList、投稿、反応はReusables Text／Button + Uniwind Free 1.13.2／Tailwind CSS 4.3.4、設定とOS操作は共通 `@expo/ui`。SF SymbolsとMaterialの両ソースを指定する。
+下のタブはPlan Aのメイク・提案・投稿・マイをNative Tabsで構成し、設定はマイの歯車からStackで開く。メイクの流れ（①②③⑤⑥⑦⑩）はFigma Plan Aの見た目を再現し、レシピはAPIを作るまで `src/components/recipes.ts` の固定データで持つ。画像を含むため、`src/lib` ではなくUIと同じ層に置く。色と文字はFoundationsの値を `global.css` へ追加し、ネイティブのアイコン色は `useTokenColor` で同じCSS変数から読む。投稿タブは既存のSNSサンプルを使う。X型のFlatList、投稿、反応はReusables Text／Button + Uniwind Free 1.13.2／Tailwind CSS 4.3.4、設定とOS操作は共通 `@expo/ui`。SF SymbolsとMaterialの両ソースを指定する。
 
 起動画面（⓪）は、フォントの読み込み中にRoot Layoutがアプリ内の画面として表示する。ネイティブのスプラッシュは新しいビルドが必要なため変えない。ロゴの文字はフォントの読み込み前なのでシステムフォントで描く。ログイン（⑱）はPlan Aのライト配色で、ログイン成功後と「ゲストで参加」ではログインを求めた元の画面へ戻り、履歴がなければメイクへ移る。メールのリンクから戻る場合は従来どおり投稿タブを開く。
 

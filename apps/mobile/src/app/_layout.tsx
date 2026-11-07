@@ -27,6 +27,19 @@ function Navigation() {
         <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/steps" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/finish" options={{ headerShown: false }} />
+        <Stack.Screen name="parts/[part]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="products/[id]"
+          options={{
+            headerShown: false,
+            presentation: 'formSheet',
+            // Plan A ⑥ is about half the screen. ProductSheet sets its own height (taller for
+            // large text) and the sheet follows it.
+            sheetAllowedDetents: 'fitToContents',
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 28,
+          }}
+        />
         <Stack.Screen
           name="compose"
           options={{

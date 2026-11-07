@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Recipe } from '@/components/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
-import { partCards, parts, recipes } from '@/components/recipes';
+import { partCards, parts, partStyles, recipes } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
@@ -214,44 +214,74 @@ function PartGrid({ top }: { top: number }) {
       contentContainerStyle={{ paddingTop: top, paddingBottom: 24, paddingHorizontal: 16 }}
     >
       <View className="flex-row flex-wrap gap-3">
-        {partCards.map((card) => {
-          const part = parts[card.part];
-          return (
-            <View
-              key={card.part}
-              accessible
-              accessibilityLabel={`${part.label}、${card.recipeCount}レシピ`}
-              className="h-[124px] grow basis-[40%] justify-end overflow-hidden rounded-3xl border-2 border-white p-2"
-              style={{ boxShadow: '0px 4px 14px rgba(196, 61, 112, 0.1)' }}
-            >
-              <CroppedPhoto source={card.photo} crop={card.crop} opacity={card.dimmed ? 0.8 : 1} />
-              <View
-                className="absolute inset-0"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(109,109,109,0.3))',
-                }}
-              />
-              <View className="flex-row items-center gap-[7px] self-start rounded-[18px] border border-white bg-white/80 py-[5px] pl-[5px] pr-3">
-                <View
-                  className={cn(
-                    'size-[30px] items-center justify-center rounded-full',
-                    part.iconBackground,
-                  )}
-                >
-                  <Image accessible={false} source={part.icon} style={{ width: 18, height: 18 }} />
-                </View>
-                <View>
-                  <Text className="font-maru-bold text-label text-ink-primary">{part.label}</Text>
-                  <Text className="font-maru-bold text-micro text-ink-secondary">
-                    {card.recipeCount}レシピ
-                  </Text>
-                </View>
-              </View>
-            </View>
-          );
-        })}
+        {partCards.map((card) => (
+          <PartCard key={card.part} card={card} />
+        ))}
       </View>
     </ScrollView>
+  );
+}
+
+function PartCard({ card }: { card: (typeof partCards)[number] }) {
+  const part = parts[card.part];
+  const label = `${part.label}、${card.recipeCount}レシピ`;
+  const className =
+    'h-[124px] grow basis-[40%] justify-end overflow-hidden rounded-3xl border-2 border-white p-2';
+  const style = { boxShadow: '0px 4px 14px rgba(196, 61, 112, 0.1)' };
+  const content = (
+    <>
+      <CroppedPhoto source={card.photo} crop={card.crop} opacity={card.dimmed ? 0.8 : 1} />
+      <View
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            'linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(109,109,109,0.3))',
+        }}
+      />
+      <View className="flex-row items-center gap-[7px] self-start rounded-[18px] border border-white bg-white/80 py-[5px] pl-[5px] pr-3">
+        <View
+          className={cn(
+            'size-[30px] items-center justify-center rounded-full',
+            part.iconBackground,
+          )}
+        >
+          <Image accessible={false} source={part.icon} style={{ width: 18, height: 18 }} />
+        </View>
+        <View>
+          <Text className="font-maru-bold text-label text-ink-primary">{part.label}</Text>
+          <Text className="font-maru-bold text-micro text-ink-secondary">
+            {card.recipeCount}レシピ
+          </Text>
+        </View>
+      </View>
+    </>
+  );
+  // Plan A designs ③ only for 眉; the other parts have no list to open yet.
+  if (!partStyles[card.part]) {
+    return (
+      <View
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={`${label}（準備中）`}
+        accessibilityState={{ disabled: true }}
+        className={className}
+        style={style}
+      >
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      className={cn(className, 'active:opacity-80')}
+      style={style}
+      onPress={() => {
+        router.push(`/parts/${card.part}`);
+      }}
+    >
+      {content}
+    </Pressable>
   );
 }
