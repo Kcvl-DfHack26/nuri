@@ -11,6 +11,8 @@ android {
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
+    // Apps that shrink their release builds keep what MediaPipe needs (see proguard-rules.pro).
+    consumerProguardFiles 'proguard-rules.pro'
   }
   // iOS and Android share one copy of the model in the module's assets/ folder.
   sourceSets {
