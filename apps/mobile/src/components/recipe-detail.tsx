@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Fragment } from 'react';
-import { Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
@@ -573,8 +573,9 @@ function useFavorite(recipe: RecipeData) {
       );
       return { previous };
     },
-    onError: (_error, _favorited, context) => {
+    onError: (error, _favorited, context) => {
       client.setQueryData(key, context?.previous);
+      Alert.alert('お気に入りを変更できませんでした', error.message);
     },
     onSettled: () => {
       void client.invalidateQueries({ queryKey: ['recipes', 'favorites'] });

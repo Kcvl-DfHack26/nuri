@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 
 import { RecipeDetail } from './recipe-detail';
 
@@ -171,10 +172,15 @@ test('keeps a favorite at once and rolls it back when the server refuses', async
   expect(mockFavorite).toHaveBeenCalledTimes(1);
   expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
 
+  const alert = jest.spyOn(Alert, 'alert');
   mockFavorite.mockResolvedValueOnce({ ok: false, status: 500 });
   await fireEvent.press(screen.getByRole('button', { name: 'お気に入り' }));
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
   });
+  expect(alert).toHaveBeenCalledWith(
+    'お気に入りを変更できませんでした',
+    'お気に入りを変更できませんでした。',
+  );
   mockSignedIn = false;
 });

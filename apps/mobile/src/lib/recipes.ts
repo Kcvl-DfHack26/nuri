@@ -95,7 +95,8 @@ export function recipeOptions(id: string) {
   });
 }
 
-export type RecipeSummary = InferResponseType<typeof api.api.recipes.$get, 200>['items'][number];
+export type RecipePage = InferResponseType<typeof api.api.recipes.$get, 200>;
+export type RecipeSummary = RecipePage['items'][number];
 export type RecipeDetail = InferResponseType<
   (typeof api.api.recipes)[':id']['$get'],
   200

@@ -60,9 +60,9 @@ const recipe = (id: string, title: string) => ({
   likeCount: 1200,
   author: { id: 'viewer', name: 'はなこ' },
 });
-const page = (items: unknown[]) => ({
+const page = (items: unknown[], nextOffset: number | null = null) => ({
   ok: true,
-  json: async () => ({ items, nextOffset: null }),
+  json: async () => ({ items, nextOffset }),
 });
 const mockPosted = jest.fn(async () => page([recipe('own', '自分のメイク')]));
 const mockFavorites = jest.fn(async () => page([recipe('fox', '狐メイク')]));
@@ -98,12 +98,23 @@ test('shows the signed-in profile with posted and favorite recipes and opens the
     await screen.findByRole('button', { name: '自分のメイク、はなこ、いいね1.2k' }),
   );
   expect(router.push).toHaveBeenCalledWith('/recipes/own');
-  expect(screen.getByText('投稿 1')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '狐メイク、はなこ、いいね1.2k' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
 
   await fireEvent.press(screen.getByRole('button', { name: 'プロフィール設定' }));
   expect(router.push).toHaveBeenCalledWith('/profile-settings');
+});
+
+test('loads more favorites past the first page', async () => {
+  mockFavorites
+    .mockResolvedValueOnce(page([recipe('fox', '狐メイク')], 20))
+    .mockResolvedValueOnce(page([recipe('cat', '猫メイク')]));
+  await render(<MyPage />, { wrapper });
+  await fireEvent.press(await screen.findByRole('button', { name: 'もっと見る' }));
+  expect(
+    await screen.findByRole('button', { name: '猫メイク、はなこ、いいね1.2k' }),
+  ).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: 'もっと見る' })).toBeNull();
 });
 
 test('shows empty sections and retries a failed list', async () => {

@@ -8,7 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { RecipeSummary } from '@/lib/recipes';
+import type { RecipePage, RecipeSummary } from '@/lib/recipes';
 
 import { Avatar } from '@/components/avatar';
 import { Feedback } from '@/components/feedback';
@@ -81,11 +81,11 @@ export function MyPage() {
                 >
                   {user ? user.name : 'ゲスト'}
                 </Text>
-                <Text className="font-maru text-meta text-ink-secondary">
-                  {user
-                    ? `投稿 ${posted.data?.pages[0]?.items.length ?? 0}`
-                    : 'ログインするとプロフィールを表示します'}
-                </Text>
+                {user ? null : (
+                  <Text className="font-maru text-meta text-ink-secondary">
+                    ログインするとプロフィールを表示します
+                  </Text>
+                )}
               </>
             )}
           </View>
@@ -169,7 +169,7 @@ export function ProfilePhoto({ size, image }: { size: number; image?: string | n
   );
 }
 
-type RecipePages = InfiniteData<{ items: RecipeSummary[]; nextOffset: number | null }, unknown>;
+type RecipePages = InfiniteData<RecipePage, unknown>;
 
 function RecipeSection({
   title,
@@ -185,6 +185,9 @@ function RecipeSection({
     isPending: boolean;
     isError: boolean;
     refetch: () => Promise<unknown>;
+    hasNextPage: boolean;
+    isFetchingNextPage: boolean;
+    fetchNextPage: () => Promise<unknown>;
   };
 }) {
   const items = query.data?.pages.flatMap((page) => page.items) ?? [];
@@ -220,6 +223,20 @@ function RecipeSection({
               {row.length === 1 ? <View className="flex-1" /> : null}
             </View>
           ))}
+          {query.hasNextPage ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={query.isFetchingNextPage}
+              onPress={() => {
+                void query.fetchNextPage();
+              }}
+              className="min-h-12 items-center justify-center rounded-full border border-line-soft active:opacity-70"
+            >
+              <Text className="font-maru-bold text-label text-ink-primary">
+                {query.isFetchingNextPage ? '読み込み中…' : 'もっと見る'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
     </>
