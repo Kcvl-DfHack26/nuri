@@ -47,6 +47,8 @@ jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useIsFocused: () => true,
+  useNavigation: () => ({ dispatch: jest.fn() }),
+  usePreventRemove: jest.fn(),
 }));
 jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
 jest.mock('react-native-safe-area-context', () => ({
@@ -100,7 +102,10 @@ test('opens ⑫-2 without asking when recording starts', async () => {
   await render(<PostCamera />);
   await fireEvent.press(screen.getByRole('button', { name: '録画をはじめる' }));
   expect(alert).not.toHaveBeenCalled();
-  expect(router.push).toHaveBeenCalledWith('/post/recording');
+  // ⑫-1 closes its camera first, then opens ⑫-2.
+  await waitFor(() => {
+    expect(router.push).toHaveBeenCalledWith('/post/recording');
+  });
 });
 
 test('opens ⑫-3 with the chosen video without asking', async () => {

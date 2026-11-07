@@ -5,7 +5,7 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { launchImageLibraryAsync } from 'expo-image-picker';
-import { router, useIsFocused } from 'expo-router';
+import { router, useIsFocused, useNavigation, usePreventRemove } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AppState, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
@@ -109,6 +109,21 @@ export function PostCamera() {
       router.push('/account');
     }
   };
+  // Android's camera is shared by the whole app, and a camera view that closes releases it for every
+  // view. So ⑫-1 closes its camera before ⑫-2 opens one, and opens it again on return.
+  const [opening, setOpening] = useState(false);
+  const [wasFocused, setWasFocused] = useState(focused);
+  if (focused !== wasFocused) {
+    setWasFocused(focused);
+    if (focused) {
+      setOpening(false);
+    }
+  }
+  useEffect(() => {
+    if (opening) {
+      router.push('/post/recording');
+    }
+  }, [opening]);
   // iOS lays tab content under the tab bar and reports it as a safe-area inset; Android already
   // places the content above the tab bar.
   const bottom = (Platform.OS === 'ios' ? insets.bottom : 0) + 24;
@@ -116,7 +131,7 @@ export function PostCamera() {
     <View className="flex-1 bg-white">
       {focused ? <StatusBar style="dark" /> : null}
       <View className="flex-1 overflow-hidden rounded-b-[36px] bg-bg-surface">
-        {focused && access.granted ? (
+        {focused && access.granted && !opening ? (
           <CameraView facing="front" mode="video" style={StyleSheet.absoluteFill} />
         ) : null}
         <View
@@ -182,7 +197,7 @@ export function PostCamera() {
               access.retry();
               return;
             }
-            router.push('/post/recording');
+            setOpening(true);
           })}
         >
           <View
@@ -238,6 +253,25 @@ export function PostRecording() {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [marks, setMarks] = useState<number[]>([]);
+  // Leaving ⑫-2 in any way (closing, Android's back, finishing) first closes this camera, so ⑫-1's
+  // camera is never released by this one closing after it opened (see PostCamera).
+  const navigation = useNavigation();
+  const [released, setReleased] = useState(false);
+  const leave = useRef<(() => void) | null>(null);
+  usePreventRemove(!released, ({ data }) => {
+    ending.current ??= { kind: 'discard' };
+    camera.current?.stopRecording();
+    leave.current = () => {
+      navigation.dispatch(data.action);
+    };
+    setReleased(true);
+  });
+  useEffect(() => {
+    if (released) {
+      leave.current?.();
+      leave.current = null;
+    }
+  }, [released]);
   useEffect(() => {
     if (startedAt === null) {
       return;
@@ -273,6 +307,10 @@ export function PostRecording() {
         }
       })
       .catch(() => {
+        // Closing ⑫-2 may stop the recording with an error; there is nothing to report then.
+        if (ending.current?.kind === 'discard') {
+          return;
+        }
         Alert.alert('録画できませんでした', 'もう一度お試しください。');
         backOrHome();
       });
@@ -281,13 +319,15 @@ export function PostRecording() {
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
-      <CameraView
-        ref={camera}
-        facing="front"
-        mode="video"
-        style={StyleSheet.absoluteFill}
-        onCameraReady={start}
-      />
+      {released ? null : (
+        <CameraView
+          ref={camera}
+          facing="front"
+          mode="video"
+          style={StyleSheet.absoluteFill}
+          onCameraReady={start}
+        />
+      )}
       <View
         pointerEvents="none"
         className="absolute inset-x-0 top-0"
