@@ -127,6 +127,11 @@ test('shows the recipe from the API and opens the product sheet from a product r
   expect(screen.getAllByText('買う')).toHaveLength(1);
   await fireEvent.press(screen.getByRole('button', { name: '購入先を見る' }));
   expect(openBrowserAsync).toHaveBeenCalledWith('https://www.amazon.co.jp/s?k=cheek');
+  await fireEvent.press(screen.getByText('mio'));
+  expect(router.push).toHaveBeenCalledWith({
+    pathname: '/users/[id]',
+    params: { id: 'sample-mio' },
+  });
   await fireEvent.press(screen.getByRole('button', { name: 'メイクをはじめる' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox/steps');
 });

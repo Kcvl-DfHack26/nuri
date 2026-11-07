@@ -226,15 +226,28 @@ export function RecipeContent({
             </View>
           </View>
           <View className="flex-row items-center gap-2.5">
-            <ProfilePhoto size={36} image={recipe.author.image} />
-            <View className="flex-1">
-              <Text className="font-maru-bold text-label text-ink-primary">
-                {recipe.author.name}
-              </Text>
-              <Text className="font-maru text-meta text-ink-secondary">
-                {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}保存 {likes}
-              </Text>
-            </View>
+            <Pressable
+              // ⑫-8 previews the user's own draft; leaving for a profile would drop the post.
+              disabled={Boolean(onPost)}
+              accessibilityRole={onPost ? undefined : 'button'}
+              accessibilityHint={onPost ? undefined : 'プロフィールと投稿したレシピを開きます'}
+              // The 36pt row keeps Plan A's look; hitSlop extends the target to 48pt.
+              hitSlop={6}
+              onPress={() => {
+                router.push({ pathname: '/users/[id]', params: { id: recipe.author.id } });
+              }}
+              className="flex-1 flex-row items-center gap-2.5 active:opacity-70"
+            >
+              <ProfilePhoto size={36} image={recipe.author.image} />
+              <View className="flex-1">
+                <Text className="font-maru-bold text-label text-ink-primary">
+                  {recipe.author.name}
+                </Text>
+                <Text className="font-maru text-meta text-ink-secondary">
+                  {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}保存 {likes}
+                </Text>
+              </View>
+            </Pressable>
             <View
               accessible
               accessibilityRole="button"
