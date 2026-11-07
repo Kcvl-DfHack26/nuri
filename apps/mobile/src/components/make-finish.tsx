@@ -12,6 +12,7 @@ import { canTrackFace, FaceMakeupCamera, paintColor } from '@/components/face-ma
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { COMPARE } from '@/components/make-compare';
+import { RecipeStatus } from '@/components/recipe-detail';
 import { arPhotos } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
@@ -31,18 +32,29 @@ const DOWNLOAD = Icon.select({
 // tracker (Expo Go), Plan A's finished photo stands in.
 export function MakeFinish({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
-  const recipe = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) }).data;
-  // A part painted twice keeps the later step's color.
-  const layers: MakeupLayer[] = [];
-  for (const step of recipe?.steps ?? []) {
-    const layer = { part: step.part, color: paintColor(step.colors) };
-    const existing = layers.findIndex((candidate) => candidate.part === step.part);
-    if (existing === -1) {
-      layers.push(layer);
-    } else {
-      layers[existing] = layer;
-    }
+  const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
+  const recipe = query.data;
+  // The live finish paints the recipe's steps, so it needs them; Expo Go shows Plan A's photo.
+  if (canTrackFace && !recipe) {
+    return (
+      <RecipeStatus
+        loading={query.isPending && Boolean(apiUrl)}
+        message={finishStatusMessage({
+          hasApi: Boolean(apiUrl),
+          isMissing: recipe === null,
+          isError: query.isError,
+        })}
+        onRetry={
+          query.isError
+            ? () => {
+                void query.refetch();
+              }
+            : undefined
+        }
+      />
+    );
   }
+  const layers = finishLayers(recipe?.steps ?? []);
   const fade = (
     <View
       pointerEvents="none"
@@ -85,13 +97,18 @@ export function MakeFinish({ id }: { id: string }) {
           }}
         />
         <View className="flex-row gap-2">
-          <GlassIconButton
-            icon={COMPARE}
-            label="メイク前と比べる"
-            onPress={() => {
-              router.push(`/recipes/${id}/compare`);
-            }}
-          />
+          {canTrackFace ? (
+            // ⑪ compares Plan A's sample photos, not the camera; it waits for a photo of the user.
+            <GlassIconButton icon={COMPARE} label="メイク前と比べる（準備中）" />
+          ) : (
+            <GlassIconButton
+              icon={COMPARE}
+              label="メイク前と比べる"
+              onPress={() => {
+                router.push(`/recipes/${id}/compare`);
+              }}
+            />
+          )}
           <GlassIconButton icon={DOWNLOAD} label="写真を保存（準備中）" />
         </View>
       </View>
@@ -121,4 +138,40 @@ export function MakeFinish({ id }: { id: string }) {
       </View>
     </View>
   );
+}
+
+/** Every step's part in its color; a part painted twice keeps the later step's color. */
+function finishLayers(steps: readonly { part: MakeupLayer['part']; colors: string[] }[]) {
+  const layers: MakeupLayer[] = [];
+  for (const step of steps) {
+    const layer = { part: step.part, color: paintColor(step.colors) };
+    const existing = layers.findIndex((candidate) => candidate.part === step.part);
+    if (existing === -1) {
+      layers.push(layer);
+    } else {
+      layers[existing] = layer;
+    }
+  }
+  return layers;
+}
+
+function finishStatusMessage({
+  hasApi,
+  isMissing,
+  isError,
+}: {
+  hasApi: boolean;
+  isMissing: boolean;
+  isError: boolean;
+}) {
+  if (!hasApi) {
+    return '接続先が未設定です。セットアップ後に表示できます。';
+  }
+  if (isMissing) {
+    return 'レシピが見つかりません';
+  }
+  if (isError) {
+    return 'レシピを読み込めませんでした。通信状況を確認してお試しください。';
+  }
+  return 'レシピを読み込んでいます';
 }

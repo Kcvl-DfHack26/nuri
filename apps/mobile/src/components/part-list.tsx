@@ -85,20 +85,17 @@ export function PartList({ part }: { part: string }) {
   const tag = styleFilters.find((option) => option.value === filter)?.tag;
   const visible = tag ? recipes.filter((recipe) => recipe.tags.includes(tag)) : recipes;
   const selectedId = chosenId ?? recipes[0]?.id;
-  const status = !apiUrl ? (
-    <Feedback message="接続先が未設定です。セットアップ後にレシピを表示できます。" />
-  ) : list.isPending ? (
-    <Feedback loading message="レシピを読み込んでいます" />
-  ) : list.isError ? (
-    <Feedback
-      message="レシピを読み込めませんでした。通信状況を確認してお試しください。"
-      onRetry={() => {
-        void list.refetch();
-      }}
-    />
-  ) : visible.length === 0 ? (
-    <Feedback message={`${parts[partId].label}のレシピはまだありません`} />
-  ) : null;
+  const status = listStatus({
+    loading: list.isPending,
+    onRetry: list.isError
+      ? () => {
+          void list.refetch();
+        }
+      : undefined,
+    partLabel: parts[partId].label,
+    total: recipes.length,
+    shown: visible.length,
+  });
   return (
     <View className="flex-1 bg-white" style={{ paddingTop: insets.top + 4 }}>
       <StatusBar style="dark" />
@@ -142,6 +139,15 @@ export function PartList({ part }: { part: string }) {
             }}
           />
         ))}
+        {list.hasNextPage ? (
+          // Filters only see loaded recipes, so more can be loaded under any filter.
+          <LoadMore
+            loading={list.isFetchingNextPage}
+            onPress={() => {
+              void list.fetchNextPage();
+            }}
+          />
+        ) : null}
       </ScrollView>
       <StartBar
         bottom={insets.bottom}
@@ -265,6 +271,54 @@ function StyleCard({
           <Text className="font-maru text-meta text-ink-secondary">{recipe.summary}</Text>
         ) : null}
       </View>
+    </Pressable>
+  );
+}
+
+function listStatus({
+  loading,
+  onRetry,
+  partLabel,
+  total,
+  shown,
+}: {
+  loading: boolean;
+  onRetry: (() => void) | undefined;
+  partLabel: string;
+  total: number;
+  shown: number;
+}) {
+  if (!apiUrl) {
+    return <Feedback message="接続先が未設定です。セットアップ後にレシピを表示できます。" />;
+  }
+  if (loading) {
+    return <Feedback loading message="レシピを読み込んでいます" />;
+  }
+  if (onRetry) {
+    return (
+      <Feedback
+        message="レシピを読み込めませんでした。通信状況を確認してお試しください。"
+        onRetry={onRetry}
+      />
+    );
+  }
+  if (total === 0) {
+    return <Feedback message={`${partLabel}のレシピはまだありません`} />;
+  }
+  return shown === 0 ? <Feedback message="条件に合うレシピがありません" /> : null;
+}
+
+function LoadMore({ loading, onPress }: { loading: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={loading}
+      onPress={onPress}
+      className="min-h-12 w-full items-center justify-center active:opacity-70"
+    >
+      <Text className="font-maru-bold text-label text-accent-rose">
+        {loading ? '読み込み中…' : 'もっと見る'}
+      </Text>
     </Pressable>
   );
 }
