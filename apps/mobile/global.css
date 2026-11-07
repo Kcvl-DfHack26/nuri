@@ -35,6 +35,8 @@
   --color-base-sky: #e2efff;
   --color-base-peach: #ffebe0;
   --color-neutral-soft: #e8e8ec;
+  /* TabBar/Glass fill. */
+  --color-tab-glass: rgb(242 242 242 / 0.85);
 
   /* Zen Maru Gothic ships one family per weight on native platforms. */
   --font-maru: ZenMaruGothic_500Medium;
