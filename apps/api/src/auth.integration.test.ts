@@ -355,12 +355,21 @@ test('passkeys require a session to register, verify signatures/origin, and can 
   ).not.toBe(200);
 }, 20000);
 
+// Magic links allow five sign-ins a minute, so the recipe tests share one signed-in user.
+let recipeUser: Promise<{ cookie: string; me: { id: string } }> | undefined;
+function signInRecipeUser() {
+  recipeUser ??= (async () => {
+    const cookie = cookies(await app.request((await emailLink(favoriteEmail)).href));
+    const { user: me } = z
+      .object({ user: z.object({ id: z.string() }) })
+      .parse(await (await app.request('/api/me', { headers: { cookie } })).json());
+    return { cookie, me };
+  })();
+  return recipeUser;
+}
+
 test('favorites need a session, are idempotent and list only the owner’s recipes', async () => {
-  const signedIn = await app.request((await emailLink(favoriteEmail)).href);
-  const cookie = cookies(signedIn);
-  const { user: me } = z
-    .object({ user: z.object({ id: z.string() }) })
-    .parse(await (await app.request('/api/me', { headers: { cookie } })).json());
+  const { cookie, me } = await signInRecipeUser();
   const recipeId = `favorite-${unique}`;
   await db.insert(recipe).values({
     id: recipeId,
@@ -401,4 +410,88 @@ test('favorites need a session, are idempotent and list only the owner’s recip
     list.parse(await (await app.request('/api/me/favorites', { headers: { cookie } })).json())
       .items,
   ).toEqual([]);
+}, 20000);
+
+test('posting a recipe needs a session, validates it and serves its thumbnail', async () => {
+  const { cookie, me } = await signInRecipeUser();
+  const jpeg = Buffer.from([
+    0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0xff, 0xd9,
+  ]);
+  const step = {
+    part: 'cheek',
+    label: 'チーク',
+    title: '頬に入れる',
+    description: '頬骨の上に高めに',
+    uses: 'ふんわりチーク',
+    color: '#E8968A',
+  };
+  const valid = {
+    title: '  投稿のテスト  ',
+    summary: 'チークを高めに',
+    tags: ['時短'],
+    durationMinutes: 3,
+    steps: [step, { ...step, part: 'lip', label: 'リップ', description: '' }],
+    thumbnail: jpeg.toString('base64'),
+  };
+  expect((await request('/api/recipes', valid)).status).toBe(401);
+  expect((await request('/api/recipes', { ...valid, title: ' ' }, cookie)).status).toBe(400);
+  expect((await request('/api/recipes', { ...valid, steps: [] }, cookie)).status).toBe(400);
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]).toString('base64');
+  expect((await request('/api/recipes', { ...valid, thumbnail: png }, cookie)).status).toBe(400);
+  // Just over 1.5 MB once decoded, but still under the request size limit.
+  const oversized = Buffer.alloc(1_500_003, 0xff).toString('base64');
+  expect((await request('/api/recipes', { ...valid, thumbnail: oversized }, cookie)).status).toBe(
+    400,
+  );
+  // Over the request size limit itself.
+  const huge = Buffer.alloc(2_000_000, 0xff).toString('base64');
+  expect((await request('/api/recipes', { ...valid, thumbnail: huge }, cookie)).status).toBe(413);
+
+  const created = await request('/api/recipes', valid, cookie);
+  expect(created.status).toBe(201);
+  const { id } = z.object({ id: z.string().regex(/^p-[a-z0-9-]+$/) }).parse(await created.json());
+  const detail = await app.request(`/api/recipes/${id}`);
+  expect(await detail.json()).toMatchObject({
+    recipe: {
+      id,
+      title: '投稿のテスト',
+      image: `/api/recipe-images/${id}`,
+      tags: ['時短'],
+      durationMinutes: 3,
+      likeCount: 0,
+      source: null,
+      part: null,
+      summary: 'チークを高めに',
+      author: { id: me.id },
+      steps: [
+        {
+          part: 'cheek',
+          label: 'チーク',
+          title: '頬に入れる',
+          hint: '頬骨の上に高めに',
+          product: 'ふんわりチーク',
+          colors: ['#E8968A'],
+        },
+        { part: 'lip', label: 'リップ', hint: '' },
+      ],
+    },
+  });
+  const list = z.object({ items: z.array(z.object({ id: z.string() })) });
+  expect(
+    list.parse(await (await app.request('/api/recipes')).json()).items.map((item) => item.id),
+  ).toContain(id);
+  expect(
+    list
+      .parse(await (await app.request(`/api/recipes?author=${me.id}`)).json())
+      .items.map((item) => item.id),
+  ).toContain(id);
+
+  const image = await app.request(`/api/recipe-images/${id}`);
+  expect(image.status).toBe(200);
+  expect(image.headers.get('content-type')).toBe('image/jpeg');
+  expect(image.headers.get('x-content-type-options')).toBe('nosniff');
+  expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
+  expect(Buffer.from(await image.arrayBuffer())).toEqual(jpeg);
+  expect((await app.request('/api/recipe-images/fox')).status).toBe(404);
+  expect((await app.request('/api/recipe-images/Not_A_Slug')).status).toBe(400);
 }, 20000);

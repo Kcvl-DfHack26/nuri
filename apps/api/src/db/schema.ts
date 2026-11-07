@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  bytea,
   index,
   integer,
   pgTable,
@@ -171,6 +172,19 @@ export const product = pgTable('product', {
   purchasable: boolean('purchasable').default(false).notNull(),
   /** Where ⑤'s 買う opens the product, always https; null when there is nowhere to buy it. */
   purchaseUrl: text('purchase_url'),
+});
+
+/**
+ * The JPEG thumbnail of a recipe posted from ③, served at `/api/recipe-images/:id`. Kept in the
+ * database so posting needs no storage bucket.
+ */
+export const recipeImage = pgTable('recipe_image', {
+  recipeId: text('recipe_id')
+    .primaryKey()
+    .references(() => recipe.id, { onDelete: 'cascade' }),
+  contentType: text('content_type').notNull(),
+  bytes: bytea('bytes').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 /** The cosmetics a recipe uses, in the order ⑤ lists them. */

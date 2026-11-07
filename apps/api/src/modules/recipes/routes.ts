@@ -1,12 +1,25 @@
 import { zValidator } from '@hono/zod-validator';
-import { feedQuerySchema, recipeListQuerySchema, recipeParamsSchema } from '@starter/shared';
+import {
+  feedQuerySchema,
+  recipeInputSchema,
+  recipeListQuerySchema,
+  recipeParamsSchema,
+} from '@starter/shared';
 import { and, asc, count, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
 import type { Auth, AuthenticatedEnv } from '../auth';
 
-import { product, recipe, recipeFavorite, recipeProduct, recipeStep, user } from '../../db/schema';
+import {
+  product,
+  recipe,
+  recipeFavorite,
+  recipeImage,
+  recipeProduct,
+  recipeStep,
+  user,
+} from '../../db/schema';
 import { requireSession } from '../auth';
 
 const pageSize = 20;
@@ -57,6 +70,54 @@ export function recipeRoutes(db: Database, auth: Auth) {
           .limit(pageSize + 1)
           .offset(offset);
         return c.json(page(items, offset));
+      })
+      // A whole-face recipe posted from ③. Only the texts, the steps and one JPEG frame arrive;
+      // the video never leaves the device.
+      .post('/recipes', requireSession(auth), zValidator('json', recipeInputSchema), async (c) => {
+        const input = c.req.valid('json');
+        // The schema already bounds the base64 length to the decoded size limit.
+        const bytes = Buffer.from(input.thumbnail, 'base64');
+        const id = `p-${crypto.randomUUID()}`;
+        await db.transaction(async (tx) => {
+          await tx.insert(recipe).values({
+            id,
+            authorId: c.get('currentUser').id,
+            title: input.title,
+            image: `/api/recipe-images/${id}`,
+            tags: input.tags,
+            durationMinutes: input.durationMinutes,
+            summary: input.summary || null,
+          });
+          await tx.insert(recipeStep).values(
+            input.steps.map((step, position) => ({
+              recipeId: id,
+              position,
+              part: step.part,
+              label: step.label,
+              title: step.title,
+              hint: step.description,
+              product: step.uses,
+              colors: [step.color],
+            })),
+          );
+          await tx.insert(recipeImage).values({ recipeId: id, contentType: 'image/jpeg', bytes });
+        });
+        return c.json({ id }, 201);
+      })
+      // Recipes are public, and so are the thumbnails of posted ones. A posted image never
+      // changes, so clients may keep it.
+      .get('/recipe-images/:id', zValidator('param', recipeParamsSchema), async (c) => {
+        const [image] = await db
+          .select({ contentType: recipeImage.contentType, bytes: recipeImage.bytes })
+          .from(recipeImage)
+          .where(eq(recipeImage.recipeId, c.req.valid('param').id));
+        if (!image) {
+          return c.json({ error: 'not_found' as const }, 404);
+        }
+        c.header('Content-Type', image.contentType);
+        c.header('Cache-Control', 'public, max-age=31536000, immutable');
+        c.header('X-Content-Type-Options', 'nosniff');
+        return c.body(new Uint8Array(image.bytes));
       })
       // How many recipes each part has, for ②'s cards.
       .get('/recipe-parts', async (c) => {

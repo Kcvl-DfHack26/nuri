@@ -19,61 +19,74 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
     new URL(env.BETTER_AUTH_URL).origin,
     ...origins.filter((origin) => origin.startsWith('http')),
   ];
-  return new Hono()
-    .use('*', secureHeaders())
-    .get(
-      '/sample-avatars/*',
-      serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
-    )
-    .get(
-      '/sample-recipes/*',
-      serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
-    )
-    .use('/api/*', bodyLimit({ maxSize: 64 * 1024 }))
-    .use('/api/*', cors({ origin: browserOrigins, credentials: true }))
-    .use('/api/*', async (c, next) => {
-      c.header('Cache-Control', 'no-store');
-      const origin = c.req.header('origin');
-      if (
-        !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) &&
-        origin &&
-        !browserOrigins.includes(origin)
-      ) {
-        return c.json({ error: 'forbidden_origin' as const }, 403);
-      }
-      await next();
-    })
-    .get('/health', (c) => c.json({ status: 'ok' as const }))
-    .get('/ready', async (c) => {
-      try {
-        await ready();
-        return c.json({ status: 'ready' as const });
-      } catch {
-        return c.json({ status: 'unavailable' as const }, 503);
-      }
-    })
-    .get('/.well-known/apple-app-site-association', (c) =>
-      c.json({ webcredentials: { apps: env.APPLE_APP_ID ? [env.APPLE_APP_ID] : [] } }),
-    )
-    .get('/.well-known/assetlinks.json', (c) =>
-      c.json(
-        env.ANDROID_SHA256_CERT_FINGERPRINTS
-          ? [
-              {
-                relation: ['delegate_permission/common.get_login_creds'],
-                target: {
-                  namespace: 'android_app',
-                  package_name: 'com.kcvl.nuri',
-                  sha256_cert_fingerprints: env.ANDROID_SHA256_CERT_FINGERPRINTS.split(','),
+  // Answer 413 instead of letting the thrown HTTPException become a 500 in onError.
+  const onError: Parameters<typeof bodyLimit>[0]['onError'] = (c) =>
+    c.json({ error: 'payload_too_large' as const }, 413);
+  const smallBody = bodyLimit({ maxSize: 64 * 1024, onError });
+  // POST /api/recipes carries a base64 JPEG of up to 1.5 MB (2 MB as base64) plus the texts.
+  const postedRecipeBody = bodyLimit({ maxSize: 2.5 * 1024 * 1024, onError });
+  return (
+    new Hono()
+      .use('*', secureHeaders())
+      .get(
+        '/sample-avatars/*',
+        serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
+      )
+      .get(
+        '/sample-recipes/*',
+        serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
+      )
+      // A posted recipe carries its thumbnail; every other API body stays small.
+      .use('/api/*', (c, next) =>
+        c.req.method === 'POST' && c.req.path === '/api/recipes'
+          ? postedRecipeBody(c, next)
+          : smallBody(c, next),
+      )
+      .use('/api/*', cors({ origin: browserOrigins, credentials: true }))
+      .use('/api/*', async (c, next) => {
+        c.header('Cache-Control', 'no-store');
+        const origin = c.req.header('origin');
+        if (
+          !['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) &&
+          origin &&
+          !browserOrigins.includes(origin)
+        ) {
+          return c.json({ error: 'forbidden_origin' as const }, 403);
+        }
+        await next();
+      })
+      .get('/health', (c) => c.json({ status: 'ok' as const }))
+      .get('/ready', async (c) => {
+        try {
+          await ready();
+          return c.json({ status: 'ready' as const });
+        } catch {
+          return c.json({ status: 'unavailable' as const }, 503);
+        }
+      })
+      .get('/.well-known/apple-app-site-association', (c) =>
+        c.json({ webcredentials: { apps: env.APPLE_APP_ID ? [env.APPLE_APP_ID] : [] } }),
+      )
+      .get('/.well-known/assetlinks.json', (c) =>
+        c.json(
+          env.ANDROID_SHA256_CERT_FINGERPRINTS
+            ? [
+                {
+                  relation: ['delegate_permission/common.get_login_creds'],
+                  target: {
+                    namespace: 'android_app',
+                    package_name: 'com.kcvl.nuri',
+                    sha256_cert_fingerprints: env.ANDROID_SHA256_CERT_FINGERPRINTS.split(','),
+                  },
                 },
-              },
-            ]
-          : [],
-      ),
-    )
-    .get('/api/auth-capabilities', (c) => c.json(authCapabilities(env)))
-    .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
-    .route('/api', socialRoutes(db, auth))
-    .route('/api', recipeRoutes(db, auth))
-    .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500));
+              ]
+            : [],
+        ),
+      )
+      .get('/api/auth-capabilities', (c) => c.json(authCapabilities(env)))
+      .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
+      .route('/api', socialRoutes(db, auth))
+      .route('/api', recipeRoutes(db, auth))
+      .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500))
+  );
 }
