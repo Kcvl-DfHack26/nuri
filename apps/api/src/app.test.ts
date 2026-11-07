@@ -63,4 +63,15 @@ describe('HTTP contract', () => {
       emulated: false,
     });
   });
+  test('opens a native login link from a tappable HTTPS page', async () => {
+    const response = await app.request('/api/auth/open-mobile-link');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('content-security-policy')).toContain("script-src 'nonce-");
+    const page = await response.text();
+    expect(page).toContain('location.hash.slice(1)');
+    expect(page).toContain('id="open"');
+    expect(page).not.toContain('href="com.kcvl.nuri:');
+  });
 });

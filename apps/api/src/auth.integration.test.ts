@@ -123,7 +123,7 @@ async function oauth(provider: 'google' | 'apple') {
 }
 
 async function emailLink(recipient: string, native = false) {
-  const callbackURL = native ? 'com.kcvl.nuri://auth-callback?state=bound-device-state' : origin;
+  const callbackURL = native ? 'com.kcvl.nuri:///auth-callback?state=bound-device-state' : origin;
   const sent = await request('/api/auth/sign-in/magic-link', {
     email: recipient,
     name: 'メールのユーザー',
@@ -148,13 +148,26 @@ async function emailLink(recipient: string, native = false) {
       })
     ).json(),
   );
-  const link = delivered.text
-    .split('\n')
-    .find((line) => line.startsWith(native ? 'com.kcvl.nuri://' : 'http://'));
+  const link = delivered.text.split('\n').find((line) => line.startsWith('http://'));
   if (!link) {
     throw new Error('Missing email link');
   }
-  return new URL(link);
+  if (!native) {
+    return new URL(link);
+  }
+  const open = new URL(link);
+  expect(open.pathname).toBe('/api/auth/open-mobile-link');
+  expect(open.search).toBe('');
+  const callback = new URLSearchParams(open.hash.slice(1)).get('callback');
+  if (!callback) {
+    throw new Error('Missing app callback');
+  }
+  const landing = await app.request(`${open.origin}${open.pathname}`);
+  expect(landing.status).toBe(200);
+  expect(landing.headers.get('referrer-policy')).toBe('no-referrer');
+  expect(landing.headers.get('content-security-policy')).toContain('script-src');
+  expect(await landing.text()).not.toContain(new URL(callback).searchParams.get('token') ?? '');
+  return new URL(callback);
 }
 
 test('Google/Apple OAuth use verified sessions and link the same verified email', async () => {

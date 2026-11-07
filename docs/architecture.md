@@ -63,7 +63,7 @@ Better Authが認証し、Honoの `requireSession` と所有者条件が投稿�
 
 Google／AppleのEmulate issuer・JWKS・token endpointを使うgenericOAuthを開発時だけ登録する。実署名のID tokenを検証し、認証バイパスは設けない。本番でのEmulate起動と公開エミュレータURLを拒否する。メールはResend互換エミュレータへ送る。[設定と検証](auth.md)を参照。
 
-#51のAndroid仮想端末での検証は、既存のBetter Auth Google OAuthとResendマジックリンクを使う。OpenTofuはGoogle OAuth client ID・secretとResend API keyのSecret Manager参照を、credentialを投入した後だけ有効にする。Cloud Runのruntimeには有効な方式のsecretだけを許可し、DB migrationには別のservice accountでDB URLとCloud SQLの権限だけを与える。Apple Developer Programと実機は今回使わない。Expo clientのOAuth戻り先にはセッションcookie、メールの戻り先には単回利用tokenがカスタムスキームで渡るため、任意の端末への配布には使わない。管理下の仮想端末とテストアカウントに限定し、一般配布前に検証済みHTTPSリンクかURLに認証情報を載せない方式へ変更する。設定と残る制約は[認証の手順](auth.md#android仮想端末でgoogleとメールを試す51)に記録する。
+#51のAndroid仮想端末での検証は、既存のBetter Auth Google OAuthとResendマジックリンクを使う。OpenTofuはGoogle OAuth client ID・secretとResend API keyのSecret Manager参照を、credentialを投入した後だけ有効にする。Cloud Runのruntimeには有効な方式のsecretだけを許可し、DB migrationには別のservice accountでDB URLとCloud SQLの権限だけを与える。Apple Developer Programと実機は今回使わない。メールアプリがカスタムスキームをリンク化しないため、メールにはHTTPSの案内ページを送り、そのページの操作でアプリを開く。Expo clientのOAuth戻り先にはセッションcookie、メールの戻り先には単回利用tokenがカスタムスキームで渡るため、任意の端末への配布には使わない。管理下の仮想端末とテストアカウントに限定し、一般配布前に検証済みHTTPSリンクかURLに認証情報を載せない方式へ変更する。設定と残る制約は[認証の手順](auth.md#android仮想端末でgoogleとメールを試す51)に記録する。
 
 `eslint-plugin-boundaries` がAPI composition root→module、social→authの公開入口、module→DB/platform/shared、モバイルroutes→UI→lib、型のみのAPI契約を強制する。禁止方向・内部ファイルの直接import・未知ファイルはエラー。`scripts/boundaries.test.ts` で許可・禁止例を実際のESLintへ通す。
 

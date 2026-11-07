@@ -4,8 +4,46 @@ import { z } from 'zod';
 
 import type { Auth } from './service';
 
+const openMobileLinkScript = `
+  try {
+    const value = new URLSearchParams(location.hash.slice(1)).get('callback');
+    const link = new URL(value);
+    if (
+      !['com.kcvl.nuri:', 'exp:', 'exps:'].includes(link.protocol) ||
+      !link.pathname.endsWith('/auth-callback') ||
+      !link.searchParams.get('token') ||
+      !link.searchParams.get('state')
+    ) throw new Error('invalid link');
+    document.getElementById('open').href = link.href;
+  } catch {
+    document.getElementById('open').remove();
+    document.getElementById('error').hidden = false;
+  }
+`;
+
 export function authRoutes(auth: Auth, baseURL: string) {
   return new Hono()
+    .get('/open-mobile-link', (c) => {
+      const nonce = crypto.randomUUID().replaceAll('-', '');
+      c.header('Referrer-Policy', 'no-referrer');
+      c.header(
+        'Content-Security-Policy',
+        `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'nonce-${nonce}'; base-uri 'none'; form-action 'none'`,
+      );
+      return c.html(`<!doctype html>
+<html lang="ja">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>nuriにログイン</title>
+<style nonce="${nonce}">body{font-family:system-ui,sans-serif;padding:16px}a{display:inline-block;min-height:48px;line-height:48px;padding:0 16px;font-size:18px}</style>
+<body>
+  <h1>nuriにログイン</h1>
+  <p>この端末でnuriアプリを開いてください。</p>
+  <p><a id="open">nuriアプリで開く</a></p>
+  <p id="error" hidden>リンクが無効です。nuriからもう一度メールを送ってください。</p>
+  <script nonce="${nonce}">${openMobileLinkScript}</script>
+</body>
+</html>`);
+    })
     .post(
       '/mobile-magic-link',
       zValidator('json', z.object({ token: z.string().min(1).max(256) })),
