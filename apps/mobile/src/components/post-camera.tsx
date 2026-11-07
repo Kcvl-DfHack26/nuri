@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
+import { recipeStepsMax } from '@starter/shared';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
@@ -427,8 +428,9 @@ export function PostRecording() {
           </CameraAction>
           <CameraAction
             label="手順を区切る"
+            // A post has at most recipeStepsMax steps, so marks stop one short of it.
             onPress={
-              startedAt === null
+              startedAt === null || marks.length >= recipeStepsMax - 1
                 ? undefined
                 : () => {
                     setMarks((current) => [...current, Date.now() - startedAt]);

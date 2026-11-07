@@ -1,3 +1,5 @@
+import { recipeStepsMax } from '@starter/shared';
+
 import { planSteps } from './post-steps';
 
 test('splits a recording at its marks, each step ending where the next starts', () => {
@@ -33,4 +35,11 @@ test('starts over from the first part after every part was used', () => {
     'lip',
     'base',
   ]);
+});
+
+test('ignores marks past the API step limit, so the last step runs to the end', () => {
+  const marks = Array.from({ length: 30 }, (_, index) => (index + 1) * 1000);
+  const steps = planSteps(marks, 40_000);
+  expect(steps).toHaveLength(recipeStepsMax);
+  expect(steps.at(-1)).toMatchObject({ startMs: (recipeStepsMax - 1) * 1000, endMs: 40_000 });
 });

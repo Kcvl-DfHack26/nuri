@@ -89,6 +89,7 @@ export type RecipeInput = InferRequestType<typeof api.api.recipes.$post>['json']
 const postErrors: Partial<Record<number, string>> = {
   400: '投稿の内容を確認してください。',
   401: 'ログインし直してください。',
+  409: '投稿できませんでした。投稿をやり直してください。',
   413: 'サムネイルの写真が大きすぎます。別の場面を選んでください。',
 };
 

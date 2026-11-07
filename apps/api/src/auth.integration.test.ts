@@ -19,6 +19,7 @@ const unique = crypto.randomUUID();
 const email = `auth-${unique}@example.com`;
 const secondEmail = `other-${unique}@example.com`;
 const favoriteEmail = `favorite-${unique}@example.com`;
+const posterEmail = `poster-${unique}@example.com`;
 const baseURL = 'http://localhost:8080';
 const origin = 'http://localhost:8081';
 const google = await createEmulator({
@@ -87,7 +88,9 @@ function request(path: string, body: unknown, cookie = '', method = 'POST') {
   });
 }
 afterAll(async () => {
-  await db.delete(user).where(inArray(user.email, [email, secondEmail, favoriteEmail]));
+  await db
+    .delete(user)
+    .where(inArray(user.email, [email, secondEmail, favoriteEmail, posterEmail]));
   await Promise.all([pool.end(), google.close(), apple.close(), mail.close()]);
 });
 
@@ -426,6 +429,7 @@ test('posting a recipe needs a session, validates it and serves its thumbnail', 
     color: '#E8968A',
   };
   const valid = {
+    key: crypto.randomUUID(),
     title: '  投稿のテスト  ',
     summary: 'チークを高めに',
     tags: ['時短'],
@@ -450,6 +454,20 @@ test('posting a recipe needs a session, validates it and serves its thumbnail', 
   const created = await request('/api/recipes', valid, cookie);
   expect(created.status).toBe(201);
   const { id } = z.object({ id: z.string().regex(/^p-[a-z0-9-]+$/) }).parse(await created.json());
+  // A post resent after a lost response is saved once; someone else's key is refused.
+  const resent = await request('/api/recipes', { ...valid, title: '二度目' }, cookie);
+  expect(resent.status).toBe(201);
+  expect(await resent.json()).toEqual({ id });
+  const otherKey = crypto.randomUUID();
+  await db.insert(user).values({ id: `poster-${unique}`, name: 'ほかの人', email: posterEmail });
+  await db.insert(recipe).values({
+    id: `p-${otherKey}`,
+    authorId: `poster-${unique}`,
+    title: 'ほかの人の投稿',
+    image: 'https://example.com/other.jpg',
+    durationMinutes: 3,
+  });
+  expect((await request('/api/recipes', { ...valid, key: otherKey }, cookie)).status).toBe(409);
   const detail = await app.request(`/api/recipes/${id}`);
   expect(await detail.json()).toMatchObject({
     recipe: {

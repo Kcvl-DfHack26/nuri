@@ -77,17 +77,31 @@ export function recipeRoutes(db: Database, auth: Auth) {
         const input = c.req.valid('json');
         // The schema already bounds the base64 length to the decoded size limit.
         const bytes = Buffer.from(input.thumbnail, 'base64');
-        const id = `p-${crypto.randomUUID()}`;
-        await db.transaction(async (tx) => {
-          await tx.insert(recipe).values({
-            id,
-            authorId: c.get('currentUser').id,
-            title: input.title,
-            image: `/api/recipe-images/${id}`,
-            tags: input.tags,
-            durationMinutes: input.durationMinutes,
-            summary: input.summary || null,
-          });
+        // The draft's key makes the ID, so a post resent after its response was lost is not saved
+        // twice; the same key from someone else is refused.
+        const id = `p-${input.key.toLowerCase()}`;
+        const authorId = c.get('currentUser').id;
+        const saved = await db.transaction(async (tx) => {
+          const [inserted] = await tx
+            .insert(recipe)
+            .values({
+              id,
+              authorId,
+              title: input.title,
+              image: `/api/recipe-images/${id}`,
+              tags: input.tags,
+              durationMinutes: input.durationMinutes,
+              summary: input.summary || null,
+            })
+            .onConflictDoNothing()
+            .returning({ id: recipe.id });
+          if (!inserted) {
+            const [existing] = await tx
+              .select({ authorId: recipe.authorId })
+              .from(recipe)
+              .where(eq(recipe.id, id));
+            return existing?.authorId === authorId;
+          }
           await tx.insert(recipeStep).values(
             input.steps.map((step, position) => ({
               recipeId: id,
@@ -101,7 +115,11 @@ export function recipeRoutes(db: Database, auth: Auth) {
             })),
           );
           await tx.insert(recipeImage).values({ recipeId: id, contentType: 'image/jpeg', bytes });
+          return true;
         });
+        if (!saved) {
+          return c.json({ error: 'conflict' as const }, 409);
+        }
         return c.json({ id }, 201);
       })
       // Recipes are public, and so are the thumbnails of posted ones. A posted image never

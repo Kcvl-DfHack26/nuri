@@ -1,5 +1,6 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
+import * as Crypto from 'expo-crypto';
 import { File } from 'expo-file-system';
 import { createContext, use, useCallback, useEffect, useRef, useState } from 'react';
 
@@ -44,6 +45,8 @@ type PostVideo = {
 };
 
 export type PostDraft = {
+  /** Sent with the post, so the API saves a resent post only once. */
+  key: string;
   /** The recorded or chosen video, kept on the device until the post is sent. */
   video: PostVideo | null;
   /** Made by ⑫-3 from the video's marks. */
@@ -89,7 +92,7 @@ export const cosmeticCandidates: Partial<Record<PartId, Cosmetic[]>> = {
   ],
 };
 
-const emptyDraft: PostDraft = {
+const emptyDraft: Omit<PostDraft, 'key'> = {
   video: null,
   steps: [],
   title: '',
@@ -152,6 +155,7 @@ export function PostDraftProvider({
 }) {
   const [draft, setDraft] = useState<PostDraft>(() => ({
     ...emptyDraft,
+    key: Crypto.randomUUID(),
     video: videoUri ? { uri: videoUri, marks: [], durationMs: videoDurationMs ?? null } : null,
   }));
   // A video recorded on ⑫-2 holds the user's face and voice, so it is deleted once the draft lets

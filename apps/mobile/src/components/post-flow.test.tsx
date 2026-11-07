@@ -18,6 +18,8 @@ import { PostPreview } from './post-preview';
 import { PostReview } from './post-review';
 import { PostStepEdit } from './post-step';
 
+const mockDraftKey = '3f2b8c1e-6d4a-4b7e-9c2d-1a5e8f0b7c3d';
+jest.mock('expo-crypto', () => ({ randomUUID: () => mockDraftKey }));
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-video-thumbnails', () => ({
   getThumbnailAsync: jest.fn((_uri: string, { time }: { time: number }) =>
@@ -391,6 +393,7 @@ test('asks before posting and sends the steps and thumbnail, never the video', a
   expect(mockPost).toHaveBeenCalledTimes(1);
   expect(mockPost).toHaveBeenCalledWith({
     json: {
+      key: mockDraftKey,
       title: ' 狐メイク ',
       summary: '高めのチーク',
       tags: ['時短'],
@@ -453,7 +456,8 @@ test('keeps the draft when posting fails and posts it on retry', async () => {
   expect(router.push).not.toHaveBeenCalled();
   expect(screen.getByText('狐メイク')).toBeOnTheScreen();
 
-  await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
+  // The button comes back once the failed mutation settles.
+  await fireEvent.press(await screen.findByRole('button', { name: '投稿' }));
   await pressAlertButton('投稿する');
   await waitFor(() => {
     expect(router.push).toHaveBeenCalledWith('/post/done');

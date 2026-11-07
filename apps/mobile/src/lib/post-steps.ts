@@ -1,4 +1,4 @@
-import { makeupParts } from '@starter/shared';
+import { makeupParts, recipeStepsMax } from '@starter/shared';
 
 type PartId = (typeof makeupParts)[number];
 
@@ -15,11 +15,14 @@ export type PlannedStep = {
 /**
  * ⑫-3: splits the video into steps at the marks of 手順を区切る. A video without marks, such as one
  * chosen with 動画から, is one step. Marks outside the video and repeated marks are ignored, so no
- * step is empty. Parts follow ②'s order until something better can suggest them.
+ * step is empty; marks past the API's step limit are ignored. Parts follow ②'s order until something better can suggest them.
  */
 export function planSteps(marks: readonly number[], durationMs: number | null): PlannedStep[] {
   const starts = [0];
   for (const mark of [...marks].sort((a, b) => a - b)) {
+    if (starts.length >= recipeStepsMax) {
+      break;
+    }
     if (mark > (starts.at(-1) ?? 0) && (durationMs === null || mark < durationMs)) {
       starts.push(mark);
     }

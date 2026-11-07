@@ -8,7 +8,7 @@ import { Alert } from 'react-native';
 import type { PostDraft } from '@/components/post-draft';
 import type { RecipeDetail, RecipeInput } from '@/lib/recipes';
 
-import { stepTitle, usedCosmetics, usePostDraft } from '@/components/post-draft';
+import { stepTitle, usePostDraft } from '@/components/post-draft';
 import { RecipeContent } from '@/components/recipe-detail';
 import { partColors, parts } from '@/components/recipes';
 import { authClient } from '@/lib/api';
@@ -20,6 +20,7 @@ const fieldsSchema = recipeInputSchema.omit({ thumbnail: true });
 /** The draft's texts and steps as the API takes them; the thumbnail is read only when posting. */
 function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
   return {
+    key: draft.key,
     title: draft.title,
     summary: draft.message,
     tags: draft.tags.map((tag) => tag.replace(/^#/u, '')),
@@ -72,7 +73,10 @@ async function thumbnailBase64(
 
 // Plan A ⑫-8 投稿のプレビュー: ⑤ with the draft, and 投稿 sends it. Before sending, a native alert
 // asks to publish the thumbnail, which can show the user's face, and the steps. The video is never
-// sent. A failed post keeps the draft so 投稿 can be pressed again; a sent one is not sent twice.
+// sent. A failed post keeps the draft so 投稿 can be pressed again; the draft's key lets the API
+// save a post resent after a lost response only once. ⑫-6's cosmetics are Plan A samples with no
+// product behind them, so they are posted as names in the steps, and the preview shows no product
+// list either.
 export function PostPreview() {
   const { draft, setDraft, trackFile } = usePostDraft();
   const { data: session } = authClient.useSession();
@@ -112,14 +116,6 @@ export function PostPreview() {
     products: [],
     steps: [],
   };
-  const cosmetics = draft.publishCosmetics
-    ? usedCosmetics(draft.steps).map((cosmetic) => ({
-        id: cosmetic.id,
-        name: cosmetic.name,
-        detail: `${cosmetic.category}・${cosmetic.shade}`,
-        color: cosmetic.color,
-      }))
-    : null;
   const onPost = () => {
     if (draft.postedId) {
       router.push('/post/done');
@@ -152,12 +148,6 @@ export function PostPreview() {
     );
   };
   return (
-    <RecipeContent
-      recipe={recipe}
-      steps={fields.steps}
-      postedCosmetics={cosmetics}
-      onPost={onPost}
-      posting={post.isPending}
-    />
+    <RecipeContent recipe={recipe} steps={fields.steps} onPost={onPost} posting={post.isPending} />
   );
 }

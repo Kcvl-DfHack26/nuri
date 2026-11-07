@@ -1,3 +1,5 @@
+import { recipeTagsMax } from '@starter/shared';
+
 /** A tag as typed on ⑫-7, shown with one leading #; null when nothing remains to add. */
 export function normalizeTag(input: string) {
   const body = input
@@ -7,13 +9,10 @@ export function normalizeTag(input: string) {
   return body ? `#${body}` : null;
 }
 
-/** A post carries at most this many tags, as the API accepts. */
-const tagCount = 10;
-
 /** Adds a typed tag once; returns the same list when it is empty, already there or full. */
 export function addTag(tags: string[], input: string) {
   const tag = normalizeTag(input);
-  return tag && !tags.includes(tag) && tags.length < tagCount ? [...tags, tag] : tags;
+  return tag && !tags.includes(tag) && tags.length < recipeTagsMax ? [...tags, tag] : tags;
 }
 
 /** Stay just before the end, where some videos have no decodable frame. */

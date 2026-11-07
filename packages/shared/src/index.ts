@@ -63,6 +63,10 @@ export const recipeListQuerySchema = feedQuerySchema.pick({ offset: true, author
   q: z.string().trim().min(1).max(recipeSearchMaxLength).optional(),
 });
 
+/** Most steps a posted recipe may have; ⑫-2 stops adding marks at this. */
+export const recipeStepsMax = 20;
+/** Most tags a posted recipe may have; ⑫-7 stops adding tags at this. */
+export const recipeTagsMax = 10;
 /** Largest thumbnail a posted recipe may carry, in decoded bytes. */
 export const recipeThumbnailMaxBytes = 1_500_000;
 /** Base64 of a JPEG starts with its FF D8 FF marker, which encodes to `/9j/`. */
@@ -84,15 +88,17 @@ export const recipeStepInputSchema = z.object({
  * frame as base64 are sent.
  */
 export const recipeInputSchema = z.object({
+  /** Made once per draft, so a post resent after a lost response is saved only once. */
+  key: z.uuid(),
   title: z
     .string()
     .trim()
     .min(1, 'タイトルを入力してください')
     .max(40, 'タイトルは40文字以内で入力してください'),
   summary: z.string().trim().max(200, 'メッセージは200文字以内で入力してください'),
-  tags: z.array(z.string().trim().min(1).max(30)).max(10),
+  tags: z.array(z.string().trim().min(1).max(30)).max(recipeTagsMax),
   durationMinutes: z.number().int().min(1).max(600),
-  steps: z.array(recipeStepInputSchema).min(1).max(20),
+  steps: z.array(recipeStepInputSchema).min(1).max(recipeStepsMax),
   thumbnail: z
     .base64()
     .max(Math.ceil(recipeThumbnailMaxBytes / 3) * 4)

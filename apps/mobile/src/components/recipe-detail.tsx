@@ -101,27 +101,10 @@ type StepSummary = Pick<RecipeStep, 'part' | 'label'>;
 // Plan A ⑤ レシピ詳細.
 // ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top, a single 投稿
 // action, and the draft's cosmetics (null when the post does not publish them).
-export type PostedCosmetic = { id: string; name: string; detail: string; color: string };
-
-export function RecipeDetail({
-  id,
-  onPost,
-  postedCosmetics,
-}: {
-  id: string;
-  onPost?: () => void;
-  postedCosmetics?: PostedCosmetic[] | null;
-}) {
+export function RecipeDetail({ id, onPost }: { id: string; onPost?: () => void }) {
   const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
   if (query.data) {
-    return (
-      <RecipeContent
-        recipe={query.data}
-        steps={query.data.steps}
-        onPost={onPost}
-        postedCosmetics={postedCosmetics}
-      />
-    );
+    return <RecipeContent recipe={query.data} steps={query.data.steps} onPost={onPost} />;
   }
   return (
     <RecipeStatus
@@ -181,14 +164,12 @@ export function RecipeContent({
   recipe,
   steps,
   onPost,
-  postedCosmetics,
   posting = false,
 }: {
   recipe: RecipeData;
   /** Empty for a recipe without steps yet; it cannot start ⑦. */
   steps: StepSummary[];
   onPost: (() => void) | undefined;
-  postedCosmetics: PostedCosmetic[] | null | undefined;
   /** ⑫-8 is sending the post; 投稿 waits until it finishes. */
   posting?: boolean;
 }) {
@@ -313,26 +294,7 @@ export function RecipeContent({
               </View>
             </>
           ) : null}
-          {postedCosmetics === undefined ? (
-            recipe.products.length > 0 ? (
-              <>
-                <View className="flex-row items-center justify-between">
-                  <Text
-                    accessibilityRole="header"
-                    className="font-maru-bold text-heading text-ink-primary"
-                  >
-                    使うメイク品
-                  </Text>
-                  <Text className="font-maru text-meta text-ink-secondary">
-                    {recipe.products.length}点
-                  </Text>
-                </View>
-                {recipe.products.map((product) => (
-                  <ProductRow key={product.id} product={product} />
-                ))}
-              </>
-            ) : null
-          ) : postedCosmetics === null ? null : (
+          {recipe.products.length > 0 ? (
             <>
               <View className="flex-row items-center justify-between">
                 <Text
@@ -342,32 +304,14 @@ export function RecipeContent({
                   使うメイク品
                 </Text>
                 <Text className="font-maru text-meta text-ink-secondary">
-                  {postedCosmetics.length}点
+                  {recipe.products.length}点
                 </Text>
               </View>
-              {postedCosmetics.map((cosmetic) => (
-                <View
-                  key={cosmetic.id}
-                  accessible
-                  accessibilityLabel={`${cosmetic.name}、${cosmetic.detail}`}
-                  className="flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5"
-                >
-                  <View
-                    className="size-[52px] rounded-[14px]"
-                    style={{ backgroundColor: cosmetic.color }}
-                  />
-                  <View className="flex-1 gap-0.5">
-                    <Text className="font-maru-bold text-label text-ink-primary">
-                      {cosmetic.name}
-                    </Text>
-                    <Text className="font-maru text-meta text-ink-secondary">
-                      {cosmetic.detail}
-                    </Text>
-                  </View>
-                </View>
+              {recipe.products.map((product) => (
+                <ProductRow key={product.id} product={product} />
               ))}
             </>
-          )}
+          ) : null}
         </ScrollView>
       </View>
       <View
