@@ -11,31 +11,57 @@ import sparkleWhite from '../../assets/plan-a/icons/sparkle-white.svg';
 
 const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 
-// Plan A bottom bar shared by ③ and ⑤: favorite (not built yet) and the main start action.
+const HEART_FILLED = Icon.select({
+  ios: 'heart.fill',
+  android: import('@expo/material-symbols/favorite.xml'),
+});
+
+// Plan A bottom bar shared by ③ and ⑤: favorite and the main start action.
 export function StartBar({
   bottom,
   onStart,
+  favorite,
 }: {
   bottom: number;
   /** Without a handler the start action shows as not built yet. */
   onStart?: (() => void) | undefined;
+  /** Without it the favorite button shows as not built yet. */
+  favorite?: { favorited: boolean; onPress: () => void } | undefined;
 }) {
   const ink = useTokenColor('--color-ink-primary');
+  const rose = useTokenColor('--color-accent-rose');
   const disabled = !onStart;
   return (
     <View
       className="absolute inset-x-0 bottom-0 flex-row items-center gap-2.5 bg-[rgba(242,242,242,0.85)] px-4 pt-3"
       style={{ paddingBottom: Math.max(bottom, 12) }}
     >
-      <View
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel="お気に入り（準備中）"
-        accessibilityState={{ disabled: true }}
-        className="size-[52px] items-center justify-center rounded-full bg-white"
-      >
-        <SocialIcon name={HEART} size={22} color={ink} />
-      </View>
+      {favorite ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="お気に入り"
+          accessibilityState={{ selected: favorite.favorited }}
+          onPress={favorite.onPress}
+          className="size-[52px] items-center justify-center rounded-full bg-white active:opacity-70"
+        >
+          {/* Android ships only outlined symbols, so the rose color also marks a favorite. */}
+          <SocialIcon
+            name={favorite.favorited ? HEART_FILLED : HEART}
+            size={22}
+            color={favorite.favorited ? rose : ink}
+          />
+        </Pressable>
+      ) : (
+        <View
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="お気に入り（準備中）"
+          accessibilityState={{ disabled: true }}
+          className="size-[52px] items-center justify-center rounded-full bg-white"
+        >
+          <SocialIcon name={HEART} size={22} color={ink} />
+        </View>
+      )}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={disabled ? 'メイクをはじめる（準備中）' : 'メイクをはじめる'}

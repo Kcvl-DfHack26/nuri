@@ -17,6 +17,7 @@ const sample: RecipeDetail = {
   part: null,
   summary: null,
   author: { id: 'preview', name: 'mio', image: null },
+  favorited: false,
   products: [],
   steps: [],
 };

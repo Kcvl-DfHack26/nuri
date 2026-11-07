@@ -7,14 +7,23 @@ import { api } from '@/lib/api';
 
 type PartId = (typeof makeupParts)[number];
 
-/** Whole-face recipes (①), or with `part` the recipes for that part (③). */
-export function recipeListOptions(part?: PartId) {
+/**
+ * Whole-face recipes (①); with `part`, the recipes for that part (③); with `author`, the recipes
+ * that user wrote (⑰).
+ */
+export function recipeListOptions({ part, author }: { part?: PartId; author?: string } = {}) {
   return infiniteQueryOptions({
-    queryKey: ['recipes', 'list', part ?? 'whole'],
+    queryKey: ['recipes', 'list', part ?? 'whole', author],
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }) => {
       const response = await api.api.recipes.$get(
-        { query: { offset: String(pageParam), ...(part ? { part } : {}) } },
+        {
+          query: {
+            offset: String(pageParam),
+            ...(part ? { part } : {}),
+            ...(author ? { author } : {}),
+          },
+        },
         { init: { signal } },
       );
       if (!response.ok) {
@@ -37,6 +46,37 @@ export const recipePartsOptions = queryOptions({
     return (await response.json()).items;
   },
 });
+
+/** The signed-in user's favorite recipes, most recently added first (⑰). */
+export function favoriteListOptions(userId: string) {
+  return infiniteQueryOptions({
+    queryKey: ['recipes', 'favorites', userId],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam, signal }) => {
+      const response = await api.api.me.favorites.$get(
+        { query: { offset: String(pageParam) } },
+        { init: { signal } },
+      );
+      if (!response.ok) {
+        throw new Error('お気に入りを読み込めませんでした。通信状況を確認してお試しください。');
+      }
+      return await response.json();
+    },
+    getNextPageParam: (last) => last.nextOffset,
+  });
+}
+
+export async function changeFavorite(id: string, favorited: boolean) {
+  const endpoint = api.api.recipes[':id'].favorite;
+  const response = favorited
+    ? await endpoint.$delete({ param: { id } })
+    : await endpoint.$put({ param: { id } });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 401 ? 'ログインし直してください。' : 'お気に入りを変更できませんでした。',
+    );
+  }
+}
 
 export function recipeOptions(id: string) {
   return queryOptions({

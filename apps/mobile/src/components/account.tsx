@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -80,9 +79,10 @@ export function Account() {
     actions = (
       <PillButton
         tone="rose"
-        label="タイムラインに戻る"
+        label="もとの画面に戻る"
         onPress={() => {
-          router.replace('/timeline');
+          // Return to the screen that asked for login (#42).
+          backOrHome();
         }}
       />
     );

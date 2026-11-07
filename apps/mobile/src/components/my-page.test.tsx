@@ -1,10 +1,26 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import { MyPage } from './my-page';
 
-jest.mock('@expo/ui', () => ({
-  Icon: Object.assign(() => null, { select: () => 'icon' }),
+jest.mock('@expo/ui', () => {
+  const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    Icon: Object.assign(() => null, { select: () => 'icon' }),
+    Button: ({ label, onPress }: { label: string; onPress: () => void }) => (
+      <reactNative.Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        onPress={onPress}
+      >
+        <reactNative.Text>{label}</reactNative.Text>
+      </reactNative.Pressable>
+    ),
+  };
+});
+jest.mock('@/theme/colors', () => ({
+  colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
 }));
 jest.mock('@/components/avatar', () => ({ Avatar: () => null }));
 jest.mock('@/components/native-host', () => ({
@@ -26,10 +42,37 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 jest.mock('@/lib/api', () => ({
+  apiAssetUrl: (path: string) => path,
   authClient: {
     useSession: () => mockUseSession(),
   },
+  api: {
+    api: {
+      recipes: { $get: () => mockPosted() },
+      me: { favorites: { $get: () => mockFavorites() } },
+    },
+  },
 }));
+const recipe = (id: string, title: string) => ({
+  id,
+  title,
+  image: `/sample-recipes/${id}.jpg`,
+  likeCount: 1200,
+  author: { id: 'viewer', name: 'はなこ' },
+});
+const page = (items: unknown[]) => ({
+  ok: true,
+  json: async () => ({ items, nextOffset: null }),
+});
+const mockPosted = jest.fn(async () => page([recipe('own', '自分のメイク')]));
+const mockFavorites = jest.fn(async () => page([recipe('fox', '狐メイク')]));
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
+  });
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
 type Session = { data: { user: { id: string; name: string; email: string } } | null };
 const viewer: Session = {
   data: { user: { id: 'viewer', name: 'はなこ', email: 'hanako@example.com' } },
@@ -45,24 +88,41 @@ afterEach(() => {
   mockUseSession.mockImplementation(() => ({ ...viewer, isPending: false }));
 });
 
-test('shows the signed-in profile with sample numbers and opens the settings and a recipe', async () => {
-  await render(<MyPage />);
+test('shows the signed-in profile with posted and favorite recipes and opens them', async () => {
+  await render(<MyPage />, { wrapper });
   expect(screen.getByText('はなこ')).toBeOnTheScreen();
   expect(screen.getByLabelText('フォロワー 328')).toBeOnTheScreen();
-  expect(screen.getByText('顔タイプ・数字・投稿は見本です')).toBeOnTheScreen();
+  expect(screen.getByText('フォロワー・フォロー中・いいねの数は見本です')).toBeOnTheScreen();
 
-  await fireEvent.press(screen.getByRole('button', { name: '丸顔メイク、nana' }));
-  expect(router.push).toHaveBeenCalledWith('/recipes/round');
-  await fireEvent.press(screen.getByRole('button', { name: '狐メイク、rina' }));
+  await fireEvent.press(
+    await screen.findByRole('button', { name: '自分のメイク、はなこ、いいね1.2k' }),
+  );
+  expect(router.push).toHaveBeenCalledWith('/recipes/own');
+  expect(screen.getByText('投稿 1')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '狐メイク、はなこ、いいね1.2k' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
 
   await fireEvent.press(screen.getByRole('button', { name: 'プロフィール設定' }));
   expect(router.push).toHaveBeenCalledWith('/profile-settings');
 });
 
+test('shows empty sections and retries a failed list', async () => {
+  mockPosted.mockResolvedValueOnce(page([]));
+  mockFavorites.mockRejectedValueOnce(new Error('通信エラー'));
+  await render(<MyPage />, { wrapper });
+  expect(await screen.findByText('まだ投稿したレシピはありません')).toBeOnTheScreen();
+  expect(
+    await screen.findByText('お気に入りを読み込めませんでした。通信状況を確認してお試しください。'),
+  ).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
+  expect(
+    await screen.findByRole('button', { name: '狐メイク、はなこ、いいね1.2k' }),
+  ).toBeOnTheScreen();
+});
+
 test('asks a guest to log in instead of showing a profile', async () => {
   signOutForTest();
-  await render(<MyPage />);
+  await render(<MyPage />, { wrapper });
   expect(screen.getByText('ゲスト')).toBeOnTheScreen();
   expect(screen.queryByText('投稿')).not.toBeOnTheScreen();
 

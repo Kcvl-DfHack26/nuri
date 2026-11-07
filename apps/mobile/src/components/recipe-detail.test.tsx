@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import { RecipeDetail } from './recipe-detail';
@@ -38,8 +38,20 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock('@/lib/api', () => ({
   apiUrl: 'http://localhost:8080',
   apiAssetUrl: (path: string) => path,
-  api: { api: { recipes: { ':id': { $get: () => mockGetRecipe() } } } },
+  authClient: { useSession: () => ({ data: mockSignedIn ? { user: { id: 'viewer' } } : null }) },
+  api: {
+    api: {
+      recipes: {
+        ':id': {
+          $get: () => mockGetRecipe(),
+          favorite: { $put: () => mockFavorite(), $delete: () => mockFavorite() },
+        },
+      },
+    },
+  },
 }));
+let mockSignedIn = false;
+const mockFavorite = jest.fn(async () => ({ ok: true, status: 200 }));
 const fox = {
   id: 'fox',
   title: '狐メイク',
@@ -49,6 +61,7 @@ const fox = {
   likeCount: 1200,
   source: 'instagram',
   author: { id: 'sample-mio', name: 'mio', image: null },
+  favorited: false,
   products: [
     {
       id: 'celane-brow-pencil',
@@ -139,4 +152,29 @@ test('retries a failed load and reports a missing recipe without retrying', asyn
   await render(<RecipeDetail id="missing" />, { wrapper });
   expect(await screen.findByText('レシピが見つかりません')).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'もう一度試す' })).toBeNull();
+});
+
+test('sends a guest to log in before keeping a favorite', async () => {
+  mockSignedIn = false;
+  await render(<RecipeDetail id="fox" />, { wrapper });
+  await fireEvent.press(await screen.findByRole('button', { name: 'お気に入り' }));
+  expect(router.push).toHaveBeenCalledWith('/account');
+  expect(mockFavorite).not.toHaveBeenCalled();
+});
+
+test('keeps a favorite at once and rolls it back when the server refuses', async () => {
+  mockSignedIn = true;
+  await render(<RecipeDetail id="fox" />, { wrapper });
+  const favorite = await screen.findByRole('button', { name: 'お気に入り' });
+  expect(favorite).not.toBeSelected();
+  await fireEvent.press(favorite);
+  expect(mockFavorite).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
+
+  mockFavorite.mockResolvedValueOnce({ ok: false, status: 500 });
+  await fireEvent.press(screen.getByRole('button', { name: 'お気に入り' }));
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
+  });
+  mockSignedIn = false;
 });
