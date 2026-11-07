@@ -1,4 +1,5 @@
 import { Icon } from '@expo/ui';
+import { recipeSearchMaxLength } from '@starter/shared';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
@@ -23,8 +24,6 @@ const SEARCH = Icon.select({
   android: import('@expo/material-symbols/search.xml'),
 });
 
-// The API's limit for a search term.
-const maxLength = 50;
 const debounceMs = 300;
 
 // Plan A has no search results screen: ①'s search field becomes a text field above ①'s cards.
@@ -87,7 +86,7 @@ export function RecipeSearch() {
             autoCorrect={false}
             returnKeyType="search"
             clearButtonMode="while-editing"
-            maxLength={maxLength}
+            maxLength={recipeSearchMaxLength}
             value={text}
             onChangeText={setText}
             onSubmitEditing={() => {
@@ -98,6 +97,7 @@ export function RecipeSearch() {
         </View>
       </View>
       <FlatList
+        automaticallyAdjustKeyboardInsets
         data={items}
         keyExtractor={(recipe) => recipe.id}
         numColumns={2}
