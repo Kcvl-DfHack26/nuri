@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
+import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Platform, Pressable, View } from 'react-native';
+import { Alert, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FaceScene } from '@/components/face-scene';
@@ -21,6 +22,27 @@ const IMAGE = Icon.select({ ios: 'photo', android: import('@expo/material-symbol
 const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
 const MIC = Icon.select({ ios: 'mic', android: import('@expo/material-symbols/mic.xml') });
 const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/add.xml') });
+
+// Both entries ask before anything can be sent (#46). Declining sends nothing and stays on ⑫-1.
+function confirmUpload(onAccept: () => void) {
+  Alert.alert('動画をサーバーへ送信して解析します', undefined, [
+    { text: 'いいえ', style: 'cancel' },
+    { text: 'はい', onPress: onAccept },
+  ]);
+}
+
+// The system picker hands over only the chosen video, so no photo library permission is asked.
+async function pickVideo() {
+  const result = await launchImageLibraryAsync({ mediaTypes: 'videos' });
+  const video = result.assets?.[0];
+  if (result.canceled || !video) {
+    return;
+  }
+  // Choosing the video is the send action; the URI stays on the device in the post's data.
+  confirmUpload(() => {
+    router.push({ pathname: '/post/creating', params: { video: video.uri } });
+  });
+}
 
 // Plan A ⑫-1 動画を撮る. The camera is not built; Plan A's still frame stands in and no
 // image leaves the device.
@@ -67,7 +89,12 @@ export function PostCamera() {
         className="-mt-6 flex-row items-end justify-center gap-[11px] px-4"
         style={{ paddingBottom: bottom }}
       >
-        <CameraAction label="動画から">
+        <CameraAction
+          label="動画から"
+          onPress={() => {
+            void pickVideo();
+          }}
+        >
           <View className="size-[52px] items-center justify-center rounded-full border border-ink-primary bg-bg-surface">
             <SocialIcon name={IMAGE} size={24} color={ink} />
           </View>
@@ -75,7 +102,9 @@ export function PostCamera() {
         <CameraAction
           label="録画をはじめる"
           onPress={() => {
-            router.push('/post/recording');
+            confirmUpload(() => {
+              router.push('/post/recording');
+            });
           }}
         >
           <View
