@@ -297,7 +297,7 @@ function BrowCard({ current, suited }: { current: BrowShape | null; suited: Brow
             onPress={() => {
               router.push('/parts/brow');
             }}
-            className="min-h-11 flex-row items-center justify-center gap-1 rounded-[22px] border border-black px-4 active:opacity-70"
+            className="min-h-12 flex-row items-center justify-center gap-1 rounded-[24px] border border-black px-4 active:opacity-70"
           >
             <Text className="font-maru-bold text-label text-ink-primary">眉のメイクを見る</Text>
             <SocialIcon name={NEXT} size={18} color={ink} />

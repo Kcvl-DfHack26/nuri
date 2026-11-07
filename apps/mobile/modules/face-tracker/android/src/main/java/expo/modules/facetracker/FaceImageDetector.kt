@@ -12,7 +12,7 @@ import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import expo.modules.kotlin.exception.CodedException
 
-// Photos are scaled down before detection; the landmarker resizes its input to a small size anyway.
+// Photos are scaled down to this long side before detection; the landmarker shrinks its input anyway.
 private const val MAX_SIDE = 1280
 
 internal class ImageUnreadableException : CodedException("写真を読み込めませんでした")
@@ -56,13 +56,20 @@ private fun readUpright(context: Context, uri: Uri): Bitmap {
   val orientation = resolver.openInputStream(uri)?.use {
     ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
   } ?: ExifInterface.ORIENTATION_NORMAL
-  val degrees = when (orientation) {
-    ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-    ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-    ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-    else -> 0f
+  // Sampling halves the size, so finish scaling the long side down to MAX_SIDE here.
+  val scale = minOf(1f, MAX_SIDE.toFloat() / maxOf(decoded.width, decoded.height))
+  val matrix = Matrix().apply {
+    postScale(scale, scale)
+    when (orientation) {
+      ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> postScale(-1f, 1f)
+      ExifInterface.ORIENTATION_ROTATE_180 -> postRotate(180f)
+      ExifInterface.ORIENTATION_FLIP_VERTICAL -> postScale(1f, -1f)
+      ExifInterface.ORIENTATION_TRANSPOSE -> { postRotate(90f); postScale(-1f, 1f) }
+      ExifInterface.ORIENTATION_ROTATE_90 -> postRotate(90f)
+      ExifInterface.ORIENTATION_TRANSVERSE -> { postRotate(270f); postScale(-1f, 1f) }
+      ExifInterface.ORIENTATION_ROTATE_270 -> postRotate(270f)
+    }
   }
-  if (degrees == 0f) return decoded
-  val matrix = Matrix().apply { postRotate(degrees) }
+  if (matrix.isIdentity) return decoded
   return Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
 }

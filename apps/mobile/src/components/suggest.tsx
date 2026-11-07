@@ -108,27 +108,32 @@ export function Suggest() {
       return;
     }
     setMessage(undefined);
-    const picked =
-      source === 'camera'
-        ? await takePhoto()
-        : await launchImageLibraryAsync({ mediaTypes: 'images' });
-    if ('error' in picked) {
-      setMessage(picked.error);
-      return;
-    }
-    const uri = picked.assets?.[0]?.uri;
-    if (picked.canceled || !uri) {
-      return;
-    }
-    setPhoto(uri);
-    setAnalyzing(true);
-    const outcome = await diagnosePhoto(uri);
-    setAnalyzing(false);
-    if ('message' in outcome) {
-      setMessage(outcome.message);
-    } else {
-      setLast(outcome);
-      openResult(outcome);
+    try {
+      const picked =
+        source === 'camera'
+          ? await takePhoto()
+          : await launchImageLibraryAsync({ mediaTypes: 'images' });
+      if ('error' in picked) {
+        setMessage(picked.error);
+        return;
+      }
+      const uri = picked.assets?.[0]?.uri;
+      if (picked.canceled || !uri) {
+        return;
+      }
+      setPhoto(uri);
+      setAnalyzing(true);
+      const outcome = await diagnosePhoto(uri);
+      if ('message' in outcome) {
+        setMessage(outcome.message);
+      } else {
+        setLast(outcome);
+        openResult(outcome);
+      }
+    } catch {
+      setMessage('写真を用意できませんでした。もう一度お試しください');
+    } finally {
+      setAnalyzing(false);
     }
   }
 

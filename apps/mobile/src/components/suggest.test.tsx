@@ -138,6 +138,16 @@ test('explains a photo without a face or a turned face', async () => {
   expect(router.push).not.toHaveBeenCalled();
 });
 
+test('explains when the photo cannot be taken or picked', async () => {
+  pick.mockRejectedValueOnce(new Error('picker failed'));
+  await render(<Suggest />);
+  await fireEvent.press(screen.getByRole('button', { name: '写真から診断' }));
+  expect(
+    await screen.findByText('写真を用意できませんでした。もう一度お試しください'),
+  ).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '写真から診断' })).toBeEnabled();
+});
+
 test('shows the face type, the brows and recipes for that face type first', async () => {
   params.mockReturnValue({ face: 'round', brow: 'falling', photo: 'file:///face.jpg' });
   await render(<Diagnosis />, { wrapper });
