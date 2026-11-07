@@ -287,7 +287,7 @@ gcloud auth application-default set-quota-project YOUR_PROJECT_ID
 gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com storage.googleapis.com
 ```
 
-認証済みGCPプロジェクトへの変更はこの手順以降で発生し、Cloud SQL等に料金がかかる。今回はここ以降の実リソース作成は実行していない。
+認証済みGCPプロジェクトへの変更はこの手順以降で発生し、Cloud SQL等に料金がかかる。`kcvlb4` の `nuri-staging` は2026年11月7日に作成した。別環境で再実行する前に既存のstateとリソースを確認する。
 
 ### 適用の時期・規模・費用
 
@@ -399,11 +399,11 @@ curl --fail "$API_ORIGIN/ready"
 
 サービスのstartup probeは `/ready`（DBへ `SELECT 1`）を使う。DB URLやsecretが誤っているとrevisionが起動せず、applyが失敗する。このときCloud Runのサービスだけが作られ、OpenTofuのstateには残らない。secretを直してから `gcloud run services delete nuri-staging --region=asia-northeast1` で消し、もう一度applyする（`deletion_protection` はOpenTofu側の設定なので、gcloudでは消せる）。liveness probeは `/health` のままにし、DBが一時的に落ちてもインスタンスを再起動しない。
 
-`api_origin`出力と`service_uri`が一致することを確認する。custom domainを使う場合はDNS/ドメインマッピングを別途設定し、`api_origin`にそのHTTPS URLを渡す。
+初回の `api_origin` はサービス作成前に実URLが分からないため暫定値になる。`service_uri` と一致しなければ、`terraform.tfvars` の `api_origin` に `service_uri` を設定し、再度 `tofu plan` と `tofu apply` を行う。これでCloud Runの `BETTER_AUTH_URL` も実URLに変わる。`kcvlb4` では初回の推定URLと実URLが異なったため、この2回目の適用を行った。最後に両方の出力が一致することを確認する。custom domainを使う場合はDNS/ドメインマッピングを別途設定し、`api_origin`にそのHTTPS URLを渡す。
 
 ### CIからのデプロイを有効にする
 
-nuriのリポジトリには、2026年11月7日の時点でGitHub Environment `production` がない（`preview` だけ）。先にmainだけが使えるEnvironmentを作る。
+nuriのリポジトリには、2026年11月7日にGitHub Environment `production` を作成し、利用可能なブランチをmainだけに制限した。別のリポジトリで未作成なら、先に同じ設定で作る。
 
 ```sh
 gh api -X PUT repos/Kcvl-DfHack26/nuri/environments/production \
@@ -430,6 +430,8 @@ gh workflow run deploy.yml --ref main
 以後、mainの成功したCIから「イメージ作成 → migrationのjob → トラフィックなしのcandidateで `/ready` → トラフィック切替」の順に動く。migrationが失敗したらデプロイは止まり、今のrevisionがトラフィックを受け続ける。Expo側にproduction API URLとビルドを用意してから `EXPO_UPDATE_ENABLED=true` を設定すると、最後にExpo Updateを配信する。
 
 アプリから読むには、ExpoのEnvironment Variablesの `EXPO_PUBLIC_API_URL`（previewとproduction）に `service_uri` を設定する（[Expo GitHub連携・環境変数](#expo-github連携環境変数)）。
+
+2026年11月7日の初回公開では、[mainのデプロイ](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42372457055)でmigration・candidateの `/ready`・トラフィック切替が成功し、`https://nuri-staging-v3kjfarita-an.a.run.app` の `/health`・`/ready`・`/api/recipes` が200で応答した。Expoのdevelopment・preview・production環境の `EXPO_PUBLIC_API_URL` もこのURLに設定した。Androidエミュレーターの開発ビルドでメイク画面の空状態を確認し、Cloud Runのログでアプリからの `GET /api/recipes?offset=0` が200で応答した。iOS実機は未確認。DBはmigrationのみで、レシピ一覧は空。開発用seedを本番DBへ実行せず、アプリでレシピを表示するためのデータは #30 の方針に従って用意する。
 
 CIはトラフィックを特定のrevisionへ固定する。そのため、CIのデプロイ後に `tofu apply` で環境変数などを変えると、新しいrevisionはトラフィック0%で作られる。変更後は `gh workflow run deploy.yml --ref main` で配信し直すか、`gcloud run services update-traffic nuri-staging --region=asia-northeast1 --to-latest` で切り替える。
 

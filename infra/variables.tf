@@ -61,7 +61,7 @@ variable "image" {
   }
 }
 variable "api_origin" {
-  description = "Optional HTTPS custom domain; empty uses the deterministic Cloud Run URL."
+  description = "HTTPS origin for Better Auth. After first deployment, set this to service_uri (or a mapped custom domain); the empty fallback is provisional."
   type        = string
   default     = ""
 }
