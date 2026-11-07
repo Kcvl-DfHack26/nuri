@@ -64,10 +64,10 @@ const sample = {
       part: 'brow',
       label: '眉',
       iconBackground: 'bg-pastel-peach',
-      summary: '眉尻を少し上げると、すっきり見えます',
+      summary: '眉山に高さを出してすっきり見せます',
       detail: {
         current: { label: '今の眉', value: '眉尻がやや下がり気味' },
-        suited: { label: '似合う形', value: '少し上げた平行眉' },
+        suited: { label: '似合う形', value: 'アーチ眉' },
         colors: ['#B88F73', '#8A664F', '#6B4D3D', '#4A3330'],
         action: '眉のメイクを見る',
       },
