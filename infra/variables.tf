@@ -46,6 +46,11 @@ variable "deploy_application" {
   type        = bool
   default     = false
 }
+variable "deletion_protection" {
+  description = "Guards Cloud SQL, the Cloud Run service and the migration job. Set false only to destroy them."
+  type        = bool
+  default     = true
+}
 variable "image" {
   description = "Initial immutable Artifact Registry image URI. Later revisions are owned by CI."
   type        = string

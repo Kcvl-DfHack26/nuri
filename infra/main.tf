@@ -80,7 +80,7 @@ resource "google_sql_database_instance" "postgres" {
   name                = var.name
   region              = var.region
   database_version    = "POSTGRES_17"
-  deletion_protection = true
+  deletion_protection = var.deletion_protection
   settings {
     tier              = var.database_tier
     edition           = "ENTERPRISE"
@@ -99,15 +99,19 @@ resource "google_sql_database_instance" "postgres" {
   }
   depends_on = [google_project_service.enabled]
 }
+# Deleting the instance removes the database and user with it. ABANDON keeps
+# destroy from failing on open connections or on objects the user owns.
 resource "google_sql_database" "app" {
-  name     = "expo-hono-opentofu-starter"
-  instance = google_sql_database_instance.postgres.name
+  name            = "expo-hono-opentofu-starter"
+  instance        = google_sql_database_instance.postgres.name
+  deletion_policy = "ABANDON"
 }
 resource "google_sql_user" "app" {
   name                = "expo-hono-opentofu-starter"
   instance            = google_sql_database_instance.postgres.name
   password_wo         = var.database_password
   password_wo_version = var.database_password_version
+  deletion_policy     = "ABANDON"
 }
 resource "google_secret_manager_secret" "app" {
   for_each  = toset(["database-url", "auth-secret"])
@@ -128,7 +132,7 @@ resource "google_cloud_run_v2_service" "api" {
   count               = var.deploy_application ? 1 : 0
   name                = var.name
   location            = var.region
-  deletion_protection = true
+  deletion_protection = var.deletion_protection
   ingress             = "INGRESS_TRAFFIC_ALL"
   template {
     service_account = google_service_account.runtime.email
@@ -168,8 +172,13 @@ resource "google_cloud_run_v2_service" "api" {
           }
         }
       }
+      # A revision takes traffic only after it can reach the database.
+      # Liveness stays on /health so a short database outage does not restart instances.
       startup_probe {
-        http_get { path = "/health" }
+        http_get { path = "/ready" }
+        timeout_seconds   = 3
+        period_seconds    = 5
+        failure_threshold = 12
       }
       liveness_probe {
         http_get { path = "/health" }
@@ -190,7 +199,7 @@ resource "google_cloud_run_v2_job" "migrate" {
   count               = var.deploy_application ? 1 : 0
   name                = "${var.name}-migrate"
   location            = var.region
-  deletion_protection = true
+  deletion_protection = var.deletion_protection
   template {
     template {
       service_account = google_service_account.runtime.email
