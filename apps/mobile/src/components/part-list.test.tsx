@@ -48,7 +48,7 @@ test('filters the styles with the chips', async () => {
   expect(screen.getByRole('button', { name: '丸顔におすすめ' })).toBeSelected();
   expect(screen.getAllByRole('radio')).toHaveLength(1);
   expect(
-    screen.getByRole('radio', { name: '上がり眉、シャープで自信のある、丸顔におすすめ' }),
+    screen.getByRole('radio', { name: 'アーチ眉、女性らしく上品な、丸顔におすすめ' }),
   ).toBeOnTheScreen();
   // The hidden selection stays, so the start button still opens its recipe.
   await fireEvent.press(screen.getByRole('button', { name: 'メイクをはじめる' }));

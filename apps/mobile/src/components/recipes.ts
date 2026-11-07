@@ -357,7 +357,8 @@ const browCell = (column: number, row: number): PhotoCrop => ({
 
 /**
  * ③ 部位別一覧: Plan A designs only the brow list. Plan A shows the 丸顔におすすめ badge on
- * 上がり眉; the beginner and natural assignments are sample data.
+ * 上がり眉, but #47 decided that アーチ眉 suits a round face (docs/requirements.md F7); the
+ * beginner and natural assignments are sample data.
  */
 export const partStyles: Partial<Record<PartId, { photo: number; styles: PartStyle[] }>> = {
   brow: {
@@ -383,7 +384,7 @@ export const partStyles: Partial<Record<PartId, { photo: number; styles: PartSty
         name: 'アーチ眉',
         caption: '女性らしく上品な',
         crop: browCell(0, 1),
-        filters: [],
+        filters: ['round'],
       },
       {
         id: 'straight',
@@ -397,7 +398,7 @@ export const partStyles: Partial<Record<PartId, { photo: number; styles: PartSty
         name: '上がり眉',
         caption: 'シャープで自信のある',
         crop: browCell(0, 2),
-        filters: ['round'],
+        filters: [],
       },
       {
         id: 'falling',

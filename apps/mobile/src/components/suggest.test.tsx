@@ -31,16 +31,16 @@ test('opens the sample result from the previous diagnosis and keeps capture disa
 
 test('folds the brow finding and opens a recommended recipe', async () => {
   await render(<Diagnosis />);
-  const brow = screen.getByRole('button', { name: '眉、眉尻を少し上げると、すっきり見えます' });
+  const brow = screen.getByRole('button', { name: '眉、眉山に高さを出してすっきり見せます' });
   expect(brow).toBeExpanded();
-  expect(screen.getByText('少し上げた平行眉')).toBeOnTheScreen();
+  expect(screen.getByText('アーチ眉')).toBeOnTheScreen();
 
   await fireEvent.press(brow);
   expect(brow).toBeCollapsed();
-  expect(screen.queryByText('少し上げた平行眉')).not.toBeOnTheScreen();
+  expect(screen.queryByText('アーチ眉')).not.toBeOnTheScreen();
 
   await fireEvent.press(brow);
-  expect(screen.getByText('少し上げた平行眉')).toBeOnTheScreen();
+  expect(screen.getByText('アーチ眉')).toBeOnTheScreen();
   expect(
     screen.getByRole('button', { name: '目元、目尻のラインで横幅を出します（準備中）' }),
   ).toBeDisabled();
