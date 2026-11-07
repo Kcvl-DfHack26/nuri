@@ -62,8 +62,9 @@ export function ProductSheet({ id }: { id: string }) {
         </View>
         <CloseButton />
       </View>
-      {/* On iOS react-native-screens resizes a sheet's ScrollView it can find to the whole sheet,
-          which drew the details over the header. This wrapper keeps it out of that search. */}
+      {/* On iOS react-native-screens 4.x (tryFindDescendantScrollView) resizes a sheet's ScrollView
+          it can find to the whole sheet, which drew the details over the header. This wrapper
+          keeps it out of that search; re-check it when upgrading react-native-screens. */}
       <View collapsable={false} className="mt-4 flex-1">
         <ScrollView contentInsetAdjustmentBehavior="never" contentContainerClassName="gap-4 pb-4">
           <ProductDetails info={info} />
