@@ -454,10 +454,19 @@ test('posting a recipe needs a session, validates it and serves its thumbnail', 
   const created = await request('/api/recipes', valid, cookie);
   expect(created.status).toBe(201);
   const { id } = z.object({ id: z.string().regex(/^p-[a-z0-9-]+$/) }).parse(await created.json());
-  // A post resent after a lost response is saved once; someone else's key is refused.
-  const resent = await request('/api/recipes', { ...valid, title: '二度目' }, cookie);
+  // A post resent after a lost response is saved once, with the latest contents; someone else's
+  // key is refused.
+  const resent = await request(
+    '/api/recipes',
+    { ...valid, title: '二度目', steps: [step] },
+    cookie,
+  );
   expect(resent.status).toBe(201);
   expect(await resent.json()).toEqual({ id });
+  expect(await (await app.request(`/api/recipes/${id}`)).json()).toMatchObject({
+    recipe: { title: '二度目', steps: [{ part: 'cheek' }] },
+  });
+  expect((await request('/api/recipes', valid, cookie)).status).toBe(201);
   const otherKey = crypto.randomUUID();
   await db.insert(user).values({ id: `poster-${unique}`, name: 'ほかの人', email: posterEmail });
   await db.insert(recipe).values({

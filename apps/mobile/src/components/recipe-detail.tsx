@@ -264,7 +264,10 @@ export function RecipeContent({
               >
                 手順
               </Text>
-              <View className="flex-row justify-between">
+              {/* Plan A spreads a few steps over the row; a long posted recipe wraps instead. */}
+              <View
+                className={cn('flex-row', steps.length > 6 ? 'flex-wrap gap-3' : 'justify-between')}
+              >
                 {steps.map((step, index) => {
                   const part = parts[step.part];
                   return (

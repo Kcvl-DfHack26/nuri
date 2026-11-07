@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
+import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 
 import type { PostDraft } from '@/components/post-draft';
@@ -26,7 +27,9 @@ function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
     tags: draft.tags.map((tag) => tag.replace(/^#/u, '')),
     durationMinutes: recipeMinutes(draft.video?.durationMs ?? null),
     steps: draft.steps.map((step) => {
-      const names = draft.publishCosmetics ? step.cosmetics.map((cosmetic) => cosmetic.name) : [];
+      // Only published cosmetics give their names and color; otherwise the part stands in.
+      const cosmetics = draft.publishCosmetics ? step.cosmetics : [];
+      const names = cosmetics.map((cosmetic) => cosmetic.name);
       return {
         part: step.part,
         label: parts[step.part].label,
@@ -34,7 +37,7 @@ function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
         description: step.description,
         // ⑦ shows this as what the step uses; the part's name stands in when nothing is named.
         uses: names.join('、') || parts[step.part].label,
-        color: step.cosmetics[0]?.color ?? partColors[step.part],
+        color: cosmetics[0]?.color ?? partColors[step.part],
       };
     }),
   };
@@ -74,13 +77,20 @@ async function thumbnailBase64(
 // Plan A ⑫-8 投稿のプレビュー: ⑤ with the draft, and 投稿 sends it. Before sending, a native alert
 // asks to publish the thumbnail, which can show the user's face, and the steps. The video is never
 // sent. A failed post keeps the draft so 投稿 can be pressed again; the draft's key lets the API
-// save a post resent after a lost response only once. ⑫-6's cosmetics are Plan A samples with no
+// save a post resent after a lost response only once, with the latest contents. ⑫-6's cosmetics are Plan A samples with no
 // product behind them, so they are posted as names in the steps, and the preview shows no product
 // list either.
 export function PostPreview() {
   const { draft, setDraft, trackFile } = usePostDraft();
   const { data: session } = authClient.useSession();
   const client = useQueryClient();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const post = useMutation({
     mutationFn: async (current: PostDraft) =>
       await postRecipe({
@@ -88,12 +98,18 @@ export function PostPreview() {
         thumbnail: await thumbnailBase64(current, trackFile),
       }),
     onSuccess: (id) => {
-      setDraft((current) => ({ ...current, postedId: id }));
       void client.invalidateQueries({ queryKey: ['recipes'] });
-      router.push('/post/done');
+      // The post is saved even if the user left the flow while it was sending; ⑫-9 needs the
+      // draft that left with them, so it opens only while this screen is still there.
+      if (mounted.current) {
+        setDraft((current) => ({ ...current, postedId: id }));
+        router.push('/post/done');
+      }
     },
     onError: (error) => {
-      Alert.alert('投稿できませんでした', error.message);
+      if (mounted.current) {
+        Alert.alert('投稿できませんでした', error.message);
+      }
     },
   });
   const fields = postFields(draft);

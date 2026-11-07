@@ -66,6 +66,7 @@ test('bounds a posted recipe and accepts only a JPEG thumbnail within the limit'
     color: '#E8968A',
   };
   const valid = {
+    key: '3f2b8c1e-6d4a-4b7e-9c2d-1a5e8f0b7c3d',
     title: ' 狐メイク ',
     summary: '',
     tags: ['時短'],

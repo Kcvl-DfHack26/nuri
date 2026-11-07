@@ -77,30 +77,34 @@ export function recipeRoutes(db: Database, auth: Auth) {
         const input = c.req.valid('json');
         // The schema already bounds the base64 length to the decoded size limit.
         const bytes = Buffer.from(input.thumbnail, 'base64');
-        // The draft's key makes the ID, so a post resent after its response was lost is not saved
-        // twice; the same key from someone else is refused.
+        // The draft's key makes the ID, so a post resent after its response was lost is saved
+        // once, with the contents of the latest send (the user may have changed the photo). The
+        // same key from someone else is refused.
         const id = `p-${input.key.toLowerCase()}`;
         const authorId = c.get('currentUser').id;
+        const fields = {
+          title: input.title,
+          image: `/api/recipe-images/${id}`,
+          tags: input.tags,
+          durationMinutes: input.durationMinutes,
+          summary: input.summary || null,
+        };
         const saved = await db.transaction(async (tx) => {
           const [inserted] = await tx
             .insert(recipe)
-            .values({
-              id,
-              authorId,
-              title: input.title,
-              image: `/api/recipe-images/${id}`,
-              tags: input.tags,
-              durationMinutes: input.durationMinutes,
-              summary: input.summary || null,
-            })
+            .values({ id, authorId, ...fields })
             .onConflictDoNothing()
             .returning({ id: recipe.id });
           if (!inserted) {
-            const [existing] = await tx
-              .select({ authorId: recipe.authorId })
-              .from(recipe)
-              .where(eq(recipe.id, id));
-            return existing?.authorId === authorId;
+            const [updated] = await tx
+              .update(recipe)
+              .set(fields)
+              .where(and(eq(recipe.id, id), eq(recipe.authorId, authorId)))
+              .returning({ id: recipe.id });
+            if (!updated) {
+              return false;
+            }
+            await tx.delete(recipeStep).where(eq(recipeStep.recipeId, id));
           }
           await tx.insert(recipeStep).values(
             input.steps.map((step, position) => ({
@@ -114,7 +118,10 @@ export function recipeRoutes(db: Database, auth: Auth) {
               colors: [step.color],
             })),
           );
-          await tx.insert(recipeImage).values({ recipeId: id, contentType: 'image/jpeg', bytes });
+          await tx
+            .insert(recipeImage)
+            .values({ recipeId: id, contentType: 'image/jpeg', bytes })
+            .onConflictDoUpdate({ target: recipeImage.recipeId, set: { bytes } });
           return true;
         });
         if (!saved) {

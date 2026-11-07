@@ -172,7 +172,7 @@ export function PostMessage() {
         <View className="overflow-hidden rounded-[18px] border-[1.5px] border-line-soft bg-white">
           <PublishOption
             title="使ったコスメを公開"
-            detail="商品へのリンクも表示します"
+            detail="手順に使ったコスメの名前と色を載せます"
             value={draft.publishCosmetics}
             onChange={(publishCosmetics) => {
               setDraft((current) => ({ ...current, publishCosmetics }));
