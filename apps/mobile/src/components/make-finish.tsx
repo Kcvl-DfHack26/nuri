@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { COMPARE } from '@/components/make-compare';
 import { arPhotos, findRecipe } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
 import { backOrHome } from '@/lib/navigation';
@@ -50,7 +51,16 @@ export function MakeFinish({ id }: { id: string }) {
             backOrHome();
           }}
         />
-        <GlassIconButton icon={DOWNLOAD} label="写真を保存（準備中）" />
+        <View className="flex-row gap-2">
+          <GlassIconButton
+            icon={COMPARE}
+            label="メイク前と比べる"
+            onPress={() => {
+              router.push(`/recipes/${id}/compare`);
+            }}
+          />
+          <GlassIconButton icon={DOWNLOAD} label="写真を保存（準備中）" />
+        </View>
       </View>
       <View
         className="absolute inset-x-0 bottom-0 items-center gap-3.5 px-5"
