@@ -210,7 +210,7 @@ adb reverse tcp:8081 tcp:8081
 
 | 種別                 | 名前                             | 値・取得元                                                      |
 | -------------------- | -------------------------------- | --------------------------------------------------------------- |
-| Repository Variable  | `GCP_DEPLOY_ENABLED`             | 現在 `false`。GCP構築・secret投入・初期サービス作成後に `true`  |
+| Repository Variable  | `GCP_DEPLOY_ENABLED`             | 現在 `true`。停止時は `false`                                   |
 | Environment Variable | `GCP_PROJECT_ID`                 | 対象GCP project ID                                              |
 | Environment Variable | `GCP_REGION`                     | 例: `asia-northeast1`                                           |
 | Environment Variable | `CLOUD_RUN_SERVICE`              | OpenTofuの `name`                                               |
@@ -431,7 +431,7 @@ gh workflow run deploy.yml --ref main
 
 アプリから読むには、ExpoのEnvironment Variablesの `EXPO_PUBLIC_API_URL`（previewとproduction）に `service_uri` を設定する（[Expo GitHub連携・環境変数](#expo-github連携環境変数)）。
 
-2026年11月7日の初回公開では、[mainのデプロイ](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42372457055)でmigration・candidateの `/ready`・トラフィック切替が成功し、`https://nuri-staging-v3kjfarita-an.a.run.app` の `/health`・`/ready`・`/api/recipes` が200で応答した。Expoのdevelopment・preview・production環境の `EXPO_PUBLIC_API_URL` もこのURLに設定した。Androidエミュレーターの開発ビルドでメイク画面の空状態を確認し、Cloud Runのログでアプリからの `GET /api/recipes?offset=0` が200で応答した。iOS実機は未確認。DBはmigrationのみで、レシピ一覧は空。開発用seedを本番DBへ実行せず、アプリでレシピを表示するためのデータは #30 の方針に従って用意する。
+2026年11月7日の初回公開では、このブランチのOpenTofu設定を適用してmigration jobとCloud Runサービスを作成した。その後、[mainのデプロイ](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42372457055)（`ce37dd2`）でmigration・candidateの `/ready`・トラフィック切替が成功した。CIはOpenTofuの変更を適用しないため、IaCの検証結果とは分けて扱う。実サービスのstartup probeが `/ready` であることを確認し、`https://nuri-staging-v3kjfarita-an.a.run.app` の `/health`・`/ready`・`/api/recipes` が200で応答した。Expoのdevelopment・preview・production環境の `EXPO_PUBLIC_API_URL` もこのURLに設定した。Androidエミュレーターの開発ビルドでメイク画面の空状態を確認し、Cloud Runのログでアプリからの `GET /api/recipes?offset=0` が200で応答した。iOS実機は未確認。DBはmigrationのみで、レシピ一覧は空。開発用seedを本番DBへ実行せず、アプリでレシピを表示するためのデータは #30 の方針に従って用意する。
 
 CIはトラフィックを特定のrevisionへ固定する。そのため、CIのデプロイ後に `tofu apply` で環境変数などを変えると、新しいrevisionはトラフィック0%で作られる。変更後は `gh workflow run deploy.yml --ref main` で配信し直すか、`gcloud run services update-traffic nuri-staging --region=asia-northeast1 --to-latest` で切り替える。
 
@@ -472,7 +472,7 @@ tofu -chdir=infra apply -var=deletion_protection=false
 tofu -chdir=infra destroy -var=deletion_protection=false
 ```
 
-`deletion_protection` はCloud SQL・Cloud Runのサービス・migrationのjobの削除を防ぐ。`false` で一度applyしてからdestroyする。stateのbucket（`infra/bootstrap`）は `prevent_destroy` のため残る。費用は月数セント以下。削除するとstateも失うため、不要になったときに手動で消す。Workload Identity Poolは削除後30日間は同じIDで作り直せない（`gcloud iam workload-identity-pools undelete` で戻す）。Cloud SQLのインスタンス名も削除後しばらく再利用できない。
+`deletion_protection` はCloud SQL・Cloud Runのサービス・migrationのjobのOpenTofuからの削除を防ぎ、Cloud SQLではGCP側の削除防止も有効にする。`false` で一度applyして両方を解除してからdestroyする。stateのbucket（`infra/bootstrap`）は `prevent_destroy` のため残る。費用は月数セント以下。削除するとstateも失うため、不要になったときに手動で消す。Workload Identity Poolは削除後30日間は同じIDで作り直せない（`gcloud iam workload-identity-pools undelete` で戻す）。Cloud SQLのインスタンス名も削除後しばらく再利用できない。
 
 ## 5. ハーネスと検証
 

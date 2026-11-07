@@ -82,11 +82,12 @@ resource "google_sql_database_instance" "postgres" {
   database_version    = "POSTGRES_17"
   deletion_protection = var.deletion_protection
   settings {
-    tier              = var.database_tier
-    edition           = "ENTERPRISE"
-    disk_size         = 10
-    disk_autoresize   = true
-    availability_type = "ZONAL"
+    tier                        = var.database_tier
+    edition                     = "ENTERPRISE"
+    disk_size                   = 10
+    disk_autoresize             = true
+    availability_type           = "ZONAL"
+    deletion_protection_enabled = var.deletion_protection
     backup_configuration {
       enabled                        = true
       point_in_time_recovery_enabled = true

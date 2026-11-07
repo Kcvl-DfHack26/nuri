@@ -47,7 +47,7 @@ variable "deploy_application" {
   default     = false
 }
 variable "deletion_protection" {
-  description = "Guards Cloud SQL, the Cloud Run service and the migration job. Set false only to destroy them."
+  description = "Guards Cloud SQL in OpenTofu and Google Cloud, plus the Cloud Run service and migration job in OpenTofu. Set false only to destroy them."
   type        = bool
   default     = true
 }
