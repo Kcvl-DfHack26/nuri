@@ -29,6 +29,10 @@ class FaceTrackerModule : Module() {
       Prop("active") { view: FaceTrackerView, active: Boolean ->
         view.setActive(active)
       }
+
+      OnViewDestroys { view: FaceTrackerView ->
+        view.release()
+      }
     }
   }
 }

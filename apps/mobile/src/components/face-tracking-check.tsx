@@ -3,7 +3,15 @@ import { Canvas, Points } from '@shopify/react-native-skia';
 import { useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { AppState, Linking, PermissionsAndroid, Platform, Pressable, View } from 'react-native';
+import {
+  AppState,
+  Linking,
+  PermissionsAndroid,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Point, Size } from '@/lib/face-landmarks';
@@ -48,11 +56,17 @@ export function FaceTrackingCheck() {
       return;
     }
     let mounted = true;
-    void FaceTracker.requestCameraPermissionAsync().then((granted) => {
-      if (mounted) {
-        setPermission(granted ? 'granted' : 'denied');
-      }
-    });
+    FaceTracker.requestCameraPermissionAsync()
+      .then((granted) => {
+        if (mounted) {
+          setPermission(granted ? 'granted' : 'denied');
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setPermission('denied');
+        }
+      });
     return () => {
       mounted = false;
     };
@@ -68,11 +82,15 @@ export function FaceTrackingCheck() {
       if (state !== 'active') {
         return;
       }
-      void PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA).then((granted) => {
-        if (granted) {
-          setPermission('granted');
-        }
-      });
+      PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA)
+        .then((granted) => {
+          if (granted) {
+            setPermission('granted');
+          }
+        })
+        .catch(() => {
+          setPermission('denied');
+        });
     });
     return () => {
       subscription.remove();
@@ -94,15 +112,8 @@ export function FaceTrackingCheck() {
     setPoints(toViewPoints(event.points, event, view));
   }
 
-  const message = !FaceTracker
-    ? 'この画面は開発ビルドで開いてください。Expo Goでは顔追跡を使えません'
-    : permission === 'denied' || status?.status === 'permissionDenied'
-      ? 'カメラを使う許可がありません'
-      : status?.status === 'noFace'
-        ? '顔をカメラに向けてください'
-        : status?.status === 'error'
-          ? (status.message ?? '顔追跡を始められませんでした')
-          : undefined;
+  const cameraDenied = permission === 'denied' || status?.status === 'permissionDenied';
+  const message = guidanceMessage(status, cameraDenied);
   const tracking = status?.status === 'tracking';
 
   return (
@@ -117,7 +128,7 @@ export function FaceTrackingCheck() {
       {FaceTracker ? (
         <FaceTrackerView
           active={permission === 'granted' && focused}
-          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+          style={StyleSheet.absoluteFill}
           onLandmarks={(event) => {
             handleLandmarks(event.nativeEvent);
           }}
@@ -127,10 +138,7 @@ export function FaceTrackingCheck() {
         />
       ) : null}
       {tracking ? (
-        <Canvas
-          pointerEvents="none"
-          style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-        >
+        <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
           <Points points={points} mode="points" color={rose} strokeWidth={3} strokeCap="round" />
         </Canvas>
       ) : null}
@@ -162,7 +170,7 @@ export function FaceTrackingCheck() {
             {message}
           </Text>
         ) : null}
-        {permission === 'denied' || status?.status === 'permissionDenied' ? (
+        {cameraDenied ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => {
@@ -183,4 +191,20 @@ export function FaceTrackingCheck() {
       </View>
     </View>
   );
+}
+
+function guidanceMessage(status: FaceTrackerStatusEvent | undefined, cameraDenied: boolean) {
+  if (!FaceTracker) {
+    return 'この画面は開発ビルドで開いてください。Expo Goでは顔追跡を使えません';
+  }
+  if (cameraDenied) {
+    return 'カメラを使う許可がありません';
+  }
+  if (status?.status === 'noFace') {
+    return '顔をカメラに向けてください';
+  }
+  if (status?.status === 'error') {
+    return status.message ?? '顔追跡を始められませんでした';
+  }
+  return undefined;
 }

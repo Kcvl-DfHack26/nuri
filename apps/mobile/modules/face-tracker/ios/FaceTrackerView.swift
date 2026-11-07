@@ -19,6 +19,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   private var configured = false
   private var active = false
   private var lastStatus: String?
+  private var lastMessage: String?
 
   // Shared between the video queue and MediaPipe's callback thread.
   private let lock = NSLock()
@@ -181,7 +182,11 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       captureTimes = captureTimes.filter { $0.key > timestamp - 2000 }
     }
     lock.unlock()
-    try? landmarker.detectAsync(image: image, timestampInMilliseconds: timestamp)
+    do {
+      try landmarker.detectAsync(image: image, timestampInMilliseconds: timestamp)
+    } catch {
+      emitStatus("error", message: error.localizedDescription)
+    }
   }
 
   // MARK: MediaPipe results (MediaPipe's thread)
@@ -230,10 +235,11 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
 
   // Main thread. Only sends changes, so a steady state does not flood JavaScript.
   private func setStatus(_ status: String, message: String?) {
-    guard status != lastStatus || message != nil else {
+    guard status != lastStatus || message != lastMessage else {
       return
     }
     lastStatus = status
+    lastMessage = message
     var payload: [String: Any] = ["status": status]
     if let message {
       payload["message"] = message
