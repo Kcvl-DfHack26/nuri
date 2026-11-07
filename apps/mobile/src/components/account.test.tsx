@@ -56,7 +56,11 @@ const mockMagicLink = jest.fn(async () => ({ error: null }));
 
 function renderAccount() {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    // No garbage-collection timers, so Jest can exit after the run.
+    defaultOptions: {
+      queries: { retry: false, gcTime: Infinity },
+      mutations: { retry: false, gcTime: Infinity },
+    },
   });
   return render(
     <QueryClientProvider client={client}>
