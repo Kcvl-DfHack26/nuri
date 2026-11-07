@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { useColorScheme } from 'react-native';
 
+import { Launch } from '@/components/launch';
 import { PreferencesProvider } from '@/lib/preferences';
 import { stackOptions } from '@/theme/navigation';
 
@@ -20,7 +21,7 @@ function Navigation() {
     <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={stackOptions}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="account" options={{ title: 'ログイン' }} />
+        <Stack.Screen name="account" options={{ title: 'ログイン', headerShown: false }} />
         <Stack.Screen name="users/[id]" options={{ title: 'プロフィール' }} />
         <Stack.Screen name="settings" options={{ title: '設定' }} />
         <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
@@ -75,7 +76,7 @@ export default function RootLayout() {
     ZenMaruGothic_900Black,
   });
   if (!fontsLoaded && !fontError) {
-    return null;
+    return <Launch />;
   }
   return (
     <QueryClientProvider client={client}>

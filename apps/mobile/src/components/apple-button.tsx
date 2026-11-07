@@ -1,28 +1,25 @@
-import { Image, useColorScheme, useWindowDimensions } from 'react-native';
+import { Image, useWindowDimensions } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 
-import whiteButton from '../../assets/auth/apple-sign-in-white.png';
-import blackButton from '../../assets/auth/apple-sign-in.png';
+import continueButton from '../../assets/auth/apple-continue.png';
 
+// The login screen is light only (Plan A), so Apple's black artwork is always used.
 export function AppleButton({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
-  const dark = useColorScheme() === 'dark';
   const { fontScale } = useWindowDimensions();
+  const height = Math.max(52, 48 * fontScale);
   return (
     <Button
-      accessibilityLabel="Appleでサインイン"
+      accessibilityLabel="Appleで続ける"
       disabled={disabled}
       onPress={onPress}
-      className="w-full rounded-xl p-0"
-      style={{
-        backgroundColor: dark ? '#ffffff' : '#000000',
-        minHeight: Math.max(56, 48 * fontScale),
-      }}
+      className="w-full rounded-full bg-black p-0 active:bg-black"
+      style={{ minHeight: height, boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
     >
       <Image
-        source={dark ? whiteButton : blackButton}
+        source={continueButton}
         resizeMode="contain"
-        style={{ width: '100%', height: Math.max(56, 48 * fontScale) }}
+        style={{ width: '100%', height }}
         accessible={false}
       />
     </Button>

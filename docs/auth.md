@@ -45,7 +45,7 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 
 ## パスキーの端末設定
 
-WebはBetter Auth公式passkey client、ネイティブは `react-native-passkey` から同じ登録／認証検証エンドポイントを使う。Expo Goにはこのモジュールがないため、登録・ログインを無効化して理由を表示する。登録済みキーの表示・削除はログイン後に利用できる。
+WebはBetter Auth公式passkey client、ネイティブは `react-native-passkey` から同じ登録／認証検証エンドポイントを使う。Expo Goにはこのモジュールがないため、ログイン画面（⑱）にはパスキーの操作を出さず、設定の登録は無効化して理由を表示する。登録済みキーの表示・削除はログイン後に利用できる。
 
 Development Buildには `EXPO_PUBLIC_PASSKEY_RP_ID` を設定する。iOSのAssociated Domainsはapp.config.tsが `webcredentials:<RP ID>` を生成する。APIの `/.well-known/apple-app-site-association` と `/.well-known/assetlinks.json` に正しいアプリID・署名を設定する。RPドメインから認証エンドポイントと関連付けファイルを公開し、HTTPSと端末の関連付けを確認する。Androidのnative originも `PASSKEY_ORIGINS` へ明示する。
 
