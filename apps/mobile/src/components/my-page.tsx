@@ -18,7 +18,6 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, authClient } from '@/lib/api';
 import { favoriteListOptions, formatCount, recipeListOptions } from '@/lib/recipes';
-import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
 const SETTINGS = Icon.select({
@@ -31,16 +30,9 @@ const PERSON = Icon.select({
   android: import('@expo/material-symbols/person.xml'),
 });
 
-// Plan A sample numbers until following and recipe likes are built.
-const stats = [
-  { label: 'フォロワー', value: '328', background: 'bg-base-lilac' },
-  { label: 'フォロー中', value: '96', background: 'bg-base-mint' },
-  { label: 'いいね', value: '2.4k', background: 'bg-base-peach' },
-];
-
 // Plan A ⑰ マイページ. The name and photo come from the session, and the recipes the user posted
-// and kept as favorites from the API. The follower and like numbers are Plan A samples, which the
-// screen says.
+// and kept as favorites from the API. Plan A's follower, following and like counts are left out
+// until following and likes are built.
 export function MyPage() {
   const insets = useSafeAreaInsets();
   // The tab stays mounted under other tabs; only claim the status bar while it is shown.
@@ -100,22 +92,6 @@ export function MyPage() {
         </View>
         {user ? (
           <>
-            <View className="mt-4 flex-row gap-2">
-              {stats.map((stat) => (
-                <View
-                  key={stat.label}
-                  accessible
-                  accessibilityLabel={`${stat.label} ${stat.value}`}
-                  className={cn('flex-1 items-center rounded-[18px] px-2 py-2.5', stat.background)}
-                >
-                  <Text className="font-maru-bold text-heading text-ink-primary">{stat.value}</Text>
-                  <Text className="font-maru-bold text-micro text-ink-secondary">{stat.label}</Text>
-                </View>
-              ))}
-            </View>
-            <Text className="mt-2 px-1 font-maru text-meta text-ink-secondary">
-              フォロワー・フォロー中・いいねの数は見本です
-            </Text>
             <RecipeSection
               title="投稿"
               empty="まだ投稿したレシピはありません"
