@@ -79,9 +79,9 @@ export function Diagnosis() {
     readResult(useLocalSearchParams<{ face?: string; brow?: string; photo?: string }>());
   // The header floats over the feed; measure it so larger text never covers the first card.
   const [headerHeight, setHeaderHeight] = useState(44);
-  // iOS insets the tab's first ScrollView for the status bar and tab bar; Android tabs only
-  // pad the tab bar, so the status bar is added here.
+  // iOS insets the tab's first ScrollView for the status bar and tab bar; Android adds both here.
   const scrollTop = Platform.OS === 'ios' ? 0 : insets.top;
+  const scrollBottom = Platform.OS === 'ios' ? 0 : insets.bottom;
   const faceType = result ? faceTypes[result.faceType] : undefined;
   return (
     <View className="flex-1 bg-white">
@@ -89,7 +89,10 @@ export function Diagnosis() {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerClassName="gap-6"
-        contentContainerStyle={{ paddingTop: scrollTop + headerHeight + 12, paddingBottom: 28 }}
+        contentContainerStyle={{
+          paddingTop: scrollTop + headerHeight + 12,
+          paddingBottom: scrollBottom + 28,
+        }}
       >
         {result && faceType ? (
           <>

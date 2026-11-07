@@ -3,7 +3,8 @@ import type { ReactElement } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList } from 'react-native';
+import { FlatList, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Feedback } from '@/components/feedback';
 import { PostRow } from '@/components/post-row';
@@ -14,6 +15,9 @@ import { feedOptions } from '@/lib/social';
 import { colors } from '@/theme/colors';
 
 export function Feed({ authorId, header }: { authorId?: string; header?: ReactElement }) {
+  const insets = useSafeAreaInsets();
+  // iOS insets the list for the tab bar; Android's tab bar floats over it (see AppTabs).
+  const bottom = Platform.OS === 'ios' ? 0 : insets.bottom;
   const [refreshing, setRefreshing] = useState(false);
   const [displayTime, setDisplayTime] = useState(Date.now);
   useFocusEffect(
@@ -53,7 +57,7 @@ export function Feed({ authorId, header }: { authorId?: string; header?: ReactEl
     <FlatList
       style={{ flex: 1, backgroundColor: colors.background }}
       contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ paddingTop: header ? 0 : 8, paddingBottom: 24 }}
+      contentContainerStyle={{ paddingTop: header ? 0 : 8, paddingBottom: bottom + 24 }}
       data={items}
       keyExtractor={(item) => item.id}
       testID="timeline"

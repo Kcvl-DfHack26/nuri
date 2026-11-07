@@ -4,7 +4,7 @@
 
 主要SNS機能はXを参考にした独自UIを使う。タイムラインは左にアバター、右に名前・日時・本文・いいね／共有を配置する。本文・反応はReusables／Uniwind、プロフィールは独立したユーザーの概要とネイティブ編集ボタンを使う。投稿者のアイコンからユーザー→投稿一覧へ移動できる。投稿カードは外側の横余白12pt・カード間8pt・角丸16pt、内側は横と上12pt。40ptアバターと8ptの間隔で密度を保ち、いいね・共有は右寄せで4pt間隔にする。操作のタップ領域は48pt/dp以上にする。未実装の返信・リポスト・フォローを操作可能なボタンとして置かない。
 
-Native Tabs・Stack・戻る操作・共有シートはOS標準。設定はネイティブのForm／Picker／Switchを使う。投稿シートは65%の高さから開く。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。iOS 26の投稿導線はタイムライン（`/timeline`）を開いている間だけタブ直上のBottomAccessory、それ以前とAndroidはツールバー。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigma Plan AのFoundationsに従い、Plan Aがライトのみを定義するため、ダーク外観でも明るい配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
+Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、AndroidはPlan Aの `TabBar/Glass` を `expo-router/ui` で描く（[architecture](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。投稿シートは65%の高さから開く。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。iOS 26の投稿導線はタイムライン（`/timeline`）を開いている間だけタブ直上のBottomAccessory、それ以前とAndroidはツールバー。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigma Plan AのFoundationsに従い、Plan Aがライトのみを定義するため、ダーク外観でも明るい配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
 
 Googleは公式の多色ロゴ付き白ボタン、AppleはiOSの公式AppleAuthenticationButton（黒）を使う。AndroidのAppleボタンも公式生成画像。ログイン（⑱）はPlan Aに合わせてライト配色だけで表示し、両ボタンを「続ける」表記の角丸ピルにする。出典は `apps/mobile/assets/auth/README.md` にある。
 
@@ -21,7 +21,7 @@ Googleは公式の多色ロゴ付き白ボタン、AppleはiOSの公式AppleAuth
 
 独自UIのサイズは `global.css` の `text-body`（17/24pt）、`text-caption`（13/18pt）、`text-title`（22/28pt）に集約する。名前はbodyのsemibold、本文・操作ラベルはbody、日時・反応数・補足はcaption。`lib/utils.ts` のtailwind-mergeにもこの3つを文字サイズとして登録し、文字色を上書きさせない。ネイティブのナビゲーション・FormはOSの文字スタイルを使う。Dynamic Typeは無効化しない。
 
-操作アイコンは `theme/metrics.ts` の20pt。アバターは投稿40pt、ユーザー概要80pt。補助的なchevronとOSのタブアイコンは役割の違う標準サイズを保つ。Google／Appleの公式ロゴはブランド規約を優先する。
+操作アイコンは `theme/metrics.ts` の20pt。アバターは投稿40pt、ユーザー概要80pt。補助的なchevronとiOSのタブアイコンは役割の違う標準サイズを保つ。Google／Appleの公式ロゴはブランド規約を優先する。
 
 投稿日時は `lib/date.ts` で1分未満は「たった今」、1時間未満は分、24時間未満は時間、それ以前は月日、別年は年月日。読み上げは正確な年月日時刻を使う。一覧内で基準時刻を共有し、画面への復帰と手動更新で揃えて更新する。いいねした行だけ時刻表記が進まないようにする。行ごとの `toLocaleString` のオプション指定はしない。
 

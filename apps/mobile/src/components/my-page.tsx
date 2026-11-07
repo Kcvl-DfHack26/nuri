@@ -47,16 +47,16 @@ export function MyPage() {
     ...favoriteListOptions(user?.id ?? ''),
     enabled: Boolean(user),
   });
-  // iOS insets the tab's first ScrollView for the status bar and tab bar; Android tabs only
-  // pad the tab bar, so the status bar is added here.
+  // iOS insets the tab's first ScrollView for the status bar and tab bar; Android adds both here.
   const scrollTop = Platform.OS === 'ios' ? 0 : insets.top;
+  const scrollBottom = Platform.OS === 'ios' ? 0 : insets.bottom;
   return (
     <View className="flex-1 bg-white">
       {focused ? <StatusBar style="dark" /> : null}
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerClassName="px-4"
-        contentContainerStyle={{ paddingTop: scrollTop + 8, paddingBottom: 28 }}
+        contentContainerStyle={{ paddingTop: scrollTop + 8, paddingBottom: scrollBottom + 28 }}
       >
         <View className="flex-row items-center gap-3.5">
           <View className="size-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-accent-pink">
