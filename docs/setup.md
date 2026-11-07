@@ -176,7 +176,7 @@ EASの `development` のAndroidビルドは、ビルド用マシンでGradleが�
 
 2026年11月7日時点で、試したApple IDはApple Developer Programに入っておらず、`bunx eas device:create` がAppleに拒否されたため、iPhoneのDevelopment Buildはまだ作れていない。Developer ProgramのチームにいるApple IDで、試す人のiPhoneを先に `bunx eas device:create` で登録してからビルドする（登録していない端末には入らない）。AndroidのAPKは端末の登録なしで入れられる。
 
-顔追跡（`apps/mobile/modules/face-tracker`、MediaPipe Face Landmarker）はネイティブモジュールのため、Expo Goでは動かずDevelopment Buildが必要。Development Buildでは設定の「開発用」から「顔追跡の確認」を開き、カメラの映像に特徴点を重ね、fpsと遅延を表示する。ネイティブモジュールや依存を変えたら、新しいDevelopment Buildを作る（OTAでは届かない）。
+顔追跡（`apps/mobile/modules/face-tracker`、MediaPipe Face Landmarker）はネイティブモジュールのため、Expo Goでは動かずDevelopment Buildが必要。Development Buildでは⑦（レシピの「メイクをはじめる」）と⑩で、カメラの映像に今の手順の塗る範囲を重ねる。ネイティブモジュールや依存を変えたら、新しいDevelopment Buildを作る（OTAでは届かない）。
 
 Androidのネイティブコードは手元でもコンパイルを確かめられる。JDK 17とAndroid SDK（Platform 37.0、Build-Tools 37.0.0、NDK 27.1.12297006、CMake 3.22.1）を入れ、`JAVA_HOME` と `ANDROID_HOME` を設定する。生成される `android/` はコミットしない。
 
@@ -196,7 +196,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb reverse tcp:8081 tcp:8081
 ```
 
-アプリを開いて開発サーバー `http://127.0.0.1:8081` を選び、設定の「開発用」から「顔追跡の確認」を開く。この方式ではMediaPipeのGPU推論が毎フレーム失敗し、150フレーム後にCPUに切り替わる（エミュレーターのカメラでは約10秒）。GPUで動くことだけを確かめるときは `-feature GuestAngle` を足す（1回約400msかかる）。
+アプリを開いて開発サーバー `http://127.0.0.1:8081` を選び、レシピの⑤から「メイクをはじめる」で⑦を開く。この方式ではMediaPipeのGPU推論が毎フレーム失敗し、150フレーム後にCPUに切り替わる（エミュレーターのカメラでは約10秒）。GPUで動くことだけを確かめるときは `-feature GuestAngle` を足す（1回約400msかかる）。
 
 このリポジトリはEASに接続済みで、`build:configure` / `update:configure`も実行済み。設定はfingerprint runtime policy、development/preview/production channel。フォーク時は `eas init`、`eas build:configure`、`eas update:configure` で自分のプロジェクトへ再接続する。
 

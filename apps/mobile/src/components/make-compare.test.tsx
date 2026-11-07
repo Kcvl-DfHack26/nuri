@@ -5,6 +5,12 @@ import { router } from 'expo-router';
 import { MakeCompare } from './make-compare';
 import { MakeFinish } from './make-finish';
 
+// The live camera needs the native face tracker and Skia; Expo Go and Jest use Plan A's photo.
+jest.mock('@/components/face-makeup-camera', () => ({
+  canTrackFace: false,
+  FaceMakeupCamera: () => null,
+  paintColor: (colors: string[]) => colors[0],
+}));
 jest.mock('@expo/ui', () => {
   const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
   return {
@@ -53,8 +59,8 @@ const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
     recipe: {
       id: 'fox',
       steps: [
-        { part: 'brow', label: '眉' },
-        { part: 'shading', label: 'シェード' },
+        { part: 'brow', label: '眉', colors: ['#79513A'] },
+        { part: 'shading', label: 'シェード', colors: ['#A17B60'] },
       ],
     },
   }),
@@ -66,7 +72,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 test('opens the comparison from the finish screen', async () => {
-  await render(<MakeFinish id="fox" />);
+  await render(<MakeFinish id="fox" />, { wrapper });
   await fireEvent.press(screen.getByRole('button', { name: 'メイク前と比べる' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox/compare');
 });

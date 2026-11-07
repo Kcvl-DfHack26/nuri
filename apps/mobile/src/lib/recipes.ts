@@ -1,16 +1,20 @@
+import type { makeupParts } from '@starter/shared';
 import type { InferResponseType } from 'hono/client';
 
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
 
-export function recipeListOptions() {
+type PartId = (typeof makeupParts)[number];
+
+/** Whole-face recipes (①), or with `part` the recipes for that part (③). */
+export function recipeListOptions(part?: PartId) {
   return infiniteQueryOptions({
-    queryKey: ['recipes', 'list'],
+    queryKey: ['recipes', 'list', part ?? 'whole'],
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }) => {
       const response = await api.api.recipes.$get(
-        { query: { offset: String(pageParam) } },
+        { query: { offset: String(pageParam), ...(part ? { part } : {}) } },
         { init: { signal } },
       );
       if (!response.ok) {
@@ -21,6 +25,18 @@ export function recipeListOptions() {
     getNextPageParam: (last) => last.nextOffset,
   });
 }
+
+/** How many recipes each part has (②). */
+export const recipePartsOptions = queryOptions({
+  queryKey: ['recipes', 'parts'],
+  queryFn: async ({ signal }) => {
+    const response = await api.api['recipe-parts'].$get({}, { init: { signal } });
+    if (!response.ok) {
+      throw new Error('部位のレシピを読み込めませんでした。');
+    }
+    return (await response.json()).items;
+  },
+});
 
 export function recipeOptions(id: string) {
   return queryOptions({

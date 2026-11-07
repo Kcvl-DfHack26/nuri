@@ -150,10 +150,15 @@ export const recipe = pgTable(
     // Display-only until saving recipes is built.
     likeCount: integer('like_count').notNull().default(0),
     source: text('source', { enum: recipeSources }),
+    /** The one part a part recipe (②③) works on; null for a whole-face recipe (①). */
+    part: text('part', { enum: makeupParts }),
+    /** A one-line description, e.g. ③'s caption under the style name. */
+    summary: text('summary'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('recipe_created_at_idx').on(table.createdAt),
+    index('recipe_part_idx').on(table.part),
     index('recipe_author_id_idx').on(table.authorId),
   ],
 );

@@ -127,3 +127,17 @@ test('lists and shows recipes without a session', async () => {
   });
   expect((await app.request('/api/recipes/missing-recipe')).status).toBe(404);
 });
+
+test('lists whole-face recipes by default and part recipes by part', async () => {
+  const schema = z.object({ items: z.array(z.object({ id: z.string() })) });
+  const whole = schema.parse(await (await app.request('/api/recipes')).json());
+  expect(whole.items.map((item) => item.id)).not.toContain('brow-soft-arch');
+  const brows = schema.parse(await (await app.request('/api/recipes?part=brow')).json());
+  expect(brows.items.map((item) => item.id)).toContain('brow-soft-arch');
+  expect(brows.items.map((item) => item.id)).not.toContain('fox');
+  expect((await app.request('/api/recipes?part=nose')).status).toBe(400);
+  const counts = z
+    .object({ items: z.array(z.object({ part: z.string().nullable(), count: z.number() })) })
+    .parse(await (await app.request('/api/recipe-parts')).json());
+  expect(counts.items.find((item) => item.part === 'brow')?.count).toBeGreaterThanOrEqual(6);
+});

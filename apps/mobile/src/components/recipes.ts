@@ -14,7 +14,6 @@ import iconsEye from '../../assets/plan-a/icons/eye.svg';
 import iconsLash from '../../assets/plan-a/icons/lash.svg';
 import iconsLip from '../../assets/plan-a/icons/lip.svg';
 import iconsSparkle from '../../assets/plan-a/icons/sparkle.svg';
-import partsBrowStyles from '../../assets/plan-a/parts/brow-styles.jpg';
 import photosBrowCloseup from '../../assets/plan-a/photos/brow-closeup.jpg';
 import faceBare from '../../assets/plan-a/photos/face-bare.jpg';
 import faceMadeUp from '../../assets/plan-a/photos/face-made-up.jpg';
@@ -85,63 +84,54 @@ export const parts: Record<PartId, { label: string; icon: number; iconBackground
 /** ② ホーム（部位メイク）: the eight part cards in Plan A order. */
 export const partCards: {
   part: PartId;
-  recipeCount: number;
   photo: number;
   crop: PhotoCrop;
   dimmed: boolean;
 }[] = [
   {
     part: 'base',
-    recipeCount: 128,
     photo: faceMadeUp,
     crop: { width: '235.25%', height: '582.58%', left: '-72.5%', top: '-240.42%' },
     dimmed: true,
   },
   {
     part: 'brow',
-    recipeCount: 96,
     photo: photosBrowCloseup,
     crop: { width: '300.58%', height: '419.35%', left: '-175.43%', top: '-32.26%' },
     dimmed: false,
   },
   {
     part: 'eye',
-    recipeCount: 214,
     photo: faceMadeUp,
     crop: { width: '313.67%', height: '777.67%', left: '-150%', top: '-244.19%' },
     dimmed: true,
   },
   {
     part: 'lash',
-    recipeCount: 72,
     photo: faceMadeUp,
     crop: { width: '427.73%', height: '1058.23%', left: '-111.36%', top: '-348.73%' },
     dimmed: true,
   },
   {
     part: 'cheek',
-    recipeCount: 153,
     photo: faceMadeUp,
     crop: { width: '294.06%', height: '730.13%', left: '-162.5%', top: '-266.38%' },
     dimmed: true,
   },
   {
     part: 'shading',
-    recipeCount: 61,
     photo: faceMadeUp,
     crop: { width: '247.63%', height: '614.71%', left: '-28.95%', top: '-262.5%' },
     dimmed: true,
   },
   {
     part: 'highlight',
-    recipeCount: 48,
     photo: faceMadeUp,
     crop: { width: '361.92%', height: '898.92%', left: '-138.46%', top: '-344.09%' },
     dimmed: true,
   },
   {
     part: 'lip',
-    recipeCount: 187,
     photo: faceBare,
     crop: { width: '294.12%', height: '718.27%', left: '-97.06%', top: '-349.8%' },
     dimmed: false,
@@ -271,89 +261,6 @@ const products: Product[] = [
 export function findProduct(id: string) {
   return products.find((product) => product.id === id);
 }
-
-/** ③ 部位別一覧 filter chips. `round` also marks the card with the 丸顔におすすめ badge. */
-export type StyleFilter = 'round' | 'beginner' | 'natural';
-
-export const styleFilters: { value: StyleFilter; label: string }[] = [
-  { value: 'round', label: '丸顔におすすめ' },
-  { value: 'beginner', label: '初心者OK' },
-  { value: 'natural', label: 'ナチュラル' },
-];
-
-export type PartStyle = {
-  id: string;
-  name: string;
-  caption: string;
-  /** Cell of the Plan A sprite that shows this style. */
-  crop: PhotoCrop;
-  filters: StyleFilter[];
-  /** Recipe opened from ③; styles without one are catalog previews. */
-  recipeId?: string;
-};
-
-const browCell = (column: number, row: number): PhotoCrop => ({
-  width: '200%',
-  height: '300%',
-  left: `${-100 * column}%`,
-  top: `${-100 * row}%`,
-});
-
-/**
- * ③ 部位別一覧: Plan A designs only the brow list. Plan A shows the 丸顔におすすめ badge on
- * 上がり眉, but #47 decided that アーチ眉 suits a round face (docs/requirements.md F7); the
- * beginner and natural assignments are sample data.
- */
-export const partStyles: Partial<Record<PartId, { photo: number; styles: PartStyle[] }>> = {
-  brow: {
-    photo: partsBrowStyles,
-    styles: [
-      {
-        id: 'straight-flat',
-        name: '平行眉',
-        caption: 'やさしく若見え',
-        crop: browCell(0, 0),
-        filters: ['beginner', 'natural'],
-      },
-      {
-        id: 'soft-arch',
-        name: '微アーチ眉',
-        caption: '自然で垢抜け',
-        crop: browCell(1, 0),
-        filters: ['beginner', 'natural'],
-        recipeId: 'fox',
-      },
-      {
-        id: 'arch',
-        name: 'アーチ眉',
-        caption: '女性らしく上品な',
-        crop: browCell(0, 1),
-        filters: ['round'],
-      },
-      {
-        id: 'straight',
-        name: 'ストレート眉',
-        caption: '知的でクール',
-        crop: browCell(1, 1),
-        filters: ['beginner'],
-      },
-      {
-        id: 'rising',
-        name: '上がり眉',
-        caption: 'シャープで自信のある',
-        crop: browCell(0, 2),
-        filters: [],
-      },
-      {
-        id: 'falling',
-        name: '下がり眉',
-        caption: '優しく穏やかな',
-        crop: browCell(1, 2),
-        filters: ['natural'],
-      },
-    ],
-  },
-};
 
 export function isPartId(value: string): value is PartId {
   return Object.hasOwn(parts, value);

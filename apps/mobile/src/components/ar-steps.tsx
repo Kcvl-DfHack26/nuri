@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { RecipeStep } from '@/lib/recipes';
 
+import { canTrackFace, FaceMakeupCamera, paintColor } from '@/components/face-makeup-camera';
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { RecipeStatus } from '@/components/recipe-detail';
@@ -38,8 +39,8 @@ const NEXT = Icon.select({
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
 
-// Plan A ⑦ AR手順, walking through the recipe's steps from the API. The camera and face tracking
-// come later (#31); Plan A's frame and overlays stand in.
+// Plan A ⑦ AR手順, walking through the recipe's steps from the API. The current step's area is painted
+// on the tracked face with its recommended color, and its pin and label follow the face.
 export function ArSteps({ id }: { id: string }) {
   const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
   const recipe = query.data;
@@ -117,16 +118,24 @@ function StepsContent({
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
-      <FaceScene photo={arPhotos.camera}>
-        {overlayVisible && overlay !== undefined ? (
-          <Image
-            accessible={false}
-            source={overlay}
-            contentFit="fill"
-            style={{ position: 'absolute', width: '100%', height: '100%' }}
-          />
-        ) : null}
-      </FaceScene>
+      {canTrackFace ? (
+        <FaceMakeupCamera
+          layers={overlayVisible ? [{ part: step.part, color: paintColor(step.colors) }] : []}
+          annotation={overlayVisible ? { part: step.part, label: step.label } : undefined}
+        />
+      ) : (
+        // Expo Go has no face tracker; Plan A's frame and overlays stand in.
+        <FaceScene photo={arPhotos.camera}>
+          {overlayVisible && overlay !== undefined ? (
+            <Image
+              accessible={false}
+              source={overlay}
+              contentFit="fill"
+              style={{ position: 'absolute', width: '100%', height: '100%' }}
+            />
+          ) : null}
+        </FaceScene>
+      )}
       <View
         pointerEvents="none"
         className="absolute inset-x-0 top-0 h-[200px]"

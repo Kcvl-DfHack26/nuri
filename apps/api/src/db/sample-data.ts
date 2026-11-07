@@ -119,6 +119,11 @@ const foxSteps: SeedStep[] = [
   },
 ];
 
+// ③'s brow styles, one step each. Their photos are cells of Plan A's brow style sheet. Plan A
+// recommends アーチ眉 for round faces (#47); the other tags are sample values.
+function browStep(title: string, hint: string): SeedStep {
+  return { part: 'brow', label: '眉', title, hint, product: 'アイブロウ', colors: ['#79513A'] };
+}
 // Newest first, in Plan A's ① order. Only fox has Plan A detail data; the other tags,
 // durations, sources and counts are sample values.
 const recipes = [
@@ -190,6 +195,84 @@ const recipes = [
     source: 'tiktok' as const,
     products: [],
     steps: [],
+  },
+  {
+    id: 'brow-straight-flat',
+    authorId: 'sample-mio',
+    title: '平行眉',
+    part: 'brow' as const,
+    summary: 'やさしく若見え',
+    tags: ['初心者OK', 'ナチュラル'],
+    durationMinutes: 3,
+    likeCount: 96,
+    source: null,
+    products: [],
+    steps: [browStep('眉山を作らず平行に描く', '眉頭から眉尻まで高さをそろえる')],
+  },
+  {
+    id: 'brow-soft-arch',
+    authorId: 'sample-mio',
+    title: '微アーチ眉',
+    part: 'brow' as const,
+    summary: '自然で垢抜け',
+    tags: ['初心者OK', 'ナチュラル'],
+    durationMinutes: 3,
+    likeCount: 412,
+    source: null,
+    products: [],
+    steps: [browStep('眉山をほんの少しだけ上げる', '眉尻は眉頭より下げない')],
+  },
+  {
+    id: 'brow-arch',
+    authorId: 'sample-mio',
+    title: 'アーチ眉',
+    part: 'brow' as const,
+    summary: '女性らしく上品な',
+    tags: ['丸顔向け'],
+    durationMinutes: 3,
+    likeCount: 188,
+    source: null,
+    products: [],
+    steps: [browStep('眉山をなだらかな弧でつなぐ', '眉頭は淡く、眉山から眉尻へ細くする')],
+  },
+  {
+    id: 'brow-straight',
+    authorId: 'sample-mio',
+    title: 'ストレート眉',
+    part: 'brow' as const,
+    summary: '知的でクール',
+    tags: ['初心者OK'],
+    durationMinutes: 3,
+    likeCount: 73,
+    source: null,
+    products: [],
+    steps: [browStep('眉頭から眉尻へまっすぐ描く', '下側のラインをそろえて直線にする')],
+  },
+  {
+    id: 'brow-rising',
+    authorId: 'sample-mio',
+    title: '上がり眉',
+    part: 'brow' as const,
+    summary: 'シャープで自信のある',
+    tags: [],
+    durationMinutes: 3,
+    likeCount: 254,
+    source: null,
+    products: [],
+    steps: [browStep('眉尻に向かって角度をつける', '眉山を外側に置き、縦の印象を足す')],
+  },
+  {
+    id: 'brow-falling',
+    authorId: 'sample-mio',
+    title: '下がり眉',
+    part: 'brow' as const,
+    summary: '優しく穏やかな',
+    tags: ['ナチュラル'],
+    durationMinutes: 3,
+    likeCount: 61,
+    source: null,
+    products: [],
+    steps: [browStep('眉尻をやや下げて描く', '眉頭はふんわり、眉尻は細く')],
   },
 ];
 
