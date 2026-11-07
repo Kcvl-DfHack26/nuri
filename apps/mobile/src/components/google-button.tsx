@@ -5,13 +5,14 @@ import { Text } from '@/components/ui/text';
 
 import googleLogo from '../../assets/auth/google.png';
 
+// Google's light button: white fill, #747775 stroke, #1f1f1f label and the full-color logo.
 export function GoogleButton({ disabled, onPress }: { disabled: boolean; onPress: () => void }) {
   return (
     <Button
       variant="outline"
       disabled={disabled}
       onPress={onPress}
-      className="min-h-14 w-full flex-row gap-3 rounded-xl px-4 py-3"
+      className="min-h-[52px] w-full flex-row gap-3 rounded-full px-[18px] py-3"
       style={{ backgroundColor: '#ffffff', borderColor: '#747775' }}
     >
       <Image
@@ -21,7 +22,7 @@ export function GoogleButton({ disabled, onPress }: { disabled: boolean; onPress
         accessible={false}
       />
       <Text className="shrink text-center font-medium" style={{ color: '#1f1f1f' }}>
-        Googleでログイン
+        Googleで続ける
       </Text>
     </Button>
   );
