@@ -2,6 +2,7 @@ import type { makeupParts } from '@starter/shared';
 import type { InferResponseType } from 'hono/client';
 
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
+import { Share } from 'react-native';
 
 import { api } from '@/lib/api';
 
@@ -121,4 +122,17 @@ export function formatCount(value: number) {
   }
   const thousands = Math.floor(value / 100) / 10;
   return `${Number.isInteger(thousands) ? thousands.toFixed(0) : thousands.toFixed(1)}k`;
+}
+
+/**
+ * Opens the OS share sheet with a line about the recipe, e.g. from ⑤ or ⑩. Only this text is
+ * shared: never a photo of the user's face.
+ */
+export function shareRecipe(
+  recipe: Pick<RecipeDetail, 'title' | 'author'>,
+  verb: '見つけました' | '試しました',
+) {
+  void Share.share({ message: `${recipe.title}（${recipe.author.name}）をnuriで${verb}` }).catch(
+    () => undefined,
+  );
 }

@@ -31,7 +31,7 @@ const SHARE = Icon.select({
   ios: 'square.and.arrow.up',
   android: import('@expo/material-symbols/ios_share.xml'),
 });
-export const COMPARE = Icon.select({
+const COMPARE = Icon.select({
   ios: 'arrow.left.and.line.vertical.and.arrow.right',
   android: import('@expo/material-symbols/arrow_range.xml'),
 });

@@ -36,6 +36,8 @@ export const profilePatchSchema = profileInputSchema
 
 // Recipe IDs are readable slugs (e.g. fox) so seeded recipes keep stable URLs.
 export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,64}$/) });
+/** A shop page for a cosmetic. Only https, so ⑤ never opens another scheme or plain http. */
+export const purchaseUrlSchema = z.url({ protocol: /^https$/, hostname: z.regexes.domain });
 /** Where an imported recipe came from; null means it was made in nuri. */
 export const recipeSources = ['instagram', 'tiktok', 'youtube'] as const;
 /** The face parts a makeup step works on, in Plan A's ② order. */

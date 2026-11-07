@@ -147,7 +147,8 @@ export function ProfilePhoto({ size, image }: { size: number; image?: string | n
 
 type RecipePages = InfiniteData<RecipePage, unknown>;
 
-function RecipeSection({
+/** A titled two-column grid of recipes with its loading, error, empty and more states. */
+export function RecipeSection({
   title,
   empty,
   failure,

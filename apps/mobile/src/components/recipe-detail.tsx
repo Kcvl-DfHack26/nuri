@@ -1,10 +1,14 @@
+import type { AccessibilityActionEvent } from 'react-native';
+
 import { Icon } from '@expo/ui';
+import { purchaseUrlSchema } from '@starter/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { openBrowserAsync } from 'expo-web-browser';
 import { Fragment } from 'react';
-import { Alert, Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
@@ -20,7 +24,13 @@ import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
-import { changeFavorite, formatCount, recipeOptions, sourceLabels } from '@/lib/recipes';
+import {
+  changeFavorite,
+  formatCount,
+  recipeOptions,
+  shareRecipe,
+  sourceLabels,
+} from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -223,15 +233,28 @@ export function RecipeContent({
             </View>
           </View>
           <View className="flex-row items-center gap-2.5">
-            <ProfilePhoto size={36} image={recipe.author.image} />
-            <View className="flex-1">
-              <Text className="font-maru-bold text-label text-ink-primary">
-                {recipe.author.name}
-              </Text>
-              <Text className="font-maru text-meta text-ink-secondary">
-                {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}保存 {likes}
-              </Text>
-            </View>
+            <Pressable
+              // ⑫-8 previews the user's own draft; leaving for a profile would drop the post.
+              disabled={Boolean(onPost)}
+              accessibilityRole={onPost ? undefined : 'button'}
+              accessibilityHint={onPost ? undefined : 'プロフィールと投稿したレシピを開きます'}
+              // The 36pt row keeps Plan A's look; hitSlop extends the target to 48pt.
+              hitSlop={6}
+              onPress={() => {
+                router.push({ pathname: '/users/[id]', params: { id: recipe.author.id } });
+              }}
+              className="flex-1 flex-row items-center gap-2.5 active:opacity-70"
+            >
+              <ProfilePhoto size={36} image={recipe.author.image} />
+              <View className="flex-1">
+                <Text className="font-maru-bold text-label text-ink-primary">
+                  {recipe.author.name}
+                </Text>
+                <Text className="font-maru text-meta text-ink-secondary">
+                  {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}保存 {likes}
+                </Text>
+              </View>
+            </Pressable>
             <View
               accessible
               accessibilityRole="button"
@@ -372,9 +395,7 @@ export function RecipeContent({
               icon={SHARE}
               label="共有"
               onPress={() => {
-                void Share.share({
-                  message: `${recipe.title}（${recipe.author.name}）をnuriで見つけました`,
-                }).catch(() => undefined);
+                shareRecipe(recipe, '見つけました');
               }}
             />
             <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />
@@ -456,6 +477,16 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
 function ProductRow({ product }: { product: RecipeData['products'][number] }) {
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
+  // Only an https shop opens, whatever the API returns.
+  const purchaseUrl = purchaseUrlSchema.safeParse(product.purchaseUrl).data;
+  // The shop opens in the in-app browser (Safari View Controller or Custom Tabs).
+  const openShop = purchaseUrl
+    ? () => {
+        void openBrowserAsync(purchaseUrl).catch(() => {
+          Alert.alert('購入先を開けませんでした');
+        });
+      }
+    : undefined;
   const content = (
     <>
       <View className="size-[52px] overflow-hidden rounded-[14px] bg-neutral-soft">
@@ -471,19 +502,41 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
         <Text className="font-maru-bold text-label text-ink-primary">{product.name}</Text>
         <Text className="font-maru text-meta text-ink-secondary">{product.usage}</Text>
       </View>
-      {product.purchasable ? (
-        <View className="min-h-6 flex-row items-center gap-1 rounded-xl bg-base-peach px-2.5">
+      {openShop ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="購入先を見る"
+          // The 24pt chip keeps Plan A's look; hitSlop extends the target to 48pt.
+          hitSlop={12}
+          onPress={openShop}
+          className="min-h-6 flex-row items-center gap-1 rounded-xl bg-base-peach px-2.5 active:opacity-70"
+        >
           <SocialIcon name={CART} size={12} color={ink} />
           <Text className="font-maru-bold text-micro text-ink-primary">買う</Text>
-        </View>
+        </Pressable>
       ) : null}
       <SocialIcon name={NEXT} size={18} color={secondary} />
     </>
   );
   const className =
     'flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5';
+  // VoiceOver reads the row as one element, so 買う is also offered as an action on the row.
+  const purchase = openShop
+    ? {
+        accessibilityActions: [{ name: 'purchase', label: '購入先を見る' }],
+        onAccessibilityAction: (event: AccessibilityActionEvent) => {
+          if (event.nativeEvent.actionName === 'purchase') {
+            openShop();
+          }
+        },
+      }
+    : {};
   // Only products with Plan A detail data open ⑥ until product details come from the API.
   if (!findProduct(product.id)) {
+    // The row itself does nothing yet; with a shop, 買う stays its own button for screen readers.
+    if (openShop) {
+      return <View className={className}>{content}</View>;
+    }
     return (
       <View
         accessible
@@ -504,6 +557,7 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
       onPress={() => {
         router.push(`/products/${product.id}`);
       }}
+      {...purchase}
     >
       {content}
     </Pressable>

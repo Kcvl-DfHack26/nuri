@@ -165,7 +165,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
             id: product.id,
             name: product.name,
             image: product.image,
-            purchasable: product.purchasable,
+            purchaseUrl: product.purchaseUrl,
             usage: recipeProduct.usage,
           })
           .from(recipeProduct)

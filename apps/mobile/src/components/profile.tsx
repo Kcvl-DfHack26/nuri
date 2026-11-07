@@ -1,20 +1,27 @@
 import { Button as NativeButton } from '@expo/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { View } from 'react-native';
 
 import { Avatar } from '@/components/avatar';
 import { Feed } from '@/components/feed';
 import { Feedback } from '@/components/feedback';
+import { RecipeSection } from '@/components/my-page';
 import { NativeHost } from '@/components/native-host';
 import { Text } from '@/components/ui/text';
 import { api, apiUrl, authClient } from '@/lib/api';
+import { recipeListOptions } from '@/lib/recipes';
 import { colors } from '@/theme/colors';
 import { avatarSize } from '@/theme/metrics';
 
-// Another user's profile opened from a post. Your own profile is the マイ tab (⑰).
+// Another user's profile opened from a post or a recipe's author (⑤), with the recipes they
+// posted and their posts. Your own profile is the マイ tab (⑰).
 export function Profile({ id }: { id: string }) {
   const { data: session } = authClient.useSession();
+  const recipes = useInfiniteQuery({
+    ...recipeListOptions({ author: id }),
+    enabled: Boolean(apiUrl),
+  });
   const profile = useQuery({
     queryKey: ['user', id],
     enabled: Boolean(apiUrl),
@@ -76,6 +83,15 @@ export function Profile({ id }: { id: string }) {
                 />
               </NativeHost>
             ) : null}
+          </View>
+          {/* Recipes use Plan A's light palette, so they keep a white card in dark mode too. */}
+          <View className="mx-5 mt-4 rounded-[20px] bg-white px-3 pb-4 pt-1">
+            <RecipeSection
+              title="レシピ"
+              empty="まだ投稿したレシピはありません"
+              failure="レシピを読み込めませんでした。通信状況を確認してお試しください。"
+              query={recipes}
+            />
           </View>
           <View style={{ paddingHorizontal: 20, paddingTop: 28, paddingBottom: 12 }}>
             <Text accessibilityRole="header" className="font-semibold text-muted-foreground">

@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "d1fc828f-3b29-44ea-8884-fc7f8e1ee138",
+  "prevIds": [
+    "00591b7a-8655-4e21-ba27-f4508095b18d"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "product",
+        "purchase_url"
+      ],
+      "writes": [
+        "s|col|public.product.purchase_url",
+        "n|col|public.product.purchase_url",
+        "e|col|public.product.purchase_url"
+      ],
+      "reads": [
+        "n|tbl|public.product",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "product",
+        "name": "purchase_url",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}
