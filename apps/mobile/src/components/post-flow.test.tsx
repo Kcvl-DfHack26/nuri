@@ -182,6 +182,26 @@ test('deletes the cut frames when the post flow closes', async () => {
   expect(mockDelete).toHaveBeenCalled();
 });
 
+test('deletes a frame that arrives after the post flow closed', async () => {
+  let finish: (() => void) | undefined;
+  jest.mocked(getThumbnailAsync).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = () => {
+          resolve({ uri: 'file:///late.jpg', width: 1, height: 1 });
+        };
+      }),
+  );
+  const { unmount } = await renderWithVideo();
+  await unmount();
+  await act(async () => {
+    finish?.();
+    await Promise.resolve();
+  });
+  expect(File).toHaveBeenCalledWith('file:///late.jpg');
+  expect(mockDelete).toHaveBeenCalled();
+});
+
 test('keeps the thumbnail when the timeline is canceled', async () => {
   await renderWithVideo();
   await fireEvent.press(await screen.findByRole('button', { name: 'サムネイル 0:06の場面' }));

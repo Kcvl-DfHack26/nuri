@@ -177,6 +177,13 @@ type PostDraftContextValue = {
 const PostDraftContext = createContext<PostDraftContextValue | null>(null);
 
 // Mounted by the post flow's layout, so leaving the flow discards the draft.
+function deleteFile(uri: string) {
+  const file = new File(uri);
+  if (file.exists) {
+    file.delete();
+  }
+}
+
 export function PostDraftProvider({
   videoUri,
   videoDurationMs,
@@ -200,28 +207,30 @@ export function PostDraftProvider({
       return;
     }
     return () => {
-      const file = new File(recordedUri);
-      if (file.exists) {
-        file.delete();
-      }
+      deleteFile(recordedUri);
     };
   }, [recordedUri]);
   // Frames cut from the video can show the user's face, so none outlive the flow.
   const files = useRef(new Set<string>());
+  // A frame still being cut when the flow closes is deleted as soon as it arrives.
+  const closed = useRef(false);
   useEffect(() => {
+    closed.current = false;
     const owned = files.current;
     return () => {
+      closed.current = true;
       for (const uri of owned) {
-        const file = new File(uri);
-        if (file.exists) {
-          file.delete();
-        }
+        deleteFile(uri);
       }
       owned.clear();
     };
   }, []);
   const trackFile = useCallback((uri: string) => {
-    files.current.add(uri);
+    if (closed.current) {
+      deleteFile(uri);
+    } else {
+      files.current.add(uri);
+    }
   }, []);
   const updateStep = (index: number, change: Partial<PostStep>) => {
     setDraft((current) => ({
