@@ -1,3 +1,5 @@
+import { recipeSources } from '@starter/shared';
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
@@ -125,4 +127,57 @@ export const like = pgTable(
       .references(() => user.id, { onDelete: 'cascade' }),
   },
   (table) => [primaryKey({ columns: [table.postId, table.userId] })],
+);
+
+export const recipe = pgTable(
+  'recipe',
+  {
+    id: text('id').primaryKey(),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    /** Photo of the finished look; a path on this API or an absolute URL. */
+    image: text('image').notNull(),
+    tags: text('tags')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    durationMinutes: integer('duration_minutes').notNull(),
+    // Display-only until saving recipes is built.
+    likeCount: integer('like_count').notNull().default(0),
+    source: text('source', { enum: recipeSources }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('recipe_created_at_idx').on(table.createdAt),
+    index('recipe_author_id_idx').on(table.authorId),
+  ],
+);
+
+export const product = pgTable('product', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  image: text('image'),
+  purchasable: boolean('purchasable').default(false).notNull(),
+});
+
+/** The cosmetics a recipe uses, in the order ⑤ lists them. */
+export const recipeProduct = pgTable(
+  'recipe_product',
+  {
+    recipeId: text('recipe_id')
+      .notNull()
+      .references(() => recipe.id, { onDelete: 'cascade' }),
+    productId: text('product_id')
+      .notNull()
+      .references(() => product.id, { onDelete: 'restrict' }),
+    position: integer('position').notNull(),
+    /** How this recipe uses the product, e.g. 眉・モカブラウン. */
+    usage: text('usage').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.recipeId, table.productId] }),
+    index('recipe_product_product_id_idx').on(table.productId),
+  ],
 );

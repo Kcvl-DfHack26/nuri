@@ -7,4 +7,6 @@ Local sample portraits from [Random User Generator](https://randomuser.me/copyri
 - `yui.jpg`: https://randomuser.me/api/portraits/women/68.jpg
 - `ren.jpg`: https://randomuser.me/api/portraits/men/75.jpg
 
+`mio.png` is from the Figma Plan A file; see `../sample-recipes/README.md`.
+
 Retrieved 2026-11-06. Sample users cannot authenticate; Emulate supplies separate login accounts.
