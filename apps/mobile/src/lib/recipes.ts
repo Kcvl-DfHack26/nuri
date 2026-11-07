@@ -44,6 +44,7 @@ export type RecipeDetail = InferResponseType<
   (typeof api.api.recipes)[':id']['$get'],
   200
 >['recipe'];
+export type RecipeStep = RecipeDetail['steps'][number];
 
 export const sourceLabels: Record<NonNullable<RecipeDetail['source']>, string> = {
   instagram: 'Instagram',

@@ -383,14 +383,6 @@ function RecommendationCard({ recipe, match }: { recipe: Recipe; match: number }
     </>
   );
   const label = `${recipe.title}、${recipe.author}、相性${match}%`;
-  // Only recipes with Plan A detail screens open ⑤; the rest are catalog previews.
-  if (!recipe.detail) {
-    return (
-      <View accessible accessibilityLabel={label} className="w-[172px] gap-[5px]">
-        {content}
-      </View>
-    );
-  }
   return (
     <Pressable
       accessibilityRole="button"

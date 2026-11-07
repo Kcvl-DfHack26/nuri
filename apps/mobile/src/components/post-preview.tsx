@@ -4,7 +4,6 @@ import type { RecipeDetail } from '@/lib/recipes';
 
 import { usedCosmetics, usePostDraft } from '@/components/post-draft';
 import { RecipeContent } from '@/components/recipe-detail';
-import { findRecipe } from '@/components/recipes';
 
 // The post is not saved anywhere yet, so the preview shows a local sample instead of the API.
 const sample: RecipeDetail = {
@@ -17,6 +16,7 @@ const sample: RecipeDetail = {
   source: 'instagram',
   author: { id: 'preview', name: 'mio', image: null },
   products: [],
+  steps: [],
 };
 
 // Plan A ⑫-8 投稿のプレビュー: the sample recipe screen with the draft's cosmetics, hidden
@@ -34,7 +34,7 @@ export function PostPreview() {
   return (
     <RecipeContent
       recipe={sample}
-      steps={findRecipe(sample.id)?.detail}
+      steps={draft.steps}
       postedCosmetics={cosmetics}
       onPost={() => {
         router.push('/post/done');

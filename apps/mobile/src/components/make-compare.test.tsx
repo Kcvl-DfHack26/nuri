@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
@@ -18,6 +19,35 @@ jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
+jest.mock('@/lib/api', () => ({
+  apiUrl: 'http://localhost:8080',
+  api: {
+    api: {
+      recipes: {
+        ':id': {
+          $get: async () => ({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              recipe: {
+                id: 'fox',
+                steps: [
+                  { part: 'brow', label: '眉' },
+                  { part: 'shading', label: 'シェード' },
+                ],
+              },
+            }),
+          }),
+        },
+      },
+    },
+  },
+}));
+
+function wrapper({ children }: { children: React.ReactNode }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
 
 test('opens the comparison from the finish screen', async () => {
   await render(<MakeFinish id="fox" />);
@@ -26,7 +56,7 @@ test('opens the comparison from the finish screen', async () => {
 });
 
 test('moves the divider with accessibility actions and goes back', async () => {
-  await render(<MakeCompare id="fox" />);
+  await render(<MakeCompare id="fox" />, { wrapper });
   const divider = screen.getByRole('adjustable', { name: 'メイク前とメイク後の境目' });
   expect(divider).toHaveAccessibilityValue({ text: 'メイク前50% メイク後50%' });
 
@@ -41,11 +71,10 @@ test('moves the divider with accessibility actions and goes back', async () => {
 });
 
 test('shows unbuilt actions and layer toggles as disabled', async () => {
-  await render(<MakeCompare id="fox" />);
+  await render(<MakeCompare id="fox" />, { wrapper });
   expect(screen.getByRole('button', { name: '共有（準備中）' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '写真を保存（準備中）' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'レシピを投稿する（準備中）' })).toBeDisabled();
-  expect(screen.getByRole('checkbox', { name: '眉（準備中）' })).toBeChecked();
+  expect(await screen.findByRole('checkbox', { name: '眉（準備中）' })).toBeChecked();
   expect(screen.getByRole('checkbox', { name: 'シェード（準備中）' })).not.toBeChecked();
-  expect(screen.getByRole('checkbox', { name: 'リップ（準備中）' })).toBeDisabled();
 });
