@@ -3,7 +3,7 @@ import { Canvas, Points } from '@shopify/react-native-skia';
 import { useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import { AppState, Linking, PermissionsAndroid, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Point, Size } from '@/lib/face-landmarks';
@@ -57,6 +57,27 @@ export function FaceTrackingCheck() {
       mounted = false;
     };
   }, []);
+
+  // Android keeps the app running when the camera is allowed in the system settings, so check again
+  // on return without prompting. iOS restarts the app after a permission change and asks on mount.
+  useEffect(() => {
+    if (!FaceTracker || Platform.OS !== 'android' || permission !== 'denied') {
+      return;
+    }
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') {
+        return;
+      }
+      void PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.CAMERA).then((granted) => {
+        if (granted) {
+          setPermission('granted');
+        }
+      });
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [permission]);
 
   function handleLandmarks(event: FaceLandmarksEvent) {
     const now = performance.now();
