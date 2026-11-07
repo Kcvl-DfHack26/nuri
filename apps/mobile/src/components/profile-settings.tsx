@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Host, Icon, Switch as NativeSwitch } from '@expo/ui';
-import { profileInputSchema } from '@starter/shared';
+import { profileInputSchema, profilePatchSchema } from '@starter/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -213,11 +213,7 @@ function Editor({
       router.dismissTo('/');
     },
   });
-  const canSave =
-    Object.keys(changes).length > 0 &&
-    profileInputSchema.safeParse(input).success &&
-    !save.isPending &&
-    !refreshError;
+  const canSave = profilePatchSchema.safeParse(changes).success && !save.isPending && !refreshError;
   const error = save.error ?? logout.error;
   return (
     <>

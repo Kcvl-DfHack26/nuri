@@ -184,6 +184,22 @@ test('keeps a remote privacy change when saving only an edited name', async () =
   });
 });
 
+test('saves a privacy change when the existing display name exceeds the edit limit', async () => {
+  mockGetProfile.mockResolvedValueOnce({
+    status: 200,
+    json: async () => ({
+      profile: { name: 'x'.repeat(41), handle: null, bio: '', isPublic: true },
+    }),
+  });
+  await renderWithClient(<ProfileSettings />);
+  await screen.findByLabelText('表示名');
+  await fireEvent(screen.getByLabelText('プロフィールを公開'), 'valueChange', false);
+  await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
+  await waitFor(() => {
+    expect(mockPutProfile).toHaveBeenLastCalledWith({ json: { isPublic: false } });
+  });
+});
+
 test('blocks saving a draft until a failed refresh is retried', async () => {
   const client = createTestClient();
   await renderWithClient(<ProfileSettings />, client);
