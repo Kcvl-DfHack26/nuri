@@ -8,7 +8,14 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { openBrowserAsync } from 'expo-web-browser';
 import { Fragment } from 'react';
-import { Alert, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
@@ -175,12 +182,15 @@ export function RecipeContent({
   steps,
   onPost,
   postedCosmetics,
+  posting = false,
 }: {
   recipe: RecipeData;
   /** Empty for a recipe without steps yet; it cannot start ⑦. */
   steps: StepSummary[];
   onPost: (() => void) | undefined;
   postedCosmetics: PostedCosmetic[] | null | undefined;
+  /** ⑫-8 is sending the post; 投稿 waits until it finishes. */
+  posting?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -403,7 +413,7 @@ export function RecipeContent({
         )}
       </View>
       {onPost ? (
-        <PostBar onPost={onPost} bottom={insets.bottom} />
+        <PostBar onPost={onPost} posting={posting} bottom={insets.bottom} />
       ) : (
         <RecipeStartBar recipe={recipe} canStart={steps.length > 0} bottom={insets.bottom} />
       )}
@@ -564,7 +574,15 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
   );
 }
 
-function PostBar({ onPost, bottom }: { onPost: () => void; bottom: number }) {
+function PostBar({
+  onPost,
+  posting,
+  bottom,
+}: {
+  onPost: () => void;
+  posting: boolean;
+  bottom: number;
+}) {
   const white = useTokenColor('--color-bg-surface');
   return (
     <View
@@ -573,12 +591,24 @@ function PostBar({ onPost, bottom }: { onPost: () => void; bottom: number }) {
     >
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={posting ? '投稿しています' : '投稿'}
+        accessibilityState={{ disabled: posting, busy: posting }}
+        disabled={posting}
         onPress={onPost}
-        className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80"
+        className={cn(
+          'min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80',
+          posting && 'opacity-60',
+        )}
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
       >
-        <SocialIcon name={UPLOAD} size={20} color={white} />
-        <Text className="font-maru-bold text-action text-white">投稿</Text>
+        {posting ? (
+          <ActivityIndicator color={white} />
+        ) : (
+          <SocialIcon name={UPLOAD} size={20} color={white} />
+        )}
+        <Text className="font-maru-bold text-action text-white">
+          {posting ? '投稿しています' : '投稿'}
+        </Text>
       </Pressable>
     </View>
   );

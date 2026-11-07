@@ -1,5 +1,5 @@
 import type { makeupParts } from '@starter/shared';
-import type { InferResponseType } from 'hono/client';
+import type { InferRequestType, InferResponseType } from 'hono/client';
 
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { Share } from 'react-native';
@@ -82,6 +82,30 @@ export async function changeFavorite(id: string, favorited: boolean) {
       response.status === 401 ? 'ログインし直してください。' : 'お気に入りを変更できませんでした。',
     );
   }
+}
+
+export type RecipeInput = InferRequestType<typeof api.api.recipes.$post>['json'];
+
+const postErrors: Partial<Record<number, string>> = {
+  400: '投稿の内容を確認してください。',
+  401: 'ログインし直してください。',
+  413: 'サムネイルの写真が大きすぎます。別の場面を選んでください。',
+};
+
+/** Saves a recipe posted from ③ (⑫-8) and returns its ID. */
+export async function postRecipe(json: RecipeInput) {
+  let response;
+  try {
+    response = await api.api.recipes.$post({ json });
+  } catch {
+    throw new Error('投稿できませんでした。通信状況を確認してお試しください。');
+  }
+  if (response.status === 201) {
+    return (await response.json()).id;
+  }
+  throw new Error(
+    postErrors[response.status] ?? '投稿できませんでした。時間をおいてお試しください。',
+  );
 }
 
 export function recipeOptions(id: string) {

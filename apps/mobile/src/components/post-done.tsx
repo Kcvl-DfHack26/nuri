@@ -1,4 +1,5 @@
 import { Icon } from '@expo/ui';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -6,11 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { PrimaryButton } from '@/components/post-chrome';
-import { sampleVideoLength, usedCosmetics, usePostDraft } from '@/components/post-draft';
+import { usedCosmetics, usePostDraft } from '@/components/post-draft';
 import { portraitCrop } from '@/components/post-message';
 import { arPhotos } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { formatClock } from '@/lib/post-edit';
 import { useTokenColor } from '@/theme/tokens';
 
 const SHARE = Icon.select({
@@ -18,16 +20,18 @@ const SHARE = Icon.select({
   android: import('@expo/material-symbols/share.xml'),
 });
 
-// Plan A ⑫-9 投稿完了. Posting is not built, so the sample post opens the sample recipe (⑤).
+// Plan A ⑫-9 投稿完了: 投稿を見る opens the saved recipe (⑤) in place of the post flow.
 export function PostDone() {
   const insets = useSafeAreaInsets();
   const { draft } = usePostDraft();
   const ink = useTokenColor('--color-ink-primary');
+  const durationMs = draft.video?.durationMs;
   const stats = [
     { value: String(draft.steps.length), label: '手順' },
     { value: String(usedCosmetics(draft.steps).length), label: 'コスメ' },
-    { value: sampleVideoLength, label: '動画' },
+    ...(durationMs ? [{ value: formatClock(durationMs), label: '動画' }] : []),
   ];
+  const postedId = draft.postedId;
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
@@ -42,10 +46,19 @@ export function PostDone() {
         <View
           accessible
           accessibilityRole="image"
-          accessibilityLabel="仕上がりの見本の写真"
+          accessibilityLabel={draft.thumbnail ? 'サムネイルの写真' : '仕上がりの見本の写真'}
           className="size-[220px] overflow-hidden rounded-full border-[6px] border-pastel-pink"
         >
-          <CroppedPhoto source={arPhotos.finished} crop={portraitCrop} />
+          {draft.thumbnail ? (
+            <Image
+              accessible={false}
+              source={{ uri: draft.thumbnail.uri }}
+              contentFit="cover"
+              style={{ width: '100%', height: '100%' }}
+            />
+          ) : (
+            <CroppedPhoto source={arPhotos.finished} crop={portraitCrop} />
+          )}
         </View>
         <View className="items-center gap-1.5">
           <Text
@@ -74,12 +87,15 @@ export function PostDone() {
         <View className="w-full gap-5">
           <PrimaryButton
             label="投稿を見る"
+            disabled={!postedId}
             onPress={() => {
-              // Leave the post flow and show the sample recipe in its place.
-              router.replace('/recipes/fox');
+              // Leave the post flow and show the new recipe in its place.
+              if (postedId) {
+                router.replace(`/recipes/${postedId}`);
+              }
             }}
           />
-          {/* Nothing is posted yet, so sharing stays inactive instead of announcing a post. */}
+          {/* Sharing a post is not built yet, so it stays inactive. */}
           <View
             accessible
             accessibilityRole="button"

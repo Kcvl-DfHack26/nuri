@@ -1,31 +1,117 @@
+import { recipeInputSchema, recipeThumbnailMaxBytes } from '@starter/shared';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { File } from 'expo-file-system';
 import { router } from 'expo-router';
+import { getThumbnailAsync } from 'expo-video-thumbnails';
+import { Alert } from 'react-native';
 
-import type { RecipeDetail } from '@/lib/recipes';
+import type { PostDraft } from '@/components/post-draft';
+import type { RecipeDetail, RecipeInput } from '@/lib/recipes';
 
-import { usedCosmetics, usePostDraft } from '@/components/post-draft';
+import { stepTitle, usedCosmetics, usePostDraft } from '@/components/post-draft';
 import { RecipeContent } from '@/components/recipe-detail';
+import { partColors, parts } from '@/components/recipes';
+import { authClient } from '@/lib/api';
+import { recipeMinutes } from '@/lib/post-edit';
+import { postRecipe } from '@/lib/recipes';
 
-// The post is not saved anywhere yet, so the preview shows a local sample instead of the API.
-const sample: RecipeDetail = {
-  id: 'fox',
-  title: '狐メイク',
-  image: '',
-  tags: ['丸顔向け'],
-  durationMinutes: 15,
-  likeCount: 1200,
-  source: 'instagram',
-  part: null,
-  summary: null,
-  author: { id: 'preview', name: 'mio', image: null },
-  favorited: false,
-  products: [],
-  steps: [],
-};
+const fieldsSchema = recipeInputSchema.omit({ thumbnail: true });
 
-// Plan A ⑫-8 投稿のプレビュー: the sample recipe screen with the draft's cosmetics, hidden
-// when the post does not publish them.
+/** The draft's texts and steps as the API takes them; the thumbnail is read only when posting. */
+function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
+  return {
+    title: draft.title,
+    summary: draft.message,
+    tags: draft.tags.map((tag) => tag.replace(/^#/u, '')),
+    durationMinutes: recipeMinutes(draft.video?.durationMs ?? null),
+    steps: draft.steps.map((step) => {
+      const names = draft.publishCosmetics ? step.cosmetics.map((cosmetic) => cosmetic.name) : [];
+      return {
+        part: step.part,
+        label: parts[step.part].label,
+        title: stepTitle(step),
+        description: step.description,
+        // ⑦ shows this as what the step uses; the part's name stands in when nothing is named.
+        uses: names.join('、') || parts[step.part].label,
+        color: step.cosmetics[0]?.color ?? partColors[step.part],
+      };
+    }),
+  };
+}
+
+function invalidMessage(field: PropertyKey | undefined) {
+  if (field === 'title') {
+    return 'タイトルを確認してください。';
+  }
+  return field === 'steps' ? '手順を確認してください。' : '投稿の内容を確認してください。';
+}
+
+/**
+ * The thumbnail as base64 JPEG. A frame over the API's limit is cut again at a lower quality; the
+ * file is deleted with the other frames when the flow closes.
+ */
+async function thumbnailBase64(
+  draft: PostDraft,
+  trackFile: (uri: string) => void,
+): Promise<string> {
+  const { video, thumbnail } = draft;
+  if (!video || !thumbnail) {
+    throw new Error('サムネイルにする場面を選んでください。');
+  }
+  let file = new File(thumbnail.uri);
+  if (file.size > recipeThumbnailMaxBytes) {
+    const smaller = await getThumbnailAsync(video.uri, { time: thumbnail.timeMs, quality: 0.3 });
+    trackFile(smaller.uri);
+    file = new File(smaller.uri);
+  }
+  if (file.size > recipeThumbnailMaxBytes) {
+    throw new Error('サムネイルの写真が大きすぎます。別の場面を選んでください。');
+  }
+  return await file.base64();
+}
+
+// Plan A ⑫-8 投稿のプレビュー: ⑤ with the draft, and 投稿 sends it. Before sending, a native alert
+// asks to publish the thumbnail, which can show the user's face, and the steps. The video is never
+// sent. A failed post keeps the draft so 投稿 can be pressed again; a sent one is not sent twice.
 export function PostPreview() {
-  const { draft } = usePostDraft();
+  const { draft, setDraft, trackFile } = usePostDraft();
+  const { data: session } = authClient.useSession();
+  const client = useQueryClient();
+  const post = useMutation({
+    mutationFn: async (current: PostDraft) =>
+      await postRecipe({
+        ...postFields(current),
+        thumbnail: await thumbnailBase64(current, trackFile),
+      }),
+    onSuccess: (id) => {
+      setDraft((current) => ({ ...current, postedId: id }));
+      void client.invalidateQueries({ queryKey: ['recipes'] });
+      router.push('/post/done');
+    },
+    onError: (error) => {
+      Alert.alert('投稿できませんでした', error.message);
+    },
+  });
+  const fields = postFields(draft);
+  const recipe: RecipeDetail = {
+    id: 'preview',
+    title: draft.title.trim(),
+    image: draft.thumbnail?.uri ?? '',
+    tags: fields.tags,
+    durationMinutes: fields.durationMinutes,
+    likeCount: 0,
+    source: null,
+    part: null,
+    summary: draft.message.trim() || null,
+    author: {
+      id: session?.user.id ?? 'preview',
+      name: session?.user.name ?? '',
+      image: session?.user.image ?? null,
+    },
+    favorited: false,
+    products: [],
+    steps: [],
+  };
   const cosmetics = draft.publishCosmetics
     ? usedCosmetics(draft.steps).map((cosmetic) => ({
         id: cosmetic.id,
@@ -34,14 +120,44 @@ export function PostPreview() {
         color: cosmetic.color,
       }))
     : null;
+  const onPost = () => {
+    if (draft.postedId) {
+      router.push('/post/done');
+      return;
+    }
+    if (post.isPending) {
+      return;
+    }
+    const checked = fieldsSchema.safeParse(fields);
+    if (!checked.success) {
+      Alert.alert('投稿できません', invalidMessage(checked.error.issues[0]?.path[0]));
+      return;
+    }
+    if (!draft.thumbnail) {
+      Alert.alert('投稿できません', 'サムネイルにする場面を選んでください。');
+      return;
+    }
+    Alert.alert(
+      '投稿して公開しますか',
+      'サムネイルの写真と手順をサーバーに送り、だれでも見られるように公開します。写真に顔が写っている場合は、その顔も公開されます。動画は送りません。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '投稿する',
+          onPress: () => {
+            post.mutate(draft);
+          },
+        },
+      ],
+    );
+  };
   return (
     <RecipeContent
-      recipe={sample}
-      steps={draft.steps}
+      recipe={recipe}
+      steps={fields.steps}
       postedCosmetics={cosmetics}
-      onPost={() => {
-        router.push('/post/done');
-      }}
+      onPost={onPost}
+      posting={post.isPending}
     />
   );
 }

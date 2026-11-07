@@ -12,11 +12,11 @@ import type { PhotoCrop } from '@/components/recipes';
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { NativeHost } from '@/components/native-host';
 import { PostHeader, PrimaryButton } from '@/components/post-chrome';
-import { sampleVideoLength, usePostDraft } from '@/components/post-draft';
+import { usePostDraft } from '@/components/post-draft';
 import { arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { addTag, lastFrameTime } from '@/lib/post-edit';
+import { addTag, formatClock, lastFrameTime } from '@/lib/post-edit';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -26,7 +26,9 @@ const PLUS = Icon.select({
 });
 const REMOVE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
 
+const titleLimit = 40;
 const messageLimit = 200;
+const tagLimit = 30;
 /** Before and After photos in ⑫-7 and ⑫-9 share Plan A's face crop. */
 export const portraitCrop: PhotoCrop = {
   width: '154.25%',
@@ -34,15 +36,18 @@ export const portraitCrop: PhotoCrop = {
   left: '-29.51%',
   top: '-40.6%',
 };
-// Plan A ⑫-7 メッセージを付けて投稿. The message, tags, thumbnail and publish option live in the
-// device-only draft; nothing is sent. Before and After stay hidden, with 「Before写真を公開」, until
-// they are built; the thumbnail takes their place at the top.
+// Plan A ⑫-7 メッセージを付けて投稿. The title, message, tags, thumbnail and publish option live
+// in the device-only draft until ⑫-8 posts it. Plan A has no title field, but a recipe needs one,
+// so it sits above the message and must be filled before the preview. Before and After stay
+// hidden, with 「Before写真を公開」, until they are built; the thumbnail takes their place at the top.
 export function PostMessage() {
   const insets = useSafeAreaInsets();
   const { draft, setDraft } = usePostDraft();
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
   const [tagInput, setTagInput] = useState('');
+  const durationMs = draft.video?.durationMs ?? null;
+  const titled = draft.title.trim().length > 0;
   const submitTag = () => {
     setDraft((current) => ({ ...current, tags: addTag(current.tags, tagInput) }));
     setTagInput('');
@@ -77,12 +82,31 @@ export function PostMessage() {
             <Text className="font-maru-bold text-label text-ink-primary">
               手順書 {draft.steps.length}ステップ
             </Text>
-            <Text className="font-maru text-meta text-ink-secondary">
-              動画 {sampleVideoLength} から作成
-            </Text>
+            {durationMs ? (
+              <Text className="font-maru text-meta text-ink-secondary">
+                動画 {formatClock(durationMs)} から作成
+              </Text>
+            ) : null}
           </View>
           <Text className="font-maru-bold text-label text-accent-rose">確認する</Text>
         </Pressable>
+        <View className="gap-1.5 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface p-3.5">
+          <Text className="font-maru-bold text-label text-ink-secondary">タイトル（必須）</Text>
+          <TextInput
+            accessibilityLabel="タイトル"
+            maxLength={titleLimit}
+            placeholder="例：丸顔さんの狐メイク"
+            placeholderTextColor={secondary}
+            value={draft.title}
+            onChangeText={(title) => {
+              setDraft((current) => ({ ...current, title }));
+            }}
+            className="min-h-12 p-0 font-maru text-ui text-ink-primary"
+          />
+          <Text className="text-right font-maru-bold text-micro text-ink-secondary">
+            {draft.title.length}/{titleLimit}
+          </Text>
+        </View>
         <View className="gap-1.5 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface p-3.5">
           <Text className="font-maru-bold text-label text-ink-secondary">メッセージ</Text>
           <TextInput
@@ -125,6 +149,7 @@ export function PostMessage() {
         <View className="min-h-12 flex-row items-center gap-2 rounded-full border-[1.5px] border-line-soft bg-white pl-4 pr-1">
           <TextInput
             accessibilityLabel="タグ"
+            maxLength={tagLimit}
             placeholder="タグを入力"
             placeholderTextColor={secondary}
             value={tagInput}
@@ -156,8 +181,14 @@ export function PostMessage() {
         </View>
       </ScrollView>
       <View className="px-4 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+        {titled ? null : (
+          <Text className="pb-2 text-center font-maru text-meta text-ink-secondary">
+            タイトルを入力するとプレビューを見られます
+          </Text>
+        )}
         <PrimaryButton
           label="プレビューを見る"
+          disabled={!titled}
           onPress={() => {
             router.push('/post/preview');
           }}
@@ -165,12 +196,6 @@ export function PostMessage() {
       </View>
     </View>
   );
-}
-
-/** m:ss of a frame, read in labels. */
-function frameTime(ms: number) {
-  const seconds = Math.floor(ms / 1000);
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 type VideoFrame = { uri: string; timeMs: number };
@@ -267,7 +292,7 @@ function ThumbnailPicker() {
       <Pressable
         accessibilityRole={canEdit ? 'button' : 'image'}
         accessibilityLabel={
-          shown ? `サムネイル ${frameTime(shown.timeMs)}の場面` : 'サムネイルの見本の写真'
+          shown ? `サムネイル ${formatClock(shown.timeMs)}の場面` : 'サムネイルの見本の写真'
         }
         accessibilityHint={canEdit ? 'サムネイルにする場面を変更します' : undefined}
         disabled={!canEdit || editingAt !== null}
@@ -303,10 +328,10 @@ function ThumbnailPicker() {
               accessibilityLiveRegion="polite"
               className="font-maru-bold text-meta text-ink-primary"
             >
-              {frameTime(editingAt)}
+              {formatClock(editingAt)}
             </Text>
             <Text className="font-maru text-meta text-ink-secondary">
-              {frameTime(video.durationMs)}
+              {formatClock(video.durationMs)}
             </Text>
           </View>
           {previewFailed ? (

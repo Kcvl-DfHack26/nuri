@@ -6,10 +6,14 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import type { PostStep } from '@/components/post-draft';
 
-import { CroppedPhoto } from '@/components/cropped-photo';
-import { BottomCta, DashedButton, PostHeader, PrimaryButton } from '@/components/post-chrome';
-import { stepTitle, usePostDraft } from '@/components/post-draft';
-import { arPhotos } from '@/components/recipes';
+import {
+  BottomCta,
+  DashedButton,
+  PostHeader,
+  PrimaryButton,
+  StepFrame,
+} from '@/components/post-chrome';
+import { segmentLength, stepTitle, usePostDraft } from '@/components/post-draft';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { useTokenColor } from '@/theme/tokens';
@@ -59,7 +63,8 @@ export function PostReview() {
           </View>
         </View>
         {draft.steps.map((step, index) => (
-          <StepCard key={step.part} step={step} index={index} />
+          // A post may work on the same part twice, so the position is the key.
+          <StepCard key={index} step={step} index={index} />
         ))}
         <DashedButton label="手順を追加" icon={addIcon} />
       </ScrollView>
@@ -80,10 +85,11 @@ function StepCard({ step, index }: { step: PostStep; index: number }) {
   const title = stepTitle(step);
   // Plan A names the cosmetic once one is chosen, and the step's note otherwise.
   const summary = step.cosmetics[0]?.name ?? step.description;
+  const length = segmentLength(step);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`手順${index + 1} ${title}、${summary}、区間 ${step.segment.length}`}
+      accessibilityLabel={`手順${index + 1} ${title}、${summary}、区間 ${length}`}
       accessibilityHint="手順を編集します"
       onPress={() => {
         router.push(`/post/step/${index}`);
@@ -91,7 +97,7 @@ function StepCard({ step, index }: { step: PostStep; index: number }) {
       className="flex-row items-center gap-3 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface py-2.5 pl-2.5 pr-2 active:opacity-70"
     >
       <View className="h-[84px] w-[68px] overflow-hidden rounded-[14px]">
-        <CroppedPhoto source={arPhotos.camera} crop={step.thumbCrop} />
+        <StepFrame step={step} />
         <View className="absolute left-[5px] top-[5px] size-[22px] items-center justify-center rounded-full bg-accent-rose">
           <Text className="font-maru-bold text-micro text-bg-surface">{index + 1}</Text>
         </View>
@@ -101,8 +107,8 @@ function StepCard({ step, index }: { step: PostStep; index: number }) {
       </View>
       <View className="flex-1 gap-[3px]">
         <Text className="font-maru-bold text-action text-ink-primary">{title}</Text>
-        <Text className="font-maru text-meta text-ink-secondary">{summary}</Text>
-        <Text className="font-maru text-meta text-accent-rose">区間 {step.segment.length}</Text>
+        {summary ? <Text className="font-maru text-meta text-ink-secondary">{summary}</Text> : null}
+        <Text className="font-maru text-meta text-accent-rose">区間 {length}</Text>
       </View>
       <SocialIcon name={MORE} size={22} color={ink} />
     </Pressable>
