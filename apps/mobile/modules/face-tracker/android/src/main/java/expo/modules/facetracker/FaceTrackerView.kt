@@ -65,7 +65,9 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private var landmarkerUnavailable = false
   // Frames sent since the last result: counted on the analysis thread, reset on MediaPipe's thread.
   private val framesWithoutResult = AtomicInteger(0)
-  private var active = false
+  @Volatile private var active = false
+  @Volatile private var sessionGeneration = 0
+  @Volatile private var discardResultsBeforeMs = 0L
   private var lastStatus: String? = null
   private var lastMessage: String? = null
 
@@ -148,6 +150,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   private fun stop() {
+    sessionGeneration++
+    discardResultsBeforeMs = SystemClock.uptimeMillis()
     cameraProvider?.unbind(*useCases)
     useCases = emptyArray()
     // A resumed camera must report its first state even when it matches the previous session.
@@ -234,6 +238,11 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
 
   // Analysis thread.
   private fun analyze(image: ImageProxy) {
+    val generation = sessionGeneration
+    if (!active) {
+      image.close()
+      return
+    }
     val current = landmarker ?: openLandmarker()
     if (current == null) {
       image.close()
@@ -260,6 +269,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     frameWidth = upright.width
     frameHeight = upright.height
+    if (!active || generation != sessionGeneration) return
     try {
       current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
     } catch (error: MediaPipeException) {
@@ -269,10 +279,13 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
 
   // MediaPipe's thread.
   private fun onResult(result: FaceLandmarkerResult) {
+    if (result.timestampMs() <= discardResultsBeforeMs) return
     framesWithoutResult.set(0)
     val face = result.faceLandmarks().firstOrNull()
     if (face.isNullOrEmpty()) {
-      post { setStatus("noFace") }
+      post {
+        if (result.timestampMs() > discardResultsBeforeMs) setStatus("noFace")
+      }
       return
     }
     val points = ArrayList<Double>(face.size * 2)
@@ -284,7 +297,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val width = frameWidth.toDouble()
     val height = frameHeight.toDouble()
     post {
-      if (!active || !isAttachedToWindow) return@post
+      if (!active || !isAttachedToWindow || result.timestampMs() <= discardResultsBeforeMs) return@post
       setStatus("tracking")
       onLandmarks(mapOf("points" to points, "width" to width, "height" to height, "latencyMs" to latencyMs))
     }
