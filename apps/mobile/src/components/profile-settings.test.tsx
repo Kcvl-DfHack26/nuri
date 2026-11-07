@@ -149,6 +149,16 @@ test('opens the app settings and logs out from the profile settings', async () =
   expect(mockSignOut).toHaveBeenCalled();
 });
 
+test('explains invalid user IDs before saving', async () => {
+  await renderWithClient(<ProfileSettings />);
+  await screen.findByLabelText('ユーザーID');
+  await fireEvent.changeText(screen.getByLabelText('ユーザーID'), 'Hana');
+  expect(
+    screen.getByText('ユーザーIDは半角英小文字・数字・_で3〜20文字にしてください'),
+  ).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
+});
+
 test('lets a guest log in or open the app settings from the profile settings', async () => {
   signOutForTest();
   await renderWithClient(<ProfileSettings />);

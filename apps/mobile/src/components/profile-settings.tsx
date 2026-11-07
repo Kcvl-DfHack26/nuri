@@ -61,7 +61,7 @@ export function ProfileSettings() {
         <Feedback fullScreen message="接続先が未設定です。" />
       ) : user && profile.isPending ? (
         <Feedback fullScreen loading message="プロフィールを読み込んでいます" />
-      ) : user && profile.isError ? (
+      ) : user && profile.isError && !profile.data ? (
         <Feedback
           fullScreen
           message={profile.error.message}
@@ -76,6 +76,10 @@ export function ProfileSettings() {
           email={user.email}
           image={user.image}
           top={insets.top + headerHeight + 16}
+          refreshError={profile.isError}
+          onRetry={() => {
+            void profile.refetch();
+          }}
         />
       ) : (
         <ScrollView
@@ -145,11 +149,15 @@ function Editor({
   email,
   image,
   top,
+  refreshError,
+  onRetry,
 }: {
   profile: { name: string; handle: string | null; bio: string; isPublic: boolean };
   email: string;
   image: string | null | undefined;
   top: number;
+  refreshError: boolean;
+  onRetry: () => void;
 }) {
   const [name, setName] = useState(profile.name);
   const [handle, setHandle] = useState(profile.handle ?? '');
@@ -158,6 +166,8 @@ function Editor({
   const client = useQueryClient();
   const secondary = useTokenColor('--color-ink-secondary');
   const input = { name, handle: handle.trim() || null, bio, isPublic };
+  const handleInvalid =
+    input.handle !== null && !profileInputSchema.shape.handle.safeParse(input.handle).success;
   const save = useMutation({
     mutationFn: async () => {
       const response = await api.api.me.profile.$put({ json: profileInputSchema.parse(input) });
@@ -206,6 +216,17 @@ function Editor({
         contentContainerClassName="gap-5 px-4"
         contentContainerStyle={{ paddingTop: top, paddingBottom: 24 }}
       >
+        {refreshError ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRetry}
+            className="min-h-12 justify-center"
+          >
+            <Text className="font-maru text-meta text-accent-rose">
+              最新のプロフィールを読み込めませんでした。再試行
+            </Text>
+          </Pressable>
+        ) : null}
         <View className="items-center gap-2">
           <View className="size-24">
             <ProfilePhoto size={96} image={image} />
@@ -234,7 +255,15 @@ function Editor({
               className="p-0 font-maru text-ui text-ink-primary"
             />
           </Field>
-          <Field label="ユーザーID">
+          <Field
+            label="ユーザーID"
+            caption={
+              handleInvalid
+                ? 'ユーザーIDは半角英小文字・数字・_で3〜20文字にしてください'
+                : '半角英小文字・数字・_で3〜20文字。空欄も可'
+            }
+            error={handleInvalid}
+          >
             <TextInput
               accessibilityLabel="ユーザーID"
               value={handle}
@@ -267,9 +296,10 @@ function Editor({
         <Section title="公開と通知">
           <SwitchRow
             title="プロフィールを公開"
-            detail="オフなら自分だけに表示します"
+            detail="オフならプロフィール画面は本人のみ。公開投稿・レシピの名前と写真は表示されます"
             value={isPublic}
             onValueChange={setIsPublic}
+            disabled={save.isPending}
           />
           <Divider />
           <SwitchRow title="新着の通知" detail="フォロー中の人の投稿をお知らせします" />
@@ -331,10 +361,12 @@ function Editor({
 function Field({
   label,
   caption,
+  error,
   children,
 }: {
   label: string;
   caption?: string;
+  error?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -343,7 +375,17 @@ function Field({
       <View className="min-h-12 justify-center rounded-2xl border border-black bg-bg-surface px-3.5 py-[13px]">
         {children}
       </View>
-      {caption ? <Text className="font-maru text-meta text-ink-secondary">{caption}</Text> : null}
+      {caption ? (
+        <Text
+          className={
+            error
+              ? 'font-maru text-meta text-accent-rose'
+              : 'font-maru text-meta text-ink-secondary'
+          }
+        >
+          {caption}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -393,18 +435,20 @@ function SwitchRow({
   detail,
   value = true,
   onValueChange,
+  disabled = false,
 }: {
   title: string;
   detail: string;
   value?: boolean;
   onValueChange?: (value: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <View className="min-h-[62px] gap-px py-2 pl-3.5 pr-3">
       <Host matchContents={{ vertical: true }} style={{ minHeight: 48 }}>
         <NativeSwitch
           label={onValueChange ? title : `${title}（準備中）`}
-          disabled={!onValueChange}
+          disabled={!onValueChange || disabled}
           value={value}
           onValueChange={onValueChange ?? (() => {})}
         />

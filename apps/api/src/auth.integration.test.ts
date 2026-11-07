@@ -171,6 +171,7 @@ test('Google/Apple OAuth use verified sessions and link the same verified email'
 }, 20000);
 
 test('magic links are single-use and sessions protect posts, likes and deletion', async () => {
+  const handle = `h_${unique.replaceAll('-', '').slice(0, 18)}`;
   const link = await emailLink(email);
   const signedIn = await app.request(link.href);
   const cookie = cookies(signedIn);
@@ -238,7 +239,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     (
       await request(
         '/api/me/profile',
-        { name: 'はな', handle: 'hanako_1', bio: 'よろしく', isPublic: false },
+        { name: 'はな', handle, bio: 'よろしく', isPublic: false },
         cookie,
         'PUT',
       )
@@ -247,7 +248,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
   const privateProfile = await app.request(`/api/users/${author?.id}`, { headers: { cookie } });
   expect(privateProfile.status).toBe(200);
   expect(await privateProfile.json()).toEqual({
-    user: { ...author, name: 'はな', handle: 'hanako_1', bio: 'よろしく', isPublic: false },
+    user: { ...author, name: 'はな', handle, bio: 'よろしく', isPublic: false },
   });
   expect((await app.request(`/api/users/${author?.id}`)).status).toBe(404);
   expect(
@@ -257,7 +258,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     (
       await request(
         '/api/me/profile',
-        { name: '別の人', handle: 'hanako_1', bio: '', isPublic: true },
+        { name: '別の人', handle, bio: '', isPublic: true },
         other,
         'PUT',
       )
