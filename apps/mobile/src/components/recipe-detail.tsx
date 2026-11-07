@@ -42,6 +42,10 @@ const CART = Icon.select({
   ios: 'cart',
   android: import('@expo/material-symbols/shopping_cart.xml'),
 });
+const UPLOAD = Icon.select({
+  ios: 'square.and.arrow.up',
+  android: import('@expo/material-symbols/upload.xml'),
+});
 
 // Hero layout from Plan A ⑤ (390×540 frame). The guides and pins were drawn on its top 480pt.
 const heroCrop: PhotoCrop = {
@@ -70,7 +74,19 @@ const atFrame = (x: number, y: number) =>
   ({ left: `${(x / 390) * 100}%`, top: `${(y / 540) * 100}%` }) as const;
 
 // Plan A ⑤ レシピ詳細.
-export function RecipeDetail({ id }: { id: string }) {
+// ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top, a single 投稿
+// action, and the draft's cosmetics (null when the post does not publish them).
+export type PostedCosmetic = { id: string; name: string; detail: string; color: string };
+
+export function RecipeDetail({
+  id,
+  onPost,
+  postedCosmetics,
+}: {
+  id: string;
+  onPost?: () => void;
+  postedCosmetics?: PostedCosmetic[] | null;
+}) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const recipe = findRecipe(id);
@@ -186,18 +202,59 @@ export function RecipeDetail({ id }: { id: string }) {
               );
             })}
           </View>
-          <View className="flex-row items-center justify-between">
-            <Text
-              accessibilityRole="header"
-              className="font-maru-bold text-heading text-ink-primary"
-            >
-              使うメイク品
-            </Text>
-            <Text className="font-maru text-meta text-ink-secondary">{detail.productCount}点</Text>
-          </View>
-          {detail.products.map((product) => (
-            <ProductRow key={product.id} product={product} />
-          ))}
+          {postedCosmetics === undefined ? (
+            <>
+              <View className="flex-row items-center justify-between">
+                <Text
+                  accessibilityRole="header"
+                  className="font-maru-bold text-heading text-ink-primary"
+                >
+                  使うメイク品
+                </Text>
+                <Text className="font-maru text-meta text-ink-secondary">
+                  {detail.productCount}点
+                </Text>
+              </View>
+              {detail.products.map((product) => (
+                <ProductRow key={product.id} product={product} />
+              ))}
+            </>
+          ) : postedCosmetics === null ? null : (
+            <>
+              <View className="flex-row items-center justify-between">
+                <Text
+                  accessibilityRole="header"
+                  className="font-maru-bold text-heading text-ink-primary"
+                >
+                  使うメイク品
+                </Text>
+                <Text className="font-maru text-meta text-ink-secondary">
+                  {postedCosmetics.length}点
+                </Text>
+              </View>
+              {postedCosmetics.map((cosmetic) => (
+                <View
+                  key={cosmetic.id}
+                  accessible
+                  accessibilityLabel={`${cosmetic.name}、${cosmetic.detail}`}
+                  className="flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5"
+                >
+                  <View
+                    className="size-[52px] rounded-[14px]"
+                    style={{ backgroundColor: cosmetic.color }}
+                  />
+                  <View className="flex-1 gap-0.5">
+                    <Text className="font-maru-bold text-label text-ink-primary">
+                      {cosmetic.name}
+                    </Text>
+                    <Text className="font-maru text-meta text-ink-secondary">
+                      {cosmetic.detail}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </>
+          )}
         </ScrollView>
       </View>
       <View
@@ -219,24 +276,41 @@ export function RecipeDetail({ id }: { id: string }) {
             backOrHome();
           }}
         />
-        <View className="flex-1" />
-        <GlassIconButton
-          icon={SHARE}
-          label="共有"
-          onPress={() => {
-            void Share.share({
-              message: `${recipe.title}（${recipe.author}）をnuriで見つけました`,
-            }).catch(() => undefined);
+        {onPost ? (
+          <>
+            <View className="flex-1 items-center">
+              <View className="min-h-9 justify-center rounded-full border border-black bg-white px-[22px]">
+                <Text className="font-maru-bold text-label text-ink-primary">プレビュー</Text>
+              </View>
+            </View>
+            <View className="w-10" />
+          </>
+        ) : (
+          <>
+            <View className="flex-1" />
+            <GlassIconButton
+              icon={SHARE}
+              label="共有"
+              onPress={() => {
+                void Share.share({
+                  message: `${recipe.title}（${recipe.author}）をnuriで見つけました`,
+                }).catch(() => undefined);
+              }}
+            />
+            <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />
+          </>
+        )}
+      </View>
+      {onPost ? (
+        <PostBar onPost={onPost} bottom={insets.bottom} />
+      ) : (
+        <StartBar
+          bottom={insets.bottom}
+          onStart={() => {
+            router.push(`/recipes/${recipe.id}/steps`);
           }}
         />
-        <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />
-      </View>
-      <StartBar
-        bottom={insets.bottom}
-        onStart={() => {
-          router.push(`/recipes/${recipe.id}/steps`);
-        }}
-      />
+      )}
     </View>
   );
 }
@@ -342,5 +416,25 @@ function ProductRow({ product }: { product: Product }) {
     >
       {content}
     </Pressable>
+  );
+}
+
+function PostBar({ onPost, bottom }: { onPost: () => void; bottom: number }) {
+  const white = useTokenColor('--color-bg-surface');
+  return (
+    <View
+      className="absolute inset-x-0 bottom-0 bg-[rgba(242,242,242,0.85)] px-4 pt-3"
+      style={{ paddingBottom: Math.max(bottom, 12) }}
+    >
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPost}
+        className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80"
+        style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
+      >
+        <SocialIcon name={UPLOAD} size={20} color={white} />
+        <Text className="font-maru-bold text-action text-white">投稿</Text>
+      </Pressable>
+    </View>
   );
 }
