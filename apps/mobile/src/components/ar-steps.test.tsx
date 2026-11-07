@@ -4,6 +4,12 @@ import { router } from 'expo-router';
 
 import { ArSteps } from './ar-steps';
 
+// The live camera needs the native face tracker and Skia; Expo Go and Jest use Plan A's photo.
+jest.mock('@/components/face-makeup-camera', () => ({
+  canTrackFace: false,
+  FaceMakeupCamera: () => null,
+  paintColor: (colors: string[]) => colors[0],
+}));
 jest.mock('@expo/ui', () => {
   const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
   return {

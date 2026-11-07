@@ -20,8 +20,6 @@ import { usePreferences } from '@/lib/preferences';
 import { colors } from '@/theme/colors';
 import { iconSize } from '@/theme/metrics';
 
-import FaceTracker from '../../modules/face-tracker/src/FaceTrackerModule';
-
 export function Settings() {
   const { preferences, update, storageError } = usePreferences();
   const session = authClient.useSession();
@@ -188,18 +186,6 @@ export function Settings() {
                 }}
               />
               {!passkeysAvailable ? <NativeText>この環境では登録できません。</NativeText> : null}
-            </FieldGroup.Section>
-          ) : null}
-          {__DEV__ && FaceTracker ? (
-            // Only in development builds, which include the native face tracker (#25).
-            <FieldGroup.Section title="開発用">
-              <Button
-                label="顔追跡の確認"
-                variant="outlined"
-                onPress={() => {
-                  router.push('/face-tracking');
-                }}
-              />
             </FieldGroup.Section>
           ) : null}
           <FieldGroup.Section title="このアプリについて">
