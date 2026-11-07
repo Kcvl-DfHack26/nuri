@@ -1,0 +1,126 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "491656c9-37ab-4ed5-a669-a58ee658607f",
+  "prevIds": [
+    "9d1eb570-3e3d-4e85-8cdf-15d145a02323",
+    "9c116315-33f5-4ed3-81ec-e8ae411ed9cb"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "recipe",
+        "part"
+      ],
+      "writes": [
+        "s|col|public.recipe.part",
+        "n|col|public.recipe.part",
+        "e|col|public.recipe.part"
+      ],
+      "reads": [
+        "n|tbl|public.recipe",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "recipe",
+        "summary"
+      ],
+      "writes": [
+        "s|col|public.recipe.summary",
+        "n|col|public.recipe.summary",
+        "e|col|public.recipe.summary"
+      ],
+      "reads": [
+        "n|tbl|public.recipe",
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "recipe",
+        "recipe_part_idx"
+      ],
+      "writes": [
+        "s|idx|public.recipe_part_idx",
+        "n|idx|public.recipe_part_idx",
+        "e|idx|public.recipe_part_idx",
+        "n|rel|public.recipe_part_idx"
+      ],
+      "reads": [
+        "n|tbl|public.recipe",
+        "n|sch|public",
+        "n|col|public.recipe.part"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe",
+        "name": "part",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe",
+        "name": "summary",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe",
+        "name": "recipe_part_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "part",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

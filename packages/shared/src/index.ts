@@ -36,7 +36,6 @@ export const profilePatchSchema = profileInputSchema
 
 // Recipe IDs are readable slugs (e.g. fox) so seeded recipes keep stable URLs.
 export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,64}$/) });
-export const recipeListQuerySchema = feedQuerySchema.pick({ offset: true });
 /** Where an imported recipe came from; null means it was made in nuri. */
 export const recipeSources = ['instagram', 'tiktok', 'youtube'] as const;
 /** The face parts a makeup step works on, in Plan A's ② order. */
@@ -50,3 +49,7 @@ export const makeupParts = [
   'highlight',
   'lip',
 ] as const;
+/** Whole-face recipes by default; with `part`, the recipes for that one part (② ③). */
+export const recipeListQuerySchema = feedQuerySchema
+  .pick({ offset: true })
+  .extend({ part: z.enum(makeupParts).optional() });
