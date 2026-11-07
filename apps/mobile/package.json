@@ -25,6 +25,7 @@
     "@expo/material-symbols": "0.1.1",
     "@expo/ui": "~58.0.27",
     "@rn-primitives/slot": "1.5.2",
+    "@shopify/react-native-skia": "2.14.0",
     "@starter/shared": "workspace:*",
     "@tanstack/react-query": "5.101.2",
     "better-auth": "^1.7.17",

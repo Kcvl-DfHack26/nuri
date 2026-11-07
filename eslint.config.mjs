@@ -51,6 +51,8 @@ export default [
         { type: 'mobile-ui', pattern: 'apps/mobile/src/components' },
         { type: 'mobile-lib', pattern: 'apps/mobile/src/lib' },
         { type: 'mobile-assets', pattern: 'apps/mobile/assets' },
+        // Local Expo modules with native code (e.g. the face tracker).
+        { type: 'mobile-native', pattern: 'apps/mobile/modules/*' },
         { type: 'mobile-theme', pattern: 'apps/mobile/src/theme' },
         { type: 'shared', pattern: 'packages/shared/src' },
         { type: 'emulate', pattern: 'apps/emulate/src' },
@@ -124,7 +126,15 @@ export default [
               from: { element: { type: 'mobile-ui' } },
               allow: {
                 to: {
-                  element: { type: ['mobile-lib', 'mobile-theme', 'mobile-assets', 'shared'] },
+                  element: {
+                    type: [
+                      'mobile-lib',
+                      'mobile-theme',
+                      'mobile-assets',
+                      'mobile-native',
+                      'shared',
+                    ],
+                  },
                 },
               },
             },

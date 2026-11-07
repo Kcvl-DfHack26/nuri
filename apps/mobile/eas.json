@@ -10,7 +10,13 @@
       "developmentClient": true,
       "distribution": "internal",
       "channel": "development",
-      "environment": "development"
+      "environment": "development",
+      "android": {
+        "env": {
+          "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-XX:MaxMetaspaceSize=1g -Xmx4g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\" -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2",
+          "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64"
+        }
+      }
     },
     "development-simulator": {
       "extends": "development",

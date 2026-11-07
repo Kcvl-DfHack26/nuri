@@ -172,7 +172,31 @@ bunx eas build --profile development --platform android
 
 iPhone実機への内部配布にはApple Developer Program、端末登録、署名情報が必要。初回は対話形式で `bunx eas device:create` / `bunx eas credentials` を実行して登録する。Apple側の契約・端末承認はIaCで代替できない。クラウドビルドはEASの利用枠を消費する。
 
-このプロジェクトではApple Developer Programは未契約のため、iPhoneではExpo Goを使う。Apple契約なしで作れるiOS SimulatorビルドはiPhoneへインストールできない。Androidのpreview APKは署名済みの単体アプリとして配布できる。
+EASの `development` のAndroidビルドは、ビルド用マシンでGradleがメモリ不足で落ちたため、`eas.json` でGradleのworkerを2つに絞り、ABIを `arm64-v8a` と `x86_64` に限っている。32bit ARMの端末には入らない。この設定でのEASのビルドはまだ確かめていない。
+
+2026年11月7日時点で、試したApple IDはApple Developer Programに入っておらず、`bunx eas device:create` がAppleに拒否されたため、iPhoneのDevelopment Buildはまだ作れていない。Developer ProgramのチームにいるApple IDで、試す人のiPhoneを先に `bunx eas device:create` で登録してからビルドする（登録していない端末には入らない）。AndroidのAPKは端末の登録なしで入れられる。
+
+顔追跡（`apps/mobile/modules/face-tracker`、MediaPipe Face Landmarker）はネイティブモジュールのため、Expo Goでは動かずDevelopment Buildが必要。Development Buildでは設定の「開発用」から「顔追跡の確認」を開き、カメラの映像に特徴点を重ね、fpsと遅延を表示する。ネイティブモジュールや依存を変えたら、新しいDevelopment Buildを作る（OTAでは届かない）。
+
+Androidのネイティブコードは手元でもコンパイルを確かめられる。JDK 17とAndroid SDK（Platform 37.0、Build-Tools 37.0.0、NDK 27.1.12297006、CMake 3.22.1）を入れ、`JAVA_HOME` と `ANDROID_HOME` を設定する。生成される `android/` はコミットしない。
+
+```sh
+cd apps/mobile
+CI=1 bunx expo prebuild --platform android --no-install
+cd android && ./gradlew :app:assembleDebug
+```
+
+実機がないときは、Android StudioのエミュレーターとPCのウェブカメラで顔追跡の動作を確かめられる。エミュレーターはカメラの映像とGPUの命令を変換して渡すため、fpsと遅延は中位の端末の性能を表さない。Android Studioの初回設定（Standard）でSDKとエミュレーターを入れると、足りないNDK・CMake・Build-ToolsはGradleが入れる。AVDの `~/.android/avd/<AVD名>.avd/config.ini` で `hw.camera.front=webcam0` にする（使えるカメラは `emulator -webcam-list` で分かる）。`-gpu host` はPCのGPUで画面を描き、`-qemu -cpu host` はAVX2などをエミュレーターの中に見せてCPUの推論を速くする。ウェブカメラを挿し直したら、スナップショットが古いデバイスを開いたままになるため `-no-snapshot-load` で起動し直す。
+
+```sh
+~/Android/Sdk/emulator/emulator -avd <AVD名> -gpu host -memory 4096 -no-snapshot-load -qemu -cpu host
+cd apps/mobile/android
+./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb reverse tcp:8081 tcp:8081
+```
+
+アプリを開いて開発サーバー `http://127.0.0.1:8081` を選び、設定の「開発用」から「顔追跡の確認」を開く。この方式ではMediaPipeのGPU推論が毎フレーム失敗し、150フレーム後にCPUに切り替わる（エミュレーターのカメラでは約10秒）。GPUで動くことだけを確かめるときは `-feature GuestAngle` を足す（1回約400msかかる）。
 
 このリポジトリはEASに接続済みで、`build:configure` / `update:configure`も実行済み。設定はfingerprint runtime policy、development/preview/production channel。フォーク時は `eas init`、`eas build:configure`、`eas update:configure` で自分のプロジェクトへ再接続する。
 

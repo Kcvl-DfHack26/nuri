@@ -297,4 +297,6 @@ ARの顔追跡には[MediaPipe Face Landmarker](https://developers.google.com/ed
 
 ## 12. 検証の状況
 
-2026年11月7日時点で確かめたのは、スターターの取り込み後の静的な検査（整形、lint、型、Bun・Jestのテスト、PostgreSQLでの認証テスト、expo-doctor、iOS・Androidのbundle生成、OpenTofuのvalidate）だけ。実機での動作、開発ビルド、Google Cloudへのデプロイ、顔追跡（P1・P2）はまだ確かめていない。次はPlan Aの主要画面（①⑤⑦⑩）を動かすことを優先する。
+2026年11月7日時点で確かめたのは、スターターの取り込み後の静的な検査（整形、lint、型、Bun・Jestのテスト、PostgreSQLでの認証テスト、expo-doctor、iOS・Androidのbundle生成、OpenTofuのvalidate）と、P1のAndroidエミュレーターでの動作確認。実機での動作、iOSの開発ビルド、Google Cloudへのデプロイ、P2はまだ確かめていない。次はPlan Aの主要画面（①⑤⑦⑩）を動かすことを優先する。
+
+P1（#25）は、Androidのエミュレーター（Android 17、x86_64、6コア・4GB、`-gpu host -qemu -cpu host`）とPCのウェブカメラ（eMeet C960）で確かめた。478点が取れ、拡大・切り抜き・左右反転を合わせた画面座標で顔に重なる。顔を外すと案内が出て、戻すと追跡に戻る。参考値はCPUの推論で11fps、遅延（フレームを受け取ってから結果が出るまで）は平均41ms・最大78ms。エミュレーターはカメラの映像とGPUの命令を変換して渡すため、GPUの推論は通常の方式では毎フレーム失敗し、ANGLE方式（`-feature GuestAngle`）では1回約400msかかった。この値は中位の端末の性能を表さないので、合格の目安（30fps以上、遅延100ms以下、顔を左右30度向けても外れない）は判定していない。真横を向くと外れることがある。カメラを許可しない場合の案内は、まだ実際に拒否して試していない。iOSは、試したApple IDがApple Developer Programに入っておらず、開発ビルドを作れていない。
