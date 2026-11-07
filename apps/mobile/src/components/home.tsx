@@ -1,17 +1,21 @@
 import { Icon } from '@expo/ui';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { Recipe } from '@/components/recipes';
+import type { RecipeSummary } from '@/lib/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
-import { partCards, parts, partStyles, recipes } from '@/components/recipes';
+import { Feedback } from '@/components/feedback';
+import { partCards, parts, partStyles } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
+import { formatCount, recipeListOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -153,28 +157,65 @@ function ScopeSegment({ value, onChange }: { value: Scope; onChange: (value: Sco
 }
 
 function RecipeGrid({ top }: { top: number }) {
+  const list = useInfiniteQuery({ ...recipeListOptions(), enabled: Boolean(apiUrl) });
+  const items = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
+  const status = !apiUrl ? (
+    <Feedback message="接続先が未設定です。セットアップ後にレシピを表示できます。" />
+  ) : list.isPending ? (
+    <Feedback loading message="レシピを読み込んでいます" />
+  ) : list.isError ? (
+    <Feedback
+      message="レシピを読み込めませんでした。通信状況を確認してお試しください。"
+      onRetry={() => {
+        void list.refetch();
+      }}
+    />
+  ) : null;
   return (
     <FlatList
-      data={recipes}
+      data={items}
       keyExtractor={(recipe) => recipe.id}
       numColumns={2}
       columnWrapperStyle={{ gap: 6 }}
       contentContainerStyle={{ paddingTop: top, paddingBottom: 24, gap: 14 }}
       contentInsetAdjustmentBehavior="never"
+      // A failed next page keeps the loaded cards and shows the retry above them.
+      ListHeaderComponent={status ? <View className="px-4">{status}</View> : undefined}
+      ListEmptyComponent={
+        status ? undefined : (
+          <View className="px-4">
+            <Feedback message="レシピはまだありません" />
+          </View>
+        )
+      }
+      onEndReached={() => {
+        if (list.hasNextPage && !list.isFetchingNextPage && !list.isError) {
+          void list.fetchNextPage();
+        }
+      }}
       renderItem={({ item }) => <RecipeCard recipe={item} />}
     />
   );
 }
 
-function RecipeCard({ recipe }: { recipe: Recipe }) {
+function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
   const secondary = useTokenColor('--color-ink-secondary');
   const ink = useTokenColor('--color-ink-primary');
-  const content = (
-    <>
-      <View className="aspect-[192/233] w-full overflow-hidden rounded-[5px]">
+  const likes = formatCount(recipe.likeCount);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${recipe.title}、${recipe.author.name}、いいね${likes}`}
+      // Half of the row, so a lone last card keeps the grid's width.
+      className="max-w-[50%] flex-1 gap-[5px] active:opacity-80"
+      onPress={() => {
+        router.push(`/recipes/${recipe.id}`);
+      }}
+    >
+      <View className="aspect-[192/233] w-full overflow-hidden rounded-[5px] bg-neutral-soft">
         <Image
           accessible={false}
-          source={recipe.thumbnail}
+          source={{ uri: apiAssetUrl(recipe.image) }}
           contentFit="cover"
           style={{ width: '100%', height: '100%' }}
         />
@@ -185,35 +226,13 @@ function RecipeCard({ recipe }: { recipe: Recipe }) {
       <View className="w-full gap-[5px] px-2">
         <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
         <View className="flex-row items-center gap-1">
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">{recipe.author}</Text>
+          <Text className="flex-1 font-maru text-meta text-ink-secondary">
+            {recipe.author.name}
+          </Text>
           <SocialIcon name={HEART} size={14} color={secondary} />
-          <Text className="font-maru text-meta text-ink-secondary">{recipe.likes}</Text>
+          <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
         </View>
       </View>
-    </>
-  );
-  // Only recipes with Plan A detail screens open ⑤; the rest are catalog previews.
-  if (!recipe.detail) {
-    return (
-      <View
-        accessible
-        accessibilityLabel={`${recipe.title}、${recipe.author}`}
-        className="flex-1 gap-[5px]"
-      >
-        {content}
-      </View>
-    );
-  }
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${recipe.title}、${recipe.author}`}
-      className="flex-1 gap-[5px] active:opacity-80"
-      onPress={() => {
-        router.push(`/recipes/${recipe.id}`);
-      }}
-    >
-      {content}
     </Pressable>
   );
 }

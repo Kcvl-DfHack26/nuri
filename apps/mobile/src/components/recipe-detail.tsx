@@ -1,19 +1,25 @@
 import { Icon } from '@expo/ui';
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PhotoCrop, Product, Recipe } from '@/components/recipes';
+import type { PhotoCrop, Recipe } from '@/components/recipes';
+import type { RecipeDetail as RecipeData } from '@/lib/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
+import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { arPhotos, findRecipe, parts } from '@/components/recipes';
+import { ProfilePhoto } from '@/components/my-page';
+import { arPhotos, findProduct, findRecipe, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
+import { formatCount, recipeOptions, sourceLabels } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -72,6 +78,10 @@ const pinLabels = [
 ];
 const atFrame = (x: number, y: number) =>
   ({ left: `${(x / 390) * 100}%`, top: `${(y / 540) * 100}%` }) as const;
+// Plan A colors the tags in this order.
+const tagBackgrounds = ['bg-base-peach', 'bg-base-lilac', 'bg-base-mint'];
+
+type Steps = NonNullable<Recipe['detail']>;
 
 // Plan A ⑤ レシピ詳細.
 // ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top, a single 投稿
@@ -87,16 +97,55 @@ export function RecipeDetail({
   onPost?: () => void;
   postedCosmetics?: PostedCosmetic[] | null;
 }) {
-  const insets = useSafeAreaInsets();
-  const window = useWindowDimensions();
-  const recipe = findRecipe(id);
-  if (!recipe?.detail) {
+  const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
+  if (query.data) {
     return (
-      <View
-        className="flex-1 items-center justify-center gap-4 bg-white px-6"
-        style={{ paddingTop: insets.top }}
-      >
-        <Text className="font-maru-bold text-heading text-ink-primary">レシピが見つかりません</Text>
+      <RecipeContent
+        recipe={query.data}
+        // Steps stay fixed Plan A data until they come from the API too.
+        steps={findRecipe(id)?.detail}
+        onPost={onPost}
+        postedCosmetics={postedCosmetics}
+      />
+    );
+  }
+  return (
+    <RecipeStatus
+      loading={query.isPending && Boolean(apiUrl)}
+      message={
+        !apiUrl
+          ? '接続先が未設定です。セットアップ後にレシピを表示できます。'
+          : query.data === null
+            ? 'レシピが見つかりません'
+            : query.isError
+              ? 'レシピを読み込めませんでした。通信状況を確認してお試しください。'
+              : 'レシピを読み込んでいます'
+      }
+      onRetry={
+        query.isError
+          ? () => {
+              void query.refetch();
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+function RecipeStatus({
+  message,
+  loading,
+  onRetry,
+}: {
+  message: string;
+  loading: boolean;
+  onRetry: (() => void) | undefined;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <View className="flex-1 bg-white" style={{ paddingTop: insets.top + 6 }}>
+      <StatusBar style="dark" />
+      <View className="flex-row px-4">
         <GlassIconButton
           icon={BACK}
           label="戻る"
@@ -105,9 +154,32 @@ export function RecipeDetail({
           }}
         />
       </View>
-    );
-  }
-  const { detail } = recipe;
+      <View className="flex-1 justify-center px-6">
+        <Feedback message={message} loading={loading} {...(onRetry ? { onRetry } : {})} />
+      </View>
+    </View>
+  );
+}
+
+function RecipeContent({
+  recipe,
+  steps,
+  onPost,
+  postedCosmetics,
+}: {
+  recipe: RecipeData;
+  steps: Steps | undefined;
+  onPost: (() => void) | undefined;
+  postedCosmetics: PostedCosmetic[] | null | undefined;
+}) {
+  const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  const likes = formatCount(recipe.likeCount);
+  const tags = [
+    ...recipe.tags.map((tag) => `＃${tag}`),
+    `＃${recipe.durationMinutes}分`,
+    ...(steps ? [`${steps.overview.length}ステップ`] : []),
+  ];
   // Plan A keeps the face and the sheet in place; only the sheet's content scrolls.
   const heroHeight = (window.width * 540) / 390;
   // Wide or short windows (iPad, landscape) keep Plan A's share of the screen for the sheet.
@@ -116,7 +188,7 @@ export function RecipeDetail({
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
       <View className="absolute inset-x-0 top-0">
-        <Hero recipe={recipe} />
+        <Hero recipe={recipe} steps={steps} />
       </View>
       <View
         className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white"
@@ -136,25 +208,28 @@ export function RecipeDetail({
               {recipe.title}
             </Text>
             <View className="flex-row flex-wrap gap-1.5">
-              {detail.tags.map((tag) => (
+              {tags.map((tag, index) => (
                 <View
-                  key={tag.label}
-                  className={cn('min-h-6 justify-center rounded-xl px-2.5', tag.background)}
+                  key={tag}
+                  className={cn(
+                    'min-h-6 justify-center rounded-xl px-2.5',
+                    tagBackgrounds[index % tagBackgrounds.length],
+                  )}
                 >
-                  <Text className="font-maru-bold text-micro text-ink-primary">{tag.label}</Text>
+                  <Text className="font-maru-bold text-micro text-ink-primary">{tag}</Text>
                 </View>
               ))}
             </View>
           </View>
           <View className="flex-row items-center gap-2.5">
-            <Image
-              accessible={false}
-              source={detail.avatar}
-              style={{ width: 36, height: 36, borderRadius: 18 }}
-            />
+            <ProfilePhoto size={36} image={recipe.author.image} />
             <View className="flex-1">
-              <Text className="font-maru-bold text-label text-ink-primary">{recipe.author}</Text>
-              <Text className="font-maru text-meta text-ink-secondary">{detail.source}</Text>
+              <Text className="font-maru-bold text-label text-ink-primary">
+                {recipe.author.name}
+              </Text>
+              <Text className="font-maru text-meta text-ink-secondary">
+                {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}保存 {likes}
+              </Text>
             </View>
             <View
               accessible
@@ -166,59 +241,68 @@ export function RecipeDetail({
               <Text className="font-maru-bold text-label text-accent-rose">フォロー</Text>
             </View>
           </View>
-          <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
-            手順
-          </Text>
-          <View className="flex-row justify-between">
-            {detail.overview.map((partId, index) => {
-              const part = parts[partId];
-              return (
-                <View key={partId} className="items-center gap-1">
-                  <View
-                    className={cn(
-                      'size-[46px] items-center justify-center rounded-full',
-                      part.iconBackground,
-                    )}
-                  >
-                    <Image
-                      accessible={false}
-                      source={part.icon}
-                      style={{ width: 22, height: 22 }}
-                    />
-                    <View className="absolute -top-0.5 left-[30px] size-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-accent-rose">
-                      <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
+          {steps ? (
+            <>
+              <Text
+                accessibilityRole="header"
+                className="font-maru-bold text-heading text-ink-primary"
+              >
+                手順
+              </Text>
+              <View className="flex-row justify-between">
+                {steps.overview.map((partId, index) => {
+                  const part = parts[partId];
+                  return (
+                    <View key={partId} className="items-center gap-1">
+                      <View
+                        className={cn(
+                          'size-[46px] items-center justify-center rounded-full',
+                          part.iconBackground,
+                        )}
+                      >
+                        <Image
+                          accessible={false}
+                          source={part.icon}
+                          style={{ width: 22, height: 22 }}
+                        />
+                        <View className="absolute -top-0.5 left-[30px] size-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-accent-rose">
+                          <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
+                        </View>
+                      </View>
+                      <Text className="font-maru-bold text-micro text-ink-primary">
+                        {partId === 'eye'
+                          ? 'シャドウ'
+                          : partId === 'lash'
+                            ? 'ライン'
+                            : partId === 'shading'
+                              ? 'シェード'
+                              : part.label}
+                      </Text>
                     </View>
-                  </View>
-                  <Text className="font-maru-bold text-micro text-ink-primary">
-                    {partId === 'eye'
-                      ? 'シャドウ'
-                      : partId === 'lash'
-                        ? 'ライン'
-                        : partId === 'shading'
-                          ? 'シェード'
-                          : part.label}
+                  );
+                })}
+              </View>
+            </>
+          ) : null}
+          {postedCosmetics === undefined ? (
+            recipe.products.length > 0 ? (
+              <>
+                <View className="flex-row items-center justify-between">
+                  <Text
+                    accessibilityRole="header"
+                    className="font-maru-bold text-heading text-ink-primary"
+                  >
+                    使うメイク品
+                  </Text>
+                  <Text className="font-maru text-meta text-ink-secondary">
+                    {recipe.products.length}点
                   </Text>
                 </View>
-              );
-            })}
-          </View>
-          {postedCosmetics === undefined ? (
-            <>
-              <View className="flex-row items-center justify-between">
-                <Text
-                  accessibilityRole="header"
-                  className="font-maru-bold text-heading text-ink-primary"
-                >
-                  使うメイク品
-                </Text>
-                <Text className="font-maru text-meta text-ink-secondary">
-                  {detail.productCount}点
-                </Text>
-              </View>
-              {detail.products.map((product) => (
-                <ProductRow key={product.id} product={product} />
-              ))}
-            </>
+                {recipe.products.map((product) => (
+                  <ProductRow key={product.id} product={product} />
+                ))}
+              </>
+            ) : null
           ) : postedCosmetics === null ? null : (
             <>
               <View className="flex-row items-center justify-between">
@@ -293,7 +377,7 @@ export function RecipeDetail({
               label="共有"
               onPress={() => {
                 void Share.share({
-                  message: `${recipe.title}（${recipe.author}）をnuriで見つけました`,
+                  message: `${recipe.title}（${recipe.author.name}）をnuriで見つけました`,
                 }).catch(() => undefined);
               }}
             />
@@ -306,17 +390,34 @@ export function RecipeDetail({
       ) : (
         <StartBar
           bottom={insets.bottom}
-          onStart={() => {
-            router.push(`/recipes/${recipe.id}/steps`);
-          }}
+          onStart={
+            steps
+              ? () => {
+                  router.push(`/recipes/${recipe.id}/steps`);
+                }
+              : undefined
+          }
         />
       )}
     </View>
   );
 }
 
-function Hero({ recipe }: { recipe: Recipe }) {
-  const overview = recipe.detail?.overview ?? [];
+function Hero({ recipe, steps }: { recipe: RecipeData; steps: Steps | undefined }) {
+  // Plan A's guides and pins are drawn on its own face photo, so only recipes with Plan A
+  // steps show them; the others show their finished photo.
+  if (!steps) {
+    return (
+      <View className="aspect-[390/540] w-full overflow-hidden bg-neutral-soft">
+        <Image
+          accessible={false}
+          source={{ uri: apiAssetUrl(recipe.image) }}
+          contentFit="cover"
+          style={{ width: '100%', height: '100%' }}
+        />
+      </View>
+    );
+  }
   return (
     <View className="aspect-[390/540] w-full overflow-hidden">
       <CroppedPhoto source={arPhotos.finished} crop={heroCrop} />
@@ -339,7 +440,7 @@ function Hero({ recipe }: { recipe: Recipe }) {
           <View className="size-2.5 rounded-full bg-accent-rose" />
         </View>
       ))}
-      {overview.map((partId, index) => {
+      {steps.overview.map((partId, index) => {
         const label = pinLabels[index];
         if (!label) {
           return null;
@@ -357,7 +458,7 @@ function Hero({ recipe }: { recipe: Recipe }) {
               <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
             </View>
             <Text className="font-maru-bold text-micro text-ink-primary">
-              {recipe.detail?.steps[index]?.label ?? parts[partId].label}
+              {steps.steps[index]?.label ?? parts[partId].label}
             </Text>
           </View>
         );
@@ -366,19 +467,23 @@ function Hero({ recipe }: { recipe: Recipe }) {
   );
 }
 
-function ProductRow({ product }: { product: Product }) {
+function ProductRow({ product }: { product: RecipeData['products'][number] }) {
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
   const content = (
     <>
-      <Image
-        accessible={false}
-        source={product.image}
-        style={{ width: 52, height: 52, borderRadius: 14 }}
-      />
+      <View className="size-[52px] overflow-hidden rounded-[14px] bg-neutral-soft">
+        {product.image ? (
+          <Image
+            accessible={false}
+            source={{ uri: apiAssetUrl(product.image) }}
+            style={{ width: '100%', height: '100%' }}
+          />
+        ) : null}
+      </View>
       <View className="flex-1 gap-0.5">
         <Text className="font-maru-bold text-label text-ink-primary">{product.name}</Text>
-        <Text className="font-maru text-meta text-ink-secondary">{product.detail}</Text>
+        <Text className="font-maru text-meta text-ink-secondary">{product.usage}</Text>
       </View>
       {product.purchasable ? (
         <View className="min-h-6 flex-row items-center gap-1 rounded-xl bg-base-peach px-2.5">
@@ -391,13 +496,13 @@ function ProductRow({ product }: { product: Product }) {
   );
   const className =
     'flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5';
-  // Only products with Plan A detail data open ⑥.
-  if (!product.info) {
+  // Only products with Plan A detail data open ⑥ until product details come from the API.
+  if (!findProduct(product.id)) {
     return (
       <View
         accessible
         accessibilityRole="button"
-        accessibilityLabel={`${product.name}、${product.detail}（準備中）`}
+        accessibilityLabel={`${product.name}、${product.usage}（準備中）`}
         accessibilityState={{ disabled: true }}
         className={className}
       >
@@ -408,7 +513,7 @@ function ProductRow({ product }: { product: Product }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${product.name}、${product.detail}`}
+      accessibilityLabel={`${product.name}、${product.usage}`}
       className={cn(className, 'active:opacity-80')}
       onPress={() => {
         router.push(`/products/${product.id}`);

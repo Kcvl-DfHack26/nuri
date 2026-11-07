@@ -10,6 +10,10 @@ import { Platform } from 'react-native';
 
 const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/$/, '');
 export const apiUrl = configuredUrl === '' ? null : (configuredUrl ?? null);
+/** Resolves an image path served by the API (e.g. /sample-avatars/haru.jpg) to a full URL. */
+export function apiAssetUrl(path: string) {
+  return path.startsWith('/') && apiUrl ? `${apiUrl}${path}` : path;
+}
 export const authClient = createAuthClient({
   baseURL: apiUrl ?? 'http://localhost:8080',
   plugins: [

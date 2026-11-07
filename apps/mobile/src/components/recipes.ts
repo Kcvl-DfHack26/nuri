@@ -3,9 +3,7 @@ import arOverlay2 from '../../assets/plan-a/ar/overlay-2.png';
 import arOverlay3 from '../../assets/plan-a/ar/overlay-3.png';
 import arOverlay4 from '../../assets/plan-a/ar/overlay-4.png';
 import arOverlay5 from '../../assets/plan-a/ar/overlay-5.png';
-import detailAvatar from '../../assets/plan-a/detail/avatar.png';
 import detailProductBrowPencil from '../../assets/plan-a/detail/product-brow-pencil.jpg';
-import detailProductCheek from '../../assets/plan-a/detail/product-cheek.jpg';
 import iconsBrow from '../../assets/plan-a/icons/brow.svg';
 import iconsBrush from '../../assets/plan-a/icons/brush.svg';
 import iconsCheek from '../../assets/plan-a/icons/cheek.svg';
@@ -25,8 +23,8 @@ import recipesLong from '../../assets/plan-a/recipes/long.jpg';
 import recipesOffice from '../../assets/plan-a/recipes/office.jpg';
 import recipesRound from '../../assets/plan-a/recipes/round.jpg';
 
-// Fixed Plan A sample data until recipes come from the API. It lives with the UI because
-// it bundles image assets, which src/lib may not import.
+// Fixed Plan A sample data for the screens that do not read recipes from the API yet (① and ⑤
+// do). It lives with the UI because it bundles image assets, which src/lib may not import.
 
 export type PartId = 'base' | 'brow' | 'eye' | 'lash' | 'cheek' | 'shading' | 'highlight' | 'lip';
 
@@ -175,14 +173,11 @@ export type ProductInfo = {
   ingredients: { name: string; role: string; dot: string }[];
 };
 
-export type Product = {
+/** ⑥ 商品詳細 data until products come from the API, keyed by the API's product ID. */
+type Product = {
   id: string;
-  name: string;
-  detail: string;
   image: number;
-  purchasable: boolean;
-  /** Only products with Plan A detail data open ⑥. */
-  info?: ProductInfo;
+  info: ProductInfo;
 };
 
 export type Recipe = {
@@ -191,14 +186,10 @@ export type Recipe = {
   author: string;
   likes: string;
   thumbnail: number;
+  /** Plan A step data; recipes without it cannot start ⑦ yet. */
   detail?: {
-    tags: { label: string; background: string }[];
-    source: string;
-    avatar: number;
     /** Steps shown on ⑤ as pins and icons, including ones without an AR screen yet. */
     overview: PartId[];
-    productCount: number;
-    products: Product[];
     steps: MakeupStep[];
   };
 };
@@ -252,7 +243,7 @@ const foxSteps: MakeupStep[] = [
 ];
 
 /** ① ホーム（全体メイク）: cards in reading order (left, right, left, …). */
-export const recipes: Recipe[] = [
+const recipes: Recipe[] = [
   {
     id: 'fox',
     title: '狐メイク',
@@ -260,52 +251,7 @@ export const recipes: Recipe[] = [
     likes: '1.2k',
     thumbnail: recipesFox,
     detail: {
-      tags: [
-        { label: '＃丸顔向け', background: 'bg-base-peach' },
-        { label: '＃15分', background: 'bg-base-lilac' },
-        { label: '6ステップ', background: 'bg-base-mint' },
-      ],
-      source: 'Instagramから取り込み・保存 1.2k',
-      avatar: detailAvatar,
       overview: ['brow', 'eye', 'lash', 'shading', 'cheek', 'lip'],
-      productCount: 6,
-      products: [
-        {
-          id: 'celane-brow-pencil',
-          name: 'CELANE 極細アイブロウペンシル',
-          detail: '眉・モカブラウン',
-          image: detailProductBrowPencil,
-          purchasable: false,
-          info: {
-            brand: 'CELANE',
-            title: '極細アイブロウペンシル',
-            price: '¥1,320',
-            // Plan A names only the selected shade; the others are sample names.
-            colors: [
-              { name: '01 ライトブラウン', hex: '#B48A6A' },
-              { name: '02 ナチュラルブラウン', hex: '#9A6B4F' },
-              { name: '03 モカブラウン', hex: '#7A5236' },
-              { name: '04 ダークブラウン', hex: '#5A3A26' },
-              { name: '05 ブラウンブラック', hex: '#3E2A20' },
-            ],
-            initialColor: 2,
-            ingredientCount: 18,
-            freeFrom: ['アルコールフリー', '無香料', 'パラベンフリー'],
-            ingredients: [
-              { name: 'トコフェロール', role: '保湿・酸化を防ぐ', dot: 'bg-pastel-sky' },
-              { name: 'シリカ', role: '描き心地をなめらかに', dot: 'bg-pastel-lilac' },
-              { name: '酸化鉄', role: '色をつける', dot: 'bg-pastel-peach' },
-            ],
-          },
-        },
-        {
-          id: 'mousse-cheek',
-          name: 'ムースチーク',
-          detail: 'チーク・コーラル',
-          image: detailProductCheek,
-          purchasable: true,
-        },
-      ],
       steps: foxSteps,
     },
   },
@@ -350,10 +296,36 @@ export function findRecipe(id: string) {
   return recipes.find((recipe) => recipe.id === id);
 }
 
+const products: Product[] = [
+  {
+    id: 'celane-brow-pencil',
+    image: detailProductBrowPencil,
+    info: {
+      brand: 'CELANE',
+      title: '極細アイブロウペンシル',
+      price: '¥1,320',
+      // Plan A names only the selected shade; the others are sample names.
+      colors: [
+        { name: '01 ライトブラウン', hex: '#B48A6A' },
+        { name: '02 ナチュラルブラウン', hex: '#9A6B4F' },
+        { name: '03 モカブラウン', hex: '#7A5236' },
+        { name: '04 ダークブラウン', hex: '#5A3A26' },
+        { name: '05 ブラウンブラック', hex: '#3E2A20' },
+      ],
+      initialColor: 2,
+      ingredientCount: 18,
+      freeFrom: ['アルコールフリー', '無香料', 'パラベンフリー'],
+      ingredients: [
+        { name: 'トコフェロール', role: '保湿・酸化を防ぐ', dot: 'bg-pastel-sky' },
+        { name: 'シリカ', role: '描き心地をなめらかに', dot: 'bg-pastel-lilac' },
+        { name: '酸化鉄', role: '色をつける', dot: 'bg-pastel-peach' },
+      ],
+    },
+  },
+];
+
 export function findProduct(id: string) {
-  return recipes
-    .flatMap((recipe) => recipe.detail?.products ?? [])
-    .find((product) => product.id === id);
+  return products.find((product) => product.id === id);
 }
 
 /** ③ 部位別一覧 filter chips. `round` also marks the card with the 丸顔におすすめ badge. */
