@@ -67,6 +67,8 @@ function Navigation() {
           }}
         />
         <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
+        {/* Development check for face tracking (#25); replaced by ⑦ once it uses the tracker. */}
+        <Stack.Screen name="face-tracking" options={{ headerShown: false }} />
         <Stack.Screen name="auth-callback" options={{ title: 'ログイン' }} />
       </Stack>
       <StatusBar style="auto" />

@@ -135,7 +135,17 @@ bunx eas build --profile development --platform android
 
 iPhone実機への内部配布にはApple Developer Program、端末登録、署名情報が必要。初回は対話形式で `bunx eas device:create` / `bunx eas credentials` を実行して登録する。Apple側の契約・端末承認はIaCで代替できない。クラウドビルドはEASの利用枠を消費する。
 
-このプロジェクトではApple Developer Programは未契約のため、iPhoneではExpo Goを使う。Apple契約なしで作れるiOS SimulatorビルドはiPhoneへインストールできない。Androidのpreview APKは署名済みの単体アプリとして配布できる。
+nuriはApple Developer Programに登録済みで、端末を登録したiPhoneへDevelopment Buildを内部配布できる。登録していない端末には入らないため、試す人のiPhoneを先に `bunx eas device:create` で登録してからビルドする。AndroidのAPKは端末の登録なしで入れられる。
+
+顔追跡（`apps/mobile/modules/face-tracker`、MediaPipe Face Landmarker）はネイティブモジュールのため、Expo Goでは動かずDevelopment Buildが必要。Development Buildでは設定の「開発用」から「顔追跡の確認」を開き、カメラの映像に特徴点を重ね、fpsと遅延を表示する。ネイティブモジュールや依存を変えたら、新しいDevelopment Buildを作る（OTAでは届かない）。
+
+Androidのネイティブコードは手元でもコンパイルを確かめられる。JDK 17とAndroid SDK（Platform 37.0、Build-Tools 37.0.0、NDK 27.1.12297006、CMake 3.22.1）を入れ、`JAVA_HOME` と `ANDROID_HOME` を設定する。生成される `android/` はコミットしない。
+
+```sh
+cd apps/mobile
+CI=1 bunx expo prebuild --platform android --no-install
+cd android && ./gradlew :app:assembleDebug
+```
 
 このリポジトリはEASに接続済みで、`build:configure` / `update:configure`も実行済み。設定はfingerprint runtime policy、development/preview/production channel。フォーク時は `eas init`、`eas build:configure`、`eas update:configure` で自分のプロジェクトへ再接続する。
 

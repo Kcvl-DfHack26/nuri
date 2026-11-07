@@ -10,7 +10,10 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.kcvl.nuri",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "メイクの範囲をあなたの顔に重ねるためにカメラを使います。映像は端末の中だけで処理し、送信しません。"
+      }
     },
     "android": {
       "adaptiveIcon": {
