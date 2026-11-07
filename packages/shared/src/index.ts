@@ -49,10 +49,14 @@ export const makeupParts = [
   'highlight',
   'lip',
 ] as const;
+/** Longest recipe search term, shared by the API and the search field. */
+export const recipeSearchMaxLength = 50;
 /**
  * Whole-face recipes by default; with `part`, the recipes for that one part (② ③); with `author`,
- * one user's recipes, e.g. on their ⑰ page.
+ * one user's recipes, e.g. on their ⑰ page; with `q`, the recipes of every kind whose title or a
+ * tag contains it.
  */
-export const recipeListQuerySchema = feedQuerySchema
-  .pick({ offset: true, author: true })
-  .extend({ part: z.enum(makeupParts).optional() });
+export const recipeListQuerySchema = feedQuerySchema.pick({ offset: true, author: true }).extend({
+  part: z.enum(makeupParts).optional(),
+  q: z.string().trim().min(1).max(recipeSearchMaxLength).optional(),
+});

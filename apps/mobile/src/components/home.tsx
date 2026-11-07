@@ -7,15 +7,14 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { RecipeSummary } from '@/lib/recipes';
-
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
+import { RecipeCard } from '@/components/recipe-card';
 import { partCards, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { apiAssetUrl, apiUrl } from '@/lib/api';
-import { formatCount, recipeListOptions, recipePartsOptions } from '@/lib/recipes';
+import { apiUrl } from '@/lib/api';
+import { recipeListOptions, recipePartsOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -24,7 +23,6 @@ const SEARCH = Icon.select({
   android: import('@expo/material-symbols/search.xml'),
 });
 const LINK = Icon.select({ ios: 'link', android: import('@expo/material-symbols/link.xml') });
-const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 
 type Scope = 'whole' | 'parts';
 
@@ -82,18 +80,22 @@ function Header({ top, onHeight }: { top: number; onHeight: (height: number) => 
     >
       <Text className="font-maru-black text-display text-accent-rose">nuri</Text>
       <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-full border border-black bg-white/55 py-1.5 pl-3.5 pr-1.5">
-        {/* Search arrives with ③; keep the Plan A field visible but inactive. */}
-        <View
-          accessible
-          accessibilityLabel="メイクを検索（準備中）"
-          accessibilityState={{ disabled: true }}
-          className="flex-1 flex-row items-center gap-2"
+        {/* The field opens the search screen, which owns the text input. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="メイクを検索"
+          // The pill's padding extends the hit area to its 48pt height.
+          hitSlop={6}
+          onPress={() => {
+            router.push('/search');
+          }}
+          className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
         >
           <SocialIcon name={SEARCH} size={22} color={ink} />
           <Text className="flex-1 font-maru text-ui text-ink-secondary" numberOfLines={1}>
             メイクを検索
           </Text>
-        </View>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="動画URLからレシピを作る"
@@ -195,45 +197,6 @@ function RecipeGrid({ top }: { top: number }) {
       }}
       renderItem={({ item }) => <RecipeCard recipe={item} />}
     />
-  );
-}
-
-function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
-  const secondary = useTokenColor('--color-ink-secondary');
-  const ink = useTokenColor('--color-ink-primary');
-  const likes = formatCount(recipe.likeCount);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${recipe.title}、${recipe.author.name}、いいね${likes}`}
-      // Half of the row, so a lone last card keeps the grid's width.
-      className="max-w-[50%] flex-1 gap-[5px] active:opacity-80"
-      onPress={() => {
-        router.push(`/recipes/${recipe.id}`);
-      }}
-    >
-      <View className="aspect-[192/233] w-full overflow-hidden rounded-[5px] bg-neutral-soft">
-        <Image
-          accessible={false}
-          source={{ uri: apiAssetUrl(recipe.image) }}
-          contentFit="cover"
-          style={{ width: '100%', height: '100%' }}
-        />
-        <View className="absolute right-2 top-2 size-8 items-center justify-center rounded-full bg-white">
-          <SocialIcon name={HEART} size={18} color={ink} />
-        </View>
-      </View>
-      <View className="w-full gap-[5px] px-2">
-        <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-        <View className="flex-row items-center gap-1">
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">
-            {recipe.author.name}
-          </Text>
-          <SocialIcon name={HEART} size={14} color={secondary} />
-          <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
-        </View>
-      </View>
-    </Pressable>
   );
 }
 

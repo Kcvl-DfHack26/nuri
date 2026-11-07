@@ -29,6 +29,7 @@ function Navigation() {
         <Stack.Screen name="recipes/[id]/steps" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/finish" options={{ headerShown: false }} />
         <Stack.Screen name="parts/[part]" options={{ headerShown: false }} />
+        <Stack.Screen name="search" options={{ headerShown: false }} />
         <Stack.Screen
           name="products/[id]"
           options={{

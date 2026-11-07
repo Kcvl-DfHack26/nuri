@@ -90,6 +90,12 @@ test('retries a failed recipe list and opens a recipe from its card', async () =
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
 });
 
+test('opens the search screen from the search field', async () => {
+  await render(<Home />, { wrapper });
+  await fireEvent.press(screen.getByRole('button', { name: 'メイクを検索' }));
+  expect(router.push).toHaveBeenCalledWith('/search');
+});
+
 test('shows an empty recipe list', async () => {
   mockGetRecipes.mockResolvedValueOnce(page([]));
   await render(<Home />, { wrapper });
