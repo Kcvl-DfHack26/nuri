@@ -92,8 +92,10 @@ test('shows the signed-in profile with posted and favorite recipes and opens the
   await render(<MyPage />, { wrapper });
   expect(screen.getByText('はなこ')).toBeOnTheScreen();
   // Following and likes are not built, so Plan A's sample counts are not shown.
-  expect(screen.queryByText('フォロワー')).toBeNull();
-  expect(screen.queryByText('328')).toBeNull();
+  for (const label of ['フォロワー', 'フォロー中', 'いいね', '328', '96', '2.4k']) {
+    expect(screen.queryByText(label)).toBeNull();
+  }
+  expect(screen.queryByText(/見本です/)).toBeNull();
 
   await fireEvent.press(
     await screen.findByRole('button', { name: '自分のメイク、はなこ、いいね1.2k' }),
