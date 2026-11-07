@@ -105,7 +105,8 @@ function TabButton({
       accessibilityRole="tab"
       accessibilityLabel={label}
       accessibilityState={{ selected: isFocused }}
-      className="min-h-[58px] w-[76px] active:opacity-70"
+      // Plan A gives each tab 76pt; narrow windows shrink the tabs instead of pushing them off screen.
+      className="min-h-[58px] min-w-12 max-w-[76px] flex-1 active:opacity-70"
     >
       {/* TabTrigger lays its child out as a row, so the icon and label stack in this view. */}
       <View className="flex-1 items-center justify-center gap-0.5">
