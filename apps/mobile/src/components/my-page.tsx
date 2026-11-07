@@ -1,17 +1,23 @@
+import type { InfiniteData } from '@tanstack/react-query';
+
 import { Icon } from '@expo/ui';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { RecipePage, RecipeSummary } from '@/lib/recipes';
+
 import { Avatar } from '@/components/avatar';
+import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { PrimaryButton } from '@/components/post-chrome';
-import { findRecipe } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { authClient } from '@/lib/api';
+import { apiAssetUrl, authClient } from '@/lib/api';
+import { favoriteListOptions, formatCount, recipeListOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -25,30 +31,30 @@ const PERSON = Icon.select({
   android: import('@expo/material-symbols/person.xml'),
 });
 
-// Plan A sample profile numbers and posts until profiles and posts come from the API.
+// Plan A sample numbers until following and recipe likes are built.
 const stats = [
   { label: 'フォロワー', value: '328', background: 'bg-base-lilac' },
   { label: 'フォロー中', value: '96', background: 'bg-base-mint' },
   { label: 'いいね', value: '2.4k', background: 'bg-base-peach' },
 ];
-const posts = [
-  { recipe: 'round', tag: '丸顔向け', author: 'nana', likes: '2.6k' },
-  { recipe: 'office', tag: '時短', author: 'kana', likes: '1.8k' },
-  { recipe: 'cat', tag: 'たれ目向け', author: 'saki', likes: '1.8k' },
-  { recipe: 'long', tag: '面長向け', author: 'mio', likes: '2.6k' },
-  { recipe: 'fox', tag: '切れ長向け', author: 'rina', likes: '1.8k' },
-  { recipe: 'korean', tag: '透明感', author: 'yuna', likes: '2.6k' },
-] as const;
-type Post = (typeof posts)[number];
 
-// Plan A ⑰ マイページ. The name and photo come from the session; the face type, numbers and
-// posts are Plan A samples, which the screen says. Three rows of two follow the six posts.
+// Plan A ⑰ マイページ. The name and photo come from the session, and the recipes the user posted
+// and kept as favorites from the API. The follower and like numbers are Plan A samples, which the
+// screen says.
 export function MyPage() {
   const insets = useSafeAreaInsets();
   // The tab stays mounted under other tabs; only claim the status bar while it is shown.
   const focused = useIsFocused();
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;
+  const posted = useInfiniteQuery({
+    ...recipeListOptions(user ? { author: user.id } : {}),
+    enabled: Boolean(user),
+  });
+  const favorites = useInfiniteQuery({
+    ...favoriteListOptions(user?.id ?? ''),
+    enabled: Boolean(user),
+  });
   // iOS insets the tab's first ScrollView for the status bar and tab bar; Android tabs only
   // pad the tab bar, so the status bar is added here.
   const scrollTop = Platform.OS === 'ios' ? 0 : insets.top;
@@ -75,9 +81,11 @@ export function MyPage() {
                 >
                   {user ? user.name : 'ゲスト'}
                 </Text>
-                <Text className="font-maru text-meta text-ink-secondary">
-                  {user ? '丸顔×イエベ・投稿 12' : 'ログインするとプロフィールを表示します'}
-                </Text>
+                {user ? null : (
+                  <Text className="font-maru text-meta text-ink-secondary">
+                    ログインするとプロフィールを表示します
+                  </Text>
+                )}
               </>
             )}
           </View>
@@ -106,23 +114,20 @@ export function MyPage() {
               ))}
             </View>
             <Text className="mt-2 px-1 font-maru text-meta text-ink-secondary">
-              顔タイプ・数字・投稿は見本です
+              フォロワー・フォロー中・いいねの数は見本です
             </Text>
-            <Text
-              accessibilityRole="header"
-              className="mt-3 px-1 pt-0.5 font-maru-bold text-heading text-ink-primary"
-            >
-              投稿
-            </Text>
-            <View className="mt-1.5 gap-3">
-              {[0, 2, 4].map((start) => (
-                <View key={start} className="flex-row gap-3">
-                  {posts.slice(start, start + 2).map((post) => (
-                    <PostCard key={post.recipe} post={post} />
-                  ))}
-                </View>
-              ))}
-            </View>
+            <RecipeSection
+              title="投稿"
+              empty="まだ投稿したレシピはありません"
+              failure="投稿を読み込めませんでした。通信状況を確認してお試しください。"
+              query={posted}
+            />
+            <RecipeSection
+              title="お気に入り"
+              empty="お気に入りのレシピはまだありません"
+              failure="お気に入りを読み込めませんでした。通信状況を確認してお試しください。"
+              query={favorites}
+            />
           </>
         ) : isPending ? null : (
           <View className="mt-5">
@@ -164,53 +169,110 @@ export function ProfilePhoto({ size, image }: { size: number; image?: string | n
   );
 }
 
-function PostCard({ post }: { post: Post }) {
-  const ink = useTokenColor('--color-ink-primary');
-  const secondary = useTokenColor('--color-ink-secondary');
-  const recipe = findRecipe(post.recipe);
-  if (!recipe) {
-    return null;
-  }
-  const label = `${recipe.title}、${post.author}`;
-  const content = (
+type RecipePages = InfiniteData<RecipePage, unknown>;
+
+function RecipeSection({
+  title,
+  empty,
+  failure,
+  query,
+}: {
+  title: string;
+  empty: string;
+  failure: string;
+  query: {
+    data: RecipePages | undefined;
+    isPending: boolean;
+    isError: boolean;
+    refetch: () => Promise<unknown>;
+    hasNextPage: boolean;
+    isFetchingNextPage: boolean;
+    fetchNextPage: () => Promise<unknown>;
+  };
+}) {
+  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const rows = Array.from({ length: Math.ceil(items.length / 2) }, (_, row) =>
+    items.slice(row * 2, row * 2 + 2),
+  );
+  return (
     <>
-      <View className="aspect-[173/230] w-full overflow-hidden rounded-[18px]">
-        <Image
-          accessible={false}
-          source={recipe.thumbnail}
-          contentFit="cover"
-          style={{ width: '100%', height: '100%' }}
+      <Text
+        accessibilityRole="header"
+        className="mt-3 px-1 pt-0.5 font-maru-bold text-heading text-ink-primary"
+      >
+        {title}
+      </Text>
+      {query.isPending ? (
+        <Feedback loading message="読み込んでいます" />
+      ) : query.isError ? (
+        <Feedback
+          message={failure}
+          onRetry={() => {
+            void query.refetch();
+          }}
         />
-        <View
-          className="absolute left-2 top-2 rounded-2xl border border-white bg-white/78 px-3 py-1.5"
-          style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
-        >
-          <Text className="font-maru-bold text-micro text-ink-primary">{post.tag}</Text>
+      ) : items.length === 0 ? (
+        <Feedback message={empty} />
+      ) : (
+        <View className="mt-1.5 gap-3">
+          {rows.map((row) => (
+            <View key={row[0]?.id} className="flex-row gap-3">
+              {row.map((recipe) => (
+                <RecipeCard key={recipe.id} recipe={recipe} />
+              ))}
+              {row.length === 1 ? <View className="flex-1" /> : null}
+            </View>
+          ))}
+          {query.hasNextPage ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={query.isFetchingNextPage}
+              onPress={() => {
+                void query.fetchNextPage();
+              }}
+              className="min-h-12 items-center justify-center rounded-full border border-line-soft active:opacity-70"
+            >
+              <Text className="font-maru-bold text-label text-ink-primary">
+                {query.isFetchingNextPage ? '読み込み中…' : 'もっと見る'}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
-        <View className="absolute bottom-2 right-2 size-[30px] items-center justify-center rounded-full bg-white/85">
-          <SocialIcon name={HEART} size={16} color={ink} />
-        </View>
-      </View>
-      <View className="w-full gap-px px-1 pt-0.5">
-        <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-        <View className="flex-row items-center gap-[3px]">
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">{post.author}</Text>
-          <SocialIcon name={HEART} size={13} color={secondary} />
-          <Text className="font-maru text-meta text-ink-secondary">{post.likes}</Text>
-        </View>
-      </View>
+      )}
     </>
   );
+}
+
+function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
+  const secondary = useTokenColor('--color-ink-secondary');
+  const likes = formatCount(recipe.likeCount);
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={`${recipe.title}、${recipe.author.name}、いいね${likes}`}
       className="flex-1 gap-[5px] active:opacity-80"
       onPress={() => {
         router.push(`/recipes/${recipe.id}`);
       }}
     >
-      {content}
+      <View className="aspect-[173/230] w-full overflow-hidden rounded-[18px] bg-neutral-soft">
+        <Image
+          accessible={false}
+          source={{ uri: apiAssetUrl(recipe.image) }}
+          contentFit="cover"
+          style={{ width: '100%', height: '100%' }}
+        />
+      </View>
+      <View className="w-full gap-px px-1 pt-0.5">
+        <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
+        <View className="flex-row items-center gap-[3px]">
+          <Text className="flex-1 font-maru text-meta text-ink-secondary">
+            {recipe.author.name}
+          </Text>
+          <SocialIcon name={HEART} size={13} color={secondary} />
+          <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
+        </View>
+      </View>
     </Pressable>
   );
 }

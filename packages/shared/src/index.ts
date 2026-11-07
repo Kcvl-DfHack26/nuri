@@ -49,7 +49,10 @@ export const makeupParts = [
   'highlight',
   'lip',
 ] as const;
-/** Whole-face recipes by default; with `part`, the recipes for that one part (② ③). */
+/**
+ * Whole-face recipes by default; with `part`, the recipes for that one part (② ③); with `author`,
+ * one user's recipes, e.g. on their ⑰ page.
+ */
 export const recipeListQuerySchema = feedQuerySchema
-  .pick({ offset: true })
+  .pick({ offset: true, author: true })
   .extend({ part: z.enum(makeupParts).optional() });

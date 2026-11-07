@@ -33,6 +33,8 @@ Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v
 
 レシピはAPIの `recipe`・`product`・`recipe_product`・`recipe_step` 表に置き、未ログインでも `GET /api/recipes`（20件ずつのoffsetページング）と `GET /api/recipes/:id` で読める。レシピのIDは `fox` のような英小文字・数字・ハイフンのslugで、画面の固定データ（一覧の写真など）と同じIDで結び付く。手順（#30）は `recipe_step` に順番・部位・短い名前・見出し・補足・使う物・おすすめ色を持ち、すべて必須にする。部位の一覧 `makeupParts` は `packages/shared` に置く。詳細のAPIが手順を順番どおりに返し、⑤の手順・⑦の進行・⑪の重ねる手順の一覧はこれを使う。手順のないレシピは⑤で完成写真を出して開始を準備中にし、⑦は「手順が見つかりません」を出す。Plan Aの注釈付きの写真と⑦の重ね画像は狐メイク用で、#31で顔に合わせたテクスチャに替えるまで、手順のあるレシピに部位ごとで使う。seedは狐メイクに5手順を入れる（Plan Aでアイコンだけだったリップは入れない）。seedは手順を追加・更新するだけで消さないため、seedの手順を減らすときは開発用DBの余った手順を手で消す。⑥はPlan Aの商品詳細データがある商品だけ開く。いいね数はお気に入りを作るまで表示用の列で持つ。画像はAPIが `/sample-recipes/*` で配り、DBにはAPI上のパスか絶対URLを保存する。
 
+お気に入りは `recipe_favorite`（ユーザー×レシピ、主キーで冪等）に置く。`PUT`・`DELETE /api/recipes/:id/favorite` と `GET /api/me/favorites` はログインが必要で、`GET /api/recipes/:id` はログイン中なら `favorited` を返す。⑤のハートは、いいねと同じく、そのレシピのキャッシュだけを先に書き換え、失敗したら戻す。⑰は自分が作者のレシピ（`GET /api/recipes?author=`）とお気に入りを表示し、フォロワーなどの数はPlan Aの見本のまま画面に明記する。ゲストがお気に入りや⑫の撮影・動画の選択を押すと⑱へ進み、ログイン後は元の画面へ戻る（Google・Appleはログイン後すぐ、メールのリンクは⑱に戻った後の「もとの画面に戻る」で）。
+
 SNS取り込み（④）は、ホームの「動画URL」からルートStackのformSheet `/import` を開き、入力・読み取り中・完了・失敗・保存完了を一つのシート内の状態で切り替える。取得方法と権利条件が未決のため、URLは端末内で対応サービス（Instagram・YouTube・TikTok）の投稿URLかを判定するだけで、通信せず固定の見本（`src/components/sns-import-sample.ts`）を表示し、何も保存しない。④-4はシートの上に `fullScreenModal` で重ねる。iOSのネイティブStackはモーダルの後に通常のpush画面を置くとシートの下へ積むため、戻るとシートへ帰れるようにモーダルを重ねる。④-4の保存は `dismissTo` で `saved=1` を渡し、シートを④-5にする。
 
 マイページ（⑰）は、名前と写真をセッションから表示し、顔タイプ・フォロワーなどの数字・投稿の一覧はPlan Aの見本として「見本です」と画面に書く。ログインしていない場合はゲストとしてログインへの入口を出す。⑰-2の表示名・ユーザーID・自己紹介・公開設定は、認証済みの `GET/PATCH /api/me/profile` で読み書きし、画面で変更した項目だけを送る。再取得に失敗した間は保存を無効にし、編集途中の入力を保つ。ユーザーIDは小文字英数字とアンダースコアの3〜20文字で一意、自己紹介は42文字以内とし、ZodとDBの一意制約で守る。未設定のユーザーIDは `null` とする。公開しない利用者の `GET /api/users/:id` は、本人以外には404を返す。フォロー機能がないため、公開オフではプロフィール画面を本人だけが閲覧できる。公開済みの投稿・レシピに含まれる名前と写真は引き続き表示されることを設定画面にも明記する。顔タイプ・通知・写真の変更・アカウントの削除は準備中として無効にする。Plan Aの⑰-2にある「パスワード」の行は、パスワードログインを設けない方針（[認証](auth.md)）のため置かない。Plan Aで非表示の⑮コスメ一覧と⑰-3〜⑰-6持っているメイク品は作らない。⑯色味チェックは、どの商品から開くかの設計ができるまで作らない。
@@ -62,6 +64,8 @@ PoC-1・PoC-2（#24）の⑦⑩への引き継ぎには、このExpo ModuleとSk
 Better Authが認証し、Honoの `requireSession` と所有者条件が投稿・削除・いいねを認可する。入力はZod、いいねは複合主キーで冪等。公開フィードは著者ID・表示名・画像だけを返し、メールを公開しない。マジックリンクは10分・単回利用・ハッシュ保存、WebAuthnは署名／challenge／originを検証する。共通rate limitはDB保存。
 
 Google／AppleのEmulate issuer・JWKS・token endpointを使うgenericOAuthを開発時だけ登録する。実署名のID tokenを検証し、認証バイパスは設けない。本番でのEmulate起動と公開エミュレータURLを拒否する。メールはResend互換エミュレータへ送る。[設定と検証](auth.md)を参照。
+
+#51のAndroid仮想端末での検証は、既存のBetter Auth Google OAuthとResendマジックリンクを使う。OpenTofuはGoogle OAuth client ID・secretとResend API keyのSecret Manager参照を、credentialを投入した後だけ有効にする。Cloud Runのruntimeには有効な方式のsecretだけを許可し、DB migrationには別のservice accountでDB URLとCloud SQLの権限だけを与える。Apple Developer Programと実機は今回使わない。メールアプリがカスタムスキームをリンク化しないため、メールにはHTTPSの案内ページを送り、そのページの操作でアプリを開く。Expo clientのOAuth戻り先にはセッションcookie、メールの戻り先には単回利用tokenがカスタムスキームで渡るため、任意の端末への配布には使わない。管理下の仮想端末とテストアカウントに限定し、一般配布前に検証済みHTTPSリンクかURLに認証情報を載せない方式へ変更する。設定と残る制約は[認証の手順](auth.md#android仮想端末でgoogleとメールを試す51)に記録する。
 
 `eslint-plugin-boundaries` がAPI composition root→module、social→authの公開入口、module→DB/platform/shared、モバイルroutes→UI→lib、型のみのAPI契約を強制する。禁止方向・内部ファイルの直接import・未知ファイルはエラー。`scripts/boundaries.test.ts` で許可・禁止例を実際のESLintへ通す。
 
@@ -102,7 +106,7 @@ OpenTofuはAPI有効化、Artifact Registry、Cloud SQL、DB、DBユーザー、
 
 DBパスワードはOpenTofuのephemeral変数とGoogle providerのwrite-only引数を使用する。Secret Managerの**値**は手動投入し、コードやstateへ複製しない。bootstrap用GCS bucketはversioning、public access prevention、削除防止付き。
 
-GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする。コンテナをdigestで指定し、migration Jobを完了させ、トラフィックなしのcandidate revisionで `/ready` を確認してから切り替える。イメージ・revision名・トラフィックはCIが管理し、OpenTofuの差分対象から外す。その後に同じSHAのExpo Workflowを呼ぶ。本番配信には別途有効化フラグが必要。
+GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする。コンテナをdigestで指定し、migration Jobを完了させ、トラフィックなしでrevisionを作る。その後candidateタグを付けて `/ready` を確認してから切り替える。イメージ・トラフィックはCIが管理し、OpenTofuの差分対象から外す。revision名はOpenTofuの設定変更時に再生成できるよう差分対象に残す。CIでrevisionを作るときにタグも同時指定すると、OpenTofuの次回planに不要なrevision差分が出るため、タグ付けを別の操作にする。その後に同じSHAのExpo Workflowを呼ぶ。本番配信には別途有効化フラグが必要。
 
 Cloud Runのstartup probeは `/ready`、liveness probeは `/health` を使う。DBへ接続できないrevisionはトラフィックを受けず、DBの一時的な停止でインスタンスを再起動しない。最初の適用だけはmigrationのjobを `-target` で先に作って実行し、それからサービスを作る。初回はCloud Runの実URLが未確定なので `api_origin` は暫定値になる。サービス作成後、`service_uri` を `api_origin` に設定して再適用し、Better Authの公開URLを合わせる。Cloud SQL・Cloud Runのサービス・migrationのjobの削除防止は `deletion_protection` 変数にまとめる。Cloud SQLではGCP側の `deletion_protection_enabled` も同じ変数で設定し、止めるときは先に解除してからdestroyする。DBとDBユーザーはインスタンスと一緒に消えるため、`deletion_policy = "ABANDON"` でdestroyの失敗を避ける。
 

@@ -1,10 +1,10 @@
 import { Icon } from '@expo/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Fragment } from 'react';
-import { Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Share, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
@@ -18,9 +18,9 @@ import { arPhotos, findProduct, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
-import { apiAssetUrl, apiUrl } from '@/lib/api';
+import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
-import { formatCount, recipeOptions, sourceLabels } from '@/lib/recipes';
+import { changeFavorite, formatCount, recipeOptions, sourceLabels } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -384,16 +384,7 @@ export function RecipeContent({
       {onPost ? (
         <PostBar onPost={onPost} bottom={insets.bottom} />
       ) : (
-        <StartBar
-          bottom={insets.bottom}
-          onStart={
-            steps.length > 0
-              ? () => {
-                  router.push(`/recipes/${recipe.id}/steps`);
-                }
-              : undefined
-          }
-        />
+        <RecipeStartBar recipe={recipe} canStart={steps.length > 0} bottom={insets.bottom} />
       )}
     </View>
   );
@@ -537,4 +528,69 @@ function PostBar({ onPost, bottom }: { onPost: () => void; bottom: number }) {
       </Pressable>
     </View>
   );
+}
+
+function RecipeStartBar({
+  recipe,
+  canStart,
+  bottom,
+}: {
+  recipe: RecipeData;
+  canStart: boolean;
+  bottom: number;
+}) {
+  const favorite = useFavorite(recipe);
+  return (
+    <StartBar
+      bottom={bottom}
+      favorite={favorite}
+      onStart={
+        canStart
+          ? () => {
+              router.push(`/recipes/${recipe.id}/steps`);
+            }
+          : undefined
+      }
+    />
+  );
+}
+
+/**
+ * ⑤'s favorite button. Guests are sent to ⑱ first (#42). The change shows at once and is rolled
+ * back if the server rejects it; only this recipe's cache entry changes.
+ */
+function useFavorite(recipe: RecipeData) {
+  const client = useQueryClient();
+  const { data: session } = authClient.useSession();
+  const key = recipeOptions(recipe.id).queryKey;
+  const toggle = useMutation({
+    mutationFn: (favorited: boolean) => changeFavorite(recipe.id, favorited),
+    onMutate: async (favorited) => {
+      await client.cancelQueries({ queryKey: key });
+      const previous = client.getQueryData(key);
+      client.setQueryData(key, (current) =>
+        current ? { ...current, favorited: !favorited } : current,
+      );
+      return { previous };
+    },
+    onError: (error, _favorited, context) => {
+      client.setQueryData(key, context?.previous);
+      Alert.alert('お気に入りを変更できませんでした', error.message);
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['recipes', 'favorites'] });
+    },
+  });
+  return {
+    favorited: recipe.favorited,
+    onPress: () => {
+      if (!session) {
+        router.push('/account');
+        return;
+      }
+      if (!toggle.isPending) {
+        toggle.mutate(recipe.favorited);
+      }
+    },
+  };
 }

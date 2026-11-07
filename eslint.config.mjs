@@ -105,6 +105,10 @@ export default [
               allow: { to: { element: { type: 'api-module', captured: { module: 'auth' } } } },
             },
             {
+              from: { element: { type: 'api-module', captured: { module: 'recipes' } } },
+              allow: { to: { element: { type: 'api-module', captured: { module: 'auth' } } } },
+            },
+            {
               from: { element: { type: ['api-db', 'api-platform'] } },
               allow: { to: { element: { type: 'shared' } } },
             },

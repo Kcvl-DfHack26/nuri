@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { Feedback } from '@/components/feedback';
 import { authClient } from '@/lib/api';
+import { backOrHome } from '@/lib/navigation';
 
 export function AuthCallback() {
   const { token, state, error } = useLocalSearchParams<{
@@ -41,7 +42,9 @@ export function AuthCallback() {
       }
       if (active) {
         client.clear();
-        router.replace('/timeline');
+        // The email link opens over ⑱ when the app was running; going back shows ⑱ signed in,
+        // whose button returns to the screen that asked for login.
+        backOrHome();
       }
     }
     void finish().catch((cause: unknown) => {

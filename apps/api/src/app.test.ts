@@ -33,6 +33,8 @@ describe('HTTP contract', () => {
     expect((await app.request('/api/posts?offset=-1')).status).toBe(400);
     expect((await app.request('/api/recipes?offset=-1')).status).toBe(400);
     expect((await app.request('/api/recipes/Not%20a%20slug')).status).toBe(400);
+    expect((await app.request('/api/me/favorites')).status).toBe(401);
+    expect((await app.request('/api/recipes/fox/favorite', { method: 'PUT' })).status).toBe(401);
     expect((await app.request('/api/me')).status).toBe(401);
     expect(
       (
@@ -62,5 +64,16 @@ describe('HTTP contract', () => {
       email: false,
       emulated: false,
     });
+  });
+  test('opens a native login link from a tappable HTTPS page', async () => {
+    const response = await app.request('/api/auth/open-mobile-link');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('content-security-policy')).toContain("script-src 'nonce-");
+    const page = await response.text();
+    expect(page).toContain('location.hash.slice(1)');
+    expect(page).toContain('id="open"');
+    expect(page).not.toContain('href="com.kcvl.nuri:');
   });
 });

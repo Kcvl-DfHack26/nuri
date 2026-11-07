@@ -13,6 +13,7 @@ import { GlassIconButton } from '@/components/glass-icon-button';
 import { arPhotos } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -41,7 +42,16 @@ export function PostCamera() {
   const insets = useSafeAreaInsets();
   // The post tab stays mounted under other tabs; only claim the status bar while it is shown.
   const focused = useIsFocused();
+  const { data: session } = authClient.useSession();
   const ink = useTokenColor('--color-ink-primary');
+  // Posting belongs to an account, so guests log in before recording or choosing a video (#42).
+  const signedIn = (start: () => void) => () => {
+    if (session) {
+      start();
+    } else {
+      router.push('/account');
+    }
+  };
   // iOS lays tab content under the tab bar and reports it as a safe-area inset; Android already
   // places the content above the tab bar.
   const bottom = (Platform.OS === 'ios' ? insets.bottom : 0) + 24;
@@ -82,9 +92,9 @@ export function PostCamera() {
       >
         <CameraAction
           label="動画から"
-          onPress={() => {
+          onPress={signedIn(() => {
             void pickVideo();
-          }}
+          })}
         >
           <View className="size-[52px] items-center justify-center rounded-full border border-ink-primary bg-bg-surface">
             <SocialIcon name={IMAGE} size={24} color={ink} />
@@ -92,9 +102,9 @@ export function PostCamera() {
         </CameraAction>
         <CameraAction
           label="録画をはじめる"
-          onPress={() => {
+          onPress={signedIn(() => {
             router.push('/post/recording');
-          }}
+          })}
         >
           <View
             className="size-[84px] items-center justify-center rounded-full bg-bg-surface"

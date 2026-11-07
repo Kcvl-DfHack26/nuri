@@ -56,7 +56,7 @@ export function PartList({ part }: { part: string }) {
   const window = useWindowDimensions();
   const partId = isPartId(part) ? part : undefined;
   const list = useInfiniteQuery({
-    ...recipeListOptions(partId),
+    ...recipeListOptions(partId ? { part: partId } : {}),
     enabled: Boolean(apiUrl) && partId !== undefined,
   });
   const recipes = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);

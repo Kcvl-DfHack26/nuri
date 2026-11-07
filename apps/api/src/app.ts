@@ -74,6 +74,6 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
     .get('/api/auth-capabilities', (c) => c.json(authCapabilities(env)))
     .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
     .route('/api', socialRoutes(db, auth))
-    .route('/api', recipeRoutes(db))
+    .route('/api', recipeRoutes(db, auth))
     .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500));
 }

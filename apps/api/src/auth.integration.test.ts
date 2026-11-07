@@ -5,7 +5,7 @@ import { z } from 'zod';
 
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
-import { user } from './db/schema';
+import { recipe, user } from './db/schema';
 import { createAuth } from './modules/auth';
 import { softwareAuthenticator } from './passkey-fixture';
 import { readEnv } from './platform/env';
@@ -18,6 +18,7 @@ const { db, pool } = connectDatabase(databaseUrl);
 const unique = crypto.randomUUID();
 const email = `auth-${unique}@example.com`;
 const secondEmail = `other-${unique}@example.com`;
+const favoriteEmail = `favorite-${unique}@example.com`;
 const baseURL = 'http://localhost:8080';
 const origin = 'http://localhost:8081';
 const google = await createEmulator({
@@ -86,7 +87,7 @@ function request(path: string, body: unknown, cookie = '', method = 'POST') {
   });
 }
 afterAll(async () => {
-  await db.delete(user).where(inArray(user.email, [email, secondEmail]));
+  await db.delete(user).where(inArray(user.email, [email, secondEmail, favoriteEmail]));
   await Promise.all([pool.end(), google.close(), apple.close(), mail.close()]);
 });
 
@@ -123,7 +124,7 @@ async function oauth(provider: 'google' | 'apple') {
 }
 
 async function emailLink(recipient: string, native = false) {
-  const callbackURL = native ? 'com.kcvl.nuri://auth-callback?state=bound-device-state' : origin;
+  const callbackURL = native ? 'com.kcvl.nuri:///auth-callback?state=bound-device-state' : origin;
   const sent = await request('/api/auth/sign-in/magic-link', {
     email: recipient,
     name: 'メールのユーザー',
@@ -148,13 +149,26 @@ async function emailLink(recipient: string, native = false) {
       })
     ).json(),
   );
-  const link = delivered.text
-    .split('\n')
-    .find((line) => line.startsWith(native ? 'com.kcvl.nuri://' : 'http://'));
+  const link = delivered.text.split('\n').find((line) => line.startsWith('http://'));
   if (!link) {
     throw new Error('Missing email link');
   }
-  return new URL(link);
+  if (!native) {
+    return new URL(link);
+  }
+  const open = new URL(link);
+  expect(open.pathname).toBe('/api/auth/open-mobile-link');
+  expect(open.search).toBe('');
+  const callback = new URLSearchParams(open.hash.slice(1)).get('callback');
+  if (!callback) {
+    throw new Error('Missing app callback');
+  }
+  const landing = await app.request(`${open.origin}${open.pathname}`);
+  expect(landing.status).toBe(200);
+  expect(landing.headers.get('referrer-policy')).toBe('no-referrer');
+  expect(landing.headers.get('content-security-policy')).toContain('script-src');
+  expect(await landing.text()).not.toContain(new URL(callback).searchParams.get('token') ?? '');
+  return new URL(callback);
 }
 
 test('Google/Apple OAuth use verified sessions and link the same verified email', async () => {
@@ -339,4 +353,52 @@ test('passkeys require a session to register, verify signatures/origin, and can 
       )
     ).status,
   ).not.toBe(200);
+}, 20000);
+
+test('favorites need a session, are idempotent and list only the owner’s recipes', async () => {
+  const signedIn = await app.request((await emailLink(favoriteEmail)).href);
+  const cookie = cookies(signedIn);
+  const { user: me } = z
+    .object({ user: z.object({ id: z.string() }) })
+    .parse(await (await app.request('/api/me', { headers: { cookie } })).json());
+  const recipeId = `favorite-${unique}`;
+  await db.insert(recipe).values({
+    id: recipeId,
+    authorId: me.id,
+    title: 'お気に入りのテスト',
+    image: 'https://example.com/favorite.jpg',
+    durationMinutes: 5,
+  });
+  expect((await request(`/api/recipes/${recipeId}/favorite`, {}, '', 'PUT')).status).toBe(401);
+  expect((await app.request('/api/me/favorites')).status).toBe(401);
+  expect((await request('/api/recipes/missing-recipe/favorite', {}, cookie, 'PUT')).status).toBe(
+    404,
+  );
+  const added = await Promise.all([
+    request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'PUT'),
+    request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'PUT'),
+  ]);
+  expect(added.map((response) => response.status)).toEqual([200, 200]);
+  const detail = z
+    .object({ recipe: z.object({ favorited: z.boolean() }) })
+    .parse(await (await app.request(`/api/recipes/${recipeId}`, { headers: { cookie } })).json());
+  expect(detail.recipe.favorited).toBe(true);
+  const guestDetail = z
+    .object({ recipe: z.object({ favorited: z.boolean() }) })
+    .parse(await (await app.request(`/api/recipes/${recipeId}`)).json());
+  expect(guestDetail.recipe.favorited).toBe(false);
+  const list = z.object({ items: z.array(z.object({ id: z.string() })) });
+  const favorites = list.parse(
+    await (await app.request('/api/me/favorites', { headers: { cookie } })).json(),
+  );
+  expect(favorites.items.map((item) => item.id)).toEqual([recipeId]);
+  const authored = list.parse(await (await app.request(`/api/recipes?author=${me.id}`)).json());
+  expect(authored.items.map((item) => item.id)).toEqual([recipeId]);
+  expect((await request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'DELETE')).status).toBe(
+    200,
+  );
+  expect(
+    list.parse(await (await app.request('/api/me/favorites', { headers: { cookie } })).json())
+      .items,
+  ).toEqual([]);
 }, 20000);

@@ -7,3 +7,8 @@ deploy_application   = false
 # After secrets and the first image exist:
 # deploy_application = true
 # image = "asia-northeast1-docker.pkg.dev/PROJECT/nuri-staging/api@sha256:..."
+# After adding both Google OAuth credential versions to Secret Manager:
+# google_oauth_enabled = true
+# After adding a Resend key version and verifying a sender:
+# email_login_enabled = true
+# email_from = "nuri <login@your-verified-domain.example>"

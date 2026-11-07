@@ -23,6 +23,10 @@ jest.mock('@expo/ui', () => ({
   Icon: Object.assign(() => null, { select: () => 'icon' }),
 }));
 jest.mock('expo-status-bar', () => ({ StatusBar: () => null }));
+jest.mock('@/lib/api', () => ({
+  authClient: { useSession: () => ({ data: mockSignedIn ? { user: { id: 'viewer' } } : null }) },
+}));
+let mockSignedIn = true;
 
 const pick = jest.mocked(launchImageLibraryAsync);
 const alert = jest.spyOn(Alert, 'alert');
@@ -69,6 +73,17 @@ function DraftVideo() {
   const { draft } = usePostDraft();
   return <Text>{draft.video?.uri ?? '動画なし'}</Text>;
 }
+
+test('sends a guest to log in before recording or choosing a video', async () => {
+  mockSignedIn = false;
+  await render(<PostCamera />);
+  await fireEvent.press(screen.getByRole('button', { name: '録画をはじめる' }));
+  await fireEvent.press(screen.getByRole('button', { name: '動画から' }));
+  expect(router.push).toHaveBeenCalledTimes(2);
+  expect(router.push).toHaveBeenCalledWith('/account');
+  expect(pick).not.toHaveBeenCalled();
+  mockSignedIn = true;
+});
 
 test('keeps the chosen video in the post being prepared', async () => {
   await render(
