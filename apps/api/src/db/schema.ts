@@ -1,4 +1,4 @@
-import { recipeSources } from '@starter/shared';
+import { makeupParts, recipeSources } from '@starter/shared';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -183,4 +183,25 @@ export const recipeProduct = pgTable(
     primaryKey({ columns: [table.recipeId, table.productId] }),
     index('recipe_product_product_id_idx').on(table.productId),
   ],
+);
+
+/** The steps ⑦ walks through, in order. */
+export const recipeStep = pgTable(
+  'recipe_step',
+  {
+    recipeId: text('recipe_id')
+      .notNull()
+      .references(() => recipe.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull(),
+    part: text('part', { enum: makeupParts }).notNull(),
+    /** Short name in the step list, e.g. シャドウ. */
+    label: text('label').notNull(),
+    title: text('title').notNull(),
+    hint: text('hint').notNull(),
+    /** The kind of cosmetic the step uses, e.g. アイライン. */
+    product: text('product').notNull(),
+    /** Recommended colors as #RRGGBB, shown as swatches. */
+    colors: text('colors').array().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.recipeId, table.position] })],
 );

@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
 
-import { product, recipe, recipeProduct, user } from '../../db/schema';
+import { product, recipe, recipeProduct, recipeStep, user } from '../../db/schema';
 
 const pageSize = 20;
 
@@ -63,6 +63,18 @@ export function recipeRoutes(db: Database) {
         .innerJoin(product, eq(recipeProduct.productId, product.id))
         .where(eq(recipeProduct.recipeId, id))
         .orderBy(asc(recipeProduct.position));
-      return c.json({ recipe: { ...found, products } });
+      const steps = await db
+        .select({
+          part: recipeStep.part,
+          label: recipeStep.label,
+          title: recipeStep.title,
+          hint: recipeStep.hint,
+          product: recipeStep.product,
+          colors: recipeStep.colors,
+        })
+        .from(recipeStep)
+        .where(eq(recipeStep.recipeId, id))
+        .orderBy(asc(recipeStep.position));
+      return c.json({ recipe: { ...found, products, steps } });
     });
 }
