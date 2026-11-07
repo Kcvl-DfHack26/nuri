@@ -8,7 +8,14 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { openBrowserAsync } from 'expo-web-browser';
 import { Fragment } from 'react';
-import { Alert, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
@@ -94,27 +101,10 @@ type StepSummary = Pick<RecipeStep, 'part' | 'label'>;
 // Plan A ⑤ レシピ詳細.
 // ⑫-8 投稿のプレビュー shows the same screen with a プレビュー label on top, a single 投稿
 // action, and the draft's cosmetics (null when the post does not publish them).
-export type PostedCosmetic = { id: string; name: string; detail: string; color: string };
-
-export function RecipeDetail({
-  id,
-  onPost,
-  postedCosmetics,
-}: {
-  id: string;
-  onPost?: () => void;
-  postedCosmetics?: PostedCosmetic[] | null;
-}) {
+export function RecipeDetail({ id, onPost }: { id: string; onPost?: () => void }) {
   const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
   if (query.data) {
-    return (
-      <RecipeContent
-        recipe={query.data}
-        steps={query.data.steps}
-        onPost={onPost}
-        postedCosmetics={postedCosmetics}
-      />
-    );
+    return <RecipeContent recipe={query.data} steps={query.data.steps} onPost={onPost} />;
   }
   return (
     <RecipeStatus
@@ -174,13 +164,14 @@ export function RecipeContent({
   recipe,
   steps,
   onPost,
-  postedCosmetics,
+  posting = false,
 }: {
   recipe: RecipeData;
   /** Empty for a recipe without steps yet; it cannot start ⑦. */
   steps: StepSummary[];
   onPost: (() => void) | undefined;
-  postedCosmetics: PostedCosmetic[] | null | undefined;
+  /** ⑫-8 is sending the post; 投稿 waits until it finishes. */
+  posting?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -273,7 +264,10 @@ export function RecipeContent({
               >
                 手順
               </Text>
-              <View className="flex-row justify-between">
+              {/* Plan A spreads a few steps over the row; a long posted recipe wraps instead. */}
+              <View
+                className={cn('flex-row', steps.length > 6 ? 'flex-wrap gap-3' : 'justify-between')}
+              >
                 {steps.map((step, index) => {
                   const part = parts[step.part];
                   return (
@@ -303,26 +297,7 @@ export function RecipeContent({
               </View>
             </>
           ) : null}
-          {postedCosmetics === undefined ? (
-            recipe.products.length > 0 ? (
-              <>
-                <View className="flex-row items-center justify-between">
-                  <Text
-                    accessibilityRole="header"
-                    className="font-maru-bold text-heading text-ink-primary"
-                  >
-                    使うメイク品
-                  </Text>
-                  <Text className="font-maru text-meta text-ink-secondary">
-                    {recipe.products.length}点
-                  </Text>
-                </View>
-                {recipe.products.map((product) => (
-                  <ProductRow key={product.id} product={product} />
-                ))}
-              </>
-            ) : null
-          ) : postedCosmetics === null ? null : (
+          {recipe.products.length > 0 ? (
             <>
               <View className="flex-row items-center justify-between">
                 <Text
@@ -332,32 +307,14 @@ export function RecipeContent({
                   使うメイク品
                 </Text>
                 <Text className="font-maru text-meta text-ink-secondary">
-                  {postedCosmetics.length}点
+                  {recipe.products.length}点
                 </Text>
               </View>
-              {postedCosmetics.map((cosmetic) => (
-                <View
-                  key={cosmetic.id}
-                  accessible
-                  accessibilityLabel={`${cosmetic.name}、${cosmetic.detail}`}
-                  className="flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5"
-                >
-                  <View
-                    className="size-[52px] rounded-[14px]"
-                    style={{ backgroundColor: cosmetic.color }}
-                  />
-                  <View className="flex-1 gap-0.5">
-                    <Text className="font-maru-bold text-label text-ink-primary">
-                      {cosmetic.name}
-                    </Text>
-                    <Text className="font-maru text-meta text-ink-secondary">
-                      {cosmetic.detail}
-                    </Text>
-                  </View>
-                </View>
+              {recipe.products.map((product) => (
+                <ProductRow key={product.id} product={product} />
               ))}
             </>
-          )}
+          ) : null}
         </ScrollView>
       </View>
       <View
@@ -403,7 +360,7 @@ export function RecipeContent({
         )}
       </View>
       {onPost ? (
-        <PostBar onPost={onPost} bottom={insets.bottom} />
+        <PostBar onPost={onPost} posting={posting} bottom={insets.bottom} />
       ) : (
         <RecipeStartBar recipe={recipe} canStart={steps.length > 0} bottom={insets.bottom} />
       )}
@@ -564,7 +521,15 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
   );
 }
 
-function PostBar({ onPost, bottom }: { onPost: () => void; bottom: number }) {
+function PostBar({
+  onPost,
+  posting,
+  bottom,
+}: {
+  onPost: () => void;
+  posting: boolean;
+  bottom: number;
+}) {
   const white = useTokenColor('--color-bg-surface');
   return (
     <View
@@ -573,12 +538,24 @@ function PostBar({ onPost, bottom }: { onPost: () => void; bottom: number }) {
     >
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={posting ? '投稿しています' : '投稿'}
+        accessibilityState={{ disabled: posting, busy: posting }}
+        disabled={posting}
         onPress={onPost}
-        className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80"
+        className={cn(
+          'min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80',
+          posting && 'opacity-60',
+        )}
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
       >
-        <SocialIcon name={UPLOAD} size={20} color={white} />
-        <Text className="font-maru-bold text-action text-white">投稿</Text>
+        {posting ? (
+          <ActivityIndicator color={white} />
+        ) : (
+          <SocialIcon name={UPLOAD} size={20} color={white} />
+        )}
+        <Text className="font-maru-bold text-action text-white">
+          {posting ? '投稿しています' : '投稿'}
+        </Text>
       </Pressable>
     </View>
   );

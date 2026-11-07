@@ -75,6 +75,18 @@ export const parts: Record<PartId, { label: string; icon: number; iconBackground
   },
 };
 
+/** The color a step posted from ⑫ paints on ⑦ when no cosmetic was chosen for it on ⑫-6. */
+export const partColors: Record<PartId, string> = {
+  base: '#E8C4A8',
+  brow: '#79513A',
+  eye: '#C56D42',
+  lash: '#38251D',
+  cheek: '#E8968A',
+  shading: '#A17B60',
+  highlight: '#F3E3C8',
+  lip: '#D9627A',
+};
+
 /** ② ホーム（部位メイク）: the eight part cards in Plan A order. */
 export const partCards: {
   part: PartId;

@@ -1,18 +1,22 @@
-import { Icon } from '@expo/ui';
+import { Icon, Slider } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { getThumbnailAsync } from 'expo-video-thumbnails';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PhotoCrop } from '@/components/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
+import { NativeHost } from '@/components/native-host';
 import { PostHeader, PrimaryButton } from '@/components/post-chrome';
-import { sampleVideoLength, usePostDraft } from '@/components/post-draft';
+import { usePostDraft } from '@/components/post-draft';
 import { arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { addTag, formatClock, lastFrameTime } from '@/lib/post-edit';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -20,8 +24,11 @@ const PLUS = Icon.select({
   ios: 'plus.circle',
   android: import('@expo/material-symbols/add_circle.xml'),
 });
+const REMOVE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
 
+const titleLimit = 40;
 const messageLimit = 200;
+const tagLimit = 30;
 /** Before and After photos in ⑫-7 and ⑫-9 share Plan A's face crop. */
 export const portraitCrop: PhotoCrop = {
   width: '154.25%',
@@ -29,16 +36,22 @@ export const portraitCrop: PhotoCrop = {
   left: '-29.51%',
   top: '-40.6%',
 };
-// Tags come from the sample recipe until tag editing is built.
-const sampleTags = ['#狐メイク', '#丸顔', '#15分'];
-
-// Plan A ⑫-7 メッセージを付けて投稿. The message and both publish options are screen state
-// in the device-only draft; nothing is sent.
+// Plan A ⑫-7 メッセージを付けて投稿. The title, message, tags, thumbnail and publish option live
+// in the device-only draft until ⑫-8 posts it. Plan A has no title field, but a recipe needs one,
+// so it sits above the message and must be filled before the preview. Before and After stay
+// hidden, with 「Before写真を公開」, until they are built; the thumbnail takes their place at the top.
 export function PostMessage() {
   const insets = useSafeAreaInsets();
   const { draft, setDraft } = usePostDraft();
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
+  const [tagInput, setTagInput] = useState('');
+  const durationMs = draft.video?.durationMs ?? null;
+  const titled = draft.title.trim().length > 0;
+  const submitTag = () => {
+    setDraft((current) => ({ ...current, tags: addTag(current.tags, tagInput) }));
+    setTagInput('');
+  };
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
@@ -49,10 +62,7 @@ export function PostMessage() {
         contentInsetAdjustmentBehavior="never"
         contentContainerClassName="gap-3 px-4 pt-3 pb-6"
       >
-        <View className="flex-row gap-2.5">
-          <Portrait label="Before" source={arPhotos.camera} />
-          <Portrait label="After" source={arPhotos.finished} highlighted />
-        </View>
+        <ThumbnailPicker />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`手順書 ${draft.steps.length}ステップを確認する`}
@@ -72,12 +82,31 @@ export function PostMessage() {
             <Text className="font-maru-bold text-label text-ink-primary">
               手順書 {draft.steps.length}ステップ
             </Text>
-            <Text className="font-maru text-meta text-ink-secondary">
-              動画 {sampleVideoLength} から作成
-            </Text>
+            {durationMs ? (
+              <Text className="font-maru text-meta text-ink-secondary">
+                動画 {formatClock(durationMs)} から作成
+              </Text>
+            ) : null}
           </View>
           <Text className="font-maru-bold text-label text-accent-rose">確認する</Text>
         </Pressable>
+        <View className="gap-1.5 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface p-3.5">
+          <Text className="font-maru-bold text-label text-ink-secondary">タイトル（必須）</Text>
+          <TextInput
+            accessibilityLabel="タイトル"
+            maxLength={titleLimit}
+            placeholder="例：丸顔さんの狐メイク"
+            placeholderTextColor={secondary}
+            value={draft.title}
+            onChangeText={(title) => {
+              setDraft((current) => ({ ...current, title }));
+            }}
+            className="min-h-12 p-0 font-maru text-ui text-ink-primary"
+          />
+          <Text className="text-right font-maru-bold text-micro text-ink-secondary">
+            {draft.title.length}/{titleLimit}
+          </Text>
+        </View>
         <View className="gap-1.5 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface p-3.5">
           <Text className="font-maru-bold text-label text-ink-secondary">メッセージ</Text>
           <TextInput
@@ -98,48 +127,68 @@ export function PostMessage() {
           </Text>
         </View>
         <View className="flex-row flex-wrap gap-1.5">
-          {sampleTags.map((tag) => (
-            <View
+          {draft.tags.map((tag) => (
+            <Pressable
               key={tag}
-              className="min-h-[30px] justify-center rounded-full bg-pastel-pink px-3"
+              accessibilityRole="button"
+              accessibilityLabel={`${tag}を削除`}
+              hitSlop={9}
+              onPress={() => {
+                setDraft((current) => ({
+                  ...current,
+                  tags: current.tags.filter((item) => item !== tag),
+                }));
+              }}
+              className="min-h-[30px] flex-row items-center gap-1 rounded-full bg-pastel-pink pl-3 pr-2 active:opacity-70"
             >
               <Text className="font-maru-bold text-label text-accent-rose">{tag}</Text>
-            </View>
+              <SocialIcon name={REMOVE} size={12} color={ink} />
+            </Pressable>
           ))}
-          <View
-            accessible
+        </View>
+        <View className="min-h-12 flex-row items-center gap-2 rounded-full border-[1.5px] border-line-soft bg-white pl-4 pr-1">
+          <TextInput
+            accessibilityLabel="タグ"
+            maxLength={tagLimit}
+            placeholder="タグを入力"
+            placeholderTextColor={secondary}
+            value={tagInput}
+            onChangeText={setTagInput}
+            onSubmitEditing={submitTag}
+            submitBehavior="submit"
+            returnKeyType="done"
+            className="flex-1 p-0 font-maru text-ui text-ink-primary"
+          />
+          <Pressable
             accessibilityRole="button"
-            accessibilityLabel="タグを追加（準備中）"
-            accessibilityState={{ disabled: true }}
-            className="min-h-[30px] flex-row items-center gap-1 rounded-full border-[1.5px] border-line-soft bg-white px-3"
+            accessibilityLabel="タグを追加"
+            onPress={submitTag}
+            className="min-h-12 flex-row items-center gap-1 rounded-full px-3 active:opacity-70"
           >
             <SocialIcon name={PLUS} size={14} color={ink} />
-            <Text className="font-maru-bold text-label text-ink-primary">タグ</Text>
-          </View>
+            <Text className="font-maru-bold text-label text-ink-primary">追加</Text>
+          </Pressable>
         </View>
         <View className="overflow-hidden rounded-[18px] border-[1.5px] border-line-soft bg-white">
           <PublishOption
             title="使ったコスメを公開"
-            detail="商品へのリンクも表示します"
+            detail="手順に使ったコスメの名前と色を載せます"
             value={draft.publishCosmetics}
             onChange={(publishCosmetics) => {
               setDraft((current) => ({ ...current, publishCosmetics }));
             }}
           />
-          <View className="h-px bg-line-soft" />
-          <PublishOption
-            title="Before写真を公開"
-            detail="オフならAfterだけを表示します"
-            value={draft.publishBefore}
-            onChange={(publishBefore) => {
-              setDraft((current) => ({ ...current, publishBefore }));
-            }}
-          />
         </View>
       </ScrollView>
       <View className="px-4 pt-2" style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+        {titled ? null : (
+          <Text className="pb-2 text-center font-maru text-meta text-ink-secondary">
+            タイトルを入力するとプレビューを見られます
+          </Text>
+        )}
         <PrimaryButton
           label="プレビューを見る"
+          disabled={!titled}
           onPress={() => {
             router.push('/post/preview');
           }}
@@ -149,39 +198,180 @@ export function PostMessage() {
   );
 }
 
-function Portrait({
-  label,
-  source,
-  highlighted = false,
+type VideoFrame = { uri: string; timeMs: number };
+
+/**
+ * Cuts the frame at a time from the post's video on the device; a later request wins. While the
+ * slider moves, the last cut frame stays shown until the next one is ready. `failed` is set when
+ * the latest request could not be cut.
+ */
+function useVideoFrame(videoUri: string | null, timeMs: number | null) {
+  const { trackFile } = usePostDraft();
+  const [frame, setFrame] = useState<VideoFrame | null>(null);
+  const [failedAt, setFailedAt] = useState<number | null>(null);
+  useEffect(() => {
+    if (!videoUri || timeMs === null) {
+      return;
+    }
+    let active = true;
+    getThumbnailAsync(videoUri, { time: timeMs, quality: 0.7 }).then(
+      ({ uri }) => {
+        trackFile(uri);
+        if (active) {
+          setFrame({ uri, timeMs });
+          setFailedAt(null);
+        }
+      },
+      () => {
+        if (active) {
+          setFailedAt(timeMs);
+        }
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [videoUri, timeMs, trackFile]);
+  return {
+    frame: timeMs === null ? null : frame,
+    failed: timeMs !== null && failedAt === timeMs,
+  };
+}
+
+/** The picked frame, the failure note when no frame could be cut, or Plan A's sample without a video. */
+function ThumbnailContent({
+  frame,
+  hasVideo,
+  failed,
 }: {
-  label: string;
-  source: number;
-  highlighted?: boolean;
+  frame: VideoFrame | null;
+  hasVideo: boolean;
+  failed: boolean;
 }) {
+  if (frame) {
+    return <Image source={{ uri: frame.uri }} contentFit="cover" style={{ flex: 1 }} />;
+  }
+  if (!hasVideo) {
+    return <CroppedPhoto source={arPhotos.finished} crop={portraitCrop} />;
+  }
+  return failed ? (
+    <View className="flex-1 items-center justify-center px-6">
+      <Text className="text-center font-maru text-label text-ink-secondary">
+        場面を切り出せませんでした。タップして別の場面を選んでください
+      </Text>
+    </View>
+  ) : null;
+}
+
+// サムネイルの設定: ①'s recipe card photo. It defaults to the video's last frame. Tapping it shows
+// the video's timeline below; the frame under the slider is previewed and 決定 keeps it once that
+// frame is ready. Without a video Plan A's sample photo stands in.
+function ThumbnailPicker() {
+  const { draft, setDraft } = usePostDraft();
+  const video = draft.video;
+  const [editingAt, setEditingAt] = useState<number | null>(null);
+  const { frame: defaultFrame, failed: defaultFailed } = useVideoFrame(
+    video?.uri ?? null,
+    video && !draft.thumbnail ? lastFrameTime(video.durationMs) : null,
+  );
+  const { frame: preview, failed: previewFailed } = useVideoFrame(video?.uri ?? null, editingAt);
+  useEffect(() => {
+    if (defaultFrame && !draft.thumbnail) {
+      setDraft((current) => ({ ...current, thumbnail: defaultFrame }));
+    }
+  }, [defaultFrame, draft.thumbnail, setDraft]);
+  const thumbnail = draft.thumbnail;
+  const shown = editingAt === null ? thumbnail : (preview ?? thumbnail);
+  // A failed default frame can still be replaced by picking another moment on the timeline.
+  const canEdit = Boolean(video?.durationMs) && (thumbnail !== null || defaultFailed);
+  // 決定 keeps only the frame of the moment under the slider, not one still being replaced.
+  const ready = preview?.timeMs === editingAt;
   return (
-    <View
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={`${label}の見本の写真`}
-      className="h-[220px] flex-1 overflow-hidden rounded-[20px]"
-    >
-      <CroppedPhoto source={source} crop={portraitCrop} />
-      <View
-        className={cn(
-          'absolute left-2.5 top-2.5 rounded-[15px] border border-white px-3 py-[5px]',
-          highlighted ? 'bg-accent-rose' : 'bg-white/80',
-        )}
-        style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
+    <View className="gap-2">
+      <Text className="font-maru-bold text-label text-ink-secondary">サムネイルの設定</Text>
+      <Pressable
+        accessibilityRole={canEdit ? 'button' : 'image'}
+        accessibilityLabel={
+          shown ? `サムネイル ${formatClock(shown.timeMs)}の場面` : 'サムネイルの見本の写真'
+        }
+        accessibilityHint={canEdit ? 'サムネイルにする場面を変更します' : undefined}
+        disabled={!canEdit || editingAt !== null}
+        onPress={() => {
+          setEditingAt(thumbnail?.timeMs ?? 0);
+        }}
+        className="h-[220px] overflow-hidden rounded-[20px] bg-bg-base active:opacity-90"
       >
-        <Text
-          className={cn(
-            'font-maru-bold text-label',
-            highlighted ? 'text-white' : 'text-ink-primary',
-          )}
-        >
-          {label}
-        </Text>
-      </View>
+        <ThumbnailContent frame={shown} hasVideo={Boolean(video)} failed={defaultFailed} />
+        {canEdit && editingAt === null ? (
+          <View className="absolute bottom-2.5 right-2.5 rounded-[15px] bg-white/85 px-3 py-[5px]">
+            <Text className="font-maru-bold text-label text-ink-primary">タップして変更</Text>
+          </View>
+        ) : null}
+      </Pressable>
+      {editingAt !== null && video?.durationMs ? (
+        <View className="gap-1 rounded-[18px] bg-bg-base px-3.5 py-3">
+          <NativeHost matchContents={{ vertical: true }} style={{ alignSelf: 'stretch' }}>
+            <Slider
+              testID="サムネイルの時点"
+              value={editingAt}
+              min={0}
+              max={lastFrameTime(video.durationMs)}
+              step={100}
+              onValueChange={(value) => {
+                setEditingAt(Math.round(value));
+              }}
+            />
+          </NativeHost>
+          <View className="flex-row justify-between">
+            <Text className="font-maru text-meta text-ink-secondary">0:00</Text>
+            <Text
+              accessibilityLiveRegion="polite"
+              className="font-maru-bold text-meta text-ink-primary"
+            >
+              {formatClock(editingAt)}
+            </Text>
+            <Text className="font-maru text-meta text-ink-secondary">
+              {formatClock(video.durationMs)}
+            </Text>
+          </View>
+          {previewFailed ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              className="font-maru text-meta text-ink-secondary"
+            >
+              この場面は切り出せませんでした。別の時点を選んでください
+            </Text>
+          ) : null}
+          <View className="flex-row justify-end gap-2">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setEditingAt(null);
+              }}
+              className="min-h-12 justify-center rounded-full px-4 active:opacity-70"
+            >
+              <Text className="font-maru-bold text-label text-ink-secondary">キャンセル</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !ready }}
+              disabled={!ready}
+              onPress={() => {
+                if (ready) {
+                  setDraft((current) => ({ ...current, thumbnail: preview }));
+                }
+                setEditingAt(null);
+              }}
+              className={cn(
+                'min-h-12 justify-center rounded-full bg-accent-rose px-5 active:opacity-70',
+                !ready && 'opacity-50',
+              )}
+            >
+              <Text className="font-maru-bold text-label text-white">決定</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

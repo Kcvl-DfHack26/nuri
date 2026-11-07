@@ -1,0 +1,161 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "685aa338-ed84-4ace-ab3a-70c33df40a07",
+  "prevIds": [
+    "d1fc828f-3b29-44ea-8884-fc7f8e1ee138"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "recipe_image"
+      ],
+      "writes": [
+        "s|tbl|public.recipe_image",
+        "n|tbl|public.recipe_image",
+        "e|tbl|public.recipe_image",
+        "n|rel|public.recipe_image",
+        "n|type|public.recipe_image",
+        "n|rel|public.recipe_image_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "recipe_image"
+      ],
+      "writes": [
+        "s|fk|public.recipe_image.recipe_image_recipe_id_recipe_id_fkey",
+        "n|fk|public.recipe_image.recipe_image_recipe_id_recipe_id_fkey",
+        "e|fk|public.recipe_image.recipe_image_recipe_id_recipe_id_fkey",
+        "n|con|public.recipe_image.recipe_image_recipe_id_recipe_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.recipe_image",
+        "n|sch|public",
+        "n|tbl|public.recipe",
+        "n|sch|public",
+        "n|col|public.recipe_image.recipe_id",
+        "n|col|public.recipe.id",
+        "e|uniqueness|public.recipe.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "recipe_image",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_image",
+        "name": "recipe_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_image",
+        "name": "content_type",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_image",
+        "name": "bytes",
+        "type": "bytea",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_image",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_image",
+        "name": "recipe_image_recipe_id_recipe_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "recipe_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "recipe",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_image",
+        "name": "recipe_image_pkey",
+        "columns": [
+          "recipe_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

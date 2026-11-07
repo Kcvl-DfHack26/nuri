@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
+import { recipeStepsMax } from '@starter/shared';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
@@ -35,7 +36,12 @@ async function pickVideo() {
   }
   // The URI stays on the device in the post's data. Consent is asked where a video is first
   // sent, which is not built yet (#81).
-  router.push({ pathname: '/post/creating', params: { video: video.uri } });
+  router.push({
+    pathname: '/post/creating',
+    params: video.duration
+      ? { video: video.uri, duration: String(video.duration) }
+      : { video: video.uri },
+  });
 }
 
 /**
@@ -240,7 +246,7 @@ function CameraAction({
 }
 
 /** How a recording ends: kept for ⑫-3 with its marks, or deleted from the device. */
-type Ending = { kind: 'finish'; marks: number[] } | { kind: 'discard' };
+type Ending = { kind: 'finish'; marks: number[]; durationMs: number } | { kind: 'discard' };
 
 // Plan A ⑫-2 録画中. Recording starts once the camera is ready. 撮影を終える keeps the video and
 // its marks in the post's data; closing or leaving deletes the video, so nothing is sent.
@@ -310,7 +316,10 @@ export function PostRecording() {
           return;
         }
         if (end?.kind === 'finish') {
-          setDraft((current) => ({ ...current, video: { uri: result.uri, marks: end.marks } }));
+          setDraft((current) => ({
+            ...current,
+            video: { uri: result.uri, marks: end.marks, durationMs: end.durationMs },
+          }));
           router.replace('/post/creating');
           return;
         }
@@ -408,7 +417,7 @@ export function PostRecording() {
               startedAt === null
                 ? undefined
                 : () => {
-                    ending.current = { kind: 'finish', marks };
+                    ending.current = { kind: 'finish', marks, durationMs: Date.now() - startedAt };
                     camera.current?.stopRecording();
                   }
             }
@@ -419,8 +428,9 @@ export function PostRecording() {
           </CameraAction>
           <CameraAction
             label="手順を区切る"
+            // A post has at most recipeStepsMax steps, so marks stop one short of it.
             onPress={
-              startedAt === null
+              startedAt === null || marks.length >= recipeStepsMax - 1
                 ? undefined
                 : () => {
                     setMarks((current) => [...current, Date.now() - startedAt]);

@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
+import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { PostStep } from '@/components/post-draft';
+
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { parts } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
 import { backOrHome } from '@/lib/navigation';
 import { cn } from '@/lib/utils';
@@ -118,5 +122,25 @@ export function DashedButton({
       {icon}
       <Text className="font-maru-bold text-label text-ink-primary">{label}</Text>
     </Pressable>
+  );
+}
+
+/** ⑫-4/⑫-5: the step's frame from the video, or its part's icon when no frame could be cut. */
+export function StepFrame({ step }: { step: Pick<PostStep, 'part' | 'image'> }) {
+  if (step.image) {
+    return (
+      <Image
+        accessible={false}
+        source={{ uri: step.image }}
+        contentFit="cover"
+        style={{ width: '100%', height: '100%' }}
+      />
+    );
+  }
+  const part = parts[step.part];
+  return (
+    <View className={cn('flex-1 items-center justify-center', part.iconBackground)}>
+      <Image accessible={false} source={part.icon} style={{ width: 28, height: 28 }} />
+    </View>
   );
 }
