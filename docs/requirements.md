@@ -314,7 +314,7 @@ ARの顔追跡には[MediaPipe Face Landmarker](https://developers.google.com/ed
 - モデルは `face_landmarker.task`（顔検出BlazeFace short-range 192×192、特徴点モデル256×256、blendshapeモデル）。既定は `num_faces=1`（1のとき時間方向の平滑化が効く）、各信頼度0.5。
 - iOSはSwift Package Managerの `MediaPipeTasksVision`、Androidは `com.google.mediapipe:tasks-vision`。
 - 標準の顔メッシュ [`canonical_face_model.obj`](https://github.com/google-ai-edge/mediapipe/blob/a908d668c730/mediapipe/modules/face_geometry/data/canonical_face_model.obj)（Apache-2.0）は頂点468・UV座標468・三角形898。三角形の各角は頂点番号とUV番号を別々に持つ（例：`f 174/43 156/119 134/220`）。頂点 i のUVが `vt[i]` とは限らないため、UVは必ず三角形の定義から引く。
-- 特徴点478点のうち先頭468点が標準メッシュの頂点に対応し、残り10点が虹彩と見込む（PoCで確認する）。
+- 特徴点478点のうち先頭468点が標準メッシュの頂点に対応し、残り10点が虹彩（468〜472が本人の右目、473〜477が左目。各5点の先頭が中心）。#26でエミュレーターの1フレームの特徴点を標準メッシュの頂点へ弱透視の射影で当てはめて確かめた。番号どおりの対応は平均4.0px（顔の幅149px）、1つずらすと平均36.7px。468・473は、それぞれ目の4点の中心から目の幅の0.19倍・0.23倍の位置にあり、残り4点の平均と0.2px以内で一致する。
 
 ### 処理の流れ（案）
 
@@ -347,3 +347,5 @@ ARの顔追跡には[MediaPipe Face Landmarker](https://developers.google.com/ed
 2026年11月7日時点で確かめたのは、スターターの取り込み後の静的な検査（整形、lint、型、Bun・Jestのテスト、PostgreSQLでの認証テスト、expo-doctor、iOS・Androidのbundle生成、OpenTofuのvalidate）と、P1のAndroidエミュレーターでの動作確認。実機での動作、iOSの開発ビルド、Google Cloudへのデプロイ、P2はまだ確かめていない。次はPlan Aの主要画面（①⑤⑦⑩）を動かすことを優先する。
 
 P1（#25）は、Androidのエミュレーター（Android 17、x86_64、6コア・4GB、`-gpu host -qemu -cpu host`）とPCのウェブカメラ（eMeet C960）で確かめた。478点が取れ、拡大・切り抜き・左右反転を合わせた画面座標で顔に重なる。顔を外すと案内が出て、戻すと追跡に戻る。参考値はCPUの推論で11fps、遅延（フレームを受け取ってから結果が出るまで）は平均41ms・最大78ms。エミュレーターはカメラの映像とGPUの命令を変換して渡すため、GPUの推論は通常の方式では毎フレーム失敗し、ANGLE方式（`-feature GuestAngle`）では1回約400msかかった。この値は中位の端末の性能を表さないので、合格の目安（30fps以上、遅延100ms以下、顔を左右30度向けても外れない）は判定していない。真横を向くと外れることがある。カメラを許可しない場合の案内は、まだ実際に拒否して試していない。iOSは、試したApple IDがApple Developer Programに入っておらず、開発ビルドを作れていない。
+
+P2の最初の段階（#26、眉）は、同じAndroidのエミュレーターで、1人（眼鏡あり）を目で見て確かめた。顔を止めると、両方の眉のテクスチャが実際の眉に重なり、虹彩の点は瞳の上に乗る。顔を横に向けても、見えている側の眉に重なっていた。顔を動かしている間は、テクスチャが顔より遅れてずれる。このときCPUの推論で5〜11fps、遅延は平均45〜80ms・最大235msで、エミュレーターの性能による遅れと見ている。左右30度の角度は測っておらず、奥側の三角形が手前に折り返す表示は見えなかった。実機、iOS、顔型の違う5人での見た目はまだ確かめていない。
