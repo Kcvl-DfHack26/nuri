@@ -3,8 +3,7 @@ import type { ReactNode } from 'react';
 import { Icon } from '@expo/ui';
 import { profileInputSchema } from '@starter/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
@@ -18,8 +17,6 @@ import { Text } from '@/components/ui/text';
 import { authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
 import { useTokenColor } from '@/theme/tokens';
-
-import sampleAvatar from '../../assets/plan-a/my/avatar.png';
 
 const BACK = Icon.select({
   ios: 'chevron.left',
@@ -40,12 +37,14 @@ const NEXT = Icon.select({
 export function ProfileSettings() {
   const insets = useSafeAreaInsets();
   const session = authClient.useSession();
+  // The screen stays mounted under the app settings; only claim the status bar while shown.
+  const focused = useIsFocused();
   // The header floats over the form; measure it so larger text never covers the first field.
   const [headerHeight, setHeaderHeight] = useState(44);
   const user = session.data?.user;
   return (
     <View className="flex-1 bg-white">
-      <StatusBar style="dark" />
+      {focused ? <StatusBar style="dark" /> : null}
       {session.isPending ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator accessibilityLabel="読み込み中" />
@@ -171,15 +170,7 @@ function Editor({
       >
         <View className="items-center gap-2">
           <View className="size-24">
-            {image ? (
-              <Avatar size={96} image={image} />
-            ) : (
-              <Image
-                accessible={false}
-                source={sampleAvatar}
-                style={{ width: 96, height: 96, borderRadius: 48 }}
-              />
-            )}
+            <Avatar size={96} image={image} />
             <View className="absolute left-[66px] top-[66px] size-8 items-center justify-center rounded-full border-2 border-bg-surface bg-accent-rose">
               <SocialIcon name={CAMERA} size={18} color="white" />
             </View>
@@ -238,16 +229,13 @@ function Editor({
           <Row label="連携アカウント" />
         </Section>
         <AppSection />
-        {error ? (
-          <Text accessibilityRole="alert" className="font-maru text-meta text-accent-rose">
-            {error.message}
-          </Text>
-        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ disabled: logout.isPending }}
           disabled={logout.isPending}
           onPress={() => {
+            // Show only the latest failure.
+            save.reset();
             logout.mutate();
           }}
           className="min-h-12 items-center justify-center rounded-full border border-black active:opacity-70"
@@ -267,17 +255,23 @@ function Editor({
         </View>
       </ScrollView>
       <BottomCta>
-        {canSave ? (
-          <PrimaryButton
-            label="保存する"
-            onPress={() => {
-              save.mutate();
-            }}
-          />
-        ) : (
-          // Shown as not ready until the name changes; it also stays inactive while saving.
-          <PrimaryButton label={save.isPending ? '保存中' : '保存する'} />
-        )}
+        {error ? (
+          <Text
+            accessibilityLiveRegion="polite"
+            className="mb-2 text-center font-maru text-meta text-accent-rose"
+          >
+            {error.message}
+          </Text>
+        ) : null}
+        {/* Inactive until the name changes, and while saving. */}
+        <PrimaryButton
+          label={save.isPending ? '保存中' : '保存する'}
+          disabled={!canSave}
+          onPress={() => {
+            logout.reset();
+            save.mutate();
+          }}
+        />
       </BottomCta>
     </>
   );

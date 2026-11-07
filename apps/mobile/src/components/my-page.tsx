@@ -15,8 +15,6 @@ import { authClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
-import sampleAvatar from '../../assets/plan-a/my/avatar.png';
-
 const SETTINGS = Icon.select({
   ios: 'gearshape.fill',
   android: import('@expo/material-symbols/settings.xml'),
@@ -40,7 +38,7 @@ const posts = [
 type Post = (typeof posts)[number];
 
 // Plan A ⑰ マイページ. The name and photo come from the session; the face type, numbers and
-// posts are Plan A samples, which the screen says.
+// posts are Plan A samples, which the screen says. Three rows of two follow the six posts.
 export function MyPage() {
   const insets = useSafeAreaInsets();
   // The tab stays mounted under other tabs; only claim the status bar while it is shown.
@@ -60,13 +58,7 @@ export function MyPage() {
       >
         <View className="flex-row items-center gap-3.5">
           <View className="size-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-accent-pink">
-            {user?.image ? (
-              <Avatar size={58} image={user.image} />
-            ) : user ? (
-              <Image accessible={false} source={sampleAvatar} style={{ width: 58, height: 58 }} />
-            ) : (
-              <Avatar size={58} />
-            )}
+            <Avatar size={58} image={user?.image} />
           </View>
           <View className="flex-1 gap-0.5">
             {isPending ? (

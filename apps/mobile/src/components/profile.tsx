@@ -7,33 +7,32 @@ import { Avatar } from '@/components/avatar';
 import { Feed } from '@/components/feed';
 import { Feedback } from '@/components/feedback';
 import { NativeHost } from '@/components/native-host';
-import { Screen } from '@/components/screen';
-import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { api, apiUrl, authClient } from '@/lib/api';
 import { colors } from '@/theme/colors';
 import { avatarSize } from '@/theme/metrics';
 
-export function Profile({ id }: { id?: string }) {
-  const { data: session, isPending } = authClient.useSession();
+// Another user's profile opened from a post. Your own profile is the マイ tab (⑰).
+export function Profile({ id }: { id: string }) {
+  const { data: session } = authClient.useSession();
   const profile = useQuery({
     queryKey: ['user', id],
-    enabled: Boolean(id && apiUrl),
+    enabled: Boolean(apiUrl),
     queryFn: async () => {
-      const response = await api.api.users[':id'].$get({ param: { id: id ?? '' } });
+      const response = await api.api.users[':id'].$get({ param: { id } });
       if (response.status !== 200) {
         throw new Error('プロフィールを読み込めませんでした。');
       }
       return await response.json();
     },
   });
-  if (id && !apiUrl) {
+  if (!apiUrl) {
     return <Feedback fullScreen message="接続先が未設定です。" />;
   }
-  if (id ? profile.isPending : isPending) {
+  if (profile.isPending) {
     return <Feedback fullScreen loading message="プロフィールを読み込んでいます" />;
   }
-  if (id && profile.isError) {
+  if (profile.isError) {
     return (
       <Feedback
         fullScreen
@@ -44,22 +43,7 @@ export function Profile({ id }: { id?: string }) {
       />
     );
   }
-  const person = id ? profile.data?.user : session?.user;
-  if (!person) {
-    return (
-      <Screen>
-        <Text className="text-muted-foreground">自分の投稿を確認するにはログインしてください</Text>
-        <Button
-          className="rounded-full"
-          onPress={() => {
-            router.push('/account');
-          }}
-        >
-          <Text>ログイン</Text>
-        </Button>
-      </Screen>
-    );
-  }
+  const person = profile.data.user;
   return (
     <Feed
       authorId={person.id}
