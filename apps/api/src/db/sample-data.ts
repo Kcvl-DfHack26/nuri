@@ -1,8 +1,8 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 
 import type { Database } from './client';
 
-import { like, post, product, recipe, recipeProduct, user } from './schema';
+import { like, post, product, recipe, recipeProduct, recipeStep, user } from './schema';
 
 // Development sample data. Every row has a stable ID and is upserted, so running the seed again
 // neither duplicates rows nor removes or rewrites data created through the app.
@@ -73,6 +73,52 @@ const products = [
     purchasable: true,
   },
 ];
+type SeedStep = Omit<typeof recipeStep.$inferInsert, 'recipeId' | 'position'>;
+
+// Plan A's ⑦ steps for fox, the only recipe Plan A details.
+const foxSteps: SeedStep[] = [
+  {
+    part: 'brow',
+    label: '眉',
+    title: '眉尻を濃く、眉頭は淡く',
+    hint: 'スクリューブラシで眉頭の毛を立てる',
+    product: 'アイブロウ（微アーチ眉）',
+    colors: ['#79513A'],
+  },
+  {
+    part: 'eye',
+    label: 'シャドウ',
+    title: '目尻側から横長にぼかす',
+    hint: '中間・締め色は目頭側へ薄く',
+    product: 'アイシャドウ（ベース・中間・締め）',
+    colors: ['#E5B58A', '#C56D42', '#713E2C'],
+  },
+  {
+    part: 'lash',
+    label: 'ライン',
+    title: '黒目の外側から徐々に太く',
+    hint: '目尻は斜め上に跳ね上げ三角を埋める',
+    product: 'アイライン',
+    colors: ['#38251D'],
+  },
+  {
+    part: 'shading',
+    label: 'シェード',
+    title: '骨の凹みに沿って滑らせる',
+    hint: '外側から内側へ境目を馴染ませる',
+    product: 'シェーディング',
+    colors: ['#A17B60'],
+  },
+  {
+    part: 'cheek',
+    label: 'チーク',
+    title: 'こめかみへ斜め上に滑らせる',
+    hint: '頬骨の高い位置から丸く広げない',
+    product: 'チーク',
+    colors: ['#B8754F'],
+  },
+];
+
 // Newest first, in Plan A's ① order. Only fox has Plan A detail data; the other tags,
 // durations, sources and counts are sample values.
 const recipes = [
@@ -88,6 +134,7 @@ const recipes = [
       { productId: 'celane-brow-pencil', usage: '眉・モカブラウン' },
       { productId: 'mousse-cheek', usage: 'チーク・コーラル' },
     ],
+    steps: foxSteps,
   },
   {
     id: 'round',
@@ -98,6 +145,7 @@ const recipes = [
     likeCount: 1200,
     source: null,
     products: [],
+    steps: [],
   },
   {
     id: 'cat',
@@ -108,6 +156,7 @@ const recipes = [
     likeCount: 1200,
     source: 'instagram' as const,
     products: [],
+    steps: [],
   },
   {
     id: 'long',
@@ -118,6 +167,7 @@ const recipes = [
     likeCount: 1200,
     source: null,
     products: [],
+    steps: [],
   },
   {
     id: 'office',
@@ -128,6 +178,7 @@ const recipes = [
     likeCount: 864,
     source: 'youtube' as const,
     products: [],
+    steps: [],
   },
   {
     id: 'korean',
@@ -138,6 +189,7 @@ const recipes = [
     likeCount: 3400,
     source: 'tiktok' as const,
     products: [],
+    steps: [],
   },
 ];
 
@@ -165,7 +217,7 @@ export async function seedSampleData(db: Database) {
         .values({ id, ...item })
         .onConflictDoUpdate({ target: product.id, set: item });
     }
-    for (const [index, { products: used, ...item }] of recipes.entries()) {
+    for (const [index, { products: used, steps, ...item }] of recipes.entries()) {
       const values = { ...item, image: `/sample-recipes/${item.id}.jpg` };
       const seeded = await tx
         .insert(recipe)
@@ -189,6 +241,16 @@ export async function seedSampleData(db: Database) {
             set: { position, usage: entry.usage },
           });
       }
+      for (const [position, step] of steps.entries()) {
+        await tx
+          .insert(recipeStep)
+          .values({ recipeId: item.id, position, ...step })
+          .onConflictDoUpdate({ target: [recipeStep.recipeId, recipeStep.position], set: step });
+      }
+      // Steps past the end are left over from a longer earlier seed and would run after the last one.
+      await tx
+        .delete(recipeStep)
+        .where(and(eq(recipeStep.recipeId, item.id), gte(recipeStep.position, steps.length)));
     }
   });
   return { users: people.length, posts: posts.length, recipes: recipes.length };

@@ -1,0 +1,226 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "9c116315-33f5-4ed3-81ec-e8ae411ed9cb",
+  "prevIds": [
+    "32a5d200-6000-4076-80d5-72bf7b8dd620"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "recipe_step"
+      ],
+      "writes": [
+        "s|tbl|public.recipe_step",
+        "n|tbl|public.recipe_step",
+        "e|tbl|public.recipe_step",
+        "n|rel|public.recipe_step",
+        "n|type|public.recipe_step",
+        "n|rel|public.recipe_step_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "recipe_step"
+      ],
+      "writes": [
+        "s|fk|public.recipe_step.recipe_step_recipe_id_recipe_id_fkey",
+        "n|fk|public.recipe_step.recipe_step_recipe_id_recipe_id_fkey",
+        "e|fk|public.recipe_step.recipe_step_recipe_id_recipe_id_fkey",
+        "n|con|public.recipe_step.recipe_step_recipe_id_recipe_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.recipe_step",
+        "n|sch|public",
+        "n|tbl|public.recipe",
+        "n|sch|public",
+        "n|col|public.recipe_step.recipe_id",
+        "n|col|public.recipe.id",
+        "e|uniqueness|public.recipe.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "recipe_step",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "recipe_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "position",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "part",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "label",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "title",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "hint",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "product",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "colors",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "recipe_step_recipe_id_recipe_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "recipe_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "recipe",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "recipe_step_pkey",
+        "columns": [
+          "recipe_id",
+          "position"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

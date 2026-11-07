@@ -100,5 +100,12 @@ test('lists and shows recipes without a session', async () => {
       ],
     },
   });
+  const { recipe: fox } = z
+    .object({ recipe: z.object({ steps: z.array(z.object({ part: z.string() })) }) })
+    .parse(await (await app.request('/api/recipes/fox')).json());
+  expect(fox.steps.map((step) => step.part)).toEqual(['brow', 'eye', 'lash', 'shading', 'cheek']);
+  expect(await (await app.request('/api/recipes/round')).json()).toMatchObject({
+    recipe: { steps: [] },
+  });
   expect((await app.request('/api/recipes/missing-recipe')).status).toBe(404);
 });
