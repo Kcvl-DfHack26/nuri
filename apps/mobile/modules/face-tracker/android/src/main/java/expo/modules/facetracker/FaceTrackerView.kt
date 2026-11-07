@@ -141,7 +141,10 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       try {
         val provider = future.get()
         cameraProvider = provider
-        provider.unbind(*useCases)
+        // Navigating from ⑦ to ⑩ starts the new screen's camera before the old screen's stops. Both
+        // share the activity's camera, and two previews plus two analyses exceed what it can bind,
+        // so the screen that starts last takes the camera.
+        provider.unbindAll()
         useCases = arrayOf(preview, analysis)
         provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
       } catch (error: Exception) {
