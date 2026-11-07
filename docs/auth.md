@@ -34,7 +34,7 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 | `AUTH_EMULATE`                              | ローカル限定。本番でtrueなら起動を拒否                       |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 実Google OAuthクライアント                                   |
 | `APPLE_CLIENT_ID` / `APPLE_CLIENT_SECRET`   | 実Apple Services IDと署名済みclient-secret JWT。期限前に更新 |
-| `RESEND_API_KEY` / `EMAIL_FROM`             | 実メール送信キーと検証済み送信元                             |
+| `RESEND_API_KEY` / `EMAIL_FROM`             | 実メール送信キーと送信元。一般配信には検証済みドメインが必要 |
 | `PASSKEY_RP_ID` / `PASSKEY_ORIGINS`         | パスキーのRPドメインと許可origin（カンマ区切り）             |
 | `APPLE_APP_ID`                              | `TEAM_ID.com.kcvl.nuri`                                      |
 | `ANDROID_SHA256_CERT_FINGERPRINTS`          | Android署名証明書のSHA-256（カンマ区切り）                   |
@@ -46,9 +46,9 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 今回使う方法は、スターターにあるBetter AuthのGoogle OAuthと、Resendで送る10分・単回利用のマジックリンク。Apple、パスキー、iOSとスマートフォン実機は今回の確認範囲外。両方ともAndroid Studio仮想端末のDevelopment Buildから、公開済みのHTTPS APIへ接続する。Expo GoではDevelopment Buildのネイティブ設定を確認できない。
 
 1. Google Cloudの `kcvlb4` にある [Google Auth Platform](https://console.cloud.google.com/auth/overview?project=kcvlb4) で、アプリ名とサポート用メールを設定し、外部向けのテスト利用者を登録する。Google OAuthクライアントは**ウェブアプリケーション**型で作り、承認済みリダイレクトURIを `https://nuri-staging-v3kjfarita-an.a.run.app/api/auth/callback/google` にする。これはAPIがGoogleの認可コードを受け取るURIで、Androidアプリのカスタムスキームではない。[Googleの設定手順](https://developers.google.com/identity/protocols/oauth2/web-server#creatingcred)。
-2. Resendで送信元を用意し、送信用APIキーを発行する。任意のメールアドレスへ送る場合はドメインを検証する。送信元を `nuri <login@検証済みドメイン>` の形で決める。Resendのテスト送信先だけでは実際の受信箱でログインリンクを開く確認にならない。[Resendの送信ドメイン](https://resend.com/docs/dashboard/domains/introduction)。
+2. Resendで送信専用APIキーを発行する。ドメイン未登録の段階では `nuri <onboarding@resend.dev>` を送信元にして、Resendアカウント自身の受信箱だけで検証する。任意の利用者へ送る前には所有ドメインを検証し、送信元を `nuri <login@検証済みドメイン>` に替える。`delivered@resend.dev` などの疑似宛先では実際の受信箱でログインリンクを開く確認にならない。[Resendの送信ドメイン](https://resend.com/docs/dashboard/domains/introduction)。
 3. OpenTofuを初期設定のまま適用し、Secret Managerに `nuri-staging-google-client-id`、`nuri-staging-google-client-secret`、`nuri-staging-resend-api-key` の器を作る。GoogleのID・secretとResendのキーをそれぞれのsecretへ**バージョンとして**登録する。値をリポジトリ、Issue、PR、`terraform.tfvars`、Expoの環境変数に書かない。
-4. `infra/terraform.tfvars` に `google_oauth_enabled = true`、`email_login_enabled = true`、`email_from = "nuri <login@検証済みドメイン>"` を設定してOpenTofuを再適用する。新revisionはCIが固定したトラフィックを引き継がず、0%のままになる。`gcloud run services describe nuri-staging --region=asia-northeast1 --format='value(status.latestCreatedRevisionName)'` で新revision名を取得し、`gcloud run services update-traffic nuri-staging --region=asia-northeast1 --update-tags=auth-test=新revision名` でテスト用URLを付ける。そのURLの `/ready` と `/api/auth-capabilities` で `google` と `email` がtrue、`emulated` がfalseであることを確認する。secretの値そのものは表示しない。
+4. `infra/terraform.tfvars` に `google_oauth_enabled = true`、`email_login_enabled = true`、`email_from = "nuri <onboarding@resend.dev>"`（自身の受信箱での検証時）を設定してOpenTofuを再適用する。検証済みドメインがある場合はその送信元を使う。新revisionはCIが固定したトラフィックを引き継がず、0%のままになる。`gcloud run services describe nuri-staging --region=asia-northeast1 --format='value(status.latestCreatedRevisionName)'` で新revision名を取得し、`gcloud run services update-traffic nuri-staging --region=asia-northeast1 --update-tags=auth-test=新revision名` でテスト用URLを付ける。そのURLの `/ready` と `/api/auth-capabilities` で `google` と `email` がtrue、`emulated` がfalseであることを確認する。secretの値そのものは表示しない。
 5. candidateの準備が整ったら、[CIからのデプロイ](setup.md#ciからのデプロイを有効にする)に従ってmainから配信するか、stagingの `gcloud run services update-traffic nuri-staging --region=asia-northeast1 --to-revisions=新revision名=100` で確認済みrevisionへ切り替える。`status.traffic` と公開URLの `/ready`・`/api/auth-capabilities` を再確認する。
 6. `EXPO_PUBLIC_API_URL` が上の公開API URLであるDevelopment BuildをAndroid仮想端末へ入れる。Googleでログインし、アプリへ戻り、アカウント表示とログアウト、再起動後のセッションを確認する。メールでは仮想端末からリンク送信後、**同じ仮想端末**の受信箱でリンクを開いて同じ確認をする。リンクの再利用・期限切れ・ブラウザを閉じた場合の案内も確認する。
 
