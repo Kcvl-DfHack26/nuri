@@ -45,6 +45,12 @@ export function parseFaceMesh(objText: string): FaceMesh {
 /** MediaPipe's canonical face mesh. A malformed model throws when the app loads this module. */
 export const canonicalFaceMesh = parseFaceMesh(canonicalFaceModelObj);
 
+/**
+ * The canonical mesh's 468 vertices are MediaPipe's first 468 landmarks; the 10 after them are the
+ * irises, which the mesh does not cover.
+ */
+export const canonicalVertexCount = canonicalFaceMesh.textureCoordinates.length;
+
 function parseTextureCoordinate(fields: string[]): Point {
   const u = Number(fields[0]);
   const v = Number(fields[1]);

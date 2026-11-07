@@ -5,9 +5,7 @@ import { useMemo } from 'react';
 
 import type { Point } from '@/lib/face-landmarks';
 
-import { canonicalFaceMesh } from '@/lib/face-mesh';
-
-const vertexCount = canonicalFaceMesh.textureCoordinates.length;
+import { canonicalFaceMesh, canonicalVertexCount } from '@/lib/face-mesh';
 
 type FaceTextureProps = {
   /** Landmarks in view coordinates, in MediaPipe's order. Only the mesh's 468 vertices are used. */
@@ -36,12 +34,12 @@ export function FaceTexture({ points, texture, color, opacity }: FaceTextureProp
       })),
     [textureWidth, textureHeight],
   );
-  if (points.length < vertexCount) {
+  if (points.length < canonicalVertexCount) {
     return null;
   }
   return (
     <Vertices
-      vertices={points.slice(0, vertexCount)}
+      vertices={points.slice(0, canonicalVertexCount)}
       textures={texturePixels}
       indices={canonicalFaceMesh.triangles}
       opacity={opacity}

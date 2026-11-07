@@ -20,7 +20,7 @@ import { FaceTexture } from '@/components/face-texture';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { Text } from '@/components/ui/text';
 import { toViewPoints } from '@/lib/face-landmarks';
-import { canonicalFaceMesh } from '@/lib/face-mesh';
+import { canonicalVertexCount } from '@/lib/face-mesh';
 import { backOrHome } from '@/lib/navigation';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -152,9 +152,8 @@ export function FaceTrackingCheck() {
           {brow ? (
             <FaceTexture points={points} texture={brow} color={BROW_COLOR} opacity={BROW_OPACITY} />
           ) : null}
-          {/* MediaPipe's landmarks after the mesh's 468 vertices are the two irises. */}
           <Points
-            points={points.slice(canonicalFaceMesh.textureCoordinates.length)}
+            points={points.slice(canonicalVertexCount)}
             mode="points"
             color={rose}
             strokeWidth={4}
