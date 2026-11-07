@@ -14,6 +14,7 @@ import iconsEye from '../../assets/plan-a/icons/eye.svg';
 import iconsLash from '../../assets/plan-a/icons/lash.svg';
 import iconsLip from '../../assets/plan-a/icons/lip.svg';
 import iconsSparkle from '../../assets/plan-a/icons/sparkle.svg';
+import partsBrowStyles from '../../assets/plan-a/parts/brow-styles.jpg';
 import photosBrowCloseup from '../../assets/plan-a/photos/brow-closeup.jpg';
 import faceBare from '../../assets/plan-a/photos/face-bare.jpg';
 import faceMadeUp from '../../assets/plan-a/photos/face-made-up.jpg';
@@ -159,11 +160,29 @@ export type MakeupStep = {
   overlay: number;
 };
 
+/** ⑥ 商品詳細: the sheet opened from a product row on ⑤. */
+export type ProductInfo = {
+  brand: string;
+  /** Product name without the brand, shown under it. */
+  title: string;
+  price: string;
+  colors: { name: string; hex: string }[];
+  /** Index into `colors` that the sheet opens with. */
+  initialColor: number;
+  ingredientCount: number;
+  freeFrom: string[];
+  /** Key ingredients with the Plan A dot color class. */
+  ingredients: { name: string; role: string; dot: string }[];
+};
+
 export type Product = {
+  id: string;
   name: string;
   detail: string;
   image: number;
   purchasable: boolean;
+  /** Only products with Plan A detail data open ⑥. */
+  info?: ProductInfo;
 };
 
 export type Recipe = {
@@ -252,12 +271,35 @@ export const recipes: Recipe[] = [
       productCount: 6,
       products: [
         {
+          id: 'celane-brow-pencil',
           name: 'CELANE 極細アイブロウペンシル',
           detail: '眉・モカブラウン',
           image: detailProductBrowPencil,
           purchasable: false,
+          info: {
+            brand: 'CELANE',
+            title: '極細アイブロウペンシル',
+            price: '¥1,320',
+            // Plan A names only the selected shade; the others are sample names.
+            colors: [
+              { name: '01 ライトブラウン', hex: '#B48A6A' },
+              { name: '02 ナチュラルブラウン', hex: '#9A6B4F' },
+              { name: '03 モカブラウン', hex: '#7A5236' },
+              { name: '04 ダークブラウン', hex: '#5A3A26' },
+              { name: '05 ブラウンブラック', hex: '#3E2A20' },
+            ],
+            initialColor: 2,
+            ingredientCount: 18,
+            freeFrom: ['アルコールフリー', '無香料', 'パラベンフリー'],
+            ingredients: [
+              { name: 'トコフェロール', role: '保湿・酸化を防ぐ', dot: 'bg-pastel-sky' },
+              { name: 'シリカ', role: '描き心地をなめらかに', dot: 'bg-pastel-lilac' },
+              { name: '酸化鉄', role: '色をつける', dot: 'bg-pastel-peach' },
+            ],
+          },
         },
         {
+          id: 'mousse-cheek',
           name: 'ムースチーク',
           detail: 'チーク・コーラル',
           image: detailProductCheek,
@@ -306,6 +348,98 @@ export const recipes: Recipe[] = [
 
 export function findRecipe(id: string) {
   return recipes.find((recipe) => recipe.id === id);
+}
+
+export function findProduct(id: string) {
+  return recipes
+    .flatMap((recipe) => recipe.detail?.products ?? [])
+    .find((product) => product.id === id);
+}
+
+/** ③ 部位別一覧 filter chips. `round` also marks the card with the 丸顔におすすめ badge. */
+export type StyleFilter = 'round' | 'beginner' | 'natural';
+
+export const styleFilters: { value: StyleFilter; label: string }[] = [
+  { value: 'round', label: '丸顔におすすめ' },
+  { value: 'beginner', label: '初心者OK' },
+  { value: 'natural', label: 'ナチュラル' },
+];
+
+export type PartStyle = {
+  id: string;
+  name: string;
+  caption: string;
+  /** Cell of the Plan A sprite that shows this style. */
+  crop: PhotoCrop;
+  filters: StyleFilter[];
+  /** Recipe opened from ③; styles without one are catalog previews. */
+  recipeId?: string;
+};
+
+const browCell = (column: number, row: number): PhotoCrop => ({
+  width: '200%',
+  height: '300%',
+  left: `${-100 * column}%`,
+  top: `${-100 * row}%`,
+});
+
+/**
+ * ③ 部位別一覧: Plan A designs only the brow list. Plan A shows the 丸顔におすすめ badge on
+ * 上がり眉; the beginner and natural assignments are sample data.
+ */
+export const partStyles: Partial<Record<PartId, { photo: number; styles: PartStyle[] }>> = {
+  brow: {
+    photo: partsBrowStyles,
+    styles: [
+      {
+        id: 'straight-flat',
+        name: '平行眉',
+        caption: 'やさしく若見え',
+        crop: browCell(0, 0),
+        filters: ['beginner', 'natural'],
+      },
+      {
+        id: 'soft-arch',
+        name: '微アーチ眉',
+        caption: '自然で垢抜け',
+        crop: browCell(1, 0),
+        filters: ['beginner', 'natural'],
+        recipeId: 'fox',
+      },
+      {
+        id: 'arch',
+        name: 'アーチ眉',
+        caption: '女性らしく上品な',
+        crop: browCell(0, 1),
+        filters: [],
+      },
+      {
+        id: 'straight',
+        name: 'ストレート眉',
+        caption: '知的でクール',
+        crop: browCell(1, 1),
+        filters: ['beginner'],
+      },
+      {
+        id: 'rising',
+        name: '上がり眉',
+        caption: 'シャープで自信のある',
+        crop: browCell(0, 2),
+        filters: ['round'],
+      },
+      {
+        id: 'falling',
+        name: '下がり眉',
+        caption: '優しく穏やかな',
+        crop: browCell(1, 2),
+        filters: ['natural'],
+      },
+    ],
+  },
+};
+
+export function isPartId(value: string): value is PartId {
+  return Object.hasOwn(parts, value);
 }
 
 /** Plan A shares one camera frame and one finished look across the AR flow. */

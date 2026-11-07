@@ -1,29 +1,37 @@
-import { Button, Column, Icon, TextInput } from '@expo/ui';
+import type { ReactNode } from 'react';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
+import { Image } from 'expo-image';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
+import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Platform, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppleButton } from '@/components/apple-button';
-import { AuthButton } from '@/components/auth-button';
-import { Feedback } from '@/components/feedback';
 import { GoogleButton } from '@/components/google-button';
-import { NativeHost } from '@/components/native-host';
-import { Screen } from '@/components/screen';
 import { Text } from '@/components/ui/text';
 import { api, apiUrl, authClient } from '@/lib/api';
+import { backOrHome } from '@/lib/navigation';
 import { passkeysAvailable, signInWithPasskey } from '@/lib/passkeys';
-import { colors } from '@/theme/colors';
+import { cn } from '@/lib/utils';
+import { useTokenColor } from '@/theme/tokens';
 
-export function Account() {
-  const session = authClient.useSession();
-  const client = useQueryClient();
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const capabilities = useQuery({
+import faceMadeUp from '../../assets/plan-a/photos/face-made-up.jpg';
+import recipeCat from '../../assets/plan-a/recipes/cat.jpg';
+import recipeFox from '../../assets/plan-a/recipes/fox.jpg';
+import sparkleGold from '../../assets/plan-a/start/sparkle-gold.svg';
+import sparklePink from '../../assets/plan-a/start/sparkle-pink.svg';
+import sparkleRose from '../../assets/plan-a/start/sparkle-rose.svg';
+
+const SHADOW = '0px 8px 10px rgba(196, 61, 112, 0.25)';
+const PHOTO_SHADOW = '0px 10px 24px rgba(196, 61, 112, 0.18)';
+
+function useCapabilities() {
+  return useQuery({
     queryKey: ['auth-capabilities'],
     enabled: Boolean(apiUrl),
     queryFn: async ({ signal }) => {
@@ -34,6 +42,106 @@ export function Account() {
       return await response.json();
     },
   });
+}
+
+// Plan A ⑱ ログイン. The sign-in flows are the Better Auth ones; only the presentation follows Plan A.
+export function Account() {
+  const session = authClient.useSession();
+  const insets = useSafeAreaInsets();
+  const rose = useTokenColor('--color-accent-rose');
+  const capabilities = useCapabilities();
+
+  let actions: ReactNode;
+  if (!apiUrl) {
+    actions = <Notice>接続先が未設定です。セットアップ後にログインできます。</Notice>;
+  } else if (session.isPending || capabilities.isPending) {
+    actions = (
+      <View className="items-center gap-2 py-2">
+        <ActivityIndicator color={rose} accessibilityLabel="読み込み中" />
+        <Notice>ログインの準備をしています</Notice>
+      </View>
+    );
+  } else if (capabilities.isError || session.error) {
+    actions = (
+      <>
+        <Notice alert>
+          {capabilities.isError ? capabilities.error.message : 'アカウントを確認できませんでした。'}
+        </Notice>
+        <PillButton
+          tone="outline"
+          label="もう一度試す"
+          onPress={() => {
+            void (capabilities.isError ? capabilities.refetch() : session.refetch());
+          }}
+        />
+      </>
+    );
+  } else if (session.data) {
+    actions = (
+      <PillButton
+        tone="rose"
+        label="タイムラインに戻る"
+        onPress={() => {
+          router.replace('/timeline');
+        }}
+      />
+    );
+  } else {
+    actions = <SignInOptions capabilities={capabilities.data} />;
+  }
+
+  return (
+    <View
+      className="flex-1 bg-white"
+      style={{
+        backgroundImage: 'linear-gradient(to bottom, #fff0f5 0%, #ffffff 55%, #ffffff 100%)',
+      }}
+    >
+      <StatusBar style="dark" />
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={{
+          flexGrow: 1,
+          justifyContent: 'center',
+          paddingTop: insets.top + 24,
+          paddingBottom: insets.bottom + 24,
+          paddingHorizontal: 24,
+        }}
+      >
+        <Collage />
+        <View className="mt-[22px] items-center gap-1.5">
+          <Text
+            accessibilityRole="header"
+            className="text-center font-maru-black text-[52px] leading-[72px] text-accent-rose"
+          >
+            nuri
+          </Text>
+          <Text className="text-center font-maru-bold text-heading text-ink-primary">
+            あの子のメイクをわたしの顔で
+          </Text>
+        </View>
+        <View className="mt-[27px] gap-2.5">
+          {actions}
+          {session.data ? null : (
+            // Plan A draws this link in light blue; ink-secondary keeps it readable (WCAG AA) on white.
+            <LinkButton label="ゲストで参加" className="text-ink-secondary" onPress={backOrHome} />
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function SignInOptions({
+  capabilities,
+}: {
+  capabilities: NonNullable<ReturnType<typeof useCapabilities>['data']>;
+}) {
+  const client = useQueryClient();
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
   const login = useMutation({
     mutationFn: async (method: 'google' | 'apple' | 'passkey' | 'email') => {
       if (method === 'passkey') {
@@ -61,7 +169,7 @@ export function Account() {
         return;
       }
       const result = await authClient.signIn.social({
-        provider: capabilities.data?.emulated ? `emulate-${method}` : method,
+        provider: capabilities.emulated ? `emulate-${method}` : method,
         callbackURL: Linking.createURL('/'),
       });
       if (result.error) {
@@ -76,152 +184,284 @@ export function Account() {
       // Dismissing the OS login browser is cancellation, not a successful login.
       if (current.data) {
         client.clear();
-        router.replace('/timeline');
+        // Return to the screen that asked for login.
+        backOrHome();
       }
     },
   });
-  if (!apiUrl) {
-    return <Feedback fullScreen message="接続先が未設定です。セットアップ後にログインできます。" />;
-  }
-  if (session.isPending || capabilities.isPending) {
-    return <Feedback fullScreen loading message="ログインの準備をしています" />;
-  }
-  if (capabilities.isError) {
-    return (
-      <Feedback
-        fullScreen
-        message={capabilities.error.message}
-        onRetry={() => {
-          void capabilities.refetch();
-        }}
-      />
-    );
-  }
-  if (session.error) {
-    return (
-      <Feedback
-        fullScreen
-        message="アカウントを確認できませんでした。"
-        onRetry={() => {
-          void session.refetch();
-        }}
-      />
-    );
-  }
+  const canSend = !login.isPending && email.trim().includes('@');
+  const sendLink = () => {
+    if (canSend) {
+      login.mutate('email');
+    }
+  };
   return (
-    <Screen>
-      <Text className="text-muted-foreground">
-        投稿やいいねを利用するにはログインしてください
-        初めての方は同じ操作でアカウントを作成できます
-      </Text>
-      {session.data ? (
-        <NativeHost matchContents={{ vertical: true }}>
-          <Button
-            label="タイムラインに戻る"
-            onPress={() => {
-              router.replace('/timeline');
-            }}
-          />
-        </NativeHost>
-      ) : (
-        <View style={{ gap: 28 }}>
-          <View style={{ gap: 12 }}>
-            {capabilities.data?.apple ? (
-              <AppleButton
-                disabled={login.isPending}
-                onPress={() => {
-                  login.mutate('apple');
-                }}
-              />
-            ) : null}
-            {capabilities.data?.google ? (
-              <GoogleButton
-                disabled={login.isPending}
-                onPress={() => {
-                  login.mutate('google');
-                }}
-              />
-            ) : null}
-            <NativeHost matchContents={{ vertical: true }}>
-              <AuthButton
-                label="パスキーでログイン"
-                icon={Icon.select({
-                  ios: 'person.badge.key.fill',
-                  android: import('@expo/material-symbols/passkey.xml'),
-                })}
-                disabled={login.isPending || !passkeysAvailable}
-                onPress={() => {
-                  login.mutate('passkey');
-                }}
-              />
-            </NativeHost>
-          </View>
-          {capabilities.data?.email ? (
-            <View style={{ gap: 12 }}>
-              <Text className="font-semibold">メールでログイン</Text>
-              <NativeHost matchContents={{ vertical: true }}>
-                <Column spacing={16} style={{ width: '100%' }}>
-                  <TextInput
-                    accessibilityLabel="メールアドレス"
-                    placeholder="メールアドレス"
-                    keyboardType="email-address"
-                    autoComplete="email"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    style={{
-                      width: '100%',
-                      padding: 16,
-                      backgroundColor: colors.card,
-                      borderRadius: 12,
-                    }}
-                    onChangeText={(value) => {
-                      setEmail(value);
-                      setSent(false);
-                    }}
-                    editable={!login.isPending}
-                  />
-                  <AuthButton
-                    label={login.isPending ? '処理中' : 'ログインリンクを送信'}
-                    icon={Icon.select({
-                      ios: 'envelope',
-                      android: import('@expo/material-symbols/mail.xml'),
-                    })}
-                    disabled={login.isPending || !email.trim().includes('@')}
-                    onPress={() => {
-                      login.mutate('email');
-                    }}
-                  />
-                </Column>
-              </NativeHost>
-            </View>
-          ) : null}
-        </View>
-      )}
-      {sent ? (
-        <Text accessibilityLiveRegion="polite">
-          メールを送信しました。10分以内に、この端末でリンクを開いてください。
-        </Text>
-      ) : null}
-      {!passkeysAvailable ? (
-        <Text className="text-caption text-muted-foreground">
-          この環境ではパスキーを利用できません。ほかの方法でログインしてください。
-        </Text>
-      ) : null}
-      {login.error ? <Feedback message={login.error.message} /> : null}
-      {capabilities.data?.emulated ? (
-        <Text className="text-caption text-muted-foreground">
-          サンプル環境ではテスト用アカウントとメール受信箱を使用します
-        </Text>
-      ) : null}
-      <NativeHost matchContents={{ vertical: true }}>
-        <Button
-          label="タイムラインを見る"
-          variant="outlined"
+    <>
+      {capabilities.apple ? (
+        <AppleButton
+          disabled={login.isPending}
           onPress={() => {
-            router.replace('/timeline');
+            login.mutate('apple');
           }}
         />
-      </NativeHost>
-    </Screen>
+      ) : null}
+      {capabilities.google ? (
+        <GoogleButton
+          disabled={login.isPending}
+          onPress={() => {
+            login.mutate('google');
+          }}
+        />
+      ) : null}
+      {capabilities.email && emailOpen ? (
+        <>
+          <EmailInput
+            value={email}
+            editable={!login.isPending}
+            onChange={(value) => {
+              setEmail(value);
+              setSent(false);
+            }}
+            onSubmit={sendLink}
+          />
+          <PillButton
+            tone="rose"
+            label={login.isPending ? '処理中' : 'ログインリンクを送信'}
+            disabled={!canSend}
+            onPress={sendLink}
+          />
+        </>
+      ) : null}
+      {capabilities.email && !emailOpen ? (
+        <PillButton
+          tone="rose"
+          label="メールアドレスで続ける"
+          disabled={login.isPending}
+          onPress={() => {
+            setEmailOpen(true);
+          }}
+        />
+      ) : null}
+      {sent ? (
+        <Notice live>メールを送信しました。10分以内に、この端末でリンクを開いてください。</Notice>
+      ) : null}
+      {login.error ? <Notice alert>{login.error.message}</Notice> : null}
+      {passkeysAvailable ? (
+        <LinkButton
+          label="パスキーでログイン"
+          className="text-accent-rose"
+          disabled={login.isPending}
+          onPress={() => {
+            login.mutate('passkey');
+          }}
+        />
+      ) : null}
+      {capabilities.emulated ? (
+        <Notice>サンプル環境ではテスト用アカウントとメール受信箱を使用します</Notice>
+      ) : null}
+    </>
+  );
+}
+
+// Three tilted sample photos with sparkles, positioned on Plan A's 390pt-wide canvas.
+function Collage() {
+  return (
+    <View className="h-[300px] w-[390px] self-center">
+      <CollagePhoto
+        source={recipeFox}
+        left={33.84}
+        top={47.39}
+        width={140}
+        height={180}
+        tilt={-8}
+      />
+      <CollagePhoto
+        source={recipeCat}
+        left={222.79}
+        top={46.87}
+        width={140}
+        height={180}
+        tilt={8}
+      />
+      <CollagePhoto source={faceMadeUp} left={115} top={20} width={160} height={214} tilt={0} />
+      <Sparkle source={sparkleRose} left={40} top={40} size={20} />
+      <Sparkle source={sparkleGold} left={340} top={250} size={22} />
+      <Sparkle source={sparklePink} left={70} top={280} size={14} />
+      <Sparkle source={sparklePink} left={300} top={20} size={14} />
+    </View>
+  );
+}
+
+function CollagePhoto({
+  source,
+  left,
+  top,
+  width,
+  height,
+  tilt,
+}: {
+  source: number;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  tilt: number;
+}) {
+  return (
+    <View
+      className="absolute rounded-[22px] bg-white p-[5px]"
+      style={{
+        left,
+        top,
+        width,
+        height,
+        boxShadow: PHOTO_SHADOW,
+        transform: [{ rotate: `${tilt}deg` }],
+      }}
+    >
+      <Image
+        accessible={false}
+        source={source}
+        contentFit="cover"
+        style={{ flex: 1, borderRadius: 17 }}
+      />
+    </View>
+  );
+}
+
+function Sparkle({
+  source,
+  left,
+  top,
+  size,
+}: {
+  source: number;
+  left: number;
+  top: number;
+  size: number;
+}) {
+  return (
+    <Image
+      accessible={false}
+      source={source}
+      style={{ position: 'absolute', left, top, width: size, height: size }}
+    />
+  );
+}
+
+function PillButton({
+  label,
+  tone,
+  disabled = false,
+  onPress,
+}: {
+  label: string;
+  tone: 'rose' | 'outline';
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className={cn(
+        'min-h-[52px] items-center justify-center rounded-full px-[18px] py-2 active:opacity-80',
+        tone === 'rose' ? 'bg-accent-rose' : 'border-[1.5px] border-black/15 bg-white',
+        disabled && 'opacity-50',
+      )}
+      style={tone === 'rose' ? { boxShadow: SHADOW } : undefined}
+    >
+      <Text
+        className={cn(
+          'text-center font-maru-bold text-action',
+          tone === 'rose' ? 'text-white' : 'text-ink-primary',
+        )}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function LinkButton({
+  label,
+  className,
+  disabled = false,
+  onPress,
+}: {
+  label: string;
+  className: string;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      className={cn(
+        'min-h-12 items-center justify-center self-center px-4 active:opacity-60',
+        disabled && 'opacity-50',
+      )}
+    >
+      <Text className={cn('text-center font-maru-bold text-label', className)}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function EmailInput({
+  value,
+  editable,
+  onChange,
+  onSubmit,
+}: {
+  value: string;
+  editable: boolean;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+}) {
+  const placeholder = useTokenColor('--color-ink-secondary');
+  return (
+    <TextInput
+      accessibilityLabel="メールアドレス"
+      placeholder="メールアドレス"
+      placeholderTextColor={placeholder}
+      keyboardType="email-address"
+      autoComplete="email"
+      autoCapitalize="none"
+      autoCorrect={false}
+      returnKeyType="send"
+      value={value}
+      editable={editable}
+      onChangeText={onChange}
+      onSubmitEditing={onSubmit}
+      className="min-h-[52px] rounded-full border-[1.5px] border-line-soft bg-white px-[18px] py-3 font-maru text-action text-ink-primary"
+    />
+  );
+}
+
+function Notice({
+  children,
+  alert = false,
+  live = false,
+}: {
+  children: ReactNode;
+  alert?: boolean;
+  live?: boolean;
+}) {
+  return (
+    <Text
+      accessibilityRole={alert ? 'alert' : undefined}
+      accessibilityLiveRegion={live || alert ? 'polite' : undefined}
+      className={cn(
+        'text-center font-maru text-label',
+        alert ? 'text-accent-rose' : 'text-ink-secondary',
+      )}
+    >
+      {children}
+    </Text>
   );
 }

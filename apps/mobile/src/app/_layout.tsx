@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { useColorScheme } from 'react-native';
 
+import { Launch } from '@/components/launch';
 import { PreferencesProvider } from '@/lib/preferences';
 import { stackOptions } from '@/theme/navigation';
 
@@ -20,12 +21,40 @@ function Navigation() {
     <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack screenOptions={stackOptions}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="account" options={{ title: 'ログイン' }} />
+        <Stack.Screen name="account" options={{ title: 'ログイン', headerShown: false }} />
         <Stack.Screen name="users/[id]" options={{ title: 'プロフィール' }} />
         <Stack.Screen name="settings" options={{ title: '設定' }} />
         <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/steps" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/finish" options={{ headerShown: false }} />
+        <Stack.Screen name="parts/[part]" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="products/[id]"
+          options={{
+            headerShown: false,
+            presentation: 'formSheet',
+            // Plan A ⑥ is about half the screen. ProductSheet sets its own height (taller for
+            // large text) and the sheet follows it.
+            sheetAllowedDetents: 'fitToContents',
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 28,
+          }}
+        />
+        {/* Plan A ④ draws its own sheet header; ④-4 covers the sheet so back returns to it. */}
+        <Stack.Screen
+          name="import/index"
+          options={{
+            headerShown: false,
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.65, 1],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 28,
+          }}
+        />
+        <Stack.Screen
+          name="import/steps"
+          options={{ headerShown: false, presentation: 'fullScreenModal' }}
+        />
         <Stack.Screen name="recipes/[id]/compare" options={{ headerShown: false }} />
         <Stack.Screen
           name="compose"
@@ -63,7 +92,7 @@ export default function RootLayout() {
     ZenMaruGothic_900Black,
   });
   if (!fontsLoaded && !fontError) {
-    return null;
+    return <Launch />;
   }
   return (
     <QueryClientProvider client={client}>
