@@ -13,8 +13,8 @@
     "build": "bun build src/index.ts src/db/migrate.ts --target=node --outdir=dist --external=pg --external=better-auth --external=@better-auth/expo --external=@better-auth/passkey",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "bun test src/app.test.ts src/platform/env.test.ts",
-    "test:integration": "bun test src/auth.integration.test.ts",
+    "test": "bun test --path-ignore-patterns='**/*.integration.test.ts' ./src",
+    "test:integration": "bun test .integration.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts",
     "db:seed": "node --env-file-if-exists=.env --import tsx src/seed.ts"

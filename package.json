@@ -9,6 +9,8 @@
   "type": "module",
   "scripts": {
     "dev": "bun run compose up --build api metro",
+    "dev:devices": "node scripts/devices.ts",
+    "devices": "npx --yes expo-device-hub@0.21.0 --host 127.0.0.1",
     "dev:mobile": "bun run compose up --build metro",
     "dev:api": "bun run compose up --build api",
     "format": "oxfmt --write .",
@@ -16,7 +18,7 @@
     "lint": "oxlint --type-aware --deny-warnings && eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit && turbo run typecheck",
     "test": "bun test ./scripts && turbo run test",
-    "test:integration": "bun run compose run --rm api bun run --cwd apps/api test:integration",
+    "test:integration": "bun run compose run --rm --no-deps api bun run --cwd apps/api test:integration",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run deadcode",
     "deadcode": "fallow dead-code",
     "db:generate": "bun run --cwd apps/api db:generate",

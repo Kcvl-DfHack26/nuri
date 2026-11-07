@@ -1,0 +1,27 @@
+# Host and virtual devices share Portless HTTPS origins. Internal addresses stay unchanged.
+services:
+  api:
+    environment:
+      BETTER_AUTH_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
+      TRUSTED_ORIGINS: com.kcvl.nuri://,${DEVICE_EXPO_ORIGIN:?Run bun run dev:devices first}
+      PASSKEY_ORIGINS: ${DEVICE_METRO_ORIGIN:?Run bun run dev:devices first}
+      DEV_METRO_ORIGIN: ${DEVICE_METRO_ORIGIN:?Run bun run dev:devices first}
+      GOOGLE_EMULATOR_PUBLIC_URL: ${DEVICE_GOOGLE_ORIGIN:?Run bun run dev:devices first}
+      APPLE_EMULATOR_PUBLIC_URL: ${DEVICE_APPLE_ORIGIN:?Run bun run dev:devices first}
+  metro:
+    environment:
+      EXPO_PUBLIC_API_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
+      EXPO_PACKAGER_PROXY_URL: ${DEVICE_METRO_ORIGIN:?Run bun run dev:devices first}
+    command: bun run --cwd apps/mobile start --dev-client
+  google:
+    environment:
+      BETTER_AUTH_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
+      EMULATE_PUBLIC_URL: ${DEVICE_GOOGLE_ORIGIN:?Run bun run dev:devices first}
+  apple:
+    environment:
+      BETTER_AUTH_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
+      EMULATE_PUBLIC_URL: ${DEVICE_APPLE_ORIGIN:?Run bun run dev:devices first}
+  mail:
+    environment:
+      BETTER_AUTH_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
+      EMULATE_PUBLIC_URL: ${DEVICE_MAIL_ORIGIN:?Run bun run dev:devices first}

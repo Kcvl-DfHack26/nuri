@@ -14,12 +14,13 @@ Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel Emul
 
 ```sh
 npm install --global portless@0.16.0
-git worktree add -b codex/my-change ../my-change HEAD
-cd ../my-change
+# 例: Issue 123の作業ブランチを用意してから追加
+git worktree add ../nuri-123-example codex/123-example
+cd ../nuri-123-example
 sh scripts/worktree-init.sh
 ```
 
-POSIXの初期化処理が実パス由来のID・Compose名・mount先をルートのGit管理外 `.env` へ保存する。branch変更やdetached HEADでもIDは変わらない。checkoutとGit共通ディレクトリをホストと同じ絶対パスでmountするため、linked worktreeでもGitが動く。`node_modules`、ルートの生成 `.env`、DB volumeは他worktreeからコピーしない。
+Composeはディレクトリ名をproject名として使う。メインのcheckoutは `nuri`、作業用は `nuri-<issue>-<topic>` とし、ホスト内で一意にする。小文字・数字・ハイフンのみ、先頭・末尾は英数字、63文字以内とする。別の親ディレクトリでも同じ名前ならコンテナ・ネットワーク・volumeを共有してしまう。POSIXの初期化処理はmount先をルートのGit管理外 `.env` へ保存する。checkoutとGit共通ディレクトリをホストと同じ絶対パスでmountするため、linked worktreeでもGitが動く。`node_modules`、ルートの生成 `.env`、DB volumeは他worktreeからコピーしない。
 
 ### 起動・接続・停止
 
@@ -34,12 +35,12 @@ PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 
 Composeが依存導入・未作成のアプリenv生成・PostgreSQLのhealthcheck・migrationを行う。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432。Google／Apple／メールのEmulateもAPIの依存として起動する。PostgreSQLはホストへ公開せず、PortlessがHTTPサービスにloopback上の空きポートを割り当てる。
 
-| サービス    | ホストからのURL                                           |
-| ----------- | --------------------------------------------------------- |
-| API         | `https://api.expo-hono-opentofu-starter-<ID>.localhost`   |
-| Metro / Web | `https://metro.expo-hono-opentofu-starter-<ID>.localhost` |
+| サービス    | ホストからのURL                                |
+| ----------- | ---------------------------------------------- |
+| API         | `https://api.nuri-<issue>-<topic>.localhost`   |
+| Metro / Web | `https://metro.nuri-<issue>-<topic>.localhost` |
 
-URL形式は `https://<service>.<repo>-<worktree ID>.localhost`。ホストのブラウザ用であり、iPhone/Android実機は後述のHTTPSトンネルを使う。API・Metroの内部通信は引き続きHTTPで、TLS終端はホストのPortlessが担当する。
+URL形式は `https://<service>.<project>.localhost`。ホストと、端末用構成を使うSimulator／Emulator向けであり、iPhone／Android実機は後述のHTTPSトンネルを使う。API・Metroの内部通信は引き続きHTTPで、TLS終端はホストのPortlessが担当する。
 
 実際のURLはPortlessが表示する。ホスト公開ポートは `portless compose port api 8080` / `portless compose port metro 8081` で確認できる。Portlessはprojectごとに割当を保持し、複数worktree間の衝突を避ける。開発では `.env` の空の `BETTER_AUTH_URL` をComposeのAPI originで補い、Metro originも許可originへ追加する。
 
@@ -74,19 +75,55 @@ bun run setup
 bun run dev          # API・Metro（依存DBとmigrationを含む）
 bun run dev:api      # APIとDB
 bun run dev:mobile   # Metroのみ。DB不要
+bun run dev:devices  # Simulator／Emulatorの開発ビルド用
+bun run devices      # ホストのExpo Device Hub
 bun run dev:go       # API・DBとExpo Go用トンネル付きMetro
 bun run services:up  # API・DB・Metroをバックグラウンド起動
 bun run db:migrate
 bun run db:seed      # 4ユーザーの画像・8投稿・いいね。既存の利用者データは保持
-bun run test:integration
+bun run test:integration # 起動済みのDBを使用
 bun run services:down
 ```
 
-旧来のホスト実行モードと `compose.host.yaml`、独自のポート解決・プロセス監視スクリプトは廃止した。同じcheckoutのCompose project名・DB volume名は維持する。旧ホストプロセスが残っている場合は、そのターミナルでCtrl+Cしてから切り替える。
+統合テストの前にAPIを起動する。テストコマンドは起動中のDBを使い、端末用構成で動いているAPIやEmulateを通常構成で作り直さない。
+
+### 旧ハッシュ名から移行する
+
+初期化を実行する前に、旧ルート `.env` の `COMPOSE_PROJECT_NAME` を控える。旧projectを起動したホストと同じPortless proxyを選び、控えた名前で対象だけを止める。
+
+```sh
+old_project='expo-hono-opentofu-starter-<旧ID>'
+PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose -p "$old_project" --profile '*' down
+sh scripts/worktree-init.sh
+```
+
+新しい名前では空のローカルDBで開始する。旧volumeとアプリの `.env`・secretは保持し、データを自動移行しない。`down -v` や共有proxyの停止は不要。アプリenvに旧URLを明示していた場合は新URLに直す。端末用設定を再生成し、必要に応じてAndroidのhostsを更新して再ログインする。旧ルートenvが残っている間、`dev:devices` は旧projectを作り直さずに終了する。
 
 ## 2. iPhone / Android から開く
 
-### まずExpo Goでショーケース
+### SimulatorとEmulatorで開発する
+
+iOS Simulator用は `development-simulator`、Android Emulator用は `development` で開発ビルドを作る。クラウドビルドは手動で起動する。ローカルではSDKを準備し、`apps/mobile` で `bunx expo run:ios --no-bundler --device` または `bunx expo run:android --no-bundler --device SERIAL` を使える。previewはMetro接続用の開発ビルドと区別する。
+
+worktreeルートから実行する。
+
+```sh
+bun run dev:devices
+# 別のホストターミナル
+bun run devices
+```
+
+`dev:devices` は選択したPortlessの公開HTTPS URLから、Git管理外の `.env.devices` と `.env.devices.hosts` を生成する。既存のアプリenvは上書きしない。別のHTTPS proxyを使う場合は、起動・CA取得・停止の全コマンドに同じ `PORTLESS_STATE_DIR` をexportする。HTTP proxyしか選ばれていない場合はコンテナの再作成前に停止する。
+
+- **iOS Simulator:** `xcrun simctl list devices available` で対象を選び、`xcrun simctl keychain SIMULATOR_UDID add-root-cert "${PORTLESS_STATE_DIR:-$HOME/.portless}/ca.pem"` を実行する。macOSの名前解決は同じproxyを選んで `portless hosts sync` で同期する。
+- **Android Emulator:** `adb devices -l` で対象serialを確認し、`adb -s SERIAL push "${PORTLESS_STATE_DIR:-$HOME/.portless}/ca.pem" /sdcard/Download/portless-ca.crt` で公開CAを送る。Emulatorのセキュリティ設定からCA証明書として登録する。ユーザーCAを信頼するのはnuriのdebugビルドのlocalhostのみ。この設定を使うには開発ビルドを作り直す。
+- **Androidの名前解決:** AOSPまたはGoogle APIsの開発用AVDを `emulator -avd AVD_NAME -writable-system -no-snapshot` で起動する。対象serialだけで `adb -s SERIAL root` と `adb -s SERIAL remount` を行い、`adb -s SERIAL pull /system/etc/hosts .env.devices.android-hosts` で既存hostsを取得する。remountがverity解除と再起動を求める場合は、そのAVDに限り `adb -s SERIAL disable-verity` と `adb -s SERIAL reboot` の後でroot／remountをやり直す。既存行を残して `.env.devices.hosts` の自project分をマージし、`adb -s SERIAL push .env.devices.android-hosts /system/etc/hosts` で戻す。最後に `adb -s SERIAL reverse tcp:443 tcp:443` を実行する（標準以外はhelperが表示したポートを使う）。AVDを終了したらhosts、端末を再起動したら転送を再確認する。
+
+HubはXcode／Android SDKがあるOSで起動する。WindowsではComposeはWSL2、HubとADBはWindows側で使う。Dev ClientのEnter URLにはhelperが表示するMetroのHTTPS URLを入れる。MetroがFast Refreshを担当し、Hubは画面表示と操作を担当する。CAの秘密鍵は端末へコピーしない。
+
+終了時はHubをCtrl+C、サービスは `bun run services:down` で自worktreeだけを止める。ADBの転送を共有する他のworktreeがないときだけ、対象serialの `adb -s SERIAL reverse --remove tcp:443` で転送を外す。通常構成に戻すには `bun run dev` を使う。端末用overrideは明示した起動時だけ読み込まれる。
+
+### Expo Goで実機を確認する
 
 同じworktreeで起動中のMetroがあればCtrl+Cで止め、ホストのworktreeルートから実行する。
 
@@ -208,7 +245,7 @@ gh secret set EXPO_TOKEN --env preview
 2. ExpoのEnvironment Variablesで `EXPO_PUBLIC_API_URL` をdevelopment/preview/productionそれぞれに設定する。公開URLなのでvisibilityはplain text。previewは共有staging API、productionは本番API。ローカル `.env` はクラウドへアップロードしない。未設定なら接続案内が表示され、SNS機能は利用できない。
 3. GitHubのpreview Environmentへtokenを登録し、PRコメントまたはActionsから配信する。
 
-`apps/mobile/.eas/workflows/native-builds.yml` は手動でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら `ios_profile=development` / `android_profile=development` を選ぶ。iOS実機用にはApple署名が必要。本番は従来どおり、APIデプロイ成功後だけ `production-update.yml` を呼び出す。両方ともExpo Workflows側の実行となる。
+`apps/mobile/.eas/workflows/native-builds.yml` は手動でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら `ios_profile=development-simulator`（Simulator）または `development`（実機）、Androidは `android_profile=development` を選ぶ。iOS実機用にはApple署名が必要。本番は従来どおり、APIデプロイ成功後だけ `production-update.yml` を呼び出す。両方ともExpo Workflows側の実行となる。
 
 Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出は自動実行しない。初期設定のビルド・端末確認記録は [検証](testing.md) を参照する。
 

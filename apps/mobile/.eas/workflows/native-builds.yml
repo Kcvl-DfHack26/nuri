@@ -8,8 +8,8 @@ on:
     inputs:
       ios_profile:
         type: choice
-        description: Simulator needs no Apple Developer membership.
-        options: [simulator, development]
+        description: Simulator profiles need no Apple Developer membership.
+        options: [simulator, development-simulator, development]
         default: simulator
         required: true
       android_profile:

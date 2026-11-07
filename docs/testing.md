@@ -4,13 +4,23 @@
 
 ```sh
 bun run check
-bun run db:migrate
+bun run dev:api      # 別ターミナルで起動し、migration完了を待つ
 bun run test:integration
 bun run doctor
 bun run export:mobile
 ```
 
-integration testは専用の一意なメールアドレスを使い、終了時にそのユーザーだけを削除する。開発/CI用DBに対して実行する。
+APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。統合テストは一意なメールアドレスを使い、終了時にそのユーザーだけを削除する。開発・CI用DBに対して実行する。
+
+| 検査                | 確認すること                                                  |
+| ------------------- | ------------------------------------------------------------- |
+| ESLint・型・Bun     | workspace間の依存方向、環境設定、HTTP契約、Gitと起動CLIの境界 |
+| Bunと実PostgreSQL   | migration、認証・認可、保存された状態                         |
+| Jest・jest-expo     | ネイティブ境界を差し替えた画面の状態と操作                    |
+| 実Compose・Portless | 各構成の解決、起動、HTTPS、worktree間の分離と永続化           |
+| 開発ビルド          | 仮想端末でのTLS、Metro、Fast Refresh、認証の戻り先            |
+
+PRに確認したSHA・実行コマンドと環境・結果・未確認項目を記録する。過去の検証記録には旧project名や当時の構成を含む。
 
 ```sh
 tofu fmt -check -recursive infra
