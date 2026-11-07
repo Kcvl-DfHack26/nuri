@@ -5,7 +5,7 @@ import { Image } from 'expo-image';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Alert, Platform, Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FaceScene } from '@/components/face-scene';
@@ -23,14 +23,6 @@ const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbol
 const MIC = Icon.select({ ios: 'mic', android: import('@expo/material-symbols/mic.xml') });
 const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/add.xml') });
 
-// Both entries ask before anything can be sent (#46). Declining sends nothing and stays on ⑫-1.
-function confirmUpload(onAccept: () => void) {
-  Alert.alert('動画をサーバーへ送信して解析します', undefined, [
-    { text: 'いいえ', style: 'cancel' },
-    { text: 'はい', onPress: onAccept },
-  ]);
-}
-
 // The system picker hands over only the chosen video, so no photo library permission is asked.
 async function pickVideo() {
   const result = await launchImageLibraryAsync({ mediaTypes: 'videos' });
@@ -38,10 +30,9 @@ async function pickVideo() {
   if (result.canceled || !video) {
     return;
   }
-  // Choosing the video is the send action; the URI stays on the device in the post's data.
-  confirmUpload(() => {
-    router.push({ pathname: '/post/creating', params: { video: video.uri } });
-  });
+  // The URI stays on the device in the post's data. Consent is asked where a video is first
+  // sent, which is not built yet (#81).
+  router.push({ pathname: '/post/creating', params: { video: video.uri } });
 }
 
 // Plan A ⑫-1 動画を撮る. The camera is not built; Plan A's still frame stands in and no
@@ -102,9 +93,7 @@ export function PostCamera() {
         <CameraAction
           label="録画をはじめる"
           onPress={() => {
-            confirmUpload(() => {
-              router.push('/post/recording');
-            });
+            router.push('/post/recording');
           }}
         >
           <View
