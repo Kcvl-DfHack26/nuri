@@ -79,6 +79,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   }
 
   private func stop() {
+    // A resumed camera must report its first state even when it matches the previous session.
+    lastStatus = nil
+    lastMessage = nil
     sessionQueue.async {
       if self.session.isRunning {
         self.session.stopRunning()
@@ -215,6 +218,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     }
     let latencyMs = capturedAt.map { (CACurrentMediaTime() - $0) * 1000 } ?? -1
     DispatchQueue.main.async {
+      guard self.active, self.window != nil else {
+        return
+      }
       self.setStatus("tracking", message: nil)
       self.onLandmarks([
         "points": points,
@@ -235,6 +241,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
 
   // Main thread. Only sends changes, so a steady state does not flood JavaScript.
   private func setStatus(_ status: String, message: String?) {
+    guard active, window != nil else {
+      return
+    }
     guard status != lastStatus || message != lastMessage else {
       return
     }

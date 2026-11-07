@@ -150,6 +150,9 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private fun stop() {
     cameraProvider?.unbind(*useCases)
     useCases = emptyArray()
+    // A resumed camera must report its first state even when it matches the previous session.
+    lastStatus = null
+    lastMessage = null
   }
 
   // Analysis thread.
@@ -281,6 +284,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val width = frameWidth.toDouble()
     val height = frameHeight.toDouble()
     post {
+      if (!active || !isAttachedToWindow) return@post
       setStatus("tracking")
       onLandmarks(mapOf("points" to points, "width" to width, "height" to height, "latencyMs" to latencyMs))
     }
@@ -288,6 +292,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
 
   // Main thread. Only sends changes, so a steady state does not flood JavaScript.
   private fun setStatus(status: String, message: String? = null) {
+    if (!active || !isAttachedToWindow) return
     if (status == lastStatus && message == lastMessage) return
     lastStatus = status
     lastMessage = message
