@@ -78,6 +78,18 @@ export function FaceTrackingCheck() {
   const [stats, setStats] = useState<Stats>();
   // Arrival times and delays of the last second of results.
   const samples = useRef<{ at: number; latencyMs: number }[]>([]);
+  const active = permission === 'granted' && focused;
+
+  useEffect(() => {
+    if (active) {
+      return () => {
+        setStatus(undefined);
+        setPoints([]);
+        setStats(undefined);
+        samples.current = [];
+      };
+    }
+  }, [active]);
 
   useEffect(() => {
     if (!FaceTracker) {
@@ -142,7 +154,7 @@ export function FaceTrackingCheck() {
 
   const cameraDenied = permission === 'denied' || status?.status === 'permissionDenied';
   const message = guidanceMessage(status, cameraDenied);
-  const tracking = status?.status === 'tracking';
+  const tracking = active && status?.status === 'tracking';
 
   return (
     <View
@@ -155,13 +167,22 @@ export function FaceTrackingCheck() {
       <StatusBar style="light" />
       {FaceTracker ? (
         <FaceTrackerView
-          active={permission === 'granted' && focused}
+          active={active}
           style={StyleSheet.absoluteFill}
           onLandmarks={(event) => {
-            handleLandmarks(event.nativeEvent);
+            if (active) {
+              handleLandmarks(event.nativeEvent);
+            }
           }}
           onStatus={(event) => {
-            setStatus(event.nativeEvent);
+            if (active) {
+              setStatus(event.nativeEvent);
+              if (event.nativeEvent.status !== 'tracking') {
+                setPoints([]);
+                setStats(undefined);
+                samples.current = [];
+              }
+            }
           }}
         />
       ) : null}
@@ -215,7 +236,7 @@ export function FaceTrackingCheck() {
         style={{ bottom: Math.max(insets.bottom, 12) + 8 }}
       >
         {/* Without the tracker or the camera nothing is drawn, so the switches would do nothing. */}
-        {FaceTracker && !cameraDenied ? (
+        {FaceTracker && tracking ? (
           <View className="flex-row flex-wrap gap-2">
             {OVERLAYS.map(({ part, label }) => (
               <OverlayToggle
