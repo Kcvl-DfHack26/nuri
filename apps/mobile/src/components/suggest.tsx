@@ -2,6 +2,12 @@ import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
+import {
+  CameraType,
+  launchCameraAsync,
+  launchImageLibraryAsync,
+  requestCameraPermissionsAsync,
+} from 'expo-image-picker';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
@@ -9,15 +15,18 @@ import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PhotoCrop } from '@/components/recipes';
+import type { BrowShape, FaceType } from '@/lib/face-diagnosis';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { arPhotos } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { diagnoseFace } from '@/lib/face-diagnosis';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
 import faceGuide from '../../assets/plan-a/suggest/face-guide.svg';
+import FaceTracker from '../../modules/face-tracker/src/FaceTrackerModule';
 
 const SCAN = Icon.select({
   ios: 'faceid',
@@ -42,21 +51,98 @@ const heroCrop: PhotoCrop = {
   top: '-9.75%',
 };
 
-// Plan A ⑬ 写真からメイク提案. Camera, photo picking and diagnosis are not built yet:
-// the hero shows a fixed sample photo and 前回の診断 opens the fixed sample result (⑭).
+type Result = { faceType: FaceType; brow: BrowShape | null; photo: string };
+
+// The photo's local URI is passed to ⑭ only to show it; it stays on the device.
+function openResult(result: Result) {
+  router.push({
+    pathname: '/diagnosis',
+    params: {
+      face: result.faceType,
+      photo: result.photo,
+      ...(result.brow ? { brow: result.brow } : {}),
+    },
+  });
+}
+
+async function takePhoto() {
+  const permission = await requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    return { error: 'カメラを使う許可がありません。設定から許可してください' };
+  }
+  return await launchCameraAsync({ mediaTypes: 'images', cameraType: CameraType.front });
+}
+
+async function diagnosePhoto(uri: string): Promise<Result | { message: string }> {
+  try {
+    const landmarks = await FaceTracker?.detectFaceAsync(uri);
+    const diagnosis = landmarks ? diagnoseFace(landmarks) : undefined;
+    if (!diagnosis) {
+      return { message: '顔が見つかりませんでした。顔全体が写った写真で試してください' };
+    }
+    if (diagnosis.kind === 'notFrontal') {
+      return { message: '正面を向いた写真で試してください' };
+    }
+    return { faceType: diagnosis.faceType, brow: diagnosis.brow, photo: uri };
+  } catch {
+    return { message: '写真を読み込めませんでした。別の写真で試してください' };
+  }
+}
+
+// Plan A ⑬ 写真からメイク提案. The photo is read on device by MediaPipe Face Landmarker and is
+// never sent anywhere. The last result is kept only while the app runs.
 export function Suggest() {
   const insets = useSafeAreaInsets();
   // The suggest tab stays mounted under other tabs; only claim the status bar while it is shown.
   const focused = useIsFocused();
   // On iOS the tab's safe area includes the tab bar; Android tabs already pad their content.
   const bottom = Platform.OS === 'ios' ? insets.bottom : 0;
-  const ink = useTokenColor('--color-ink-primary');
   const rose = useTokenColor('--color-accent-rose');
-  const surface = useTokenColor('--color-bg-surface');
+  const [photo, setPhoto] = useState<string>();
+  const [analyzing, setAnalyzing] = useState(false);
+  const [message, setMessage] = useState<string>();
+  const [last, setLast] = useState<Result>();
+
+  async function diagnose(source: 'camera' | 'library') {
+    if (analyzing) {
+      return;
+    }
+    setMessage(undefined);
+    try {
+      const picked =
+        source === 'camera'
+          ? await takePhoto()
+          : await launchImageLibraryAsync({ mediaTypes: 'images' });
+      if ('error' in picked) {
+        setMessage(picked.error);
+        return;
+      }
+      const uri = picked.assets?.[0]?.uri;
+      if (picked.canceled || !uri) {
+        return;
+      }
+      setPhoto(uri);
+      setAnalyzing(true);
+      const outcome = await diagnosePhoto(uri);
+      if ('message' in outcome) {
+        setMessage(outcome.message);
+      } else {
+        setLast(outcome);
+        openResult(outcome);
+      }
+    } catch {
+      setMessage('写真を用意できませんでした。もう一度お試しください');
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  const unavailable = FaceTracker ? undefined : '写真からの診断は開発ビルドで使えます';
+  const note = unavailable ?? message;
   return (
     <View className="flex-1 bg-white" style={{ paddingBottom: bottom + 48 }}>
       {focused ? <StatusBar style="dark" /> : null}
-      <Hero />
+      <Hero photo={photo} />
       <View className="absolute inset-x-0 top-0 items-center">
         <View
           className="w-full items-center px-4 pb-[24.5px]"
@@ -73,50 +159,114 @@ export function Suggest() {
             似合うメイクを見つける
           </Text>
         </View>
-        {/* Plan A's scanning label is decoration: nothing is analysed yet, so screen readers
-            hear only the hero's sample-photo label instead of a running status. */}
-        <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <Tag>
-            <SocialIcon name={SCAN} size={14} color={rose} />
-            <Text className="font-maru-bold text-label text-accent-rose">顔の形を見ています…</Text>
-          </Tag>
-        </View>
-      </View>
-      <View className="-mt-6 flex-row justify-center">
-        <Action label="写真から" accessibilityLabel="写真から診断（準備中）">
-          <View className="size-[52px] items-center justify-center rounded-full border border-black bg-bg-surface">
-            <SocialIcon name={PHOTO} size={24} color={ink} />
+        {analyzing ? (
+          <View accessible accessibilityLiveRegion="polite">
+            <Tag>
+              <SocialIcon name={SCAN} size={14} color={rose} />
+              <Text className="font-maru-bold text-label text-accent-rose">
+                顔の形を見ています…
+              </Text>
+            </Tag>
           </View>
-        </Action>
-        <Action label="カメラで診断" accessibilityLabel="カメラで診断（準備中）">
-          <View
-            className="size-[84px] items-center justify-center rounded-full bg-bg-surface"
-            style={{ boxShadow: '0px 8px 24px rgba(196, 61, 112, 0.14)' }}
+        ) : null}
+      </View>
+      {note ? (
+        <View className="mx-4 -mt-16 mb-10 rounded-2xl bg-white/90 px-4 py-2.5">
+          <Text
+            accessibilityRole={unavailable ? undefined : 'alert'}
+            className="text-center font-maru text-label text-ink-primary"
           >
-            <View className="size-[68px] items-center justify-center rounded-full bg-accent-rose">
-              <SocialIcon name={CAMERA} size={28} color={surface} />
-            </View>
-          </View>
-        </Action>
-        <Action
-          label="前回の診断"
-          accessibilityLabel="前回の診断（見本）"
-          onPress={() => {
-            router.push('/diagnosis');
-          }}
+            {note}
+          </Text>
+        </View>
+      ) : null}
+      <Controls
+        unavailable={Boolean(unavailable)}
+        busy={analyzing}
+        onDiagnose={(source) => {
+          void diagnose(source);
+        }}
+        onLast={
+          last
+            ? () => {
+                openResult(last);
+              }
+            : undefined
+        }
+      />
+    </View>
+  );
+}
+
+// Plan A's control row: 写真から, カメラで診断 and 前回の診断.
+function Controls({
+  unavailable,
+  busy,
+  onDiagnose,
+  onLast,
+}: {
+  unavailable: boolean;
+  busy: boolean;
+  onDiagnose: (source: 'camera' | 'library') => void;
+  onLast: (() => void) | undefined;
+}) {
+  const ink = useTokenColor('--color-ink-primary');
+  const surface = useTokenColor('--color-bg-surface');
+  const enabled = !unavailable && !busy;
+  const suffix = unavailable ? '（開発ビルドで使えます）' : '';
+  return (
+    <View className="-mt-6 flex-row justify-center">
+      <Action
+        label="写真から"
+        accessibilityLabel={`写真から診断${suffix}`}
+        onPress={
+          enabled
+            ? () => {
+                onDiagnose('library');
+              }
+            : undefined
+        }
+      >
+        <View className="size-[52px] items-center justify-center rounded-full border border-black bg-bg-surface">
+          <SocialIcon name={PHOTO} size={24} color={ink} />
+        </View>
+      </Action>
+      <Action
+        label="カメラで診断"
+        accessibilityLabel={`カメラで診断${suffix}`}
+        onPress={
+          enabled
+            ? () => {
+                onDiagnose('camera');
+              }
+            : undefined
+        }
+      >
+        <View
+          className="size-[84px] items-center justify-center rounded-full bg-bg-surface"
+          style={{ boxShadow: '0px 8px 24px rgba(196, 61, 112, 0.14)' }}
         >
-          <View className="size-[52px] items-center justify-center rounded-full border border-black bg-bg-surface">
-            <SocialIcon name={HISTORY} size={24} color={ink} />
+          <View className="size-[68px] items-center justify-center rounded-full bg-accent-rose">
+            <SocialIcon name={CAMERA} size={28} color={surface} />
           </View>
-        </Action>
-      </View>
+        </View>
+      </Action>
+      <Action
+        label="前回の診断"
+        accessibilityLabel={onLast ? '前回の診断' : '前回の診断（まだありません）'}
+        onPress={onLast}
+      >
+        <View className="size-[52px] items-center justify-center rounded-full border border-black bg-bg-surface">
+          <SocialIcon name={HISTORY} size={24} color={ink} />
+        </View>
+      </Action>
     </View>
   );
 }
 
 // The hero fills the space above the controls; the Plan A frame is scaled to cover it so
 // the face guide stays on the face at every screen size.
-function Hero() {
+function Hero({ photo }: { photo: string | undefined }) {
   const [size, setSize] = useState<{ width: number; height: number }>();
   const scale = size ? Math.max(size.width / frame.width, size.height / frame.height) : 0;
   const width = frame.width * scale;
@@ -125,14 +275,21 @@ function Hero() {
     <View
       accessible
       accessibilityRole="image"
-      accessibilityLabel="顔の形を見る見本の写真"
+      accessibilityLabel={photo ? '診断する写真' : '顔の形を見る見本の写真'}
       className="flex-1 overflow-hidden rounded-b-[36px]"
       onLayout={(event) => {
         const { width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
         setSize({ width: layoutWidth, height: layoutHeight });
       }}
     >
-      {size ? (
+      {photo ? (
+        <Image
+          accessible={false}
+          source={{ uri: photo }}
+          contentFit="cover"
+          style={{ width: '100%', height: '100%' }}
+        />
+      ) : size ? (
         <View
           pointerEvents="none"
           className="absolute"
@@ -193,7 +350,7 @@ function Action({
 }: {
   label: string;
   accessibilityLabel?: string;
-  onPress?: () => void;
+  onPress?: (() => void) | undefined;
   children: ReactNode;
 }) {
   const disabled = !onPress;

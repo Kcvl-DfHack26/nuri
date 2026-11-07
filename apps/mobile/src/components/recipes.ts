@@ -17,12 +17,6 @@ import iconsSparkle from '../../assets/plan-a/icons/sparkle.svg';
 import photosBrowCloseup from '../../assets/plan-a/photos/brow-closeup.jpg';
 import faceBare from '../../assets/plan-a/photos/face-bare.jpg';
 import faceMadeUp from '../../assets/plan-a/photos/face-made-up.jpg';
-import recipesCat from '../../assets/plan-a/recipes/cat.jpg';
-import recipesFox from '../../assets/plan-a/recipes/fox.jpg';
-import recipesKorean from '../../assets/plan-a/recipes/korean.jpg';
-import recipesLong from '../../assets/plan-a/recipes/long.jpg';
-import recipesOffice from '../../assets/plan-a/recipes/office.jpg';
-import recipesRound from '../../assets/plan-a/recipes/round.jpg';
 
 // Fixed Plan A sample data for the screens that do not read recipes from the API yet (①, ⑤ and
 // the steps of ⑦ do). It lives with the UI because it bundles image assets, which src/lib may not
@@ -171,64 +165,6 @@ type Product = {
   image: number;
   info: ProductInfo;
 };
-
-export type Recipe = {
-  id: string;
-  title: string;
-  author: string;
-  likes: string;
-  thumbnail: number;
-};
-
-/** ① ホーム（全体メイク）: cards in reading order (left, right, left, …). */
-const recipes: Recipe[] = [
-  {
-    id: 'fox',
-    title: '狐メイク',
-    author: 'mio',
-    likes: '1.2k',
-    thumbnail: recipesFox,
-  },
-  {
-    id: 'round',
-    title: '丸顔メイク',
-    author: 'mio',
-    likes: '1.2k',
-    thumbnail: recipesRound,
-  },
-  {
-    id: 'cat',
-    title: '猫メイク',
-    author: 'mio',
-    likes: '1.2k',
-    thumbnail: recipesCat,
-  },
-  {
-    id: 'long',
-    title: '面長メイク',
-    author: 'mio',
-    likes: '1.2k',
-    thumbnail: recipesLong,
-  },
-  {
-    id: 'office',
-    title: '5分で仕上げるオフィス顔',
-    author: 'kana',
-    likes: '864',
-    thumbnail: recipesOffice,
-  },
-  {
-    id: 'korean',
-    title: '透明感の韓国風',
-    author: 'yuna',
-    likes: '3.4k',
-    thumbnail: recipesKorean,
-  },
-];
-
-export function findRecipe(id: string) {
-  return recipes.find((recipe) => recipe.id === id);
-}
 
 const products: Product[] = [
   {

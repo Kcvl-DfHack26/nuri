@@ -10,6 +10,11 @@ public class FaceTrackerModule: Module {
       await AVCaptureDevice.requestAccess(for: .video)
     }
 
+    // Landmarks of one face in a still photo, or nil when there is no face.
+    AsyncFunction("detectFaceAsync") { (uri: URL) throws -> [String: Any]? in
+      try detectFace(in: uri)
+    }
+
     View(FaceTrackerView.self) {
       Events("onLandmarks", "onStatus")
 

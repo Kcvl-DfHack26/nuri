@@ -155,17 +155,8 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   }
 
   private func makeLandmarker() throws -> FaceLandmarker {
-    // The pod's resource bundle is copied into the app bundle.
-    let bundles = [Bundle(for: FaceTrackerView.self), Bundle.main]
-    let modelPath = bundles.lazy
-      .compactMap { $0.url(forResource: "FaceTrackerModel", withExtension: "bundle") }
-      .compactMap { Bundle(url: $0)?.path(forResource: "face_landmarker", ofType: "task") }
-      .first
-    guard let modelPath else {
-      throw FaceTrackerError.modelMissing
-    }
     let options = FaceLandmarkerOptions()
-    options.baseOptions.modelAssetPath = modelPath
+    options.baseOptions.modelAssetPath = try faceLandmarkerModelPath()
     options.runningMode = .liveStream
     options.numFaces = 1
     options.faceLandmarkerLiveStreamDelegate = self
@@ -291,11 +282,14 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
 
 enum FaceTrackerError: LocalizedError {
   case modelMissing
+  case imageUnreadable
 
   var errorDescription: String? {
     switch self {
     case .modelMissing:
       return "顔追跡のモデルが見つかりません"
+    case .imageUnreadable:
+      return "写真を読み込めませんでした"
     }
   }
 }

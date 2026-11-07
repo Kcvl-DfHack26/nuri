@@ -1,23 +1,29 @@
 import { Icon } from '@expo/ui';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router, useIsFocused } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PartId, Recipe } from '@/components/recipes';
+import type { BrowShape, FaceType } from '@/lib/face-diagnosis';
+import type { RecipeSummary } from '@/lib/recipes';
 
+import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { findRecipe, parts } from '@/components/recipes';
+import { ProfilePhoto } from '@/components/my-page';
+import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
+import { browShapes, faceTypes, isBrowShape, isFaceType } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
+import { formatCount, recipeListOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
 import sparkleRose from '../../assets/plan-a/icons/sparkle-rose.svg';
-import resultAvatar from '../../assets/plan-a/suggest/avatar.png';
 
 const BACK = Icon.select({
   ios: 'chevron.left',
@@ -41,79 +47,27 @@ const NEXT = Icon.select({
 });
 const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 
-type Finding = {
-  part: PartId;
-  label: string;
-  iconBackground: string;
-  summary: string;
-  /** Only the brow has a designed detail in Plan A; the other rows stay closed. */
-  detail?: {
-    current: { label: string; value: string };
-    suited: { label: string; value: string };
-    colors: string[];
-    action: string;
+// Why the suited brow helps, shown on the brow row.
+const browAdvice: Record<BrowShape, string> = {
+  arch: '眉山に高さを出してすっきり見せます',
+  straight: '横のラインで縦の長さをやわらげます',
+  softArch: 'ゆるやかなカーブで自然に整えます',
+  rising: '眉尻を上げてきりっと見せます',
+  falling: '眉尻を下げてやさしく見せます',
+};
+
+type Result = { faceType: FaceType; brow: BrowShape | null; photo: string | undefined };
+
+function readResult(params: { face?: string; brow?: string; photo?: string }): Result | null {
+  if (!params.face || !isFaceType(params.face)) {
+    return null;
+  }
+  return {
+    faceType: params.face,
+    brow: params.brow && isBrowShape(params.brow) ? params.brow : null,
+    photo: params.photo,
   };
-};
-
-// Fixed Plan A sample until photo diagnosis exists; nothing is derived from a real photo.
-const sample = {
-  faceType: '丸顔×イエベ',
-  traits: ['たれ目', '中顔面短め'],
-  findings: [
-    {
-      part: 'brow',
-      label: '眉',
-      iconBackground: 'bg-pastel-peach',
-      summary: '眉山に高さを出してすっきり見せます',
-      detail: {
-        current: { label: '今の眉', value: '眉尻がやや下がり気味' },
-        suited: { label: '似合う形', value: 'アーチ眉' },
-        colors: ['#B88F73', '#8A664F', '#6B4D3D', '#4A3330'],
-        action: '眉のメイクを見る',
-      },
-    },
-    {
-      part: 'eye',
-      label: '目元',
-      iconBackground: 'bg-pastel-sky',
-      summary: '目尻のラインで横幅を出します',
-    },
-    {
-      part: 'cheek',
-      label: 'チーク',
-      iconBackground: 'bg-pastel-pink',
-      summary: '高めに入れると縦のラインが出ます',
-    },
-    {
-      part: 'shading',
-      label: 'シェーディング',
-      iconBackground: 'bg-pastel-mint',
-      summary: 'フェイスラインを細く引き締めます',
-    },
-    {
-      part: 'lip',
-      label: 'リップ',
-      iconBackground: 'bg-pastel-peach',
-      summary: 'コーラル系が肌になじみます',
-    },
-    {
-      part: 'base',
-      label: 'ベース',
-      iconBackground: 'bg-pastel-butter',
-      summary: '明るめのベージュがなじみます',
-    },
-  ] satisfies Finding[],
-  recommendations: [
-    { recipeId: 'fox', match: 94 },
-    { recipeId: 'round', match: 88 },
-    { recipeId: 'cat', match: 81 },
-  ],
-};
-
-const recommendations = sample.recommendations.flatMap(({ recipeId, match }) => {
-  const recipe = findRecipe(recipeId);
-  return recipe ? [{ recipe, match }] : [];
-});
+}
 
 // Plan A ⑭ 診断結果・おすすめメイク.
 export function Diagnosis() {
@@ -121,11 +75,14 @@ export function Diagnosis() {
   const focused = useIsFocused();
   const pink = useTokenColor('--color-pastel-pink');
   const peach = useTokenColor('--color-base-peach');
+  const result =
+    readResult(useLocalSearchParams<{ face?: string; brow?: string; photo?: string }>());
   // The header floats over the feed; measure it so larger text never covers the first card.
   const [headerHeight, setHeaderHeight] = useState(44);
   // iOS insets the tab's first ScrollView for the status bar and tab bar; Android tabs only
   // pad the tab bar, so the status bar is added here.
   const scrollTop = Platform.OS === 'ios' ? 0 : insets.top;
+  const faceType = result ? faceTypes[result.faceType] : undefined;
   return (
     <View className="flex-1 bg-white">
       {focused ? <StatusBar style="dark" /> : null}
@@ -134,84 +91,57 @@ export function Diagnosis() {
         contentContainerClassName="gap-6"
         contentContainerStyle={{ paddingTop: scrollTop + headerHeight + 12, paddingBottom: 28 }}
       >
-        <View
-          className="mx-4 flex-row items-center gap-3.5 rounded-3xl p-4"
-          style={{ backgroundImage: `linear-gradient(to right, ${pink}, ${peach})` }}
-        >
-          <Image
-            accessible={false}
-            source={resultAvatar}
-            style={{ width: 68, height: 68, borderRadius: 34 }}
-          />
-          <View className="flex-1 items-start gap-1">
-            <Text className="font-maru text-meta text-ink-secondary">あなたの顔タイプ</Text>
-            <Text
-              accessibilityRole="header"
-              className="font-maru-bold text-headline text-ink-primary"
-            >
-              {sample.faceType}
-            </Text>
-            <View className="flex-row flex-wrap gap-1.5">
-              {sample.traits.map((trait) => (
-                <View
-                  key={trait}
-                  className="min-h-[22px] justify-center rounded-[11px] bg-white px-2"
-                >
-                  <Text className="font-maru-bold text-micro text-ink-primary">{trait}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-        {/* Diagnosis is not built; say so instead of presenting the sample as the viewer's own result. */}
-        <Text className="-mt-3 mx-5 font-maru text-meta text-ink-secondary">
-          見本の診断結果です。写真からの診断はまだ使えません
-        </Text>
-        <View className="mx-4 gap-2.5">
-          <View className="gap-0.5 pl-1">
-            <Text
-              accessibilityRole="header"
-              className="font-maru-bold text-heading text-ink-primary"
-            >
-              部位ごとの診断
-            </Text>
-            <Text className="font-maru text-meta text-ink-secondary">
-              タップすると、くわしく見られます
-            </Text>
-          </View>
-          <View className="gap-2">
-            {sample.findings.map((finding) => (
-              <FindingCard key={finding.part} finding={finding} />
-            ))}
-          </View>
-        </View>
-        <View className="gap-2.5">
-          <View className="flex-row items-center justify-between px-5">
-            <Text
-              accessibilityRole="header"
-              className="font-maru-bold text-heading text-ink-primary"
-            >
-              おすすめメイク!!
-            </Text>
+        {result && faceType ? (
+          <>
             <View
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="おすすめメイクをすべて見る（準備中）"
-              accessibilityState={{ disabled: true }}
+              className="mx-4 flex-row items-center gap-3.5 rounded-3xl p-4"
+              style={{ backgroundImage: `linear-gradient(to right, ${pink}, ${peach})` }}
             >
-              <Text className="font-maru-bold text-label text-accent-rose">すべて見る</Text>
+              {result.photo ? (
+                <Image
+                  accessible={false}
+                  source={{ uri: result.photo }}
+                  contentFit="cover"
+                  style={{ width: 68, height: 68, borderRadius: 34 }}
+                />
+              ) : (
+                <ProfilePhoto size={68} />
+              )}
+              <View className="flex-1 items-start gap-1">
+                <Text className="font-maru text-meta text-ink-secondary">あなたの顔タイプ</Text>
+                <Text
+                  accessibilityRole="header"
+                  className="font-maru-bold text-headline text-ink-primary"
+                >
+                  {faceType.label}
+                </Text>
+              </View>
             </View>
+            {/* The face type rules are provisional until the team settles them (#47). */}
+            <Text className="-mt-3 mx-5 font-maru text-meta text-ink-secondary">
+              顔タイプは仮の基準で判定しています。写真はこの端末の中だけで使い、送信しません
+            </Text>
+            <View className="mx-4 gap-2.5">
+              <View className="gap-0.5 pl-1">
+                <Text
+                  accessibilityRole="header"
+                  className="font-maru-bold text-heading text-ink-primary"
+                >
+                  部位ごとの診断
+                </Text>
+                <Text className="font-maru text-meta text-ink-secondary">
+                  ほかの部位の診断は準備中です
+                </Text>
+              </View>
+              <BrowCard current={result.brow} suited={faceType.suitedBrow} />
+            </View>
+            <Recommendations faceType={result.faceType} />
+          </>
+        ) : (
+          <View className="mx-5">
+            <Feedback message="まだ診断していません。提案のタブで写真を撮るか選んでください" />
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-2.5 px-4"
-          >
-            {recommendations.map(({ recipe, match }) => (
-              <RecommendationCard key={recipe.id} recipe={recipe} match={match} />
-            ))}
-          </ScrollView>
-        </View>
+        )}
       </ScrollView>
       <View
         pointerEvents="none"
@@ -253,121 +183,166 @@ export function Diagnosis() {
   );
 }
 
-function FindingCard({ finding }: { finding: Finding }) {
-  const [open, setOpen] = useState(true);
-  const ink = useTokenColor('--color-ink-primary');
-  const { detail } = finding;
-  const row = (expanded: boolean) => (
-    <>
-      <View
-        className={cn(
-          'size-[38px] items-center justify-center rounded-full',
-          finding.iconBackground,
-        )}
-      >
-        <Image
-          accessible={false}
-          source={parts[finding.part].icon}
-          style={{ width: 20, height: 20 }}
-        />
-      </View>
-      <View className="flex-1 gap-px">
-        <Text className="font-maru-bold text-label text-ink-primary">{finding.label}</Text>
-        <Text className="font-maru text-meta text-ink-secondary">{finding.summary}</Text>
-      </View>
-      <SocialIcon name={expanded ? COLLAPSE : EXPAND} size={22} color={ink} />
-    </>
-  );
-  const rowClassName = 'min-h-12 flex-row items-center gap-3 py-2.5 pl-2.5 pr-3';
-  const label = `${finding.label}、${finding.summary}`;
+// Recipes tagged for this face type come first; the rest of the newest recipes fill the row.
+function Recommendations({ faceType }: { faceType: FaceType }) {
+  const list = useInfiniteQuery({ ...recipeListOptions(), enabled: Boolean(apiUrl) });
+  const tag = `${faceTypes[faceType].label}向け`;
+  const items = list.data?.pages[0]?.items ?? [];
+  const recipes = [
+    ...items.filter((recipe) => recipe.tags.includes(tag)),
+    ...items.filter((recipe) => !recipe.tags.includes(tag)),
+  ].slice(0, 3);
   return (
-    <View className="overflow-hidden rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface">
-      {detail ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={label}
-          accessibilityState={{ expanded: open }}
-          onPress={() => {
-            setOpen((current) => !current);
-          }}
-          className={cn(rowClassName, 'active:opacity-70')}
-        >
-          {row(open)}
-        </Pressable>
-      ) : (
-        // Details for these parts need a real diagnosis; keep the Plan A row but disabled.
+    <View className="gap-2.5">
+      <View className="flex-row items-center justify-between px-5">
+        <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
+          おすすめメイク!!
+        </Text>
         <View
           accessible
           accessibilityRole="button"
-          accessibilityLabel={`${label}（準備中）`}
-          accessibilityState={{ disabled: true, expanded: false }}
-          className={rowClassName}
+          accessibilityLabel="おすすめメイクをすべて見る（準備中）"
+          accessibilityState={{ disabled: true }}
         >
-          {row(false)}
+          <Text className="font-maru-bold text-label text-accent-rose">すべて見る</Text>
         </View>
+      </View>
+      {!apiUrl ? (
+        <View className="px-5">
+          <Feedback message="接続先が未設定です。セットアップ後におすすめを表示できます。" />
+        </View>
+      ) : list.isPending ? (
+        <View className="px-5">
+          <Feedback loading message="おすすめを読み込んでいます" />
+        </View>
+      ) : list.isError ? (
+        <View className="px-5">
+          <Feedback
+            message="おすすめを読み込めませんでした。通信状況を確認してお試しください。"
+            onRetry={() => {
+              void list.refetch();
+            }}
+          />
+        </View>
+      ) : recipes.length === 0 ? (
+        <View className="px-5">
+          <Feedback message="おすすめできるレシピはまだありません" />
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerClassName="gap-2.5 px-4"
+        >
+          {recipes.map((recipe) => (
+            <RecommendationCard
+              key={recipe.id}
+              recipe={recipe}
+              matched={recipe.tags.includes(tag) ? tag : undefined}
+            />
+          ))}
+        </ScrollView>
       )}
-      {detail && open ? (
+    </View>
+  );
+}
+
+function BrowCard({ current, suited }: { current: BrowShape | null; suited: BrowShape }) {
+  const [open, setOpen] = useState(true);
+  const ink = useTokenColor('--color-ink-primary');
+  const summary = browAdvice[suited];
+  return (
+    <View className="overflow-hidden rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`眉、${summary}`}
+        accessibilityState={{ expanded: open }}
+        onPress={() => {
+          setOpen((value) => !value);
+        }}
+        className="min-h-12 flex-row items-center gap-3 py-2.5 pl-2.5 pr-3 active:opacity-70"
+      >
+        <View className="size-[38px] items-center justify-center rounded-full bg-pastel-peach">
+          <Image accessible={false} source={parts.brow.icon} style={{ width: 20, height: 20 }} />
+        </View>
+        <View className="flex-1 gap-px">
+          <Text className="font-maru-bold text-label text-ink-primary">眉</Text>
+          <Text className="font-maru text-meta text-ink-secondary">{summary}</Text>
+        </View>
+        <SocialIcon name={open ? COLLAPSE : EXPAND} size={22} color={ink} />
+      </Pressable>
+      {open ? (
         <View className="gap-3 px-3.5 pb-3.5">
           <View className="flex-row gap-2">
             {[
-              { stat: detail.current, background: 'bg-bg-base' },
-              { stat: detail.suited, background: 'bg-pastel-peach' },
-            ].map(({ stat, background }) => (
+              {
+                label: '今の眉',
+                value: current ? browShapes[current] : '判定できませんでした',
+                background: 'bg-bg-base',
+              },
+              { label: '似合う形', value: browShapes[suited], background: 'bg-pastel-peach' },
+            ].map((stat) => (
               <View
                 key={stat.label}
                 accessible
-                className={cn('flex-1 gap-0.5 rounded-[14px] px-3 py-2.5', background)}
+                className={cn('flex-1 gap-0.5 rounded-[14px] px-3 py-2.5', stat.background)}
               >
                 <Text className="font-maru text-meta text-ink-secondary">{stat.label}</Text>
                 <Text className="font-maru-bold text-label text-ink-primary">{stat.value}</Text>
               </View>
             ))}
           </View>
-          <View className="flex-row items-center gap-2">
-            <Text className="flex-1 font-maru text-meta text-ink-secondary">おすすめの色</Text>
-            {detail.colors.map((color) => (
-              <View
-                key={color}
-                className="size-6 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </View>
-          <View
-            accessible
+          <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${detail.action}（準備中）`}
-            accessibilityState={{ disabled: true }}
-            className="min-h-11 flex-row items-center justify-center gap-1 rounded-[22px] border border-black px-4"
+            onPress={() => {
+              router.push('/parts/brow');
+            }}
+            className="min-h-12 flex-row items-center justify-center gap-1 rounded-[24px] border border-black px-4 active:opacity-70"
           >
-            <Text className="font-maru-bold text-label text-ink-primary">{detail.action}</Text>
+            <Text className="font-maru-bold text-label text-ink-primary">眉のメイクを見る</Text>
             <SocialIcon name={NEXT} size={18} color={ink} />
-          </View>
+          </Pressable>
         </View>
       ) : null}
     </View>
   );
 }
 
-function RecommendationCard({ recipe, match }: { recipe: Recipe; match: number }) {
+function RecommendationCard({
+  recipe,
+  matched,
+}: {
+  recipe: RecipeSummary;
+  matched: string | undefined;
+}) {
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
-  const content = (
-    <>
-      <View className="h-[180px] w-full overflow-hidden rounded-[18px]">
+  const likes = formatCount(recipe.likeCount);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={[recipe.title, recipe.author.name, matched].filter(Boolean).join('、')}
+      className="w-[172px] gap-[5px] active:opacity-80"
+      onPress={() => {
+        router.push(`/recipes/${recipe.id}`);
+      }}
+    >
+      <View className="h-[180px] w-full overflow-hidden rounded-[18px] bg-neutral-soft">
         <Image
           accessible={false}
-          source={recipe.thumbnail}
+          source={{ uri: apiAssetUrl(recipe.image) }}
           contentFit="cover"
           style={{ width: '100%', height: '100%' }}
         />
-        <View
-          className="absolute left-2 top-2 flex-row items-center gap-[5px] rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
-          style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
-        >
-          <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
-          <Text className="font-maru-bold text-micro text-accent-rose">相性 {match}%</Text>
-        </View>
+        {matched ? (
+          <View
+            className="absolute left-2 top-2 flex-row items-center gap-[5px] rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
+            style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
+          >
+            <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
+            <Text className="font-maru-bold text-micro text-accent-rose">{matched}</Text>
+          </View>
+        ) : null}
         <View className="absolute bottom-2 right-2 size-[30px] items-center justify-center rounded-full bg-white/85">
           <SocialIcon name={HEART} size={16} color={ink} />
         </View>
@@ -375,24 +350,13 @@ function RecommendationCard({ recipe, match }: { recipe: Recipe; match: number }
       <View className="w-full gap-px px-1 pt-0.5">
         <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
         <View className="flex-row items-center gap-[3px]">
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">{recipe.author}</Text>
+          <Text className="flex-1 font-maru text-meta text-ink-secondary">
+            {recipe.author.name}
+          </Text>
           <SocialIcon name={HEART} size={13} color={secondary} />
-          <Text className="font-maru text-meta text-ink-secondary">{recipe.likes}</Text>
+          <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
         </View>
       </View>
-    </>
-  );
-  const label = `${recipe.title}、${recipe.author}、相性${match}%`;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      className="w-[172px] gap-[5px] active:opacity-80"
-      onPress={() => {
-        router.push(`/recipes/${recipe.id}`);
-      }}
-    >
-      {content}
     </Pressable>
   );
 }
