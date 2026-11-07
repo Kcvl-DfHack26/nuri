@@ -1,3 +1,5 @@
+import type { SkImage } from '@shopify/react-native-skia';
+
 import { Icon } from '@expo/ui';
 import { Canvas, Points, useImage } from '@shopify/react-native-skia';
 import { useIsFocused } from 'expo-router';
@@ -22,6 +24,7 @@ import { Text } from '@/components/ui/text';
 import { toViewPoints } from '@/lib/face-landmarks';
 import { canonicalVertexCount } from '@/lib/face-mesh';
 import { backOrHome } from '@/lib/navigation';
+import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
 import type {
@@ -30,6 +33,8 @@ import type {
 } from '../../modules/face-tracker/src/FaceTracker.types';
 
 import browTexture from '../../assets/textures/brow.png';
+import cheekTexture from '../../assets/textures/cheek.png';
+import shadingTexture from '../../assets/textures/shading.png';
 import FaceTracker from '../../modules/face-tracker/src/FaceTrackerModule';
 import FaceTrackerView from '../../modules/face-tracker/src/FaceTrackerView';
 
@@ -38,21 +43,34 @@ const BACK = Icon.select({
   android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
 });
 
-// The sample recipe's brow color (`foxSteps` in recipes.ts). The overlay stays partly transparent so
-// bangs over the brows show through until hair is cut out of it (requirements 11).
-const BROW_COLOR = '#79513A';
-const BROW_OPACITY = 0.7;
+type OverlayPart = 'shading' | 'cheek' | 'brow';
+
+// Drawn in this order, so the brows stay on top. The colors are the sample recipe's (`foxSteps` in
+// recipes.ts). The brows stay partly transparent so bangs over them show through until hair is cut
+// out of the overlay (requirements 11).
+const OVERLAYS: readonly { part: OverlayPart; label: string; color: string; opacity: number }[] = [
+  { part: 'shading', label: 'シェーディング', color: '#A17B60', opacity: 0.8 },
+  { part: 'cheek', label: 'チーク', color: '#B8754F', opacity: 0.8 },
+  { part: 'brow', label: '眉', color: '#79513A', opacity: 0.7 },
+];
 
 type Stats = { fps: number; latencyMs: number; maxLatencyMs: number; count: number };
 
-// Development check for #25 (PoC-1) and #26: the front camera with the brow texture of the canonical
-// face mesh and the iris landmarks drawn over it, plus the measured frame rate and delay. It is
-// replaced by ⑦ once the AR steps use the tracker.
+// Development check for #25 (PoC-1), #26 and #27 (PoC-2): the front camera with the brow, cheek and
+// shading textures of the canonical face mesh, each switchable, and the iris landmarks drawn over it,
+// plus the measured frame rate and delay. It is replaced by ⑦ once the AR steps use the tracker.
 export function FaceTrackingCheck() {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const rose = useTokenColor('--color-accent-rose');
-  const brow = useImage(browTexture);
+  const textures: Record<OverlayPart, SkImage | null> = {
+    brow: useImage(browTexture),
+    cheek: useImage(cheekTexture),
+    shading: useImage(shadingTexture),
+  };
+  const [shownParts, setShownParts] = useState<ReadonlySet<OverlayPart>>(
+    () => new Set(OVERLAYS.map((overlay) => overlay.part)),
+  );
   const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [status, setStatus] = useState<FaceTrackerStatusEvent>();
   const [view, setView] = useState<Size>({ width: 0, height: 0 });
@@ -149,9 +167,21 @@ export function FaceTrackingCheck() {
       ) : null}
       {tracking ? (
         <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-          {brow ? (
-            <FaceTexture points={points} texture={brow} color={BROW_COLOR} opacity={BROW_OPACITY} />
-          ) : null}
+          {OVERLAYS.map(({ part, color, opacity }) => {
+            const texture = textures[part];
+            if (!texture || !shownParts.has(part)) {
+              return null;
+            }
+            return (
+              <FaceTexture
+                key={part}
+                points={points}
+                texture={texture}
+                color={color}
+                opacity={opacity}
+              />
+            );
+          })}
           <Points
             points={points.slice(canonicalVertexCount)}
             mode="points"
@@ -184,6 +214,27 @@ export function FaceTrackingCheck() {
         className="absolute inset-x-4 gap-2 rounded-2xl bg-black/60 p-4"
         style={{ bottom: Math.max(insets.bottom, 12) + 8 }}
       >
+        {/* Without the tracker or the camera nothing is drawn, so the switches would do nothing. */}
+        {FaceTracker && !cameraDenied ? (
+          <View className="flex-row flex-wrap gap-2">
+            {OVERLAYS.map(({ part, label }) => (
+              <OverlayToggle
+                key={part}
+                label={label}
+                checked={shownParts.has(part)}
+                onPress={() => {
+                  const next = new Set(shownParts);
+                  if (next.has(part)) {
+                    next.delete(part);
+                  } else {
+                    next.add(part);
+                  }
+                  setShownParts(next);
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
         {message ? (
           <Text accessibilityLiveRegion="polite" className="font-maru-bold text-label text-white">
             {message}
@@ -209,6 +260,35 @@ export function FaceTrackingCheck() {
         ) : null}
       </View>
     </View>
+  );
+}
+
+function OverlayToggle({
+  label,
+  checked,
+  onPress,
+}: {
+  label: string;
+  checked: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel={label}
+      accessibilityState={{ checked }}
+      onPress={onPress}
+      className={cn(
+        'min-h-12 items-center justify-center rounded-full border-[1.5px] border-white px-4 active:opacity-70',
+        checked ? 'bg-white' : 'bg-transparent',
+      )}
+    >
+      <Text
+        className={cn('font-maru-bold text-label', checked ? 'text-ink-primary' : 'text-white')}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
