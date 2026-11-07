@@ -1,7 +1,7 @@
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ProductInfo } from '@/components/recipes';
@@ -32,10 +32,13 @@ const CART = Icon.select({
 // purchase action stay put; the colors and ingredients scroll between them.
 export function ProductSheet({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
+  const window = useWindowDimensions();
+  // The sheet fits this height: half the screen as in Plan A, taller when large text needs room.
+  const height = Math.min(window.height * 0.5 * Math.max(window.fontScale, 1), window.height * 0.9);
   const product = findProduct(id);
   if (!product?.info) {
     return (
-      <View className="flex-1 items-center justify-center gap-4 bg-white px-6">
+      <View style={{ height }} className="items-center justify-center gap-4 bg-white px-6">
         <Text className="font-maru-bold text-heading text-ink-primary">商品が見つかりません</Text>
         <CloseButton />
       </View>
@@ -43,7 +46,7 @@ export function ProductSheet({ id }: { id: string }) {
   }
   const { info } = product;
   return (
-    <View className="flex-1 bg-white px-5 pt-[30px]">
+    <View style={{ height }} className="bg-white px-5 pt-[30px]">
       <View className="flex-row items-center gap-3.5">
         <Image
           accessible={false}
@@ -59,13 +62,13 @@ export function ProductSheet({ id }: { id: string }) {
         </View>
         <CloseButton />
       </View>
-      <ScrollView
-        className="mt-4 flex-1"
-        contentInsetAdjustmentBehavior="never"
-        contentContainerClassName="gap-4 pb-4"
-      >
-        <ProductDetails info={info} />
-      </ScrollView>
+      {/* On iOS react-native-screens resizes a sheet's ScrollView it can find to the whole sheet,
+          which drew the details over the header. This wrapper keeps it out of that search. */}
+      <View collapsable={false} className="mt-4 flex-1">
+        <ScrollView contentInsetAdjustmentBehavior="never" contentContainerClassName="gap-4 pb-4">
+          <ProductDetails info={info} />
+        </ScrollView>
+      </View>
       <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
         <View
           accessible

@@ -32,8 +32,9 @@ function Navigation() {
           options={{
             headerShown: false,
             presentation: 'formSheet',
-            // Plan A ⑥ opens at about half the screen; large text can expand it to full height.
-            sheetAllowedDetents: [0.5, 1],
+            // Plan A ⑥ is about half the screen. ProductSheet sets its own height (taller for
+            // large text) and the sheet follows it.
+            sheetAllowedDetents: 'fitToContents',
             sheetGrabberVisible: true,
             sheetCornerRadius: 28,
           }}
