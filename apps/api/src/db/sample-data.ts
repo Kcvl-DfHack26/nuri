@@ -1,4 +1,4 @@
-import { and, eq, gte } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 import type { Database } from './client';
 
@@ -247,10 +247,6 @@ export async function seedSampleData(db: Database) {
           .values({ recipeId: item.id, position, ...step })
           .onConflictDoUpdate({ target: [recipeStep.recipeId, recipeStep.position], set: step });
       }
-      // Steps past the end are left over from a longer earlier seed and would run after the last one.
-      await tx
-        .delete(recipeStep)
-        .where(and(eq(recipeStep.recipeId, item.id), gte(recipeStep.position, steps.length)));
     }
   });
   return { users: people.length, posts: posts.length, recipes: recipes.length };

@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
 import { seedSampleData } from './db/sample-data';
-import { recipe, recipeProduct, user } from './db/schema';
+import { recipe, recipeProduct, recipeStep, user } from './db/schema';
 import { createAuth } from './modules/auth';
 import { readEnv } from './platform/env';
 
@@ -50,6 +50,17 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
     .update(recipe)
     .set({ authorId: ownUserId, title: '同じIDの自分のレシピ' })
     .where(eq(recipe.id, 'round'));
+  const ownStep = {
+    recipeId: 'round',
+    position: 0,
+    part: 'lip' as const,
+    label: 'リップ',
+    title: '自分の手順',
+    hint: '自分の補足',
+    product: 'リップ',
+    colors: ['#C0505A'],
+  };
+  await db.insert(recipeStep).values(ownStep);
   const before = await db.select({ value: count() }).from(recipe);
   const seededProducts = await db
     .select({ value: count() })
@@ -74,6 +85,13 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
   expect(
     await db.select({ title: recipe.title }).from(recipe).where(eq(recipe.id, 'round')),
   ).toEqual([{ title: '同じIDの自分のレシピ' }]);
+  // The seed neither rewrites nor removes steps of a recipe it does not own.
+  expect(await db.select().from(recipeStep).where(eq(recipeStep.recipeId, 'round'))).toEqual([
+    ownStep,
+  ]);
+  expect(
+    await db.select({ value: count() }).from(recipeStep).where(eq(recipeStep.recipeId, 'fox')),
+  ).toEqual([{ value: 5 }]);
 });
 
 test('lists and shows recipes without a session', async () => {
