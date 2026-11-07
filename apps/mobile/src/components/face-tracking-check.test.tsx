@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { AppState } from 'react-native';
 
 import { FaceTrackingCheck } from './face-tracking-check';
 
@@ -40,6 +41,10 @@ beforeEach(() => {
   mockFocused = true;
 });
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 test('clears tracking results on blur and waits for a new result after focus', async () => {
   const result = await render(<FaceTrackingCheck />);
   await waitFor(() => {
@@ -63,6 +68,13 @@ test('clears tracking results on blur and waits for a new result after focus', a
   await result.rerender(<FaceTrackingCheck />);
   expect(screen.queryByTestId('overlay-canvas')).toBeNull();
   expect(screen.queryByText(/fps・遅延/)).toBeNull();
+
+  // Native suppresses an unchanged "tracking" status across a camera pause.
+  await fireEvent(screen.getByTestId('tracker'), 'onLandmarks', {
+    nativeEvent: { points: [], width: 640, height: 480, latencyMs: 14 },
+  });
+  expect(screen.getByTestId('overlay-canvas')).toBeOnTheScreen();
+  expect(screen.getByText(/fps・遅延/)).toBeOnTheScreen();
 });
 
 test('hides switches during errors and restores them when tracking resumes', async () => {
@@ -80,4 +92,23 @@ test('hides switches during errors and restores them when tracking resumes', asy
     nativeEvent: { status: 'tracking' },
   });
   expect(screen.getByRole('checkbox', { name: '眉' })).toBeOnTheScreen();
+});
+
+test('hides tracking results while the app is in the background', async () => {
+  const appState = jest.spyOn(AppState, 'addEventListener');
+  await render(<FaceTrackingCheck />);
+  await waitFor(() => {
+    expect(screen.getByTestId('tracker').props.active).toBe(true);
+  });
+  await fireEvent(screen.getByTestId('tracker'), 'onStatus', {
+    nativeEvent: { status: 'tracking' },
+  });
+  expect(screen.getByTestId('overlay-canvas')).toBeOnTheScreen();
+
+  const listener = appState.mock.calls.find(([event]) => event === 'change')?.[1];
+  await act(() => {
+    listener?.('background');
+  });
+  expect(screen.queryByTestId('overlay-canvas')).toBeNull();
+  expect(screen.getByTestId('tracker').props.active).toBe(false);
 });

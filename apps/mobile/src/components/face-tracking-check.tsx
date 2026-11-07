@@ -71,6 +71,9 @@ export function FaceTrackingCheck() {
   const [shownParts, setShownParts] = useState<ReadonlySet<OverlayPart>>(
     () => new Set(OVERLAYS.map((overlay) => overlay.part)),
   );
+  const [appActive, setAppActive] = useState(
+    () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive',
+  );
   const [permission, setPermission] = useState<'pending' | 'granted' | 'denied'>('pending');
   const [status, setStatus] = useState<FaceTrackerStatusEvent>();
   const [view, setView] = useState<Size>({ width: 0, height: 0 });
@@ -78,7 +81,16 @@ export function FaceTrackingCheck() {
   const [stats, setStats] = useState<Stats>();
   // Arrival times and delays of the last second of results.
   const samples = useRef<{ at: number; latencyMs: number }[]>([]);
-  const active = permission === 'granted' && focused;
+  const active = permission === 'granted' && focused && appActive;
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (active) {
@@ -138,6 +150,11 @@ export function FaceTrackingCheck() {
   }, [permission]);
 
   function handleLandmarks(event: FaceLandmarksEvent) {
+    // Native status events are deduplicated across camera pauses. A fresh landmark result is also
+    // proof that tracking has resumed, even if native does not emit another "tracking" status.
+    if (status?.status !== 'tracking') {
+      setStatus({ status: 'tracking' });
+    }
     const now = performance.now();
     const recent = samples.current.filter((sample) => now - sample.at < 1000);
     recent.push({ at: now, latencyMs: event.latencyMs });
