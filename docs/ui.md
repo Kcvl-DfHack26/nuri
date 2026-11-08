@@ -6,7 +6,7 @@
 
 Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、AndroidはPlan Aの `TabBar/Glass` を `expo-router/ui` で描く（[architecture](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。投稿シートは65%の高さから開く。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。iOS 26の投稿導線はタイムライン（`/timeline`）を開いている間だけタブ直上のBottomAccessory、それ以前とAndroidはツールバー。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigma Plan AのFoundationsに従い、アプリ全体はライト配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
 
-Googleは公式の多色ロゴ付き白ボタンを使う。ログイン（⑱）はPlan Aに合わせてライト配色で表示し、Google、パスキー、メールのマジックリンクを提供する。出典は `apps/mobile/assets/auth/README.md` にある。
+Googleは公式の多色ロゴ付き白ボタンを使う。ログイン（⑱）はPlan Aに合わせてライト配色で表示し、Googleとパスキーを提供し、メールは送信ドメインとログイン完了を確認してから再開する（#177）。出典は `apps/mobile/assets/auth/README.md` にある。
 
 ## 構成
 

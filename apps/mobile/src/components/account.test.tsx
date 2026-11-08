@@ -9,13 +9,11 @@ jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), replace: jest.fn(), canGoBack: () => mockCanGoBack() },
 }));
-jest.mock('expo-crypto', () => ({ randomUUID: () => 'state' }));
-jest.mock('expo-linking', () => ({ createURL: (path: string) => `com.kcvl.nuri://${path}` }));
-jest.mock('expo-secure-store', () => ({ setItemAsync: jest.fn(async () => {}) }));
 jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
+jest.mock('@/lib/google-sign-in', () => ({ signInWithGoogle: () => mockGoogle() }));
 jest.mock('@/lib/passkeys', () => ({
   passkeysAvailable: true,
   signInWithPasskey: jest.fn(async () => {}),
@@ -25,7 +23,6 @@ jest.mock('@/lib/api', () => ({
   authClient: {
     useSession: () => ({ data: null, isPending: false, error: null }),
     getSession: () => mockGetSession(),
-    signIn: { social: () => mockSocial(), magicLink: () => mockMagicLink() },
   },
   api: {
     api: {
@@ -38,12 +35,11 @@ jest.mock('@/lib/api', () => ({
     },
   },
 }));
-const mockSocial = jest.fn(async () => ({ error: null }));
+const mockGoogle = jest.fn(async () => {});
 const mockCanGoBack = jest.fn(() => true);
 const mockGetSession = jest.fn(async (): Promise<{ data: { user: { id: string } } | null }> => ({
   data: { user: { id: 'viewer' } },
 }));
-const mockMagicLink = jest.fn(async () => ({ error: null }));
 
 beforeEach(() => {
   // Let Testing Library flush React Query's scheduled notifications inside act.
@@ -67,21 +63,14 @@ test('shows the supported methods and returns after Google login', async () => {
     expect(router.back).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Googleで続ける' })).toBeEnabled();
   });
-  expect(mockSocial).toHaveBeenCalled();
+  expect(mockGoogle).toHaveBeenCalled();
 });
 
-test('opens the email form and sends a login link', async () => {
+test('does not offer email login even when the API advertises it', async () => {
   await renderAccount();
-  await fireEvent.press(await screen.findByRole('button', { name: 'メールアドレスで続ける' }));
-  expect(screen.getByRole('button', { name: 'ログインリンクを送信' })).toBeDisabled();
-
-  await fireEvent.changeText(screen.getByLabelText('メールアドレス'), 'hanako@example.com');
-  await fireEvent.press(screen.getByRole('button', { name: 'ログインリンクを送信' }));
-  expect(
-    await screen.findByText('メールを送信しました。10分以内に、この端末でリンクを開いてください。'),
-  ).toBeOnTheScreen();
-  expect(mockMagicLink).toHaveBeenCalled();
-  expect(router.back).not.toHaveBeenCalled();
+  await screen.findByRole('button', { name: 'Googleで続ける' });
+  expect(screen.queryByRole('button', { name: 'メールアドレスで続ける' })).toBeNull();
+  expect(screen.queryByLabelText('メールアドレス')).toBeNull();
 });
 
 test('continues as a guest by going back', async () => {
@@ -98,7 +87,7 @@ test('stays on the login screen when the OS login browser is dismissed', async (
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'Googleで続ける' })).toBeEnabled();
   });
-  expect(mockSocial).toHaveBeenCalled();
+  expect(mockGoogle).toHaveBeenCalled();
   expect(router.back).not.toHaveBeenCalled();
   expect(router.replace).not.toHaveBeenCalled();
 });
