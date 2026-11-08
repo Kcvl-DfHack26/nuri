@@ -81,7 +81,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   // with a face together with its landmarks, kept only so a snapshot and the landmarks it is
   // diagnosed with come from one frame. Holding one at a time never drops it before its result.
   private val pendingFrames = ConcurrentSkipListMap<Long, Bitmap>()
-  private class LandmarkedFrame(val bitmap: Bitmap, val points: List<Double>)
+  private class LandmarkedFrame(val bitmap: Bitmap, val points: List<Double>, val atMs: Long)
   @Volatile private var landmarkedFrame: LandmarkedFrame? = null
   @Volatile private var frameWidth = 0
   @Volatile private var frameHeight = 0
@@ -196,7 +196,10 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
    * onLandmarks. JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
    */
   fun snapshot(): Map<String, Any>? {
-    val landmarked = landmarkedFrame ?: return null
+    // The tracker misses a face for single frames, so a face from just before still counts.
+    val landmarked = landmarkedFrame
+      ?.takeIf { SystemClock.uptimeMillis() - it.atMs <= SNAPSHOT_FACE_MAX_AGE_MS }
+      ?: return null
     val upright = landmarked.bitmap
     val mirror = Matrix().apply { preScale(-1f, 1f) }
     val frame = Bitmap.createBitmap(upright, 0, 0, upright.width, upright.height, mirror, true)
@@ -337,7 +340,6 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     pendingFrames.headMap(result.timestampMs()).clear()
     val face = result.faceLandmarks().firstOrNull()
     if (face.isNullOrEmpty()) {
-      landmarkedFrame = null
       post {
         if (result.timestampMs() > discardResultsBeforeMs) setStatus("noFace")
       }
@@ -348,7 +350,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       points.add(landmark.x().toDouble())
       points.add(landmark.y().toDouble())
     }
-    if (frame != null) landmarkedFrame = LandmarkedFrame(frame, points)
+    if (frame != null) landmarkedFrame = LandmarkedFrame(frame, points, result.timestampMs())
     val latencyMs = (SystemClock.uptimeMillis() - result.timestampMs()).toDouble()
     val width = frameWidth.toDouble()
     val height = frameHeight.toDouble()
@@ -377,5 +379,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     // About 5 s at 30 fps: long enough for a GPU to prepare its first result, while a slow but
     // working GPU (the emulator's, about 0.5 s per result) answers within a dozen frames.
     const val GPU_SILENT_FRAME_LIMIT = 150
+    // How old the last frame with a face may be for a snapshot; see snapshot().
+    const val SNAPSHOT_FACE_MAX_AGE_MS = 1500L
   }
 }

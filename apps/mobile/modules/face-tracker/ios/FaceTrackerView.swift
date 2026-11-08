@@ -37,7 +37,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   // diagnosed with come from one frame. Holding one at a time never drops it before its result
   // and keeps the camera's buffers free.
   private var pendingBuffers: [Int: CVPixelBuffer] = [:]
-  private var landmarked: (buffer: CVPixelBuffer, points: [Double])?
+  private var landmarked: (buffer: CVPixelBuffer, points: [Double], at: CFTimeInterval)?
   private var lastTimestamp = -1
 
   required init(appContext: AppContext? = nil) {
@@ -213,7 +213,8 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     lock.lock()
     let frame = landmarked
     lock.unlock()
-    guard let frame else {
+    // The tracker misses a face for single frames, so a face from just before still counts.
+    guard let frame, CACurrentMediaTime() - frame.at <= 1.5 else {
       return nil
     }
     let pixelBuffer = frame.buffer
@@ -290,9 +291,6 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     let capture = captures.removeValue(forKey: timestampInMilliseconds)
     let frame = pendingBuffers.removeValue(forKey: timestampInMilliseconds)
     pendingBuffers = pendingBuffers.filter { $0.key > timestampInMilliseconds }
-    if result?.faceLandmarks.first?.isEmpty ?? true {
-      landmarked = nil
-    }
     lock.unlock()
     guard let capture else {
       return
@@ -315,7 +313,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       // A camera stopped meanwhile keeps nothing from the session it ended.
       lock.lock()
       if acceptingFrames, capture.generation == sessionGeneration {
-        landmarked = (frame, points)
+        landmarked = (frame, points, CACurrentMediaTime())
       }
       lock.unlock()
     }
