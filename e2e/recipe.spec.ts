@@ -17,7 +17,7 @@ for (const { name, viewport, firstRowCount } of [
     const openApp = page.getByRole('link', { name: 'アプリで開く', exact: true });
     await expect(openApp).toBeInViewport();
     await expect(openApp).toHaveAttribute('href', 'com.kcvl.nuri:///(tabs)/(make)');
-    const cards = page.getByRole('button', { name: /、いいね/ });
+    const cards = page.getByRole('button', { name: /、お気に入り/ });
     await expect(cards.nth(5)).toBeVisible();
     await expect
       .poll(() =>
@@ -28,7 +28,7 @@ for (const { name, viewport, firstRowCount } of [
       )
       .toBe(firstRowCount);
 
-    await page.getByRole('button', { name: /狐メイク、mio、いいね/ }).click();
+    await page.getByRole('button', { name: /狐メイク、mio、お気に入り/ }).click();
     await expect(page).toHaveURL('/recipes/fox');
     await expect(openApp).toBeInViewport();
     await expect(openApp).toHaveAttribute('href', 'com.kcvl.nuri:///recipes/fox');

@@ -1,3 +1,5 @@
+import type { Column } from 'drizzle-orm';
+
 import { zValidator } from '@hono/zod-validator';
 import {
   feedQuerySchema,
@@ -16,15 +18,6 @@ import { recipe, recipeFavorite, recipeImage, recipeStep, user } from '../../db/
 import { requireSession } from '../auth';
 
 const pageSize = 20;
-const summaryFields = {
-  id: recipe.id,
-  title: recipe.title,
-  image: recipe.image,
-  tags: recipe.tags,
-  summary: recipe.summary,
-  likeCount: recipe.likeCount,
-  author: { id: user.id, name: user.name },
-};
 
 function page<T>(items: T[], offset: number) {
   return {
@@ -35,6 +28,38 @@ function page<T>(items: T[], offset: number) {
 
 // Recipes are public: browsing them needs no session. Favorites belong to the signed-in user.
 export function recipeRoutes(db: Database, auth: Auth) {
+  /** Whether the viewer (none for a guest) has favorited the recipe with this ID. */
+  const favoritedBy = (recipeId: Column, viewerId: string | null) =>
+    exists(
+      db
+        .select({ recipeId: recipeFavorite.recipeId })
+        .from(recipeFavorite)
+        .where(
+          and(
+            eq(recipeFavorite.recipeId, recipeId),
+            eq(recipeFavorite.userId, sql.param(viewerId)),
+          ),
+        ),
+    ).mapWith(Boolean);
+  /** The heart's count: a sample's carried-over popularity plus its favorites in nuri (#191). */
+  const likeCountOf = (recipeId: Column, carriedOver: Column) =>
+    sql<number>`${carriedOver} + (${db
+      .select({ count: count() })
+      .from(recipeFavorite)
+      .where(eq(recipeFavorite.recipeId, recipeId))})`.mapWith(Number);
+  const summaryFields = (viewerId: string | null) => ({
+    id: recipe.id,
+    title: recipe.title,
+    image: recipe.image,
+    tags: recipe.tags,
+    summary: recipe.summary,
+    likeCount: likeCountOf(recipe.id, recipe.likeCount),
+    favorited: favoritedBy(recipe.id, viewerId),
+    author: { id: user.id, name: user.name },
+  });
+  const viewerOf = async (headers: Headers) =>
+    (await auth.api.getSession({ headers }))?.user.id ?? null;
+
   return (
     new Hono<AuthenticatedEnv>()
       .get('/recipes', zValidator('query', recipeListQuerySchema), async (c) => {
@@ -55,7 +80,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
             : undefined,
         );
         const items = await db
-          .select(summaryFields)
+          .select(summaryFields(await viewerOf(c.req.raw.headers)))
           .from(recipe)
           .innerJoin(user, eq(recipe.authorId, user.id))
           .where(where)
@@ -154,7 +179,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
         async (c) => {
           const { offset } = c.req.valid('query');
           const items = await db
-            .select(summaryFields)
+            .select(summaryFields(c.get('currentUser').id))
             .from(recipeFavorite)
             .innerJoin(recipe, eq(recipeFavorite.recipeId, recipe.id))
             .innerJoin(user, eq(recipe.authorId, user.id))
@@ -219,7 +244,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
       )
       .get('/recipes/:id', zValidator('param', recipeParamsSchema), async (c) => {
         const { id } = c.req.valid('param');
-        const session = await auth.api.getSession({ headers: c.req.raw.headers });
+        const viewerId = await viewerOf(c.req.raw.headers);
         const found = await db.query.recipe.findFirst({
           where: { id },
           columns: {
@@ -228,24 +253,13 @@ export function recipeRoutes(db: Database, auth: Auth) {
             image: true,
             tags: true,
             durationMinutes: true,
-            likeCount: true,
             source: true,
             part: true,
             summary: true,
           },
           extras: {
-            favorited: (row) =>
-              exists(
-                db
-                  .select({ recipeId: recipeFavorite.recipeId })
-                  .from(recipeFavorite)
-                  .where(
-                    and(
-                      eq(recipeFavorite.recipeId, row.id),
-                      eq(recipeFavorite.userId, sql.param(session?.user.id ?? null)),
-                    ),
-                  ),
-              ).mapWith(Boolean),
+            likeCount: (row) => likeCountOf(row.id, row.likeCount),
+            favorited: (row) => favoritedBy(row.id, viewerId),
           },
           with: {
             author: { columns: { id: true, name: true, image: true } },
