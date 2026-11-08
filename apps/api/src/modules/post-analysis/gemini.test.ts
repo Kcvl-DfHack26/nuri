@@ -1,10 +1,17 @@
 import { expect, test } from 'bun:test';
 
-import { analysisPrompt, geminiJsonSchema, readVerification } from './gemini';
+import {
+  analysisPrompt,
+  answerSteps,
+  clockSeconds,
+  clockText,
+  geminiJsonSchema,
+  readVerification,
+} from './gemini';
 
 test('adds the marks to the instructions only when the user made them', () => {
   expect(analysisPrompt([])).not.toContain('手順を区切りました');
-  expect(analysisPrompt([26, 62.5])).toContain('26.0秒，62.5秒');
+  expect(analysisPrompt([26, 62.5])).toContain('0:26.0，1:02.5');
 });
 
 test('reads whether search found the product, also inside a code fence', () => {
@@ -34,4 +41,28 @@ test('keeps only the schema keywords Vertex AI accepts', () => {
       part: { type: 'string', enum: ['brow'], description: '部位' },
     },
   });
+});
+
+test('reads m:ss times, past a minute too, and refuses other text', () => {
+  expect(clockSeconds('0:05')).toBe(5);
+  expect(clockSeconds('1:07')).toBe(67);
+  expect(clockSeconds(' 12:30.5 ')).toBe(750.5);
+  for (const text of ['107', '1:7', '1:60', '', 'abc', '-0:05']) {
+    expect(clockSeconds(text)).toBeNull();
+  }
+});
+
+test('writes seconds as m:ss for the instructions', () => {
+  expect(clockText(5)).toBe('0:05.0');
+  expect(clockText(62.5)).toBe('1:02.5');
+  expect(clockText(600)).toBe('10:00.0');
+});
+
+test('turns the steps’ times into seconds and leaves out a step whose time cannot be read', () => {
+  expect(
+    answerSteps([
+      { start: '0:58', end: '1:07', part: 'cheek' },
+      { start: '107', end: '115', part: 'shading' },
+    ]),
+  ).toEqual([{ start: 58, end: 67, part: 'cheek' }]);
 });
