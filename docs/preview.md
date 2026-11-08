@@ -8,7 +8,7 @@ gh workflow run preview.yml --ref main -f pr=PR_NUMBER
 
 配信せずプレビューコメントを更新する場合は `gh workflow run preview.yml --ref BRANCH -f pr=PR_NUMBER -f operation=comment` を使う。`BRANCH` にはこのモードを含むブランチを指定する。配信がまだ有効でなければ「🔧 設定待ち」を表示する。初期設定後に `--ref main` で同じ操作を実行すると配信チェックボックスが有効になる。
 
-成功すると、PRコメントの表にExpo WebとHono APIのURL、Expo GoのQRと `exps://` URL、各行の状態、デプロイ日時（JST）、費用・利用枠が表示される。キューに入っている間にPRのSHAが変わった場合、古いイベントからの配信はスキップする。同じSHAのリビジョンとビルド済みイメージは再利用する。
+成功すると、PRコメントの表にExpo WebとHono APIのURL、Expo GoのQRと `exps://` URL、各行の状態、デプロイ日時（JST）、費用・利用枠が表示される。キューに入っている間にPRのSHAが変わった場合、古いイベントからの配信はスキップする。PRのSHAとmainのプレビュー用Dockerfile・起動ファイルが同じ場合、リビジョンとイメージを再利用する。
 
 Expo Goは `apps/mobile` と同じSDKのビルドを使う。iOS実機では対応版の配布方法に従い、手元に対応版がなければWebで確認する。Expo Goに含まれないネイティブ機能は互換Development Buildで確認する。[Expo GoのSDK互換性](https://docs.expo.dev/troubleshooting/expo-go-version-mismatch/)
 
@@ -23,7 +23,7 @@ Expo Goは `apps/mobile` と同じSDKのビルドを使う。iOS実機では対�
 | `/` のExpo Go向けリクエスト、`.bundle`、ネイティブアセット | Expo CLIのMetro             |
 | `/expo-go/qr.svg`                                          | 同じホストを指すExpo Go用QR |
 
-Honoはコンテナ内の使い捨てPostgreSQLを使う。インスタンスが起動するたびにmigrationと見本データの投入を行う。Googleやメールの実認証は共有stagingの検証を使う。PRプレビューのURLは公開されるため、機密データを入れない。
+Honoはコンテナ内の使い捨てPostgreSQLを使う。インスタンスが起動するたびにmigrationと見本データの投入を行い、HonoとMetroが準備できてから公開ポートで待ち受ける。Googleやメールの実認証は共有stagingの検証を使う。PRプレビューのURLは公開されるため、機密データを入れない。
 
 ## 利用枠とcleanup
 
