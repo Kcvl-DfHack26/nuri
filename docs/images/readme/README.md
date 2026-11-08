@@ -31,3 +31,18 @@
 - 確認時点でProduction Infrastructureに必要な`TOFU_*`変数と`EXPO_UPDATE_ENABLED`は未登録。配備設定の将来の変更は図へ自動反映されない。
 
 図の破線は配信の処理順または構成管理の関係で、migration Jobがサービスを直接デプロイする意味ではない。PRプレビュー・ローカル開発・全認証方式・全DBテーブルなどは省略している。詳細は[アーキテクチャ](../../architecture.md)と[セットアップ](../../setup.md)を参照。
+
+## 紹介用ロゴ
+
+冒頭はアプリに同梱済みの`apps/mobile/assets/images/icon.png`を使用。nuriの新しいロゴは作成していない。
+
+技術ロゴは構成図と同じ取得済みSVGを使用し、明暗のテーマで見えるよう白い台座を付けた。元のロゴの形・色は変更していない。
+
+| ファイル           | ロゴ         | 元データ                                                                                                                          |
+| ------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `logo-expo.svg`    | Expo         | [取得元](https://svgl.app/library/expo.svg)                                                                                       |
+| `logo-react.svg`   | React Native | [取得元](https://svgl.app/library/react_light.svg)                                                                                |
+| `logo-hono.svg`    | Hono         | [取得元](https://svgl.app/library/hono.svg)                                                                                       |
+| `logo-vertex.svg`  | Vertex AI    | [取得元](https://services.google.com/fh/files/misc/core-products-icons.zip#Unique%20Icons/Vertex%20AI/SVG/VertexAI-512-color.svg) |
+| `logo-drizzle.svg` | Drizzle ORM  | [取得元](https://svgl.app/library/drizzle-orm_light.svg)                                                                          |
+| `logo-tofu.svg`    | OpenTofu     | [取得元](https://raw.githubusercontent.com/opentofu/brand-artifacts/main/symbol-only/transparent/SVG/on-light.svg)                |
