@@ -178,8 +178,15 @@ const lipInner = [
 export const koreanBaseShape: MakeupShape = {
   strokes: [
     { fill: true, blur: 0.05, opacity: 0.6, points: faceOval.map((at) => ({ at })) },
-    // Not on the eyes or the lips.
+    // Keep the eyes, brows and lips clear so the skin tint does not mask their colors.
     { erase: true, mirror: true, fill: true, blur: 0.01, points: eyeOutline.map((at) => ({ at })) },
+    {
+      erase: true,
+      mirror: true,
+      fill: true,
+      blur: 0.01,
+      points: [...browUpper, ...browLower].map((at) => ({ at })),
+    },
     { erase: true, fill: true, blur: 0.01, points: lipOuter.map((at) => ({ at })) },
   ],
 };
@@ -273,5 +280,126 @@ export const catLinerShape: MakeupShape = {
         { at: 130, dx: -0.045, dy: -0.024 },
       ],
     },
+  ],
+};
+
+/** A sheer color across the upper eyelid, without the outer sweep of fox or cat eyes. */
+export const naturalEyeShape: MakeupShape = {
+  strokes: [
+    {
+      mirror: true,
+      fill: true,
+      blur: 0.015,
+      opacity: 0.65,
+      points: [
+        { at: 33 },
+        { at: 161 },
+        { at: 159 },
+        { at: 157 },
+        { at: 173 },
+        { at: 190, dy: -0.01 },
+        { at: 28, dy: -0.015 },
+        { at: 27, dy: -0.016 },
+        { at: 29, dy: -0.012 },
+        { at: 30, dy: -0.008 },
+      ],
+    },
+  ],
+};
+
+/** A narrow band of shadow below the lower lid, used to balance a long face. */
+export const underEyeShape: MakeupShape = {
+  strokes: [
+    {
+      mirror: true,
+      width: 0.025,
+      blur: 0.016,
+      opacity: 0.5,
+      points: [
+        { at: 33, dy: 0.018 },
+        { at: 144, dy: 0.024 },
+        { at: 145, dy: 0.026 },
+        { at: 153, dy: 0.024 },
+        { at: 133, dy: 0.018 },
+      ],
+    },
+  ],
+};
+
+/** A short, soft oval on the high cheekbone rather than a round apple. */
+export const roundCheekShape: MakeupShape = {
+  strokes: [
+    {
+      mirror: true,
+      fill: true,
+      blur: 0.035,
+      opacity: 0.7,
+      points: [
+        { at: 205 },
+        { at: 50, dy: -0.01 },
+        { at: 101, dy: -0.012 },
+        { at: 118 },
+        { at: 111 },
+        { at: 116 },
+        { at: 123, dy: 0.01 },
+      ],
+    },
+  ],
+};
+
+/** A horizontal cheek oval, kept below the eyes and away from the jaw. */
+export const longCheekShape: MakeupShape = {
+  strokes: [
+    {
+      mirror: true,
+      fill: true,
+      blur: 0.035,
+      opacity: 0.65,
+      points: [
+        { at: 205, dy: 0.01 },
+        { at: 50, dy: 0.005 },
+        { at: 101, dy: 0.005 },
+        { at: 118, dy: 0.012 },
+        { at: 111, dy: 0.024 },
+        { at: 123, dy: 0.024 },
+        { at: 147, dy: -0.012 },
+      ],
+    },
+  ],
+};
+
+/** Subtle shadow at the top of the forehead and under the chin, not down the side of the face. */
+export const longShadingShape: MakeupShape = {
+  strokes: [
+    {
+      mirror: true,
+      width: 0.045,
+      blur: 0.022,
+      opacity: 0.55,
+      points: [
+        { at: 10, dy: 0.02 },
+        { at: 109, dy: 0.02 },
+        { at: 67, dy: 0.02 },
+      ],
+    },
+    {
+      mirror: true,
+      width: 0.04,
+      blur: 0.02,
+      opacity: 0.5,
+      points: [
+        { at: 152, dy: -0.02 },
+        { at: 148, dy: -0.02 },
+        { at: 176, dy: -0.02 },
+      ],
+    },
+  ],
+};
+
+/** Even lip color, with the open mouth excluded; the Korean look keeps its own gradient. */
+export const naturalLipShape: MakeupShape = {
+  strokes: [
+    { fill: true, blur: 0.01, opacity: 0.7, points: lipOuter.map((at) => ({ at })) },
+    { erase: true, fill: true, blur: 0.004, points: lipInner.map((at) => ({ at })) },
   ],
 };

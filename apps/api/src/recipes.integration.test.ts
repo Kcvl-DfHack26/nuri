@@ -5,8 +5,9 @@ import { z } from 'zod';
 
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
+import { templateRecipeIds } from './db/recipe-templates';
 import { seedSampleData } from './db/sample-data';
-import { recipe, recipeProduct, recipeStep, user } from './db/schema';
+import { recipe, recipeFavorite, recipeProduct, recipeStep, user } from './db/schema';
 import { createAuth } from './modules/auth';
 import { readEnv } from './platform/env';
 
@@ -46,11 +47,14 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
     image: 'https://example.com/own.jpg',
     durationMinutes: 3,
   });
+  await db.insert(recipeFavorite).values({ userId: ownUserId, recipeId: 'fox' });
   // Someone else's recipe that happens to use a seeded slug.
   await db
     .update(recipe)
     .set({ authorId: ownUserId, title: '同じIDの自分のレシピ' })
     .where(eq(recipe.id, 'round'));
+  await db.delete(recipeProduct).where(eq(recipeProduct.recipeId, 'round'));
+  await db.delete(recipeStep).where(eq(recipeStep.recipeId, 'round'));
   const ownStep = {
     recipeId: 'round',
     position: 0,
@@ -63,6 +67,10 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
     shape: null,
   };
   await db.insert(recipeStep).values(ownStep);
+  await db
+    .update(recipe)
+    .set({ authorId: 'sample-mio', source: 'instagram', likeCount: 7 })
+    .where(eq(recipe.id, 'fox'));
   const before = await db.select({ value: count() }).from(recipe);
   const seededProducts = await db
     .select({ value: count() })
@@ -93,7 +101,21 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
   ]);
   expect(
     await db.select({ value: count() }).from(recipeStep).where(eq(recipeStep.recipeId, 'fox')),
-  ).toEqual([{ value: 5 }]);
+  ).toEqual([{ value: 6 }]);
+  expect(
+    await db
+      .select({ authorId: recipe.authorId, source: recipe.source, likeCount: recipe.likeCount })
+      .from(recipe)
+      .where(eq(recipe.id, 'fox')),
+  ).toEqual([{ authorId: 'nuri-editorial', source: null, likeCount: 0 }]);
+  expect(
+    await db
+      .select({ recipeId: recipeFavorite.recipeId })
+      .from(recipeFavorite)
+      .where(eq(recipeFavorite.userId, ownUserId)),
+  ).toEqual([{ recipeId: 'fox' }]);
+  await db.delete(user).where(eq(user.id, ownUserId));
+  await seedSampleData(db);
 });
 
 test('shows the public recipe with ordered products and steps', async () => {
@@ -104,36 +126,75 @@ test('shows the public recipe with ordered products and steps', async () => {
     recipe: {
       id: 'fox',
       title: '狐メイク',
-      tags: ['丸顔向け'],
+      tags: ['切れ長アイ'],
       durationMinutes: 15,
-      source: 'instagram',
+      source: null,
       favorited: false,
-      author: { name: 'mio', image: '/sample-avatars/mio.png' },
-      products: [
-        { id: 'celane-brow-pencil', usage: '眉・モカブラウン', purchaseUrl: null },
-        {
-          id: 'mousse-cheek',
-          usage: 'チーク・コーラル',
-          purchaseUrl:
-            'https://www.amazon.co.jp/s?k=%E3%83%A0%E3%83%BC%E3%82%B9%E3%83%81%E3%83%BC%E3%82%AF',
-        },
-      ],
+      author: { name: 'nuri' },
     },
   });
   const { recipe: fox } = z
     .object({
       recipe: z.object({
+        products: z.array(
+          z.object({ id: z.string(), usage: z.string(), purchaseUrl: z.nullable(z.url()) }),
+        ),
         steps: z.array(z.object({ part: z.string(), shape: makeupShapeSchema.nullable() })),
       }),
     })
     .parse(body);
-  expect(fox.steps.map((step) => step.part)).toEqual(['brow', 'eye', 'lash', 'shading', 'cheek']);
+  expect(fox.products.slice(0, 2)).toEqual([
+    { id: 'template-brow-powder', usage: '眉頭を淡くぼかす', purchaseUrl: null },
+    { id: 'template-brow-pencil', usage: '髪色になじむブラウン', purchaseUrl: null },
+  ]);
+  expect(fox.steps.map((step) => step.part)).toEqual([
+    'brow',
+    'eye',
+    'lash',
+    'shading',
+    'cheek',
+    'lip',
+  ]);
   // Every seeded step says where it paints.
   expect(fox.steps.every((step) => step.shape !== null)).toBe(true);
-  expect(await (await app.request('/api/recipes/long')).json()).toMatchObject({
-    recipe: { products: [], steps: [] },
-  });
+  const longBody: unknown = await (await app.request('/api/recipes/long')).json();
+  const { recipe: longRecipe } = z
+    .object({
+      recipe: z.object({
+        products: z.array(z.object({ id: z.string() })),
+        steps: z.array(z.unknown()),
+      }),
+    })
+    .parse(longBody);
+  expect(longRecipe.products.map(({ id }) => id)).toContain('template-cheek');
+  expect(longRecipe.steps).toHaveLength(5);
   expect((await app.request('/api/recipes/missing-recipe')).status).toBe(404);
+});
+
+test('all twelve editorial templates have usable products, colors and painted steps', async () => {
+  expect(templateRecipeIds).toHaveLength(12);
+  for (const id of templateRecipeIds) {
+    const response = await app.request(`/api/recipes/${id}`);
+    expect(response.status).toBe(200);
+    const body: unknown = await response.json();
+    const { recipe: item } = z
+      .object({
+        recipe: z.object({
+          source: z.null(),
+          products: z.array(z.object({ id: z.string() })).min(1),
+          steps: z
+            .array(
+              z.object({
+                colors: z.array(z.string().regex(/^#[0-9A-F]{6}$/)).min(1),
+                shape: makeupShapeSchema,
+              }),
+            )
+            .min(1),
+        }),
+      })
+      .parse(body);
+    expect(item.products.length).toBeGreaterThanOrEqual(1);
+  }
 });
 
 test('lists whole-face recipes by default and part recipes by part', async () => {
@@ -160,9 +221,10 @@ test('searches recipes of every kind by title and tag with paging', async () => 
     expect(response.status).toBe(200);
     return schema.parse(await response.json());
   };
-  // 丸顔向け tags whole-face recipes and a brow recipe; 猫 is in a title only.
+  // 丸顔向け tags a whole-face recipe and a brow recipe; 猫 is in a title only.
   const round = (await search(`q=${encodeURIComponent('丸顔')}`)).items.map((item) => item.id);
-  expect(round).toEqual(expect.arrayContaining(['fox', 'round', 'brow-arch']));
+  expect(round).toEqual(expect.arrayContaining(['round', 'brow-arch']));
+  expect(round).not.toContain('fox');
   expect(round).not.toContain('cat');
   expect((await search(`q=${encodeURIComponent(' 猫 ')}`)).items.map((item) => item.id)).toEqual([
     'cat',

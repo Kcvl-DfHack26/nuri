@@ -6,11 +6,11 @@
 
 ```sh
 bun run dev
-# 別ターミナルで、起動済みのAPIへseedを投入
+# 別ターミナルで、開発用SNSデータを投入
 bun run db:seed
 ```
 
-seedはSNSサンプルの画像付き4ユーザー・8投稿・20件のいいねと、Plan Aのレシピ6件・その作者3人・使うメイク品2点を固定IDで作る。`NODE_ENV=development` かつ `AUTH_EMULATE=true` に限定し、再実行しても重複せず、アプリから作ったユーザー・投稿・いいね・レシピは削除しない。サンプル画像はAPIに同梱し、外部の画像サーバーへ実行時に接続しない。写真の出典は `apps/api/assets/sample-avatars/README.md` と `apps/api/assets/sample-recipes/README.md`。サンプル著者とログインアカウントは別である。
+seedはSNSサンプルの画像付き4ユーザー・8投稿・いいねを固定IDで作る。`NODE_ENV=development` かつ `AUTH_EMULATE=true` に限定し、再実行しても重複せず、アプリから作ったユーザー・投稿・いいね・レシピは削除しない。メイク見本12件は[編集根拠](makeup-recipes.md)に基づく別のテンプレートで、migration後に同期する。サンプル画像はAPIに同梱し、外部の画像サーバーへ実行時に接続しない。写真の出典は `apps/api/assets/sample-avatars/README.md` と `apps/api/assets/sample-recipes/README.md`。
 
 | サービス       | PortlessのURL                                   |
 | -------------- | ----------------------------------------------- |

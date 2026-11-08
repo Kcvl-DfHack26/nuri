@@ -13,6 +13,12 @@ import {
   koreanCheekShape,
   koreanHighlightShape,
   koreanLipShape,
+  longCheekShape,
+  longShadingShape,
+  naturalEyeShape,
+  naturalLipShape,
+  roundCheekShape,
+  underEyeShape,
 } from './sample-shapes';
 
 test('every sample shape is a valid makeup shape', () => {
@@ -28,6 +34,12 @@ test('every sample shape is a valid makeup shape', () => {
     koreanCheekShape,
     koreanHighlightShape,
     koreanLipShape,
+    longCheekShape,
+    longShadingShape,
+    naturalEyeShape,
+    naturalLipShape,
+    roundCheekShape,
+    underEyeShape,
   ];
   for (const shape of shapes) {
     expect(makeupShapeSchema.safeParse(shape).success).toBe(true);

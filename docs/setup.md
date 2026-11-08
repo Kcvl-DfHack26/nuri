@@ -90,12 +90,14 @@ bun run devices      # ホストのExpo Device Hub
 bun run dev:go       # API・DBとExpo Go用トンネル付きMetro
 bun run services:up  # API・DB・Metroをバックグラウンド起動
 bun run db:migrate
-bun run db:seed      # 4ユーザーの画像・8投稿・いいね。既存の利用者データは保持
+bun run db:seed      # 開発用SNS投稿・いいね。メイク見本12件はmigration後に自動同期
 bun run test:integration # 起動済みのDBを使用
 bun run services:down
 ```
 
 統合テストの前にAPIを起動する。テストコマンドは起動中のDBを使い、端末用構成で動いているAPIやEmulateを通常構成で作り直さない。
+
+メイク見本12件は[編集根拠](makeup-recipes.md)に基づくnuriのテンプレートとして、`db:migrate` が既知のIDだけを同期する。共有DBではデプロイのmigration jobが更新し、開発用のSNS seedを共有DBで実行しない。新しい見本の手順・道具を確認するときは、同じIDの利用者投稿とお気に入りが保持されていることも確かめる。
 
 ### 旧ハッシュ名から移行する
 
