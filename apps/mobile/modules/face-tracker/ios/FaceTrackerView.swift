@@ -17,7 +17,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   private let previewLayer: AVCaptureVideoPreviewLayer
   private let sessionQueue = DispatchQueue(label: "com.kcvl.nuri.facetracker.session")
   private let videoQueue = DispatchQueue(label: "com.kcvl.nuri.facetracker.video")
+  // Video queue only: create the live model on demand; retry failures on the next camera session.
   private var landmarker: FaceLandmarker?
+  private var failedLandmarkerGeneration: Int?
   private var configured = false
   private var videoOutput: AVCaptureVideoDataOutput?
   private var orientation: AVCaptureVideoOrientation = .portrait
@@ -153,12 +155,6 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
 
   // Runs on the session queue.
   private func configure(_ orientation: AVCaptureVideoOrientation) -> Bool {
-    do {
-      landmarker = try makeLandmarker()
-    } catch {
-      emitStatus("error", message: error.localizedDescription)
-      return false
-    }
     session.beginConfiguration()
     defer { session.commitConfiguration() }
     if session.canSetSessionPreset(.hd1280x720) {
@@ -248,8 +244,17 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     }
     latestFrame = (pixelBuffer, CACurrentMediaTime())
     let shouldTrack = trackLandmarks
+    let generation = sessionGeneration
     lock.unlock()
     guard shouldTrack else { return }
+    if landmarker == nil && failedLandmarkerGeneration != generation {
+      do {
+        landmarker = try makeLandmarker()
+      } catch {
+        failedLandmarkerGeneration = generation
+        emitStatus("error", message: error.localizedDescription, generation: generation)
+      }
+    }
     guard let landmarker else { return }
     let presentation = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
     let timestamp = Int(CMTimeGetSeconds(presentation) * 1000)
@@ -257,7 +262,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       return
     }
     lock.lock()
-    guard acceptingFrames else {
+    guard acceptingFrames, sessionGeneration == generation else {
       lock.unlock()
       return
     }
@@ -267,7 +272,6 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       return
     }
     lastTimestamp = timestamp
-    let generation = sessionGeneration
     let size = CGSize(
       width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
     captures[timestamp] = (CACurrentMediaTime(), generation, size, connection.videoOrientation)

@@ -228,6 +228,16 @@ export function Suggest() {
               active={focused}
               trackLandmarks={false}
               style={StyleSheet.absoluteFill}
+              onStatus={({ nativeEvent: { status } }) => {
+                if (status === 'permissionDenied' || status === 'error') {
+                  closeCamera();
+                  setMessage(
+                    status === 'permissionDenied'
+                      ? 'カメラを使う許可がありません。設定から許可してください'
+                      : 'カメラを開けませんでした。もう一度お試しください',
+                  );
+                }
+              }}
             />
           ) : undefined
         }

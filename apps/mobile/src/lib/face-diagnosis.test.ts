@@ -138,3 +138,42 @@ test('classifies brows with the thresholds decided in #47', () => {
   expect(classifyBrow({ peak: 0.18, tail: 0 })).toBeNull();
   expect(classifyBrow({ peak: 0.14, tail: 0.2 })).toBeNull();
 });
+
+test.each([
+  'file:///data/user/0/com.kcvl.nuri/cache/face-tracker/shot.jpg',
+  'file:///var/mobile/Containers/Data/Application/app/Library/Caches/ImagePicker/face%20photo.jpg',
+])('accepts a local camera or picked photo: %s', (photo) => {
+  expect(readResultParams({ face: 'round', photo })?.photo).toBe(photo);
+});
+
+test.each([
+  'https://example.com/track.jpg',
+  'http://example.com/track.jpg',
+  '//example.com/track.jpg',
+  'file://example.com/track.jpg',
+  'data:image/png;base64,AAAA',
+  'content://example.com/image',
+  // oxlint-disable-next-line eslint/no-script-url -- Deliberately unsafe deep-link input.
+  'javascript:alert(1)',
+  'face.jpg',
+  ['file:///face.jpg'],
+  { uri: 'file:///face.jpg' },
+])('ignores an unsafe or malformed photo parameter: %j', (photo) => {
+  expect(readResultParams({ face: 'round', photo })).toMatchObject({
+    faceType: 'round',
+    photo: undefined,
+  });
+});
+
+test('validates deep-link parameter types before reading a diagnosis', () => {
+  expect(readResultParams(null)).toBeNull();
+  expect(readResultParams({ face: ['round'] })).toBeNull();
+  expect(readResultParams({ face: '__proto__' })).toBeNull();
+  expect(readResultParams({ face: 'round', eye: ['droopy'], midface: {}, brow: 1 })).toEqual({
+    faceType: 'round',
+    eye: 'standard',
+    midface: 'standard',
+    brow: null,
+    photo: undefined,
+  });
+});

@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 // Face type, eye shape, midface and brow shape from MediaPipe Face Landmarker points (#84). To add,
 // remove or change a type, edit its entry in the definitions below.
 
@@ -133,9 +135,26 @@ export function resultParams(result: DiagnosisResult): Record<string, string> {
   };
 }
 
+// Both the image picker and camera return local files. Deep links must not load remote images.
+const resultParamsSchema = z.object({
+  face: z.string(),
+  eye: z.string().optional().catch(undefined),
+  midface: z.string().optional().catch(undefined),
+  brow: z.string().optional().catch(undefined),
+  photo: z
+    .url({ protocol: /^file$/, hostname: /^$/ })
+    .startsWith('file:///')
+    .optional()
+    .catch(undefined),
+});
+
 /** A result read back from ⑭'s route params; null when the face type is missing or unknown. */
-export function readResultParams(params: Partial<Record<string, string>>): DiagnosisResult | null {
-  const { face, eye, midface, brow, photo } = params;
+export function readResultParams(params: unknown): DiagnosisResult | null {
+  const parsed = resultParamsSchema.safeParse(params);
+  if (!parsed.success) {
+    return null;
+  }
+  const { face, eye, midface, brow, photo } = parsed.data;
   if (!face || !isKey(faceTypes, face)) {
     return null;
   }

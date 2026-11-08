@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { diagnoseFace } from '@/lib/face-diagnosis';
 import { deleteFile } from '@/lib/files';
 import { TestQueryProvider } from '@/lib/test/query-client';
+
+import type { FaceTrackerViewProps } from '../../modules/face-tracker/src/FaceTracker.types';
 
 import { Diagnosis } from './diagnosis';
 import { Suggest } from './suggest';
@@ -54,12 +56,13 @@ jest.mock('../../modules/face-tracker/src/FaceTrackerModule', () => ({
     requestCameraPermissionAsync: () => mockRequestCamera(),
   },
 }));
-type TrackerProps = { ref?: React.Ref<unknown> };
+let mockTrackerProps: FaceTrackerViewProps | undefined;
 const mockRequestCamera = jest.fn<Promise<boolean>, []>();
 const mockSnapshot = jest.fn<Promise<string | null>, []>();
 jest.mock('../../modules/face-tracker/src/FaceTrackerView', () => ({
   __esModule: true,
-  default: (props: TrackerProps) => {
+  default: (props: FaceTrackerViewProps) => {
+    mockTrackerProps = props;
     jest
       .requireActual<typeof import('react')>('react')
       .useImperativeHandle(props.ref, () => ({ takeSnapshotAsync: mockSnapshot }));
@@ -108,6 +111,7 @@ const params = jest.mocked(useLocalSearchParams);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockTrackerProps = undefined;
   pick.mockResolvedValue({
     canceled: false,
     assets: [{ uri: 'file:///face.jpg', width: 100, height: 100 }],
@@ -253,6 +257,36 @@ test('explains when camera permission or a camera frame is unavailable', async (
   await fireEvent.press(screen.getByRole('button', { name: 'やめる' }));
   expect(screen.getByRole('button', { name: 'カメラで診断' })).toBeEnabled();
   expect(router.push).not.toHaveBeenCalled();
+});
+
+test('explains camera startup failures and permits retry without requiring a live face', async () => {
+  mockRequestCamera.mockResolvedValue(true);
+  await render(<Suggest />);
+  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+  await act(() => {
+    mockTrackerProps?.onStatus?.({ nativeEvent: { status: 'noFace' } });
+  });
+  expect(screen.getByRole('button', { name: '撮影して診断' })).toBeEnabled();
+  expect(screen.queryByText('顔を枠に合わせてください')).not.toBeOnTheScreen();
+
+  await act(() => {
+    mockTrackerProps?.onStatus?.({ nativeEvent: { status: 'error' } });
+  });
+  expect(screen.getByText('カメラを開けませんでした。もう一度お試しください')).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: '撮影して診断' })).not.toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+  expect(
+    screen.queryByText('カメラを開けませんでした。もう一度お試しください'),
+  ).not.toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '撮影して診断' })).toBeEnabled();
+
+  await act(() => {
+    mockTrackerProps?.onStatus?.({ nativeEvent: { status: 'permissionDenied' } });
+  });
+  expect(
+    screen.getByText('カメラを使う許可がありません。設定から許可してください'),
+  ).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'カメラで診断' })).toBeEnabled();
 });
 
 test('retries a camera photo when still-image detection finds no face', async () => {
