@@ -1,6 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { AppState, Linking } from 'react-native';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { PushNotifications } from './push-notifications';
 import { PushSettings } from './push-settings';
@@ -27,7 +29,7 @@ jest.mock('@expo/ui', () => {
         <Text>{label}</Text>
       </Pressable>
     ),
-    FieldGroup: { Section: View },
+    Host: View,
     Text,
   };
 });
@@ -47,10 +49,7 @@ jest.mock('@/lib/api', () => ({
     },
   },
   authClient: {
-    useSession: () => ({
-      data: { user: { id: 'viewer' }, session: { id: 'session' } },
-      isPending: false,
-    }),
+    useSession: () => mockUseSession(),
   },
 }));
 jest.mock('@/lib/notifications', () => ({
@@ -66,7 +65,7 @@ jest.mock('@/lib/notifications', () => ({
     clearLastNotificationResponse: mockClearResponse,
     addNotificationResponseReceivedListener: (open: (response: Tap) => void) => {
       mockOpen = open;
-      return { remove: jest.fn() };
+      return { remove: mockRemoveResponseListener };
     },
   }),
 }));
@@ -83,15 +82,28 @@ const mockRequestPermissions = jest.fn(async () => {
 const mockRegister = jest.fn(async (_input: unknown, _options: unknown) => ({ ok: true }));
 const mockGetLastResponse = jest.fn((): Tap | null => null);
 const mockClearResponse = jest.fn();
+const mockRemoveResponseListener = jest.fn();
+const mockUseSession = jest.fn(() => ({
+  data: { user: { id: 'viewer' }, session: { id: 'session' } },
+  isPending: false,
+}));
 
-function renderWithClient(element: React.ReactNode) {
-  const client = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: Infinity },
-      mutations: { gcTime: Infinity },
-    },
+beforeEach(() => {
+  mockOpen = undefined;
+  jest.spyOn(AppState, 'addEventListener').mockReturnValue({ remove: jest.fn() });
+  mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: true });
+  mockUseSession.mockReturnValue({
+    data: { user: { id: 'viewer' }, session: { id: 'session' } },
+    isPending: false,
   });
-  return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+function renderWithClient(element: React.ReactElement) {
+  return render(element, { wrapper: TestQueryProvider });
 }
 
 test('requests OS permission from settings and registers the current session', async () => {
@@ -140,4 +152,85 @@ test('consumes a cold-start tap and opens only validated routes for the signed-i
     params: { id: 'fox' },
   });
   expect(router.navigate).toHaveBeenLastCalledWith('/import');
+});
+
+test('opens OS settings when permission is blocked and refreshes registration on return', async () => {
+  mockGetPermissions.mockResolvedValue({ granted: false, canAskAgain: false });
+  const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
+  const appState = jest.spyOn(AppState, 'addEventListener');
+  const view = await renderWithClient(
+    <>
+      <PushNotifications />
+      <PushSettings sessionId="session" />
+    </>,
+  );
+  try {
+    await fireEvent.press(await screen.findByRole('button', { name: '端末の通知設定を開く' }));
+    await waitFor(() => {
+      expect(openSettings).toHaveBeenCalledTimes(1);
+    });
+    expect(mockRequestPermissions).not.toHaveBeenCalled();
+    mockGetPermissions.mockResolvedValue({ granted: true, canAskAgain: false });
+    await act(() => {
+      appState.mock.calls.find(([event]) => event === 'change')?.[1]('active');
+    });
+    expect(await screen.findByText('この端末で通知を受け取れます。')).toBeOnTheScreen();
+    expect(mockRegister).toHaveBeenCalledTimes(1);
+  } finally {
+    await view.unmount();
+    openSettings.mockRestore();
+    appState.mockRestore();
+  }
+});
+
+test('removes the old response listener and rejects queued taps after switching accounts', async () => {
+  const view = await renderWithClient(<PushNotifications />);
+  await waitFor(() => {
+    expect(mockOpen).toBeDefined();
+  });
+  const previousOpen = mockOpen;
+  mockUseSession.mockReturnValue({
+    data: { user: { id: 'another-account' }, session: { id: 'another-session' } },
+    isPending: false,
+  });
+  await view.rerender(<PushNotifications />);
+  await waitFor(() => {
+    expect(mockRemoveResponseListener).toHaveBeenCalledTimes(1);
+    expect(mockOpen).not.toBe(previousOpen);
+  });
+  await act(() => {
+    previousOpen?.(tap({ kind: 'post-liked', recipientId: 'viewer' }));
+    mockOpen?.(tap({ kind: 'post-liked', recipientId: 'viewer' }));
+  });
+  expect(router.navigate).not.toHaveBeenCalled();
+  await act(() => {
+    mockOpen?.(tap({ kind: 'post-liked', recipientId: 'another-account' }));
+  });
+  expect(router.navigate).toHaveBeenCalledWith({
+    pathname: '/users/[id]',
+    params: { id: 'another-account' },
+  });
+});
+
+test('clears a registration error when returning to the app succeeds', async () => {
+  mockRegister.mockResolvedValueOnce({ ok: false });
+  const appState = jest.spyOn(AppState, 'addEventListener');
+  await renderWithClient(
+    <>
+      <PushNotifications />
+      <PushSettings sessionId="session" />
+    </>,
+  );
+  const enable = screen.getByRole('button', { name: '通知を有効にする' });
+  await waitFor(() => {
+    expect(enable).toBeEnabled();
+  });
+  await fireEvent.press(enable);
+  const error = '通知を設定できませんでした。時間をおいてもう一度お試しください。';
+  expect(await screen.findByText(error)).toBeOnTheScreen();
+  await act(() => {
+    appState.mock.calls.find(([event]) => event === 'change')?.[1]('active');
+  });
+  expect(await screen.findByText('この端末で通知を受け取れます。')).toBeOnTheScreen();
+  expect(screen.queryByText(error)).toBeNull();
 });

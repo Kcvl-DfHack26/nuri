@@ -162,10 +162,7 @@ export function socialRoutes(
             db
               .select({
                 postId: post.id,
-                userId: sql
-                  .param(c.get('currentUser').id, like.userId)
-                  .getSQL()
-                  .as(like.userId.name),
+                userId: sql.param(actorId, like.userId).getSQL().as(like.userId.name),
               })
               .from(post)
               .where(eq(post.id, postId)),

@@ -42,6 +42,9 @@ export function PushNotifications() {
           return;
         }
         const open = (response: NotificationResponse) => {
+          if (!active) {
+            return;
+          }
           notifications.clearLastNotificationResponse();
           const parsed = pushDataSchema.safeParse(response.notification.request.content.data);
           if (

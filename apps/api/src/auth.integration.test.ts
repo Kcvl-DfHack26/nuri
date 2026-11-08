@@ -77,11 +77,7 @@ const cookies = (response: Response) =>
 function request(path: string, body: unknown, cookie = '', method = 'POST') {
   return appRequest(`${baseURL}${path}`, {
     method,
-    headers: {
-      'content-type': 'application/json',
-      origin,
-      cookie,
-    },
+    headers: { 'content-type': 'application/json', origin, cookie },
     body: JSON.stringify(body),
   });
 }
@@ -668,6 +664,15 @@ test('only new likes notify the owner and push subscriptions follow the active s
         mutableContent: true,
       }),
     ]);
+
+    expo.mockResolvedValueOnce(
+      Response.json({ data: [{ status: 'error', details: { error: 'DeviceNotRegistered' } }] }),
+    );
+    await sendPush({ kind: 'recipe-failed', recipientId: owner.user.id });
+    expect(
+      await db.select().from(pushSubscription).where(eq(pushSubscription.token, token)),
+    ).toEqual([]);
+    expect((await request(route, subscription, ownerCookie, 'PUT')).status).toBe(200);
 
     // Logging in on the same installation can move the token, including after reinstall.
     expect(

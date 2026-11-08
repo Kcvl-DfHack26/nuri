@@ -11,8 +11,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Uniwind } from 'uniwind';
 
-import { PushNotifications } from '@/components/push-notifications';
 import { Launch } from '@/components/launch';
+import { PushNotifications } from '@/components/push-notifications';
 import { stackOptions } from '@/theme/navigation';
 
 Uniwind.setTheme('light');

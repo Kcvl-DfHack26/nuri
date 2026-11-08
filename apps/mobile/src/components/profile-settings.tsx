@@ -13,6 +13,7 @@ import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
 import { BottomCta, PrimaryButton } from '@/components/post-chrome';
+import { PushSettings } from '@/components/push-settings';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { api, apiUrl, authClient } from '@/lib/api';
@@ -33,7 +34,7 @@ const NEXT = Icon.select({
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
 
-// Plan A ⑰-2 プロフィール設定. Face type, photo and notifications remain samples.
+// Plan A ⑰-2 プロフィール設定. Face type and photo remain samples.
 export function ProfileSettings() {
   const insets = useSafeAreaInsets();
   const session = authClient.useSession();
@@ -70,11 +71,12 @@ export function ProfileSettings() {
             void profile.refetch();
           }}
         />
-      ) : user && profile.data ? (
+      ) : user && profile.data && session.data ? (
         <Editor
           key={user.id}
           profile={profile.data}
           userId={user.id}
+          sessionId={session.data.session.id}
           email={user.email}
           image={user.image}
           top={insets.top + headerHeight + 16}
@@ -148,6 +150,7 @@ function ProfileStatusBar() {
 function Editor({
   profile,
   userId,
+  sessionId,
   email,
   image,
   top,
@@ -156,6 +159,7 @@ function Editor({
 }: {
   profile: { name: string; handle: string | null; bio: string; isPublic: boolean };
   userId: string;
+  sessionId: string;
   email: string;
   image: string | null | undefined;
   top: number;
@@ -321,7 +325,7 @@ function Editor({
             disabled={save.isPending}
           />
           <Divider />
-          <SwitchRow title="新着の通知" detail="フォロー中の人の投稿をお知らせします" />
+          <PushSettings sessionId={sessionId} />
         </Section>
         <AccountSection userId={userId} email={email} />
         <Pressable

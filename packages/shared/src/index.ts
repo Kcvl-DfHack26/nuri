@@ -235,6 +235,7 @@ export const postAnalysisSchema = z.object({
     .max(10),
 });
 export type PostAnalysis = z.infer<typeof postAnalysisSchema>;
+
 export const pushChannels = {
   likes: 'いいね',
   'recipe-import': '動画レシピの作成',

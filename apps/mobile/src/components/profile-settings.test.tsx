@@ -33,6 +33,12 @@ jest.mock('@expo/ui', () => ({
   },
 }));
 jest.mock('@/components/avatar', () => ({ Avatar: () => null }));
+jest.mock('@/components/push-settings', () => ({
+  PushSettings: ({ sessionId }: { sessionId: string }) => {
+    const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
+    return <Text>{`プッシュ通知 ${sessionId}`}</Text>;
+  },
+}));
 jest.mock('@/components/feedback', () => ({
   Feedback: ({ message }: { message: string }) => {
     const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
@@ -89,9 +95,14 @@ jest.mock('@/lib/passkeys', () => ({
   addPasskey: () => mockAddPasskey(),
   passkeysAvailable: true,
 }));
-type Session = { data: { user: { id: string; name: string; email: string } } | null };
+type Session = {
+  data: { user: { id: string; name: string; email: string }; session: { id: string } } | null;
+};
 const viewer: Session = {
-  data: { user: { id: 'viewer', name: 'はなこ', email: 'hanako@example.com' } },
+  data: {
+    user: { id: 'viewer', name: 'はなこ', email: 'hanako@example.com' },
+    session: { id: 'current-session' },
+  },
 };
 const mockUseSession = jest.fn((): Session & { isPending: boolean } => ({
   ...viewer,
@@ -145,7 +156,7 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
   await screen.findByLabelText('表示名');
   expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '写真を変更（準備中）' })).toBeDisabled();
-  expect(screen.getByLabelText('新着の通知（準備中）')).toBeDisabled();
+  expect(screen.getByText('プッシュ通知 current-session')).toBeOnTheScreen();
   expect(
     screen.getByRole('button', { name: 'メールアドレス hanako@example.com（準備中）' }),
   ).toBeDisabled();
@@ -271,6 +282,7 @@ test('lets a guest log in from the profile settings', async () => {
   await renderWithClient(<ProfileSettings />);
   expect(screen.queryByLabelText('表示名')).not.toBeOnTheScreen();
   expect(screen.queryByText('Google 連携')).toBeNull();
+  expect(screen.queryByText('プッシュ通知 current-session')).toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: 'ログイン' }));
   expect(router.push).toHaveBeenCalledWith('/account');
   expect(screen.queryByText('アプリの設定')).toBeNull();
