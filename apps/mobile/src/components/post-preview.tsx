@@ -14,7 +14,7 @@ import { RecipeContent } from '@/components/recipe-detail';
 import { partColors, parts } from '@/components/recipes';
 import { authClient } from '@/lib/api';
 import { recipeMinutes } from '@/lib/post-edit';
-import { postRecipe } from '@/lib/recipes';
+import { postRecipe, recipeKeys } from '@/lib/recipes';
 
 const fieldsSchema = recipeInputSchema.omit({ thumbnail: true });
 
@@ -98,7 +98,7 @@ export function PostPreview() {
         thumbnail: await thumbnailBase64(current, trackFile),
       }),
     onSuccess: (id) => {
-      void client.invalidateQueries({ queryKey: ['recipes'] });
+      void client.invalidateQueries({ queryKey: recipeKeys.all });
       // The post is saved even if the user left the flow while it was sending; ⑫-9 needs the
       // draft that left with them, so it opens only while this screen is still there.
       if (mounted.current) {

@@ -1,4 +1,3 @@
-import type { makeupParts } from '@starter/shared';
 import type { InferRequestType, InferResponseType } from 'hono/client';
 
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
@@ -6,19 +5,18 @@ import { Share } from 'react-native';
 
 import { api } from '@/lib/api';
 
-type PartId = (typeof makeupParts)[number];
+const allRecipes = ['recipes'] as const;
+export const recipeKeys = { all: allRecipes, favorites: [...allRecipes, 'favorites'] as const };
+
+type RecipeListFilters = Omit<InferRequestType<typeof api.api.recipes.$get>['query'], 'offset'>;
 
 /**
  * Whole-face recipes (①); with `part`, the recipes for that part (③); with `author`, the recipes
  * that user wrote (⑰); with `q`, the recipes of every kind whose title or a tag contains it.
  */
-export function recipeListOptions({
-  part,
-  author,
-  q,
-}: { part?: PartId; author?: string; q?: string } = {}) {
+export function recipeListOptions({ part, author, q }: RecipeListFilters = {}) {
   return infiniteQueryOptions({
-    queryKey: ['recipes', 'list', part ?? 'whole', author, q],
+    queryKey: [...recipeKeys.all, 'list', part ?? 'whole', author, q],
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }) => {
       const response = await api.api.recipes.$get(
@@ -43,7 +41,7 @@ export function recipeListOptions({
 
 /** How many recipes each part has (②). */
 export const recipePartsOptions = queryOptions({
-  queryKey: ['recipes', 'parts'],
+  queryKey: [...recipeKeys.all, 'parts'],
   queryFn: async ({ signal }) => {
     const response = await api.api['recipe-parts'].$get({}, { init: { signal } });
     if (!response.ok) {
@@ -56,7 +54,7 @@ export const recipePartsOptions = queryOptions({
 /** The signed-in user's favorite recipes, most recently added first (⑰). */
 export function favoriteListOptions(userId: string) {
   return infiniteQueryOptions({
-    queryKey: ['recipes', 'favorites', userId],
+    queryKey: [...recipeKeys.favorites, userId],
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }) => {
       const response = await api.api.me.favorites.$get(
@@ -111,7 +109,7 @@ export async function postRecipe(json: RecipeInput) {
 
 export function recipeOptions(id: string) {
   return queryOptions({
-    queryKey: ['recipes', 'detail', id],
+    queryKey: [...recipeKeys.all, 'detail', id],
     queryFn: async ({ signal }) => {
       const response = await api.api.recipes[':id'].$get({ param: { id } }, { init: { signal } });
       // null is a recipe that does not exist; 400 is an ID that never can, e.g. a broken link.
