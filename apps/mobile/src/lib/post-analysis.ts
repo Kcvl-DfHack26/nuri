@@ -4,6 +4,7 @@ import { postAnalysisSchema, postAnalysisVideoMaxBytes } from '@starter/shared';
 import { File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 import { Platform } from 'react-native';
+import { Video } from 'react-native-compressor';
 
 import { api, authClient } from '@/lib/api';
 
@@ -12,6 +13,51 @@ const failures: Record<number, string> = {
   413: '動画が大きすぎるため、送れませんでした。',
   503: '今は動画から手順書を作れません。',
 };
+
+/**
+ * ⑫-3: a video over the API's limit, such as one chosen with 動画から, is shrunk on the device to
+ * about 720p at 1 Mbps, like the recordings (#169). Returns the URI to send: the video itself when
+ * it already fits, or a temporary file the caller deletes with the draft.
+ */
+export async function shrinkVideo(
+  uri: string,
+  signal: AbortSignal,
+  onProgress: (progress: number) => void,
+): Promise<string> {
+  if (new File(uri).size <= postAnalysisVideoMaxBytes) {
+    return uri;
+  }
+  let cancellationId: string | null = null;
+  const cancel = () => {
+    if (cancellationId) {
+      Video.cancelCompression(cancellationId);
+    }
+  };
+  signal.addEventListener('abort', cancel);
+  try {
+    return await Video.compress(
+      uri,
+      {
+        compressionMethod: 'manual',
+        maxSize: 1280,
+        bitrate: 1_000_000,
+        // Keep no location or other metadata from the camera roll in the copy that is sent.
+        preserveMetadata: false,
+        getCancellationId: (id) => {
+          cancellationId = id;
+        },
+      },
+      onProgress,
+    );
+  } catch (error) {
+    if (signal.aborted) {
+      throw error;
+    }
+    throw new Error('動画を縮められませんでした。');
+  } finally {
+    signal.removeEventListener('abort', cancel);
+  }
+}
 
 /**
  * ⑫-3: sends the video and the marks (ms) to the API, which reads them with Gemini (#142). The

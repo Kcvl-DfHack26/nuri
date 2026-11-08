@@ -97,8 +97,12 @@ const mockAnalyze = jest.fn<
   Promise<PostAnalysis>,
   [{ uri: string; marks: readonly number[] }, AbortSignal]
 >();
+const mockShrink = jest.fn<Promise<string>, [string, AbortSignal, (progress: number) => void]>(
+  (uri) => Promise.resolve(uri),
+);
 jest.mock('@/lib/post-analysis', () => ({
   analyzePostVideo: (...args: Parameters<typeof mockAnalyze>) => mockAnalyze(...args),
+  shrinkVideo: (...args: Parameters<typeof mockShrink>) => mockShrink(...args),
 }));
 jest.mock('@/lib/api', () => ({
   get apiUrl() {
@@ -115,6 +119,7 @@ const alert = jest.spyOn(Alert, 'alert');
 beforeEach(() => {
   jest.clearAllMocks();
   mockApi.url = null;
+  mockShrink.mockImplementation((uri) => Promise.resolve(uri));
   mockFileSize.mockImplementation(() => 1000);
   jest
     .mocked(getThumbnailAsync)
@@ -460,6 +465,22 @@ test('asks before sending the video and fills the steps with what Gemini found',
   expect(jest.mocked(getThumbnailAsync).mock.calls.map(([, options]) => options?.time)).toEqual([
     0, 26_000,
   ]);
+});
+
+test('shrinks a video over the limit, sends the copy and deletes it with the draft', async () => {
+  mockShrink.mockImplementation((_uri, _signal, onProgress) => {
+    onProgress(0.5);
+    return Promise.resolve('file:///shrunk.mp4');
+  });
+  mockAnalyze.mockResolvedValue(analysis);
+  await renderCreating();
+  await pressAlertButton('送る');
+  await waitFor(() => {
+    expect(router.replace).toHaveBeenCalledWith('/post/review');
+  });
+  expect(mockShrink.mock.calls[0]?.[0]).toBe('file:///video.mov');
+  expect(mockAnalyze.mock.calls[0]?.[0]).toEqual({ uri: 'file:///shrunk.mp4', marks: [26_000] });
+  expect(screen.getByLabelText('動画を縮める、完了')).toBeOnTheScreen();
 });
 
 test('returns to ⑫-1 without sending when the user chooses やめる', async () => {
