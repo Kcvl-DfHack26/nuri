@@ -103,7 +103,14 @@ export function createApp(
       .get('/api/auth-capabilities', (c) => c.json(authCapabilities(env)))
       .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
       .route('/api', pushRoutes(db, auth, env.EXPO_PUSH_ACCESS_TOKEN))
-      .route('/api', socialRoutes(db, auth, createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN)))
+      .route(
+        '/api',
+        socialRoutes(
+          db,
+          auth,
+          createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN, env.BETTER_AUTH_URL),
+        ),
+      )
       .route('/api', recipeRoutes(db, auth))
       .route('/api', postAnalysisRoutes(requireSession(auth), analyzePost))
       .route('/', expoWebRoutes(env.EXPO_WEB_ROOT))

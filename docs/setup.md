@@ -272,6 +272,13 @@ CLIが未認証なら `bunx eas login` を実行する。公開APIで実機を�
 
 Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出は自動実行しない。初期設定のビルド・端末確認記録は [検証](testing.md) を参照する。
 
+### プッシュ通知
+
+- Expoの nuri プロジェクトにAPNsキーとFCM v1送信用の認証情報を登録する。AndroidのFirebaseアプリのパッケージ名は `com.kcvl.nuri`。EAS Environmentの `GOOGLE_SERVICES_JSON` をファイル型・Sensitiveで設定し、ビルドとEAS Updateの同じ環境で同一の `google-services.json` を使う。ローカルビルドでは同じ変数にファイルへの絶対パスを指定する。FCMのサービスアカウントキーはEASのCredentialsに登録し、アプリに含めない。[Expoの設定手順](https://docs.expo.dev/push-notifications/push-notifications-setup/)
+- 署名付きiOSビルドでは、EAS Environmentとローカルのビルド環境にApple Developerの `APPLE_TEAM_ID` を設定し、親アプリと `com.kcvl.nuri.notification-service` の署名を用意する。通知画像の取得を担当する拡張は、`@bacons/apple-targets` がiOSのprebuild時に組み込む。Simulatorでは署名用のTeam IDを省略できる。
+- Expo Push Serviceの拡張セキュリティを有効にし、APIにだけ `EXPO_PUSH_ACCESS_TOKEN` を設定する。ローカルでは `apps/api/.env`、Cloud Runでは `<name>-expo-push-access-token` のSecret Managerにバージョンを追加し、`push_notifications_enabled = true` で参照する。アプリ環境変数やGitにトークンを置かない。[Expoの送信認証](https://docs.expo.dev/push-notifications/sending-notifications/#additional-security)
+- DB migrationを適用してAPIを起動し、通知プラグインを含むiOS・Androidの新しい開発ビルドを使う。ログイン後に「マイ → プロフィール設定 → アプリの設定 → プッシュ通知」を開き、「通知を有効にする」でOSの許可を与える。別アカウントでテスト投稿にいいねし、受信とタップ、再送・自己いいね・ログアウト後に新規送信されないことを確認する。通知の許可は端末の設定で変更できる。Androidでは「いいね」と「動画レシピの作成」を別々に管理できる。
+
 ## 4. Google CloudとOpenTofu
 
 ### ローカルのCLIを設定する

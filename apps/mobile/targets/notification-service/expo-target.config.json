@@ -1,0 +1,6 @@
+{
+  "type": "notification-service",
+  "name": "NotificationService",
+  "bundleIdentifier": ".notification-service",
+  "deploymentTarget": "16.4"
+}

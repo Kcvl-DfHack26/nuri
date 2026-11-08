@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { type pushChannels, type pushDataSchema } from '@starter/shared';
+import { pushDataSchema } from '@starter/shared';
 import { and, eq, gt } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { z } from 'zod';
 import type { Database } from '../../db/client';
 import type { Auth, AuthenticatedEnv } from '../auth';
 
-import { pushSubscription, session } from '../../db/schema';
+import { pushSubscription, recipe, session } from '../../db/schema';
 import { requireSession } from '../auth';
 
 const tokenSchema = z
@@ -39,35 +39,68 @@ export function pushRoutes(db: Database, auth: Auth, accessToken: string | undef
 }
 
 type PushData = z.infer<typeof pushDataSchema>;
-type PushEvent = PushData & { imageUrl?: string };
+type PostLiked = Extract<PushData, { kind: 'post-liked' }> & {
+  actorName: string;
+  postBody: string;
+  actorImage: string | null;
+};
+type RecipeProgress = Exclude<PushData, { kind: 'post-liked' }> & { recipeTitle?: string };
+type PushEvent = PostLiked | RecipeProgress;
 
-const messages = {
-  'post-liked': {
-    title: '❤️ 投稿にいいねが届きました',
-    body: '自分の投稿を確認できます。',
-    channelId: 'likes',
-  },
+const recipeMessages = {
   'recipe-started': {
-    title: '🎬 レシピを作成しています',
+    title: (name: string) => `🎬 ${name}を作成しています`,
     body: 'SNS動画からメイクの手順をまとめています。',
-    channelId: 'recipe-import',
   },
   'recipe-ready': {
-    title: '✨ レシピができました',
+    title: (name: string) => `✨ ${name}ができました`,
     body: '動画から作ったメイクの手順を確認できます。',
-    channelId: 'recipe-import',
   },
   'recipe-failed': {
-    title: '⚠️ レシピを作成できませんでした',
+    title: (name: string) => `⚠️ ${name}を作成できませんでした`,
     body: 'アプリで確認して、もう一度お試しください。',
-    channelId: 'recipe-import',
   },
-} satisfies Record<
-  PushData['kind'],
-  { title: string; body: string; channelId: keyof typeof pushChannels }
->;
+} satisfies Record<RecipeProgress['kind'], { title: (name: string) => string; body: string }>;
 
+const segmenter = new Intl.Segmenter('ja', { granularity: 'grapheme' });
 const imageUrlSchema = z.url({ protocol: /^https$/, hostname: z.regexes.domain });
+
+function excerpt(text: string, limit: number) {
+  const characters = Array.from(
+    segmenter.segment(text.replace(/\s+/gu, ' ').trim()),
+    (part) => part.segment,
+  );
+  return characters.length > limit
+    ? `${characters.slice(0, limit).join('')}…`
+    : characters.join('');
+}
+
+async function notificationContent(db: Database, event: PushEvent) {
+  if (event.kind === 'post-liked') {
+    const actor = excerpt(event.actorName, 24);
+    return {
+      title: actor ? `❤️ ${actor}さんがいいねしました` : '❤️ 投稿にいいねが届きました',
+      body: `投稿「${excerpt(event.postBody, 48)}」`,
+      channelId: 'likes',
+      image: event.actorImage,
+    } as const;
+  }
+  const [published] =
+    event.kind === 'recipe-ready' && event.recipeId
+      ? await db
+          .select({ title: recipe.title, image: recipe.image })
+          .from(recipe)
+          .where(and(eq(recipe.id, event.recipeId), eq(recipe.authorId, event.recipientId)))
+      : [];
+  const name = excerpt(published?.title ?? event.recipeTitle ?? '', 32);
+  const template = recipeMessages[event.kind];
+  return {
+    title: template.title(name ? `「${name}」` : 'レシピ'),
+    body: template.body,
+    channelId: 'recipe-import',
+    image: published?.image ?? null,
+  } as const;
+}
 
 const pushTickets = z.object({
   data: z.array(
@@ -79,23 +112,31 @@ const pushTickets = z.object({
 });
 
 /** Send a committed domain event. A delivery failure must never roll back the source action. */
-export function createPushSender(db: Database, accessToken: string | undefined) {
-  return async ({ imageUrl, ...data }: PushEvent) => {
+export function createPushSender(db: Database, accessToken: string | undefined, apiOrigin: string) {
+  return async (event: PushEvent) => {
     if (!accessToken) {
       return;
     }
     try {
+      const data = pushDataSchema.parse(event);
       const recipients = await db
         .select({ token: pushSubscription.token, sessionId: pushSubscription.sessionId })
         .from(session)
         .innerJoin(pushSubscription, eq(pushSubscription.sessionId, session.id))
         .where(and(eq(session.userId, data.recipientId), gt(session.expiresAt, new Date())));
-      const image = data.kind === 'recipe-ready' && imageUrlSchema.safeParse(imageUrl);
+      if (!recipients.length) {
+        return;
+      }
+      const { image, ...content } = await notificationContent(db, event);
+      const url = image ? URL.parse(image, apiOrigin) : null;
+      const thumbnail = url && !url.username && !url.password && imageUrlSchema.safeParse(url.href);
       const message = {
-        ...messages[data.kind],
+        ...content,
         data,
         ttl: 3600,
-        ...(image && image.success ? { richContent: { image: image.data } } : {}),
+        ...(thumbnail && thumbnail.success
+          ? { richContent: { image: thumbnail.data }, mutableContent: true }
+          : {}),
       };
       const signal = AbortSignal.timeout(2000);
       for (let index = 0; index < recipients.length; index += 100) {
@@ -131,7 +172,7 @@ export function createPushSender(db: Database, accessToken: string | undefined) 
       }
     } catch {
       // Provider errors can contain recipient tokens.
-      console.warn('Push notification delivery failed', data.kind);
+      console.warn('Push notification delivery failed', event.kind);
     }
   };
 }

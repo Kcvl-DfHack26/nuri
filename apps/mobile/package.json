@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@babel/runtime": "7.29.13",
+    "@bacons/apple-targets": "5.0.0",
     "@better-auth/expo": "^1.7.17",
     "@better-auth/passkey": "1.7.17",
     "@expo-google-fonts/zen-maru-gothic": "0.4.2",

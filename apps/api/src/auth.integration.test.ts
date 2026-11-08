@@ -575,10 +575,26 @@ test('only new likes notify the owner and push subscriptions follow the active s
   ).toBe(400);
   expect((await request(route, subscription, ownerCookie, 'PUT')).status).toBe(200);
 
-  const created = await request('/api/posts', { body: '通知を確認する投稿' }, ownerCookie);
+  await db
+    .update(user)
+    .set({ name: 'みお', image: 'https://assets.example.com/mio.png', isPublic: true })
+    .where(eq(user.id, actor.user.id));
+  const recipeId = `push-${unique}`;
+  await db.insert(recipe).values({
+    id: recipeId,
+    authorId: owner.user.id,
+    title: '春のピンクメイク',
+    image: '/api/recipe-images/preview',
+    durationMinutes: 5,
+  });
+  const created = await request(
+    '/api/posts',
+    { body: '春のピンクメイクを\n試しました' },
+    ownerCookie,
+  );
   const { id } = z.object({ id: z.uuid() }).parse(await created.json());
   const likePath = `/api/posts/${id}/like`;
-  const sendPush = createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN);
+  const sendPush = createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN, 'https://api.example.com');
   const requests: unknown[] = [];
   const fakeFetch = async (...[url, init]: Parameters<typeof fetch>) => {
     expect(url).toBe('https://exp.host/--/api/v2/push/send');
@@ -606,8 +622,11 @@ test('only new likes notify the owner and push subscriptions follow the active s
       [
         expect.objectContaining({
           to: token,
-          title: '❤️ 投稿にいいねが届きました',
+          title: '❤️ みおさんがいいねしました',
+          body: '投稿「春のピンクメイクを 試しました」',
           channelId: 'likes',
+          richContent: { image: 'https://assets.example.com/mio.png' },
+          mutableContent: true,
           data: { kind: 'post-liked', recipientId: owner.user.id },
         }),
       ],
@@ -620,18 +639,33 @@ test('only new likes notify the owner and push subscriptions follow the active s
     expect((await request(likePath, {}, actorCookie, 'PUT')).status).toBe(200);
     expect(expo).toHaveBeenCalledTimes(2);
 
+    await db.update(user).set({ isPublic: false }).where(eq(user.id, actor.user.id));
+    await request(likePath, {}, actorCookie, 'DELETE');
+    expect((await request(likePath, {}, actorCookie, 'PUT')).status).toBe(200);
+    expect(requests.at(-1)).toEqual([
+      {
+        to: token,
+        title: '❤️ みおさんがいいねしました',
+        body: '投稿「春のピンクメイクを 試しました」',
+        channelId: 'likes',
+        data: { kind: 'post-liked', recipientId: owner.user.id },
+        ttl: 3600,
+      },
+    ]);
+
     await sendPush({
       kind: 'recipe-ready',
       recipientId: owner.user.id,
-      recipeId: 'fox',
-      imageUrl: 'https://assets.example.com/fox.jpg',
+      recipeId,
     });
     expect(requests.at(-1)).toEqual([
       expect.objectContaining({
         to: token,
+        title: '✨ 「春のピンクメイク」ができました',
         channelId: 'recipe-import',
-        data: { kind: 'recipe-ready', recipientId: owner.user.id, recipeId: 'fox' },
-        richContent: { image: 'https://assets.example.com/fox.jpg' },
+        data: { kind: 'recipe-ready', recipientId: owner.user.id, recipeId },
+        richContent: { image: 'https://api.example.com/api/recipe-images/preview' },
+        mutableContent: true,
       }),
     ]);
 
@@ -642,11 +676,15 @@ test('only new likes notify the owner and push subscriptions follow the active s
     expo.mockClear();
     await sendPush({ kind: 'recipe-started', recipientId: owner.user.id });
     expect(expo).not.toHaveBeenCalled();
-    await sendPush({ kind: 'recipe-started', recipientId: actor.user.id });
+    await sendPush({
+      kind: 'recipe-started',
+      recipientId: actor.user.id,
+      recipeTitle: '春のピンクメイク',
+    });
     expect(requests.at(-1)).toEqual([
       expect.objectContaining({
         to: token,
-        title: '🎬 レシピを作成しています',
+        title: '🎬 「春のピンクメイク」を作成しています',
         data: { kind: 'recipe-started', recipientId: actor.user.id },
       }),
     ]);

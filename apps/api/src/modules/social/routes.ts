@@ -141,8 +141,15 @@ export function socialRoutes(
         const postId = c.req.valid('param').id;
         const actorId = c.get('currentUser').id;
         const [existing] = await db
-          .select({ userId: post.userId })
+          .select({
+            userId: post.userId,
+            body: post.body,
+            actorName: user.name,
+            actorImage: user.image,
+            actorIsPublic: user.isPublic,
+          })
           .from(post)
+          .innerJoin(user, eq(user.id, actorId))
           .where(eq(post.id, postId));
         if (!existing) {
           return c.json({ error: 'not_found' as const }, 404);
@@ -166,7 +173,13 @@ export function socialRoutes(
           .onConflictDoNothing()
           .returning({ postId: like.postId });
         if (added && existing.userId !== actorId) {
-          await sendPush({ kind: 'post-liked', recipientId: existing.userId });
+          await sendPush({
+            kind: 'post-liked',
+            recipientId: existing.userId,
+            actorName: existing.actorName,
+            postBody: existing.body,
+            actorImage: existing.actorIsPublic ? existing.actorImage : null,
+          });
         }
         return c.json({ success: true });
       },
