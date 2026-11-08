@@ -218,7 +218,7 @@ test('Apple OAuth is unavailable and Google rejects a forged native ID token', a
   }
 });
 
-test('magic links are single-use and sessions protect posts, likes and deletion', async () => {
+test('magic links are single-use and sessions protect profile updates', async () => {
   const handle = `h_${unique.replaceAll('-', '').slice(0, 18)}`;
   const link = await emailLink(email.toUpperCase());
   const signedIn = await appRequest(link.href);
