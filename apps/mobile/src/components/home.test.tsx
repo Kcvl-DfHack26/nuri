@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from 'react-native';
 
 import { TestQueryProvider } from '@/lib/test/query-client';
 
@@ -46,10 +47,14 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('@/lib/api', () => ({
   apiUrl: 'http://localhost:8080',
+  authClient: { useSession: () => ({ data: mockSignedIn ? { user: { id: 'viewer' } } : null }) },
   apiAssetUrl: (path: string) => path,
   api: {
     api: {
-      recipes: { $get: () => mockGetRecipes() },
+      recipes: {
+        $get: () => mockGetRecipes(),
+        ':id': { favorite: { $put: () => mockPutFavorite(), $delete: () => mockPutFavorite() } },
+      },
       'recipe-parts': {
         $get: async () => ({
           ok: true,
@@ -59,6 +64,8 @@ jest.mock('@/lib/api', () => ({
     },
   },
 }));
+let mockSignedIn = false;
+const mockPutFavorite = jest.fn(async () => ({ ok: true, status: 200 }));
 type Response = { ok: boolean; json: () => Promise<unknown> };
 const page = (items: unknown[]): Response => ({
   ok: true,
@@ -71,6 +78,7 @@ const mockGetRecipes = jest.fn(async () =>
       title: '狐メイク',
       image: '/sample-recipes/fox.jpg',
       likeCount: 1200,
+      favorited: false,
       author: { id: 'sample-mio', name: 'mio' },
     },
   ]),
@@ -79,6 +87,7 @@ const mockGetRecipes = jest.fn(async () =>
 beforeEach(() => {
   jest.clearAllMocks();
   jest.mocked(useLocalSearchParams).mockReturnValue({});
+  mockSignedIn = false;
 });
 
 test('retries a failed recipe list and opens a recipe from its card', async () => {
@@ -88,8 +97,41 @@ test('retries a failed recipe list and opens a recipe from its card', async () =
     await screen.findByText('レシピを読み込めませんでした。通信状況を確認してお試しください。'),
   ).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
-  await fireEvent.press(await screen.findByRole('button', { name: '狐メイク、mio、いいね1.2k' }));
+  await fireEvent.press(
+    await screen.findByRole('button', { name: '狐メイク、mio、お気に入り1.2k' }),
+  );
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
+});
+
+test('favorites a recipe from its card and rolls back when the server refuses', async () => {
+  mockSignedIn = true;
+  await render(<Home />, { wrapper: TestQueryProvider });
+  const heart = await screen.findByRole('button', { name: '狐メイクをお気に入り' });
+  expect(heart).not.toBeSelected();
+
+  await fireEvent.press(heart);
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: '狐メイクをお気に入り' })).toBeSelected();
+  });
+  expect(mockPutFavorite).toHaveBeenCalledTimes(1);
+
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  mockPutFavorite.mockResolvedValueOnce({ ok: false, status: 500 });
+  await fireEvent.press(screen.getByRole('button', { name: '狐メイクをお気に入り' }));
+  await waitFor(() => {
+    expect(alert).toHaveBeenCalledWith(
+      'お気に入りを変更できませんでした',
+      'お気に入りを変更できませんでした。',
+    );
+  });
+  expect(screen.getByRole('button', { name: '狐メイクをお気に入り' })).toBeSelected();
+});
+
+test('sends a guest to sign in from a card heart', async () => {
+  await render(<Home />, { wrapper: TestQueryProvider });
+  await fireEvent.press(await screen.findByRole('button', { name: '狐メイクをお気に入り' }));
+  expect(router.push).toHaveBeenCalledWith('/account');
+  expect(mockPutFavorite).not.toHaveBeenCalled();
 });
 
 test('opens the search screen from the search field', async () => {

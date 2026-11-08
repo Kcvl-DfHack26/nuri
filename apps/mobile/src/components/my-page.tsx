@@ -226,7 +226,7 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${recipe.title}、${recipe.author.name}、いいね${likes}`}
+      accessibilityLabel={`${recipe.title}、${recipe.author.name}、お気に入り${likes}`}
       className="flex-1 gap-1.25 active:opacity-80"
       onPress={() => {
         router.push(`/recipes/${recipe.id}`);

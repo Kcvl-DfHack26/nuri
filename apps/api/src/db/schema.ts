@@ -151,7 +151,7 @@ export const recipe = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     durationMinutes: integer('duration_minutes').notNull(),
-    // Display-only until saving recipes is built.
+    /** A sample's carried-over popularity; the heart shows it plus the recipe's favorites (#191). */
     likeCount: integer('like_count').notNull().default(0),
     source: text('source', { enum: recipeSources }),
     /** The one part a part recipe (②③) works on; null for a whole-face recipe (①). */

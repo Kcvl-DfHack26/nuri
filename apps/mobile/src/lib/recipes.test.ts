@@ -7,6 +7,7 @@ import {
   recipeListOptions,
   recipeOptions,
   recipePartsOptions,
+  setCachedFavorite,
 } from './recipes';
 
 jest.mock('@/lib/api', () => ({ api: {} }));
@@ -45,4 +46,34 @@ test('recipe query prefixes invalidate the corresponding cached data', async () 
 
   await client.invalidateQueries({ queryKey: recipeKeys.all });
   expect(invalidatedKeys()).toEqual([list, detail, parts, ...favorites]);
+});
+
+test('flips one recipe in every cached copy once and keeps other rows', () => {
+  const client = createTestQueryClient();
+  const fox = { id: 'fox', favorited: false, likeCount: 1200 };
+  const cat = { id: 'cat', favorited: false, likeCount: 5 };
+  const listKey = [...recipeKeys.lists, 'whole'];
+  client.setQueryData(listKey, {
+    pages: [
+      { items: [fox], nextOffset: 1 },
+      { items: [cat], nextOffset: null },
+    ],
+    pageParams: [0, 1],
+  });
+  // ⑤'s cache entry, written under its plain key to keep the fixture small.
+  client.setQueryData([...recipeKeys.all, 'detail', 'fox'], { ...fox, title: '狐メイク' });
+  const before = client.getQueryData<{ pages: { items: unknown[] }[] }>(listKey);
+
+  setCachedFavorite(client, 'fox', true);
+  setCachedFavorite(client, 'fox', true);
+  const after = client.getQueryData<{ pages: { items: (typeof fox)[] }[] }>(listKey);
+  expect(after?.pages[0]?.items[0]).toEqual({ id: 'fox', favorited: true, likeCount: 1201 });
+  expect(after?.pages[1]).toBe(before?.pages[1]);
+  expect(client.getQueryData(recipeOptions('fox').queryKey)).toMatchObject({
+    favorited: true,
+    likeCount: 1201,
+  });
+
+  setCachedFavorite(client, 'fox', false);
+  expect(client.getQueryData<typeof after>(listKey)?.pages[0]?.items[0]).toEqual(fox);
 });

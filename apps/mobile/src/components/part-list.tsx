@@ -15,6 +15,7 @@ import { isPartId, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
+import { useFavorite } from '@/components/use-favorite';
 import { apiAssetUrl, apiUrl } from '@/lib/api';
 import { cardGrid, cardGridGap, cardGridInset, useLayoutSize } from '@/lib/layout';
 import { backOrHome } from '@/lib/navigation';
@@ -86,7 +87,8 @@ export function PartList({ part }: { part: string }) {
   }
   const tag = styleFilters.find((option) => option.value === filter)?.tag;
   const visible = tag ? recipes.filter((recipe) => recipe.tags.includes(tag)) : recipes;
-  const selectedId = chosenId ?? recipes[0]?.id;
+  const selected = recipes.find((recipe) => recipe.id === chosenId) ?? recipes[0];
+  const selectedId = selected?.id;
   const status = listStatus({
     loading: list.isPending,
     onRetry: list.isError
@@ -156,17 +158,26 @@ export function PartList({ part }: { part: string }) {
           />
         ) : null}
       </ScrollView>
-      <StartBar
-        bottom={insets.bottom}
-        onStart={
-          selectedId
-            ? () => {
-                router.push(`/recipes/${selectedId}`);
-              }
-            : undefined
-        }
-      />
+      {selected ? (
+        <SelectedStartBar recipe={selected} bottom={insets.bottom} />
+      ) : (
+        <StartBar bottom={insets.bottom} />
+      )}
     </View>
+  );
+}
+
+// The heart and the start button act on the chosen style.
+function SelectedStartBar({ recipe, bottom }: { recipe: RecipeSummary; bottom: number }) {
+  const favorite = useFavorite(recipe);
+  return (
+    <StartBar
+      bottom={bottom}
+      favorite={favorite}
+      onStart={() => {
+        router.push(`/recipes/${recipe.id}`);
+      }}
+    />
   );
 }
 

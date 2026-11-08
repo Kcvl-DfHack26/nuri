@@ -108,7 +108,7 @@ test('shows the recipe from the API and opens the product sheet from a product r
   expect(screen.getByText('＃15分')).toBeOnTheScreen();
   expect(screen.getByText('5ステップ')).toBeOnTheScreen();
   expect(screen.getAllByText('シェード').length).toBeGreaterThan(0);
-  expect(screen.getByText('Instagramから取り込み・保存 1.2k')).toBeOnTheScreen();
+  expect(screen.getByText('Instagramから取り込み・お気に入り 1.2k')).toBeOnTheScreen();
   expect(screen.getByText('2点')).toBeOnTheScreen();
   await fireEvent.press(
     screen.getByRole('button', { name: 'CELANE 極細アイブロウペンシル、眉・モカブラウン' }),

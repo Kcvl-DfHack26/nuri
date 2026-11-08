@@ -3,7 +3,7 @@ import type { AccessibilityActionEvent } from 'react-native';
 
 import { Icon } from '@expo/ui';
 import { purchaseUrlSchema } from '@starter/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -24,17 +24,11 @@ import { arPhotos, findProduct, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
-import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
+import { useFavorite } from '@/components/use-favorite';
+import { apiAssetUrl, apiUrl } from '@/lib/api';
 import { hasRoomForSidePanel, useLayoutSize } from '@/lib/layout';
 import { backOrHome } from '@/lib/navigation';
-import {
-  changeFavorite,
-  formatCount,
-  recipeKeys,
-  recipeOptions,
-  shareRecipe,
-  sourceLabels,
-} from '@/lib/recipes';
+import { formatCount, recipeOptions, shareRecipe, sourceLabels } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -50,10 +44,6 @@ const BACK = Icon.select({
 const SHARE = Icon.select({
   ios: 'square.and.arrow.up',
   android: import('@expo/material-symbols/ios_share.xml'),
-});
-const BOOKMARK = Icon.select({
-  ios: 'bookmark',
-  android: import('@expo/material-symbols/bookmark.xml'),
 });
 const NEXT = Icon.select({
   ios: 'chevron.right',
@@ -277,7 +267,8 @@ export function RecipeContent({
                   {recipe.author.name}
                 </Text>
                 <Text className="font-maru text-meta text-ink-secondary">
-                  {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}保存 {likes}
+                  {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}お気に入り{' '}
+                  {likes}
                 </Text>
               </View>
             </Pressable>
@@ -401,7 +392,6 @@ export function RecipeContent({
                 shareRecipe(recipe, '見つけました');
               }}
             />
-            <GlassIconButton icon={BOOKMARK} label="保存（準備中）" />
           </>
         )}
       </View>
@@ -625,44 +615,4 @@ function RecipeStartBar({
       }
     />
   );
-}
-
-/**
- * ⑤'s favorite button. Guests are sent to ⑱ first (#42). The change shows at once and is rolled
- * back if the server rejects it; only this recipe's cache entry changes.
- */
-function useFavorite(recipe: RecipeData) {
-  const client = useQueryClient();
-  const { data: session } = authClient.useSession();
-  const key = recipeOptions(recipe.id).queryKey;
-  const toggle = useMutation({
-    mutationFn: (favorited: boolean) => changeFavorite(recipe.id, favorited),
-    onMutate: async (favorited) => {
-      await client.cancelQueries({ queryKey: key });
-      const previous = client.getQueryData(key);
-      client.setQueryData(key, (current) =>
-        current ? { ...current, favorited: !favorited } : current,
-      );
-      return { previous };
-    },
-    onError: (error, _favorited, context) => {
-      client.setQueryData(key, context?.previous);
-      Alert.alert('お気に入りを変更できませんでした', error.message);
-    },
-    onSettled: () => {
-      void client.invalidateQueries({ queryKey: recipeKeys.favorites });
-    },
-  });
-  return {
-    favorited: recipe.favorited,
-    onPress: () => {
-      if (!session) {
-        router.push('/account');
-        return;
-      }
-      if (!toggle.isPending) {
-        toggle.mutate(recipe.favorited);
-      }
-    },
-  };
 }

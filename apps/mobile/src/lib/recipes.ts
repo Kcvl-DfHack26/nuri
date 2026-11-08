@@ -1,3 +1,4 @@
+import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import type { InferRequestType, InferResponseType } from 'hono/client';
 
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
@@ -6,7 +7,11 @@ import { Share } from 'react-native';
 import { api } from '@/lib/api';
 
 const allRecipes = ['recipes'] as const;
-export const recipeKeys = { all: allRecipes, favorites: [...allRecipes, 'favorites'] as const };
+export const recipeKeys = {
+  all: allRecipes,
+  lists: [...allRecipes, 'list'] as const,
+  favorites: [...allRecipes, 'favorites'] as const,
+};
 
 type RecipeListFilters = Omit<InferRequestType<typeof api.api.recipes.$get>['query'], 'offset'>;
 
@@ -16,7 +21,7 @@ type RecipeListFilters = Omit<InferRequestType<typeof api.api.recipes.$get>['que
  */
 export function recipeListOptions({ part, author, q }: RecipeListFilters = {}) {
   return infiniteQueryOptions({
-    queryKey: [...recipeKeys.all, 'list', part ?? 'whole', author, q],
+    queryKey: [...recipeKeys.lists, part ?? 'whole', author, q],
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }) => {
       const response = await api.api.recipes.$get(
@@ -80,6 +85,30 @@ export async function changeFavorite(id: string, favorited: boolean) {
       response.status === 401 ? 'ログインし直してください。' : 'お気に入りを変更できませんでした。',
     );
   }
+}
+
+/**
+ * Shows one recipe as favorited or not in every cached list and its ⑤, with the heart's count
+ * moved by one. Copies already in that state, other recipes and untouched pages keep their
+ * references, so a retry or a second tap never counts twice and other rows do not re-render.
+ */
+export function setCachedFavorite(client: QueryClient, id: string, favorited: boolean) {
+  const flip = <T extends { id: string; favorited: boolean; likeCount: number }>(item: T): T =>
+    item.id !== id || item.favorited === favorited
+      ? item
+      : { ...item, favorited, likeCount: Math.max(0, item.likeCount + (favorited ? 1 : -1)) };
+  const flipPages = (data: InfiniteData<RecipePage> | undefined) =>
+    data && {
+      ...data,
+      pages: data.pages.map((page) =>
+        page.items.some((item) => item.id === id && item.favorited !== favorited)
+          ? { ...page, items: page.items.map(flip) }
+          : page,
+      ),
+    };
+  client.setQueriesData({ queryKey: recipeKeys.lists }, flipPages);
+  client.setQueriesData({ queryKey: recipeKeys.favorites }, flipPages);
+  client.setQueryData(recipeOptions(id).queryKey, (recipe) => recipe && flip(recipe));
 }
 
 export type RecipeInput = InferRequestType<typeof api.api.recipes.$post>['json'];
