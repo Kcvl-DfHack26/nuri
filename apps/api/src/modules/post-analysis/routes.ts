@@ -36,8 +36,16 @@ export function postAnalysisRoutes(requireUser: MiddlewareHandler, analyze: Post
         marks: marks.data,
       });
       return c.json(postAnalysisSchema.parse(analysis));
-    } catch {
+    } catch (error) {
       // Gemini failed or answered outside the schema; the app keeps the steps from the marks.
+      // Log only the reason, never the video or the answer, which can describe the user.
+      const status =
+        typeof error === 'object' && error !== null && 'status' in error ? error.status : undefined;
+      console.error(
+        'Post analysis failed:',
+        error instanceof Error ? error.name : 'unknown',
+        status,
+      );
       return c.json({ error: 'analysis_failed' as const }, 502);
     }
   });

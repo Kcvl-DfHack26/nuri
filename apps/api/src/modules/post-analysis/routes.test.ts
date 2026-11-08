@@ -1,6 +1,6 @@
 import type { PostAnalysis } from '@starter/shared';
 
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { createMiddleware } from 'hono/factory';
 
 import type { PostAnalyzer, PostVideo } from './gemini';
@@ -104,10 +104,14 @@ describe('POST /post-analyses', () => {
     ['fails', () => Promise.reject(new Error('503 high demand'))],
     // A title longer than 40 characters is outside postAnalysisSchema.
     ['answers outside the schema', () => Promise.resolve({ ...analysis, title: 'あ'.repeat(41) })],
-  ])('answers 502 when Gemini %s', async (_name, analyze) => {
+  ])('answers 502 when Gemini %s and logs only the reason', async (_name, analyze) => {
+    const log = spyOn(console, 'error').mockImplementation(() => undefined);
     const app = postAnalysisRoutes(signedIn, analyze);
     const response = await app.request('/post-analyses', form({ video: video() }));
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: 'analysis_failed' });
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('ナチュラルメイク');
+    log.mockRestore();
   });
 });
