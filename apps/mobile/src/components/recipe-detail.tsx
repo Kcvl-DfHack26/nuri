@@ -523,7 +523,9 @@ function AuthorRow({
   preview: boolean;
 }) {
   const profile = useQuery({ ...userOptions(author.id), enabled: Boolean(apiUrl) && !preview });
-  const followers = profile.data ? `フォロワー ${formatCount(profile.data.followerCount)}・` : '';
+  // A cached profile (e.g. the user's own from ⑰) still shows in ⑫-8's preview, so check it too.
+  const followers =
+    !preview && profile.data ? `フォロワー ${formatCount(profile.data.followerCount)}・` : '';
   return (
     <View className="flex-row items-center gap-2.5">
       <Pressable
