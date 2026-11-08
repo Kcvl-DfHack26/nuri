@@ -62,7 +62,6 @@ export type PostDraft = {
   /** Frame of the video shown on ①'s recipe card; null until one is chosen on ⑫-7. */
   thumbnail: { uri: string; timeMs: number } | null;
   publishCosmetics: boolean;
-  publishBefore: boolean;
   /** The saved recipe's ID once ⑫-8 posted it, so the post is never sent twice. */
   postedId: string | null;
 };
@@ -105,7 +104,6 @@ const emptyDraft: Omit<PostDraft, 'key'> = {
   tags: [],
   thumbnail: null,
   publishCosmetics: true,
-  publishBefore: false,
   postedId: null,
 };
 
