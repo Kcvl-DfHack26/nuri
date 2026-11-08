@@ -150,19 +150,16 @@ export function PostPreview() {
       Alert.alert('投稿できません', 'サムネイルにする場面を選んでください。');
       return;
     }
-    Alert.alert(
-      '投稿して公開しますか',
-      'サムネイルの写真と手順をサーバーに送り、だれでも見られるように公開します。写真に顔が写っている場合は、その顔も公開されます。動画は送りません。',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '投稿する',
-          onPress: () => {
-            post.mutate(draft);
-          },
+    // Pressing 投稿する is the explicit choice to send the thumbnail and steps (#182).
+    Alert.alert('レシピを投稿しますか？', undefined, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '投稿する',
+        onPress: () => {
+          post.mutate(draft);
         },
-      ],
-    );
+      },
+    ]);
   };
   return (
     <RecipeContent recipe={recipe} steps={fields.steps} onPost={onPost} posting={post.isPending} />
