@@ -2,6 +2,7 @@ import { $ } from 'bun';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { readOperationDetails } from './operation-details';
 import { executeOperation } from './run-operation';
 
 const directory = 'infra/preview-pr';
@@ -167,22 +168,23 @@ export async function runPreviewTofu(
     await $`tofu -chdir=${directory} init -reconfigure -input=false -no-color -lockfile=readonly \
       -backend-config=bucket=${bucketName(project)} -backend-config=prefix=pr-${pr}`.env(env);
     await hasPreviewService(project, pr);
-    let operationOptions = [...options, ...variables, '-auto-approve'];
+    let plan: string | undefined;
     if (operation === 'apply') {
-      const plan = join(scratch, 'preview.tfplan');
+      plan = join(scratch, 'preview.tfplan');
       const planOptions = [...options, ...variables, `-out=${plan}`];
       await $`tofu -chdir=${directory} plan ${planOptions}`.env(env);
-      operationOptions = [...options, plan];
     }
+    const details = await readOperationDetails(directory, env, plan);
     if (hooks.beforeAttempt && !(await hooks.beforeAttempt())) {
       return null;
     }
     const result = await executeOperation({
       directory,
       operation,
-      options: operationOptions,
+      options: plan ? [...options, plan] : [...options, ...variables, '-auto-approve'],
       env,
       events: join(scratch, 'events.jsonl'),
+      details,
     });
     await hooks.onAttempt(result);
     return result.exitCode;

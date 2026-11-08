@@ -31,7 +31,7 @@ PRプレビューのビルドはGitHub Actionsで行う。EAS Build・EAS Update
 
 main宛てのPRをマージ・クローズすると、対象PRのstateで `tofu destroy` を実行し、専用サービスとURLを削除する。destroyが成功したあとにイメージとstateを回収する。スタックの途中で閉じたPRや中断したcleanupは日次処理で回収する。
 
-**🧱 OpenTofu Apply** と **🧱 OpenTofu Destroy** は実行するたびに、そのプレビューのPRへ新規コメントで投稿する。コードブロックには公開できるリソース操作、件数、終了コードを載せる。詳しい診断は同じコメントのActionsリンクから確認できる。共有基盤の実行ログはActionsに残す。
+**🧱 OpenTofu Apply** と **🧱 OpenTofu Destroy** は実行するたびに、そのプレビューのPRへ新規コメントで投稿する。結果と終了コードは常に表示する。「実行ログとリソース設定」を開くと、Cloud Runサービス名、操作、件数、Applyの設定差分、Destroy前にstateへ記録されていた設定を読める。コメントに載せる設定は、スケーリングやCPU、メモリなどの公開可能な項目に限る。詳しい診断は同じコメントのActionsリンクから確認できる。共有基盤の実行ログはActionsに残す。
 
 Expo Free の月間枠は Android 15／iOS 15 ビルド、Workflows 60分、Update 1,000 MAU。PRごとの消費はいずれも0。別途、対応するネイティブビルドを新規作成する場合は、そのビルドの枠を使う。[Expo料金表](https://expo.dev/pricing)
 
