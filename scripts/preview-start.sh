@@ -6,9 +6,10 @@ set -euo pipefail
 pgdata=$(mktemp -d)
 api_pid=''
 metro_pid=''
+ready_pid=''
 proxy_pid=''
 stop() {
-  for child in "$proxy_pid" "$metro_pid" "$api_pid"; do
+  for child in "$proxy_pid" "$ready_pid" "$metro_pid" "$api_pid"; do
     if [[ -n "$child" ]]; then
       kill "$child" 2>/dev/null || true
     fi
@@ -46,6 +47,16 @@ api_pid=$!
     exec node /app/node_modules/expo/bin/cli start --go --offline --port 8082 --no-dev --minify --max-workers 2
 ) &
 metro_pid=$!
+
+# Cloud Run のスタートアッププローブには、Hono と Metro の準備後に応答する。
+node /app/scripts/preview-ready.ts &
+ready_pid=$!
+if ! wait -n -p exited "$ready_pid" "$api_pid" "$metro_pid" || [[ "$exited" != "$ready_pid" ]]; then
+  echo 'Preview dependencies did not start' >&2
+  exit 1
+fi
+ready_pid=''
+
 nginx -c /app/scripts/preview-nginx.conf -g 'daemon off;' &
 proxy_pid=$!
 wait -n "$api_pid" "$metro_pid" "$proxy_pid"

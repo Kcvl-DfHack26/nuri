@@ -195,6 +195,17 @@ async function previewImageDigest(image: string, source: string) {
   return digest;
 }
 
+async function previewRecipeDigest() {
+  const files = [
+    'apps/api/Dockerfile',
+    'scripts/preview-start.sh',
+    'scripts/preview-ready.ts',
+    'scripts/preview-nginx.conf',
+  ];
+  const contents = await Promise.all(files.map((file) => Bun.file(file).text()));
+  return new Bun.CryptoHasher('sha256').update(JSON.stringify(contents)).digest('hex').slice(0, 12);
+}
+
 async function validateOpenPullRequest(pr: string, sha: string) {
   if (!/^[a-f0-9]{40}$/.test(sha)) {
     throw new Error('Invalid commit SHA');
@@ -295,7 +306,8 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
   const tag = `pr-${pr}`;
   const candidate = 'candidate';
   const origin = serviceUrl;
-  const revisionSuffix = `rev-${sha.slice(0, 12)}`;
+  const recipeDigest = await previewRecipeDigest();
+  const revisionSuffix = `rev-${sha.slice(0, 12)}-${recipeDigest}`;
   const revision = `${service}-${revisionSuffix}`;
   const publicAnnotation = 'value(metadata.annotations."run.googleapis.com/invoker-iam-disabled")';
   const publicAccess = (
@@ -304,7 +316,7 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
   if (publicAccess !== 'true' && publicAccess !== 'True') {
     await shell`gcloud run services update ${service} --no-invoker-iam-check --quiet`;
   }
-  const image = `${registry}/${tag}:${sha}`;
+  const image = `${registry}/${tag}:${sha}-${recipeDigest}`;
   const current = servingRevision(await serviceStatus(service));
 
   let digest: string;
