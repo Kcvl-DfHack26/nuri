@@ -6,7 +6,7 @@
 gh workflow run preview.yml --ref main -f pr=PR_NUMBER
 ```
 
-成功するとコメントに対象SHA、Expo Web、Hono API、Expo Goの `exps://` URLとQRが表示される。pushは対象SHAを更新するだけ。プレビューを更新するときは、最新のコメントから再度リクエストする。同じSHAのリビジョンとビルド済みイメージは再利用する。
+成功すると、PRコメントの表にExpo WebとHono APIのURL、Expo GoのQRと `exps://` URL、各行の状態とデプロイ日時（JST）が表示される。pushは対象SHAを更新するだけ。プレビューを更新するときは、最新のコメントから再度リクエストする。同じSHAのリビジョンとビルド済みイメージは再利用する。
 
 Expo Goは `apps/mobile` と同じSDKのビルドを使う。iOS実機では対応版の配布方法に従い、手元に対応版がなければWebで確認する。Expo Goに含まれないネイティブ機能は互換Development Buildで確認する。[Expo GoのSDK互換性](https://docs.expo.dev/troubleshooting/expo-go-version-mismatch/)
 
@@ -25,14 +25,18 @@ Honoはコンテナ内の使い捨てPostgreSQLを使う。インスタンスが
 
 ## 利用枠とcleanup
 
-PRプレビューはリクエスト時のみビルドし、EAS Build・EAS Updateを使わない。Cloud Runは最小0、PRリビジョンごとの最大1インスタンス。アクセス時にはコンテナ起動・MetroのCPUとメモリ、通信量、Artifact Registryに費用が発生し得る。アクセスが途切れるとデータとMetroキャッシュは失われる。古いイメージの保存上限は14日。更新成功時はそのPRの旧リビジョンとイメージを削除する。[Cloud Runの最小インスタンス](https://docs.cloud.google.com/run/docs/configuring/min-instances)
+PRプレビューはリクエスト時のみビルドし、EAS Build・EAS Updateを使わない。Cloud Runは最小0、PRリビジョンごとの最大1インスタンス。アクセス時にはコンテナ起動・MetroのCPUとメモリ、通信量、Artifact Registryに費用が発生し得る。アクセスが途切れるとデータとMetroキャッシュは失われる。Registryは14日を超えるイメージを定期削除する。更新成功時はそのPRの旧リビジョンとイメージを削除する。[Cloud Runの最小インスタンス](https://docs.cloud.google.com/run/docs/configuring/min-instances)
 
 main宛てのPRをマージ・クローズするとタグ、PR専用リビジョン、イメージを削除する。スタックの途中で閉じたPRや中断したcleanupは日次処理で回収する。cleanupはPRが閉じていることを再確認する。
+
+Expo Free の月間枠は Android 15／iOS 15 ビルド、Workflows 60分、Update 1,000 MAU。PRごとの消費はいずれも0。別途、対応するネイティブビルドを新規作成する場合は、そのビルドの枠を使う。[Expo料金表](https://expo.dev/pricing)
+
+Cloud Runの月間無料枠は 180,000 vCPU秒、360,000 GiB秒、200万リクエスト。東京の従量単価で1 vCPU・2 GiBの課金時間10分は約 $0.017。Registryは請求先アカウント全体で月0.5 GiBまで無料。1 GiBを7日置くと、無料枠の差し引き前で約 $0.023。合計は約 $0.040 にリクエストと外向き転送料等を加えた額で、実際のクレジット消費は共有無料枠の残りと利用量で変わる。プレビューのPostgreSQLはコンテナ内で動くため、PRごとのCloud SQL料金は発生しない。[Cloud Run料金表](https://cloud.google.com/run/pricing)・[Artifact Registry料金表](https://cloud.google.com/artifact-registry/pricing)
 
 ## 初期設定
 
 1. 管理者が `production` Environmentに `PREVIEW_INFRA_WIF_PROVIDER` と `PREVIEW_INFRA_SERVICE_ACCOUNT` を用意する。専用の管理用WIFは、このリポジトリのmain、`production` Environment、`.github/workflows/infra-preview.yml` に絞る。GCSの `nuri/preview` stateの更新と、`infra/preview` が管理する資源の作成・権限設定を許可する。
-2. mainのCIが成功した状態で **Manage PR preview infrastructure** の `plan` を実行して差分を確認し、同じActionsの `apply` で専用サービス、レジストリ、配信用WIFを作成する。
+2. mainのCIが成功した状態で **Manage PR preview infrastructure** の `plan` を実行して差分を確認し、同じActionsの `apply` で専用サービス、レジストリ、配信用WIFを作成する。`pr` にmainへマージ済みの関連PR番号を指定する。適用結果は実行ごとに、そのPRへ新規コメントで投稿される。
 3. GitHubの `preview` EnvironmentにOpenTofuの `preview_wif_provider` を `PREVIEW_WIF_PROVIDER`、`preview_service_account` を `PREVIEW_SERVICE_ACCOUNT` として登録する。プレビューの実行用サービスアカウントに本番のSecret ManagerやDB権限は付けない。
 4. Repository Variable `PREVIEW_GCP_ENABLED=true` を設定し、テスト用PRをリクエストする。実際のWeb、API、Expo Goを確認したらPRを閉じ、タグとイメージの削除を確認する。
 

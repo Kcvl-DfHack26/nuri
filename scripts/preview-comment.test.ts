@@ -25,6 +25,10 @@ describe('preview request', () => {
     expect(parsePreviewRequest({ author: 'github-actions[bot]', body, before })).toBe(sha);
   });
 
+  test('recognizes the SHA on an existing preview comment', () => {
+    expect(previewSha(`${before.split('\n')[0]}\n対象SHA: ${sha}`)).toBe(sha);
+  });
+
   test('ignores forged comments, checked comments and bot status edits', () => {
     expect(parsePreviewRequest({ author: 'contributor', body, before })).toBeUndefined();
     expect(parsePreviewRequest({ author: 'github-actions[bot]', body })).toBeUndefined();
@@ -51,13 +55,20 @@ describe('preview request', () => {
     }).not.toThrow();
   });
 
-  test('links the same preview origin for Web, the API and Expo Go', () => {
+  test('shows full URLs, a QR in the Expo Go cell and the JST deployment time', () => {
     const origin = 'https://pr-130---nuri-preview-example-an.a.run.app';
-    const comment = renderPreviewComment({ sha, origin });
-    expect(comment).toContain(`[Expo Web](${origin}/)`);
-    expect(comment).toContain(`${origin}/api/recipes?offset=0`);
-    expect(comment).toContain('exps://pr-130---nuri-preview-example-an.a.run.app');
-    expect(comment).toContain(`${origin}/expo-go/qr.svg?sha=${sha}`);
+    const comment = renderPreviewComment({
+      sha,
+      status: '✅ 完了',
+      deployment: { origin, createdAt: '2026-11-08T21:10:00Z' },
+    });
+    const api = `${origin}/api/recipes?offset=0`;
+    expect(comment).toContain(`[${origin}/](${origin}/)`);
+    expect(comment).toContain(`[${api}](${api})`);
+    expect(comment).toContain(
+      `| **Expo Go**<br>\`exps://${new URL(origin).host}\`<br><img src="${origin}/expo-go/qr.svg?sha=${sha}" alt="Expo Goで開くQR" width="128"> | ✅ 完了 | 2026-11-09 06:10 |`,
+    );
+    expect(before).toContain('| **Expo Go**<br>— | 未配信 | — |');
   });
 
   test.each([

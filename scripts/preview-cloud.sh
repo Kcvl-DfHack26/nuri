@@ -41,7 +41,7 @@ cleanup() {
 }
 
 publish() {
-  local pr=$1 sha=$2 source=$3 info service_url tag candidate origin revision image digest candidate_url current
+  local pr=$1 sha=$2 source=$3 info service_url tag candidate origin revision image digest candidate_url current created_at
   check_pr_number "$pr"
   [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
   info=$(pr_info "$pr")
@@ -89,7 +89,9 @@ publish() {
     jq -er --arg tag "$tag" --arg revision "$revision" '.status.traffic[] | select(.tag == $tag and .revisionName == $revision) | .url')
   [[ "$current" == "$origin" ]]
   delete_unused "$pr" "$revision" "$digest"
-  printf 'origin=%s\n' "$origin" >> "$GITHUB_OUTPUT"
+  created_at=$(gcloud run revisions describe "$revision" --format='value(metadata.creationTimestamp)')
+  [[ "$created_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$ ]]
+  printf 'origin=%s\ndeployed_at=%s\n' "$origin" "$created_at" >> "$GITHUB_OUTPUT"
 }
 
 case "${1:?}" in
