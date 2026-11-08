@@ -12,7 +12,8 @@ import { formatClock } from '@/lib/post-edit';
 import detailProductBrowPencil from '../../assets/plan-a/detail/product-brow-pencil.jpg';
 
 // Plan A ⑫ 投稿: the post being prepared lives only on the device until ⑫-8 sends it. The video
-// never leaves the device; ⑫-8 sends the texts, the steps and one frame as the thumbnail.
+// leaves the device only when the user agrees on ⑫-3 to have it read by Gemini (#151), and the API
+// keeps no copy; ⑫-8 sends the texts, the steps and one frame as the thumbnail.
 
 export type Cosmetic = {
   id: string;

@@ -1,3 +1,4 @@
+import type { PostAnalysis } from '@starter/shared';
 import type { AlertButton } from 'react-native';
 
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -39,7 +40,13 @@ jest.mock('expo-file-system', () => ({
   })),
 }));
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), dismissTo: jest.fn() },
+  router: {
+    push: jest.fn(),
+    back: jest.fn(),
+    replace: jest.fn(),
+    dismissTo: jest.fn(),
+    canGoBack: () => true,
+  },
 }));
 jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
 jest.mock('react-native-safe-area-context', () => ({
@@ -84,8 +91,19 @@ type PostResponse = { status: number; json?: () => Promise<{ id: string }> };
 const mockPost = jest.fn((_request: unknown): Promise<PostResponse> =>
   Promise.resolve({ status: 201, json: () => Promise.resolve({ id: 'p-new' }) }),
 );
+// ⑫-3 asks to send the video only when an API is configured; most tests run without one.
+const mockApi = { url: null as string | null };
+const mockAnalyze = jest.fn<
+  Promise<PostAnalysis>,
+  [{ uri: string; marks: readonly number[] }, AbortSignal]
+>();
+jest.mock('@/lib/post-analysis', () => ({
+  analyzePostVideo: (...args: Parameters<typeof mockAnalyze>) => mockAnalyze(...args),
+}));
 jest.mock('@/lib/api', () => ({
-  apiUrl: null,
+  get apiUrl() {
+    return mockApi.url;
+  },
   apiAssetUrl: (path: string) => path,
   api: { api: { recipes: { $post: (request: unknown) => mockPost(request) } } },
   authClient: {
@@ -96,6 +114,7 @@ const alert = jest.spyOn(Alert, 'alert');
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockApi.url = null;
   mockFileSize.mockImplementation(() => 1000);
   jest
     .mocked(getThumbnailAsync)
@@ -351,6 +370,122 @@ test('makes one step per marked segment with the frame at its start', async () =
   expect(jest.mocked(getThumbnailAsync).mock.calls.map(([, options]) => options?.time)).toEqual([
     0, 1500, 4000,
   ]);
+});
+
+/** Keeps the latest draft so a test can read what ⑫-3 put in it. */
+function DraftProbe({ onDraft }: { onDraft: (draft: PostDraft) => void }) {
+  const { draft } = usePostDraft();
+  useEffect(() => {
+    onDraft(draft);
+  }, [draft, onDraft]);
+  return null;
+}
+
+const analysis: PostAnalysis = {
+  title: 'ナチュラルメイク',
+  summary: '',
+  steps: [
+    {
+      start: 26,
+      end: 62,
+      part: 'lash',
+      description: '目尻にラインを引く',
+      regions: [],
+      cosmetics: [1],
+    },
+    { start: 0, end: 26, part: 'brow', description: '眉尻を描き足す', regions: [], cosmetics: [0] },
+  ],
+  cosmetics: [
+    {
+      brand: 'peripera',
+      name: 'スピーディー スキニー ブロウ',
+      category: 'アイブロウ',
+      confidence: 'high',
+      verified: true,
+      sources: [],
+    },
+    {
+      brand: '',
+      name: 'アイライナー',
+      category: 'アイライナー',
+      confidence: 'low',
+      verified: null,
+      sources: [],
+    },
+  ],
+};
+
+async function renderCreating() {
+  mockApi.url = 'https://api.example.com';
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostCreating />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+    { video: { uri: 'file:///video.mov', marks: [26_000], durationMs: 60_000 } },
+  );
+  return () => latest;
+}
+
+test('asks before sending the video and fills the steps with what Gemini found', async () => {
+  mockAnalyze.mockResolvedValue(analysis);
+  const draft = await renderCreating();
+  expect(alert.mock.calls.at(-1)?.[0]).toBe('動画を送って手順書を作りますか');
+  expect(mockAnalyze).not.toHaveBeenCalled();
+  await pressAlertButton('送る');
+  await waitFor(() => {
+    expect(router.replace).toHaveBeenCalledWith('/post/review');
+  });
+  expect(mockAnalyze.mock.calls[0]?.[0]).toMatchObject({
+    uri: 'file:///video.mov',
+    marks: [26_000],
+  });
+  const steps = draft()?.steps ?? [];
+  expect(steps.map((step) => [step.part, step.segment, step.description])).toEqual([
+    ['brow', { startMs: 0, endMs: 26_000 }, '眉尻を描き足す'],
+    // The step's end is cut to the video's length.
+    ['lash', { startMs: 26_000, endMs: 60_000 }, '目尻にラインを引く'],
+  ]);
+  // The cosmetics Gemini saw start chosen.
+  expect(steps[0]?.cosmetics.map((cosmetic) => cosmetic.name)).toEqual([
+    'peripera スピーディー スキニー ブロウ',
+  ]);
+  expect(steps[1]?.cosmetics.map((cosmetic) => cosmetic.name)).toEqual(['アイライナー']);
+  expect(draft()?.title).toBe('ナチュラルメイク');
+  expect(jest.mocked(getThumbnailAsync).mock.calls.map(([, options]) => options?.time)).toEqual([
+    0, 26_000,
+  ]);
+});
+
+test('returns to ⑫-1 without sending when the user chooses やめる', async () => {
+  await renderCreating();
+  await pressAlertButton('やめる');
+  expect(router.back).toHaveBeenCalled();
+  expect(mockAnalyze).not.toHaveBeenCalled();
+  expect(getThumbnailAsync).not.toHaveBeenCalled();
+});
+
+test('makes the steps from the marks when the analysis fails', async () => {
+  mockAnalyze.mockRejectedValue(new Error('今は動画から手順書を作れません。'));
+  const draft = await renderCreating();
+  await pressAlertButton('送る');
+  await waitFor(() => {
+    expect(router.replace).toHaveBeenCalledWith('/post/review');
+  });
+  expect(alert).toHaveBeenCalledWith(
+    '動画から手順書を作れませんでした',
+    '今は動画から手順書を作れません。区切りから手順を作ります。',
+  );
+  expect(draft()?.steps.map((step) => step.segment)).toEqual([
+    { startMs: 0, endMs: 26_000 },
+    { startMs: 26_000, endMs: 60_000 },
+  ]);
+  expect(draft()?.steps.every((step) => step.description === '')).toBe(true);
 });
 
 test('lists the steps made from the video with their segment lengths', async () => {

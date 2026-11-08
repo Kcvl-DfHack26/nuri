@@ -46,7 +46,10 @@ jest.mock('expo-file-system', () => ({
 }));
 
 jest.mock('expo-image', () => ({ Image: () => null }));
-jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
+jest.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: jest.fn(),
+  UIImagePickerControllerQualityType: { Medium: 1 },
+}));
 jest.mock('expo-router', () => ({
   router: { push: jest.fn(), back: jest.fn(), replace: jest.fn(), canGoBack: () => true },
   useIsFocused: () => true,
@@ -124,7 +127,7 @@ test('opens ⑫-3 with the chosen video without asking', async () => {
       params: { video: 'file:///video.mov' },
     });
   });
-  expect(pick).toHaveBeenCalledWith({ mediaTypes: 'videos' });
+  expect(pick).toHaveBeenCalledWith({ mediaTypes: 'videos', videoQuality: 1 });
   expect(alert).not.toHaveBeenCalled();
 });
 
