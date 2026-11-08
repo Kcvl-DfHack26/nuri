@@ -192,12 +192,6 @@ export type RecipeDetail = InferResponseType<
 >['recipe'];
 export type RecipeStep = RecipeDetail['steps'][number];
 
-export const sourceLabels: Record<NonNullable<RecipeDetail['source']>, string> = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  youtube: 'YouTube',
-};
-
 /** Plan A's compact counts: 864, 1.2k, 3.4k. */
 export function formatCount(value: number) {
   if (value < 1000) {

@@ -139,7 +139,7 @@ test('shows the recipe from the API and opens the product sheet from a product r
   expect(screen.getByText('＃15分')).toBeOnTheScreen();
   expect(screen.getByText('5ステップ')).toBeOnTheScreen();
   expect(screen.getAllByText('シェード').length).toBeGreaterThan(0);
-  expect(screen.getByText('Instagramから取り込み・お気に入り 1.2k')).toBeOnTheScreen();
+  expect(await screen.findByText('フォロワー 3・お気に入り 1.2k')).toBeOnTheScreen();
   expect(screen.getByText('2点')).toBeOnTheScreen();
   await fireEvent.press(
     screen.getByRole('button', { name: 'CELANE 極細アイブロウペンシル、眉・モカブラウン' }),
@@ -236,6 +236,8 @@ test('follows the author from ⑤ at once and rolls it back when the server refu
   });
   expect(screen.getByText('フォロー中')).toBeOnTheScreen();
   expect(mockFollow).toHaveBeenCalledTimes(1);
+  // The row stays one line of follower count and likes; the source is not shown (#212).
+  expect(await screen.findByText('フォロワー 4・お気に入り 1.2k')).toBeOnTheScreen();
 
   const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   mockFollow.mockImplementationOnce(async () => ({ ok: false, status: 500 }));
@@ -249,6 +251,22 @@ test('follows the author from ⑤ at once and rolls it back when the server refu
   expect(screen.getByRole('button', { name: 'フォロー' })).toBeSelected();
   mockSignedIn = false;
   mockFollowing = false;
+});
+
+test('shows only likes when the author has no profile to read', async () => {
+  mockGetAuthor.mockImplementationOnce(async () => ({
+    status: 404,
+    json: async () => ({
+      user: { id: '', following: false, followerCount: 0, followingCount: 0, likeCount: 0 },
+    }),
+  }));
+  await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
+  await waitFor(() => {
+    expect(mockGetAuthor).toHaveBeenCalled();
+  });
+  expect(await screen.findByText('お気に入り 1.2k')).toBeOnTheScreen();
+  expect(screen.queryByText(/フォロワー/u)).toBeNull();
+  expect(screen.queryByRole('button', { name: 'フォロー' })).toBeNull();
 });
 
 test('sends a guest to log in before following and hides the button on your own recipe', async () => {
