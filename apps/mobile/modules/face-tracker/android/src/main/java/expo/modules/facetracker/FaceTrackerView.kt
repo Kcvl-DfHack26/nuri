@@ -55,7 +55,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
     .build()
   private var cameraProvider: ProcessCameraProvider? = null
-  // Main thread. The camera provider is shared by the whole app, so only these are unbound.
+  // Main thread. The camera provider is shared by the whole app: stopping unbinds only these, and
+  // starting takes the camera from any other view (see start()).
   private var useCases: Array<UseCase> = emptyArray()
   // Analysis thread only: MediaPipe's GPU delegate works only on the thread that created it, so the
   // landmarker is created, used, replaced and closed there.
@@ -141,7 +142,10 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       try {
         val provider = future.get()
         cameraProvider = provider
-        provider.unbind(*useCases)
+        // Navigating from ⑦ to ⑩ starts the new screen's camera before the old screen's stops. Both
+        // share the activity's camera, and two previews plus two analyses exceed what it can bind,
+        // so the screen that starts last takes the camera.
+        provider.unbindAll()
         useCases = arrayOf(preview, analysis)
         provider.bindToLifecycle(owner, CameraSelector.DEFAULT_FRONT_CAMERA, preview, analysis)
       } catch (error: Exception) {
