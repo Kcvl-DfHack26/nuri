@@ -5,21 +5,13 @@ import {
   recipeListQuerySchema,
   recipeParamsSchema,
 } from '@starter/shared';
-import { and, asc, count, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
 import type { Auth, AuthenticatedEnv } from '../auth';
 
-import {
-  product,
-  recipe,
-  recipeFavorite,
-  recipeImage,
-  recipeProduct,
-  recipeStep,
-  user,
-} from '../../db/schema';
+import { recipe, recipeFavorite, recipeImage, recipeStep, user } from '../../db/schema';
 import { requireSession } from '../auth';
 
 const pageSize = 20;
@@ -224,53 +216,57 @@ export function recipeRoutes(db: Database, auth: Auth) {
       .get('/recipes/:id', zValidator('param', recipeParamsSchema), async (c) => {
         const { id } = c.req.valid('param');
         const session = await auth.api.getSession({ headers: c.req.raw.headers });
-        const [found] = await db
-          .select({
-            id: recipe.id,
-            title: recipe.title,
-            image: recipe.image,
-            tags: recipe.tags,
-            durationMinutes: recipe.durationMinutes,
-            likeCount: recipe.likeCount,
-            source: recipe.source,
-            part: recipe.part,
-            summary: recipe.summary,
-            author: { id: user.id, name: user.name, image: user.image },
-            favorited: session
-              ? sql<boolean>`exists(select 1 from ${recipeFavorite} where ${recipeFavorite.recipeId} = ${recipe.id} and ${recipeFavorite.userId} = ${session.user.id})`
-              : sql<boolean>`false`,
-          })
-          .from(recipe)
-          .innerJoin(user, eq(recipe.authorId, user.id))
-          .where(eq(recipe.id, id));
+        const found = await db.query.recipe.findFirst({
+          where: { id },
+          columns: {
+            id: true,
+            title: true,
+            image: true,
+            tags: true,
+            durationMinutes: true,
+            likeCount: true,
+            source: true,
+            part: true,
+            summary: true,
+          },
+          extras: {
+            favorited: (row) =>
+              session
+                ? sql<boolean>`exists(select 1 from ${recipeFavorite} where ${recipeFavorite.recipeId} = ${row.id} and ${recipeFavorite.userId} = ${session.user.id})`
+                : sql<boolean>`false`,
+          },
+          with: {
+            author: { columns: { id: true, name: true, image: true } },
+            products: {
+              columns: { usage: true },
+              orderBy: { position: 'asc' },
+              with: {
+                product: { columns: { id: true, name: true, image: true, purchaseUrl: true } },
+              },
+            },
+            steps: {
+              columns: {
+                part: true,
+                label: true,
+                title: true,
+                hint: true,
+                product: true,
+                colors: true,
+              },
+              orderBy: { position: 'asc' },
+            },
+          },
+        });
         if (!found) {
           return c.json({ error: 'not_found' as const }, 404);
         }
-        const products = await db
-          .select({
-            id: product.id,
-            name: product.name,
-            image: product.image,
-            purchaseUrl: product.purchaseUrl,
-            usage: recipeProduct.usage,
-          })
-          .from(recipeProduct)
-          .innerJoin(product, eq(recipeProduct.productId, product.id))
-          .where(eq(recipeProduct.recipeId, id))
-          .orderBy(asc(recipeProduct.position));
-        const steps = await db
-          .select({
-            part: recipeStep.part,
-            label: recipeStep.label,
-            title: recipeStep.title,
-            hint: recipeStep.hint,
-            product: recipeStep.product,
-            colors: recipeStep.colors,
-          })
-          .from(recipeStep)
-          .where(eq(recipeStep.recipeId, id))
-          .orderBy(asc(recipeStep.position));
-        return c.json({ recipe: { ...found, products, steps } });
+        const { products, ...detail } = found;
+        return c.json({
+          recipe: {
+            ...detail,
+            products: products.map(({ product, usage }) => ({ ...product, usage })),
+          },
+        });
       })
   );
 }

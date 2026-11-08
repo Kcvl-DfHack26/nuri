@@ -33,6 +33,8 @@ describe('HTTP contract', () => {
     expect((await app.request('/api/posts?offset=-1')).status).toBe(400);
     expect((await app.request('/api/recipes?offset=-1')).status).toBe(400);
     expect((await app.request('/api/recipes/Not%20a%20slug')).status).toBe(400);
+    expect((await app.request('/api/recipes?part=nose')).status).toBe(400);
+    expect((await app.request('/api/recipe-images/Not_A_Slug')).status).toBe(400);
     expect((await app.request('/api/me/favorites')).status).toBe(401);
     expect((await app.request('/api/recipes/fox/favorite', { method: 'PUT' })).status).toBe(401);
     expect((await app.request('/api/me')).status).toBe(401);
@@ -45,6 +47,14 @@ describe('HTTP contract', () => {
         })
       ).status,
     ).toBe(401);
+  });
+  test.each([
+    ['/api/posts', 64 * 1024 + 1, 413],
+    ['/api/recipes', 2.5 * 1024 * 1024, 401],
+    ['/api/recipes', 2.5 * 1024 * 1024 + 1, 413],
+  ])('checks the body limit and session for %s with %i bytes', async (path, size, status) => {
+    const response = await app.request(path, { method: 'POST', body: 'a'.repeat(size) });
+    expect(response.status).toBe(status);
   });
   test('rejects cross-origin writes and exposes only configured login methods', async () => {
     const rejected = await app.request('/api/posts', {
