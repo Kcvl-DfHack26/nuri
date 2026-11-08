@@ -6,6 +6,8 @@
 gh workflow run preview.yml --ref main -f pr=PR_NUMBER
 ```
 
+表だけ作る場合は `gh workflow run preview.yml --ref BRANCH -f pr=PR_NUMBER -f operation=comment` を使う。`BRANCH` にはこのモードを含むブランチを指定する。配信がまだ有効でなければ「設定待ち」を表示する。初期設定後に `--ref main` で同じ操作を実行すると配信チェックボックスが有効になる。
+
 成功すると、PRコメントの表にExpo WebとHono APIのURL、Expo GoのQRと `exps://` URL、各行の状態とデプロイ日時（JST）が表示される。pushは対象SHAを更新するだけ。プレビューを更新するときは、最新のコメントから再度リクエストする。同じSHAのリビジョンとビルド済みイメージは再利用する。
 
 Expo Goは `apps/mobile` と同じSDKのビルドを使う。iOS実機では対応版の配布方法に従い、手元に対応版がなければWebで確認する。Expo Goに含まれないネイティブ機能は互換Development Buildで確認する。[Expo GoのSDK互換性](https://docs.expo.dev/troubleshooting/expo-go-version-mismatch/)

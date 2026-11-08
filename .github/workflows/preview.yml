@@ -13,6 +13,11 @@ on:
         description: Open pull request number
         type: string
         required: true
+      operation:
+        description: Publish the preview or create its status comment only
+        type: choice
+        options: [publish, comment]
+        default: publish
 permissions:
   contents: read
 concurrency:
@@ -21,10 +26,10 @@ concurrency:
 jobs:
   request:
     if: >-
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && inputs.operation == 'comment') ||
+      (github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.sender.type == 'User' &&
-      contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->')))
+      contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->'))))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -43,9 +48,13 @@ jobs:
         id: request
         env:
           REQUEST_PR: ${{ inputs.pr }}
+          PREVIEW_OPERATION: ${{ inputs.operation }}
+          PREVIEW_CAN_PUBLISH: ${{ github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' }}
         with:
           script: |
-            const { assertPreviewTarget, parsePreviewRequest, previewMarker, previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
+            const { assertPreviewTarget, parsePreviewRequest, previewMarker, previewSetupPendingMarker, previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
+            const commentOnly = context.eventName === 'workflow_dispatch' && process.env.PREVIEW_OPERATION === 'comment';
+            const canRequest = !commentOnly || process.env.PREVIEW_CAN_PUBLISH === 'true';
             const isComment = context.eventName === 'issue_comment';
             const payload = context.payload;
             const requestedSha = isComment ? parsePreviewRequest({ author: payload.comment.user.login, body: payload.comment.body, before: payload.changes?.body?.from }) : undefined;
@@ -58,19 +67,30 @@ jobs:
             const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number });
             let comment = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(`${previewMarker}\n`));
             if (isComment && (!comment || comment.id !== payload.comment.id || comment.body !== payload.comment.body || previewSha(comment.body) !== pr.head.sha)) throw new Error('最新のpreviewコメントから実行してください');
-            const body = renderPreviewComment({ sha: pr.head.sha, pullRequest: { number: pr.number, url: pr.html_url }, status: '⏳ 配信中', runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });
+            const activateRequest = canRequest && comment?.body?.includes(previewSetupPendingMarker);
+            if (commentOnly && comment?.body && previewSha(comment.body) === pr.head.sha && !activateRequest) return;
+            const body = renderPreviewComment({
+              sha: pr.head.sha,
+              pullRequest: { number: pr.number, url: pr.html_url },
+              canRequest,
+              status: commentOnly ? undefined : '⏳ 配信中',
+              runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            });
             if (comment) {
               await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });
             } else {
               ({ data: comment } = await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body }));
             }
+            if (commentOnly) return;
             core.setOutput('pr', String(pr.number));
             core.setOutput('sha', pr.head.sha);
             core.setOutput('comment', String(comment.id));
 
   publish:
     needs: request
-    if: needs.request.outputs.pr != '' && vars.PREVIEW_GCP_ENABLED == 'true'
+    if: >-
+      github.ref == 'refs/heads/main' && inputs.operation != 'comment' &&
+      needs.request.outputs.pr != '' && vars.PREVIEW_GCP_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: preview

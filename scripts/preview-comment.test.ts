@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   assertPreviewTarget,
   parsePreviewRequest,
+  previewSetupPendingMarker,
   previewSha,
   renderPreviewComment,
 } from './preview-comment';
@@ -69,6 +70,16 @@ describe('preview request', () => {
       `| **Expo Go**<br>\`exps://${new URL(origin).host}\`<br><img src="${origin}/expo-go/qr.svg?sha=${sha}" alt="Expo Goで開くQR" width="128"> | ✅ 完了 | 2026-11-09 06:10 |`,
     );
     expect(before).toContain('| **Expo Go**<br>— | 未配信 | — |');
+  });
+
+  test('shows setup status without an active request when publishing is unavailable', () => {
+    const pending = renderPreviewComment({ sha, canRequest: false });
+    expect(pending).toContain(previewSetupPendingMarker);
+    expect(pending).toContain('| **Expo Web**<br>— | 設定待ち | — |');
+    expect(pending).toContain('| **Hono API**<br>— | 設定待ち | — |');
+    expect(pending).toContain('| **Expo Go**<br>— | 設定待ち | — |');
+    expect(pending).not.toContain('- [ ]');
+    expect(previewSha(pending)).toBe(sha);
   });
 
   test.each([

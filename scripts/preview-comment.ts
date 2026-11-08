@@ -1,4 +1,5 @@
 export const previewMarker = '<!-- expo-hono-opentofu-starter-preview -->';
+export const previewSetupPendingMarker = '<!-- nuri-preview-setup-pending -->';
 const requestLine =
   '- [ ] 🚀 **previewを配信** <!-- expo-hono-opentofu-starter-preview-request -->';
 const checkedLine = requestLine.replace('[ ]', '[x]');
@@ -59,13 +60,14 @@ export function renderPreviewComment(input: {
   pullRequest?: { number: number; url: string };
   status?: string;
   runUrl?: string;
+  canRequest?: boolean;
   deployment?: { origin: string; createdAt: string };
 }) {
-  const { sha, pullRequest, runUrl, deployment } = input;
+  const { sha, pullRequest, runUrl, canRequest = true, deployment } = input;
   const heading = pullRequest
     ? `PR [#${pullRequest.number}](${pullRequest.url}) · [\`${sha.slice(0, 7)}\`](${pullRequest.url}/commits/${sha})`
     : `nuri PRプレビュー · \`${sha.slice(0, 7)}\``;
-  const status = input.status ?? '未配信';
+  const status = input.status ?? (canRequest ? '未配信' : '設定待ち');
   const time = deployment
     ? new Intl.DateTimeFormat('sv-SE', {
         timeZone: 'Asia/Tokyo',
@@ -90,9 +92,9 @@ export function renderPreviewComment(input: {
     `| **Hono API**<br>${apiUrl ? `[${apiUrl}](${apiUrl})` : '—'} | ${status} | ${time} |`,
     `| **Expo Go**<br>${go} | ${status} | ${time} |`,
     '',
-    requestLine,
-    '',
-    'write権限を持つ人がチェックすると、3つのプレビューを一緒に配信します。',
+    ...(canRequest
+      ? [requestLine, '', 'write権限を持つ人がチェックすると、3つのプレビューを一緒に配信します。']
+      : [previewSetupPendingMarker, 'プレビューの初期設定後に配信できます。']),
     ...(deployment
       ? ['Expo Goはプロジェクトと同じSDKを使ってください。初回起動時はバンドルを生成します。']
       : []),
