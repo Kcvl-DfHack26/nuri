@@ -104,3 +104,95 @@ export const recipeInputSchema = z.object({
     .max(Math.ceil(recipeThumbnailMaxBytes / 3) * 4)
     .refine((value) => value.startsWith(jpegBase64Prefix), 'サムネイルはJPEGにしてください'),
 });
+
+/** Largest video ⑫-3 may send for analysis; Cloud Run accepts request bodies up to 32 MiB. */
+export const postAnalysisVideoMaxBytes = 30_000_000;
+
+/**
+ * Face landmarks a painted area can start or end at. The app turns each into MediaPipe landmark
+ * numbers, so Gemini only picks names and never numbers (#46).
+ */
+const postRegionAnchors = [
+  'browHead',
+  'browPeak',
+  'browTail',
+  'browTailLine',
+  'eyeInner',
+  'eyeOuter',
+  'irisCenter',
+  'irisOuter',
+  'upperLidEdge',
+  'lowerLidEdge',
+  'noseWing',
+  'mouthCorner',
+  'cheekboneTop',
+  'cheekCenter',
+  'temple',
+  'jawAngle',
+  'glabella',
+  'noseRoot',
+  'noseBridge',
+  'noseTip',
+  'upperLipCenter',
+  'lowerLipCenter',
+  'chin',
+  'foreheadCenter',
+  'brow',
+  'upperLip',
+  'lowerLip',
+  'lips',
+] as const;
+const postRegionAreas = ['brow', 'upperLip', 'lowerLip', 'lips'] as const;
+
+/**
+ * One painted area of a step, chosen from fixed words. The width comes from the face, not from
+ * Gemini, because its millimetre guesses drew areas too thick (#46).
+ */
+const postRegionSchema = z.object({
+  /** A longer description for people, in the words of the team's makeup notes. */
+  detail: z.string().trim().max(300),
+  /** Left or right as seen on the video, which may be mirrored; the app maps it to the face. */
+  side: z.enum(['screenLeft', 'screenRight', 'both', 'center']),
+  start: z.enum(postRegionAnchors),
+  end: z.enum([...postRegionAnchors, 'none']),
+  shape: z.enum(['dot', 'line', 'band', 'ellipse', 'arc', 'area']),
+  /** How far the area reaches past `start` when there is no `end`. */
+  length: z.enum(['none', 'short', 'medium', 'long']),
+  direction: z.enum(['none', 'outward', 'inward', 'upOutward', 'downOutward', 'up', 'down']),
+  /** Keep the area inside this part, e.g. only the middle of the upper lip. */
+  clip: z.enum([...postRegionAreas, 'none']),
+});
+
+/** What the API answers for a video posted from ⑫-3: the draft of the steps and the cosmetics. */
+export const postAnalysisSchema = z.object({
+  title: z.string().trim().max(40),
+  summary: z.string().trim().max(200),
+  steps: z
+    .array(
+      z.object({
+        /** Seconds from the start of the video. */
+        start: z.number().min(0),
+        end: z.number().min(0),
+        part: z.enum(makeupParts),
+        description: z.string().trim().max(200),
+        regions: z.array(postRegionSchema).max(8),
+        /** Indexes into `cosmetics`. */
+        cosmetics: z.array(z.int().min(0)).max(10),
+      }),
+    )
+    .max(recipeStepsMax),
+  cosmetics: z
+    .array(
+      z.object({
+        brand: z.string().trim().max(60),
+        name: z.string().trim().max(80),
+        category: z.string().trim().max(40),
+        confidence: z.enum(['high', 'medium', 'low']),
+        /** Whether a Google search found the product; null when it could not be checked. */
+        verified: z.boolean().nullable(),
+        sources: z.array(z.object({ title: z.string().max(200), url: z.url() })).max(5),
+      }),
+    )
+    .max(10),
+});
+export type PostAnalysis = z.infer<typeof postAnalysisSchema>;

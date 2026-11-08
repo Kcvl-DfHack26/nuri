@@ -55,6 +55,8 @@ describe('HTTP contract', () => {
     ['/api/posts', 64 * 1024 + 1, 413],
     ['/api/recipes', 2.5 * 1024 * 1024, 401],
     ['/api/recipes', 2.5 * 1024 * 1024 + 1, 413],
+    ['/api/post-analyses', 30_000_000 + 64 * 1024, 401],
+    ['/api/post-analyses', 30_000_000 + 64 * 1024 + 1, 413],
   ])('checks the body limit and session for %s with %i bytes', async (path, size, status) => {
     const response = await app.request(path, { method: 'POST', body: 'a'.repeat(size) });
     expect(response.status).toBe(status);

@@ -1,4 +1,5 @@
 import { serveStatic } from '@hono/node-server/serve-static';
+import { postAnalysisVideoMaxBytes } from '@starter/shared';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -7,14 +8,22 @@ import { fileURLToPath } from 'node:url';
 
 import type { Database } from './db/client';
 import type { Auth } from './modules/auth';
+import type { PostAnalyzer } from './modules/post-analysis';
 import type { Environment } from './platform/env';
 
-import { authCapabilities, authRoutes } from './modules/auth';
+import { authCapabilities, authRoutes, requireSession } from './modules/auth';
+import { postAnalysisRoutes } from './modules/post-analysis';
 import { recipeRoutes } from './modules/recipes';
 import { socialRoutes } from './modules/social';
 import { expoWebRoutes } from './platform/expo-web';
 
-export function createApp(db: Database, auth: Auth, env: Environment, ready: () => Promise<void>) {
+export function createApp(
+  db: Database,
+  auth: Auth,
+  env: Environment,
+  ready: () => Promise<void>,
+  analyzePost: PostAnalyzer | null = null,
+) {
   const origins = env.TRUSTED_ORIGINS.split(',').map((value) => value.trim());
   const browserOrigins = [
     new URL(env.BETTER_AUTH_URL).origin,
@@ -26,6 +35,8 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
   const smallBody = bodyLimit({ maxSize: 64 * 1024, onError });
   // POST /api/recipes carries a base64 JPEG of up to 1.5 MB (2 MB as base64) plus the texts.
   const postedRecipeBody = bodyLimit({ maxSize: 2.5 * 1024 * 1024, onError });
+  // POST /api/post-analyses carries the video from ⑫-3 and its marks as multipart form data.
+  const postVideoBody = bodyLimit({ maxSize: postAnalysisVideoMaxBytes + 64 * 1024, onError });
   return (
     new Hono()
       .use('*', secureHeaders())
@@ -38,11 +49,15 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
         serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
       )
       // A posted recipe carries its thumbnail; every other API body stays small.
-      .use('/api/*', (c, next) =>
-        c.req.method === 'POST' && c.req.path === '/api/recipes'
-          ? postedRecipeBody(c, next)
-          : smallBody(c, next),
-      )
+      .use('/api/*', (c, next) => {
+        if (c.req.method === 'POST' && c.req.path === '/api/recipes') {
+          return postedRecipeBody(c, next);
+        }
+        if (c.req.method === 'POST' && c.req.path === '/api/post-analyses') {
+          return postVideoBody(c, next);
+        }
+        return smallBody(c, next);
+      })
       .use('/api/*', cors({ origin: browserOrigins, credentials: true }))
       .use('/api/*', async (c, next) => {
         c.header('Cache-Control', 'no-store');
@@ -88,6 +103,7 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
       .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
       .route('/api', socialRoutes(db, auth))
       .route('/api', recipeRoutes(db, auth))
+      .route('/api', postAnalysisRoutes(requireSession(auth), analyzePost))
       .route('/', expoWebRoutes(env.EXPO_WEB_ROOT))
       .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500))
   );

@@ -1,6 +1,8 @@
 import { expect, test } from 'bun:test';
 
 import {
+  postAnalysisSchema,
+  postAnalysisVideoMaxBytes,
   feedQuerySchema,
   postInputSchema,
   preferencesSchema,
@@ -105,4 +107,33 @@ test('bounds a posted recipe and accepts only a JPEG thumbnail within the limit'
   ]) {
     expect(recipeInputSchema.safeParse({ ...valid, ...change }).success).toBe(false);
   }
+});
+
+test('accepts an analysis only with fixed words for the painted areas', () => {
+  const step = {
+    start: 4,
+    end: 18,
+    part: 'brow',
+    description: '眉尻を描き足す',
+    regions: [
+      {
+        detail: '眉山から眉尻',
+        side: 'screenRight',
+        start: 'browPeak',
+        end: 'browTail',
+        shape: 'line',
+        length: 'none',
+        direction: 'none',
+        clip: 'brow',
+      },
+    ],
+    cosmetics: [],
+  };
+  const analysis = { title: '眉', summary: '', steps: [step], cosmetics: [] };
+  expect(postAnalysisSchema.safeParse(analysis).success).toBe(true);
+  const numbered = { ...step, regions: [{ ...step.regions[0], start: 105 }] };
+  expect(postAnalysisSchema.safeParse({ ...analysis, steps: [numbered] }).success).toBe(false);
+  const millimetres = { ...step, regions: [{ ...step.regions[0], length: 5 }] };
+  expect(postAnalysisSchema.safeParse({ ...analysis, steps: [millimetres] }).success).toBe(false);
+  expect(postAnalysisVideoMaxBytes).toBeLessThan(32 * 1024 * 1024);
 });
