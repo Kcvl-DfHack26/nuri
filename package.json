@@ -19,7 +19,6 @@
     "typecheck": "tsc --noEmit && turbo run typecheck",
     "test": "bun test ./scripts && turbo run test",
     "test:e2e": "playwright test",
-    "test:e2e:serve": "serve --single apps/mobile/.expo/e2e-web",
     "test:integration": "bun run compose run --rm --no-deps api bun run --cwd apps/api test:integration",
     "check": "bun run format:check && bun run lint && bun run typecheck && bun run test && bun run deadcode",
     "deadcode": "fallow dead-code",
@@ -64,7 +63,6 @@
     "oxlint-plugin-react-doctor": "0.9.22",
     "oxlint-tsgolint": "7.0.2005",
     "portless": "0.16.0",
-    "serve": "14.2.7",
     "turbo": "2.11.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1"

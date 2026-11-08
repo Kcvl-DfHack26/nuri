@@ -1,9 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-const apiPort = 49116;
-const webPort = 49117;
-const apiOrigin = `http://127.0.0.1:${apiPort}`;
-const webOrigin = `http://127.0.0.1:${webPort}`;
+const port = 49116;
+const origin = `http://127.0.0.1:${port}`;
 const database =
   process.env.NURI_E2E_DATABASE_URL ?? 'postgresql://nuri_e2e:nuri_e2e@127.0.0.1:55432/nuri_e2e';
 
@@ -18,7 +16,7 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 12_000 },
   use: {
-    baseURL: webOrigin,
+    baseURL: origin,
     viewport: { width: 390, height: 844 },
     trace: 'retain-on-failure',
   },
@@ -37,32 +35,26 @@ export default defineConfig({
       use: { browserName: 'webkit' },
     },
   ],
-  webServer: [
-    {
-      cwd: './apps/api',
-      command: 'bun run db:migrate && bun run db:seed && exec node --import tsx src/index.ts',
-      url: `${apiOrigin}/ready`,
-      timeout: 120_000,
-      env: {
-        NODE_ENV: 'development',
-        PORT: String(apiPort),
-        DATABASE_URL: database,
-        BETTER_AUTH_URL: apiOrigin,
-        BETTER_AUTH_SECRET: 'local-e2e-only-not-for-real-deployments',
-        TRUSTED_ORIGINS: webOrigin,
-        AUTH_EMULATE: 'true',
-        GOOGLE_EMULATOR_URL: 'http://127.0.0.1:4002',
-        APPLE_EMULATOR_URL: 'http://127.0.0.1:4004',
-        RESEND_API_URL: 'http://127.0.0.1:4005',
-      },
+  webServer: {
+    cwd: './apps/api',
+    command:
+      'NODE_ENV=production bun run --cwd ../mobile expo export --platform web --output-dir .expo/e2e-web && ' +
+      'bun run db:migrate && bun run db:seed && exec node --import tsx src/index.ts',
+    url: `${origin}/ready`,
+    timeout: 180_000,
+    env: {
+      NODE_ENV: 'development',
+      PORT: String(port),
+      DATABASE_URL: database,
+      BETTER_AUTH_URL: origin,
+      BETTER_AUTH_SECRET: 'local-e2e-only-not-for-real-deployments',
+      EXPO_WEB_ROOT: '../mobile/.expo/e2e-web',
+      EXPO_PUBLIC_API_URL: '/',
+      EXPO_NO_TELEMETRY: '1',
+      AUTH_EMULATE: 'true',
+      GOOGLE_EMULATOR_URL: 'http://127.0.0.1:4002',
+      APPLE_EMULATOR_URL: 'http://127.0.0.1:4004',
+      RESEND_API_URL: 'http://127.0.0.1:4005',
     },
-    {
-      command:
-        'bun run --cwd apps/mobile expo export --platform web --output-dir .expo/e2e-web && ' +
-        `exec bun run test:e2e:serve --listen tcp://127.0.0.1:${webPort}`,
-      url: webOrigin,
-      timeout: 180_000,
-      env: { EXPO_PUBLIC_API_URL: apiOrigin, EXPO_NO_TELEMETRY: '1' },
-    },
-  ],
+  },
 });

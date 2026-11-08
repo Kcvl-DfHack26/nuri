@@ -429,7 +429,16 @@ gh variable set GCP_DEPLOY_ENABLED --body true
 gh workflow run deploy.yml --ref main
 ```
 
-以後、mainの成功したCIから「イメージ作成 → migrationのjob → トラフィックなしのcandidateで `/ready` → トラフィック切替」の順に動く。migrationが失敗したらデプロイは止まり、今のrevisionがトラフィックを受け続ける。Expo側にproduction API URLとビルドを用意してから `EXPO_UPDATE_ENABLED=true` を設定すると、最後にExpo Updateを配信する。
+以後、mainの成功したCIから「Expo Webを同梱したイメージ作成 → migrationのjob → candidateで `/ready` とWeb配信の検査 → トラフィック切替」の順に動く。migrationが失敗したらデプロイは止まり、今のrevisionがトラフィックを受け続ける。Expo側にproduction API URLとビルドを用意してから `EXPO_UPDATE_ENABLED=true` を設定すると、最後にExpo Updateを配信する。
+
+### Webを開く
+
+```sh
+tofu -chdir=infra output -raw expo_web_url
+bash scripts/check-expo-web.sh "$(tofu -chdir=infra output -raw service_uri)"
+```
+
+`expo_web_url` は既存のCloud Runサービスの既定HTTPS URLを指す。Web同梱イメージの配備後は、同じホストの `/` がExpo Web、`/api/**` がHono、`/_expo/static/**` と `/assets/**` が静的ファイルになる。レシピ直リンクはSPAで開ける。将来のLP用 `/about/` は現時点では404を返す。WebはアクセスしたホストのAPIを使い、共有する正規URLはOpenTofuの `api_origin` と揃える。Google OAuthのリダイレクト先は既存どおり正規URLの `/api/auth/callback/google` を使う。
 
 アプリから読むには、ExpoのEnvironment Variablesの `EXPO_PUBLIC_API_URL`（previewとproduction）に `service_uri` を設定する（[Expo GitHub連携・環境変数](#expo-github連携環境変数)）。
 

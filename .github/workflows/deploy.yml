@@ -1,4 +1,4 @@
-name: Deploy API and mobile update
+name: Deploy API, Expo Web and mobile update
 on:
   workflow_run:
     workflows: [CI]
@@ -50,7 +50,7 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Build and push immutable API image
+      - name: Build and push immutable API and Web image
         id: image
         run: |
           gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
@@ -65,7 +65,7 @@ jobs:
         run: |
           gcloud run jobs update "$MIGRATION_JOB" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --quiet
           gcloud run jobs execute "$MIGRATION_JOB" --project="$PROJECT_ID" --region="$REGION" --wait --quiet
-      - name: Deploy candidate without traffic and check database readiness
+      - name: Deploy candidate without traffic and check API and Web
         id: candidate
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
@@ -78,6 +78,7 @@ jobs:
           gcloud run services update-traffic "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --update-tags="candidate=$revision" --quiet
           candidate_url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format=json | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')
           curl --fail --retry 6 --retry-all-errors --retry-delay 5 "$candidate_url/ready"
+          bash scripts/check-expo-web.sh "$candidate_url"
           echo "revision=$revision" >> "$GITHUB_OUTPUT"
       - name: Promote tested revision
         env:
@@ -86,6 +87,7 @@ jobs:
           gcloud run services update-traffic "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --to-revisions="$REVISION=100" --quiet
           url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')
           curl --fail --retry 3 --retry-all-errors "$url/ready"
+          bash scripts/check-expo-web.sh "$url"
       - uses: actions/setup-node@v7.1.0
         if: vars.EXPO_UPDATE_ENABLED == 'true'
         with:

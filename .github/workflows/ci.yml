@@ -128,15 +128,14 @@ jobs:
           docker compose -f compose.yaml -f compose.go.yaml config --quiet
           docker compose -f compose.yaml -f compose.devices.yaml config --quiet
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
-      - name: Run Node.js container smoke test
+      - name: Run Hono and Expo Web container smoke test
         run: |
           docker run -d --name api -p 8080:8080 \
             -e DATABASE_URL=postgresql://unused:unused@localhost:5432/unused \
             -e BETTER_AUTH_SECRET=ci-only-secret-not-for-real-deployments \
             -e BETTER_AUTH_URL=https://example.com expo-hono-opentofu-starter-api
-          for _ in $(seq 1 20); do
-            if curl --fail --silent http://localhost:8080/health; then exit 0; fi
-            sleep 1
-          done
-          docker logs api
-          exit 1
+          if ! curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://localhost:8080/health ||
+             ! bash scripts/check-expo-web.sh http://localhost:8080; then
+            docker logs api
+            exit 1
+          fi

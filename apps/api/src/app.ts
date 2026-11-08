@@ -12,6 +12,7 @@ import type { Environment } from './platform/env';
 import { authCapabilities, authRoutes } from './modules/auth';
 import { recipeRoutes } from './modules/recipes';
 import { socialRoutes } from './modules/social';
+import { expoWebRoutes } from './platform/expo-web';
 
 export function createApp(db: Database, auth: Auth, env: Environment, ready: () => Promise<void>) {
   const origins = env.TRUSTED_ORIGINS.split(',').map((value) => value.trim());
@@ -87,6 +88,7 @@ export function createApp(db: Database, auth: Auth, env: Environment, ready: () 
       .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
       .route('/api', socialRoutes(db, auth))
       .route('/api', recipeRoutes(db, auth))
+      .route('/', expoWebRoutes(env.EXPO_WEB_ROOT))
       .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500))
   );
 }

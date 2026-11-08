@@ -69,7 +69,7 @@ bunx playwright install --no-shell chromium webkit
 bun run test:e2e
 ```
 
-テストはDBへmigrationとseedを実行し、APIを49116、Webを49117で起動する。別の使い捨てローカルDBを使う場合は `NURI_E2E_DATABASE_URL` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
+テストはDBへmigrationとseedを実行し、Honoがエクスポート済みのExpo WebとAPIを49116で同一オリジン配信する。別の使い捨てローカルDBを使う場合は `NURI_E2E_DATABASE_URL` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
 
 ## Maestro
 

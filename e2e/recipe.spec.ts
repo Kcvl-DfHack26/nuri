@@ -9,7 +9,11 @@ for (const { name, viewport, firstRowCount } of [
 ]) {
   test(`open a recipe, finish its steps and use comparison on a ${name}`, async ({ page }) => {
     await page.setViewportSize(viewport);
+    const recipes = page.waitForResponse('**/api/recipes?offset=0');
     await page.goto('/');
+    const response = await recipes;
+    expect(response.ok()).toBe(true);
+    expect(new URL(response.url()).origin).toBe(new URL(page.url()).origin);
     const openApp = page.getByRole('link', { name: 'アプリで開く', exact: true });
     await expect(openApp).toBeInViewport();
     await expect(openApp).toHaveAttribute('href', 'com.kcvl.nuri:///(tabs)/(make)');

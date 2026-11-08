@@ -143,7 +143,7 @@ WebのAR手順では「カメラを使う」を押したときにブラウザの
 
 ## 審査向けWebの配信設計
 
-審査員向けの入口は既存の Cloud Run `nuri-staging`（`asia-northeast1`）の [サービスURL](https://nuri-staging-v3kjfarita-an.a.run.app/) を使う設計とする。Hono の Node.js コンテナに Expo Web のエクスポートを同梱する。将来 `apps/website` に Astro でLPを作る場合も、静的出力を同じコンテナの `/about/` に置ける。現在このサービスが公開しているのは Hono API とサンプル素材で、Webの配信設定は #105 で扱う。
+審査員向けの入口は既存の Cloud Run `nuri-staging`（`asia-northeast1`）の [サービスURL](https://nuri-staging-v3kjfarita-an.a.run.app/) を使う設計とする。Hono の Node.js コンテナに Expo Web のエクスポートを同梱する。将来 `apps/website` に Astro でLPを作る場合も、静的出力を同じコンテナの `/about/` に置ける。Webを同梱したイメージでは同じHonoコンテナがSPAと静的ファイルを配信する。OpenTofuはCloud Runの既定URLを有効にし、Web入口を `expo_web_url` に出力する。
 
 | パス                                                                                                        | 処理                                                                                                                |
 | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
@@ -153,7 +153,7 @@ WebのAR手順では「カメラを使う」を押したときにブラウザの
 | `/_expo/**`、`/assets/**`、`/favicon.ico`                                                                   | Expo Web の静的出力。公開用OG画像を追加する場合も静的配信で先に解決                                                 |
 | `/`、`/recipes/**`、`/parts/*`、`/products/*`、`/users/*`、`/post/**`、`/import/**`、その他のExpo画面ルート | Expo Router。ページへの `GET` と `HEAD` を `index.html` に解決。`/auth-callback` はアプリ画面                       |
 
-API、LP、静的ファイルの順に解決してからExpoの画面ルートを判定する。APIや静的ファイルの欠損はその領域で404を返す。ブラウザ版の `EXPO_PUBLIC_API_URL` と `BETTER_AUTH_URL` は同じ `https://nuri-staging-v3kjfarita-an.a.run.app` に合わせる。ブラウザは同一オリジンで認証Cookieを扱える。独自ドメインの購入やCookieの `Domain` 共有を省ける。ExpoのSPA共通OGは `index.html` に、LPのページ別OGはAstroの静的HTMLに出力できる。
+API、LP、静的ファイルの順に解決してからExpoの画面ルートを判定する。APIや静的ファイルの欠損はその領域で404を返す。Cloud Run向けWeb exportは `EXPO_PUBLIC_API_URL=/` を埋め込み、ブラウザが開いたオリジンをAPIの接続先にする。正規公開URLでは `BETTER_AUTH_URL` と一致し、同一オリジンで認証Cookieを扱える。候補revisionはタグ付きURLを使うため、OAuthの確認は正規のサービスURLで行う。独自ドメインの購入やCookieの `Domain` 共有を省ける。ExpoのSPA共通OGは `index.html` に、LPのページ別OGはAstroの静的HTMLに出力できる。
 
 Webのホームと公開レシピ詳細は「アプリで開く」から、インストール済みのnuriへ既存schemeで移動できる。ホームはメイクタブ、詳細は同じレシピを開く。Webの入口は公開URLのままで、リンクを押すまでアプリへの遷移は起きない。共有HTTPS URLをOSから直接アプリに関連付ける場合は、Universal Links／App Linksを別途設定する。
 

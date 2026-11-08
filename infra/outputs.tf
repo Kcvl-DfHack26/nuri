@@ -34,3 +34,7 @@ output "service_uri" {
   description = "Cloud Run service URI when enabled."
   value       = try(google_cloud_run_v2_service.api[0].uri, null)
 }
+output "expo_web_url" {
+  description = "Public entry point of the Expo Web app on the Cloud Run service."
+  value       = var.deploy_application ? "${google_cloud_run_v2_service.api[0].uri}/" : null
+}
