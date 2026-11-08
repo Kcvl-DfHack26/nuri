@@ -5,7 +5,9 @@ locals {
   api_origin      = var.api_origin != "" ? var.api_origin : "https://${var.name}-${data.google_project.current.number}.${var.region}.run.app"
   apis = toset([
     "artifactregistry.googleapis.com", "run.googleapis.com", "sqladmin.googleapis.com",
-    "secretmanager.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com"
+    "secretmanager.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com",
+    # Gemini on Vertex AI reads the ⑫-3 video (#142, #155).
+    "aiplatform.googleapis.com"
   ])
 }
 
@@ -40,6 +42,12 @@ resource "google_service_account" "deployer" {
 resource "google_project_iam_member" "sql_client" {
   project = var.project_id
   role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.runtime.email}"
+}
+# The API calls Gemini on Vertex AI with the runtime's own identity; no key file (#155).
+resource "google_project_iam_member" "vertex_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
   member  = "serviceAccount:${google_service_account.runtime.email}"
 }
 resource "google_project_iam_member" "migration_sql_client" {
@@ -185,6 +193,11 @@ resource "google_cloud_run_v2_service" "api" {
       env {
         name  = "TRUSTED_ORIGINS"
         value = join(",", var.trusted_origins)
+      }
+      # Without it the analysis answers 503; VERTEX_LOCATION keeps its default, global (#155).
+      env {
+        name  = "VERTEX_PROJECT"
+        value = var.project_id
       }
       dynamic "env" {
         for_each = var.email_login_enabled ? { EMAIL_FROM = var.email_from } : {}
