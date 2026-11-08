@@ -62,29 +62,32 @@ export const makeupParts = [
 export const makeupShapeSchema = z.object({
   strokes: z
     .array(
-      z.object({
-        points: z
-          .array(
-            z.object({
-              // The canonical mesh covers MediaPipe's first 468 landmarks; the irises are not in it.
-              at: z.int().min(0).max(467),
-              dx: z.number().min(-0.2).max(0.2).optional(),
-              dy: z.number().min(-0.2).max(0.2).optional(),
-            }),
-          )
-          .min(1)
-          .max(40),
-        /** Filled outline instead of a line through the points. */
-        fill: z.boolean().optional(),
-        /** Cut the stroke out of what is drawn before it instead of painting it. */
-        erase: z.boolean().optional(),
-        mirror: z.boolean().optional(),
-        /** Line width in UV; ignored for a fill. */
-        width: z.number().min(0).max(0.3).optional(),
-        /** Soft edge in UV. */
-        blur: z.number().min(0).max(0.1).optional(),
-        opacity: z.number().min(0).max(1).optional(),
-      }),
+      z
+        .object({
+          points: z
+            .array(
+              z.object({
+                // The canonical mesh covers MediaPipe's first 468 landmarks; the irises are not in it.
+                at: z.int().min(0).max(467),
+                dx: z.number().min(-0.2).max(0.2).optional(),
+                dy: z.number().min(-0.2).max(0.2).optional(),
+              }),
+            )
+            .min(1)
+            .max(40),
+          /** Filled outline instead of a line through the points. */
+          fill: z.boolean().optional(),
+          /** Cut the stroke out of what is drawn before it instead of painting it. */
+          erase: z.boolean().optional(),
+          mirror: z.boolean().optional(),
+          /** Line width in UV; ignored for a fill. */
+          width: z.number().min(0).max(0.3).optional(),
+          /** Soft edge in UV. */
+          blur: z.number().min(0).max(0.1).optional(),
+          opacity: z.number().min(0).max(1).optional(),
+        })
+        // A fill needs an area.
+        .refine((stroke) => !stroke.fill || stroke.points.length >= 3, 'A fill needs 3 points'),
     )
     .min(1)
     .max(8),

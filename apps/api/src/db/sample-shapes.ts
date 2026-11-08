@@ -8,8 +8,11 @@ import type { MakeupShape } from '@starter/shared';
 const browUpper = [70, 63, 105, 66, 107] as const;
 const browLower = [55, 65, 52, 53, 46] as const;
 
+/** dy for each of the five points of one brow edge. */
+type BrowEdge = readonly [number, number, number, number, number];
+
 /** A filled brow moved from the landmarks' brow by dy per point (upper tail→head, lower head→tail). */
-function brow(upperDy: readonly number[], lowerDy: readonly number[]): MakeupShape {
+function brow(upperDy: BrowEdge, lowerDy: BrowEdge): MakeupShape {
   return {
     strokes: [
       {

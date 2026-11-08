@@ -6,6 +6,7 @@ import {
   preferencesSchema,
   profileInputSchema,
   profilePatchSchema,
+  makeupShapeSchema,
   purchaseUrlSchema,
   recipeInputSchema,
   recipeListQuerySchema,
@@ -104,5 +105,20 @@ test('bounds a posted recipe and accepts only a JPEG thumbnail within the limit'
     { thumbnail: oversized },
   ]) {
     expect(recipeInputSchema.safeParse({ ...valid, ...change }).success).toBe(false);
+  }
+});
+
+test('accepts makeup shapes on canonical landmarks and needs an area for a fill', () => {
+  const brow = [{ at: 70 }, { at: 105 }, { at: 107, dy: -0.01 }];
+  expect(
+    makeupShapeSchema.safeParse({ strokes: [{ fill: true, mirror: true, points: brow }] }).success,
+  ).toBe(true);
+  for (const strokes of [
+    [],
+    [{ fill: true, points: [{ at: 105 }] }],
+    [{ points: [{ at: 468 }] }],
+    [{ points: [{ at: 105, dx: 0.5 }] }],
+  ]) {
+    expect(makeupShapeSchema.safeParse({ strokes }).success).toBe(false);
   }
 });
