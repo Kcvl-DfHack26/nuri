@@ -8,6 +8,33 @@ import { ProfileSettings } from './profile-settings';
 
 jest.mock('@expo/ui', () => ({
   Icon: Object.assign(() => null, { select: () => 'icon' }),
+  // The stand-in shows the selected item's label; pressing it picks 丸顔.
+  Picker: Object.assign(
+    ({
+      testID,
+      selectedValue,
+      onValueChange,
+      children,
+    }: {
+      testID: string;
+      selectedValue: string;
+      onValueChange: (value: string) => void;
+      children: { props: { label: string; value: string } }[];
+    }) => {
+      const { Pressable } = jest.requireActual<typeof import('react-native')>('react-native');
+      const selected = children.flat().find((item) => item.props.value === selectedValue);
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${testID} ${selected?.props.label ?? ''}`}
+          onPress={() => {
+            onValueChange('round');
+          }}
+        />
+      );
+    },
+    { Item: () => null },
+  ),
   Host: jest.requireActual<typeof import('react-native')>('react-native').View,
   Switch: ({
     label,
@@ -110,7 +137,9 @@ afterEach(() => {
 });
 const mockGetProfile = jest.fn(async () => ({
   status: 200,
-  json: async () => ({ profile: { name: 'はなこ', handle: null, bio: '', isPublic: true } }),
+  json: async () => ({
+    profile: { name: 'はなこ', handle: null, bio: '', isPublic: true, faceType: null },
+  }),
 }));
 const mockPutProfile = jest.fn(async (_input: { json: unknown }) => ({ status: 200 }));
 const mockAccounts = jest.fn(async () => ({
@@ -159,6 +188,16 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
     json: { name: 'はな', handle: 'hana_1', bio: 'よろしく', isPublic: false },
   });
   expect(mockNotify).toHaveBeenCalled();
+});
+
+test('chooses a face type and saves it, never showing a skin tone', async () => {
+  await renderWithClient(<ProfileSettings />);
+  const picker = await screen.findByRole('button', { name: '顔タイプ 未設定' });
+  expect(screen.queryByText(/イエベ/)).toBeNull();
+  await fireEvent.press(picker);
+  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeOnTheScreen();
+  await saveProfile();
+  expect(mockPutProfile).toHaveBeenCalledWith({ json: { faceType: 'round' } });
 });
 
 test('adds and removes passkeys inline in the account section', async () => {
@@ -235,7 +274,7 @@ test('saves a privacy change when the existing display name exceeds the edit lim
   mockGetProfile.mockResolvedValueOnce({
     status: 200,
     json: async () => ({
-      profile: { name: 'x'.repeat(41), handle: null, bio: '', isPublic: true },
+      profile: { name: 'x'.repeat(41), handle: null, bio: '', isPublic: true, faceType: null },
     }),
   });
   await renderWithClient(<ProfileSettings />);

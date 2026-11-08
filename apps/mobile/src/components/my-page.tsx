@@ -17,9 +17,10 @@ import { GlassIconButton } from '@/components/glass-icon-button';
 import { PrimaryButton } from '@/components/post-chrome';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { apiAssetUrl, authClient } from '@/lib/api';
+import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
+import { faceTypes } from '@/lib/face-diagnosis';
 import { favoriteListOptions, formatCount, recipeListOptions } from '@/lib/recipes';
-import { userOptions } from '@/lib/social';
+import { myProfileOptions, userOptions } from '@/lib/social';
 import { useTokenColor } from '@/theme/tokens';
 
 const SETTINGS = Icon.select({
@@ -40,6 +41,11 @@ export function MyPage() {
   const focused = useIsFocused();
   const { data: session, isPending } = authClient.useSession();
   const user = session?.user;
+  // Only its owner reads the face type (#194), so it comes from the own profile, not ⑰'s counts.
+  const { data: own } = useQuery({
+    ...myProfileOptions(user?.id),
+    enabled: Boolean(user && apiUrl),
+  });
   const posted = useInfiniteQuery({
     ...recipeListOptions(user ? { author: user.id } : {}),
     enabled: Boolean(user),
@@ -75,7 +81,13 @@ export function MyPage() {
                 >
                   {user ? user.name : 'ゲスト'}
                 </Text>
-                {user ? null : (
+                {user ? (
+                  own?.faceType ? (
+                    <Text className="font-maru text-meta text-ink-secondary">
+                      {faceTypes[own.faceType].label}
+                    </Text>
+                  ) : null
+                ) : (
                   <Text className="font-maru text-meta text-ink-secondary">
                     ログインするとプロフィールを表示します
                   </Text>

@@ -1,3 +1,5 @@
+import type { faceTypeIds } from '@starter/shared';
+
 import { z } from 'zod';
 
 // Face type, eye shape, midface and brow shape from MediaPipe Face Landmarker points (#84). To add,
@@ -60,7 +62,7 @@ export const faceTypes = {
     basis: '縦が横より少し長く、あごに向かってなだらかに細くなる',
     suitedBrow: 'softArch',
   },
-} satisfies Record<string, Definition & { suitedBrow: BrowShape }>;
+} satisfies Record<(typeof faceTypeIds)[number], Definition & { suitedBrow: BrowShape }>;
 export type FaceType = keyof typeof faceTypes;
 
 export const eyeShapes = {
