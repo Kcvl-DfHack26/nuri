@@ -155,6 +155,8 @@ WebのAR手順では「カメラを使う」を押したときにブラウザの
 
 API、LP、静的ファイルの順に解決してからExpoの画面ルートを判定する。APIや静的ファイルの欠損はその領域で404を返す。ブラウザ版の `EXPO_PUBLIC_API_URL` と `BETTER_AUTH_URL` は同じ `https://nuri-staging-v3kjfarita-an.a.run.app` に合わせる。ブラウザは同一オリジンで認証Cookieを扱える。独自ドメインの購入やCookieの `Domain` 共有を省ける。ExpoのSPA共通OGは `index.html` に、LPのページ別OGはAstroの静的HTMLに出力できる。
 
+Webのホームと公開レシピ詳細は「アプリで開く」から、インストール済みのnuriへ既存schemeで移動できる。ホームはメイクタブ、詳細は同じレシピを開く。Webの入口は公開URLのままで、リンクを押すまでアプリへの遷移は起きない。共有HTTPS URLをOSから直接アプリに関連付ける場合は、Universal Links／App Linksを別途設定する。
+
 - [Cloud RunのHTTPSサービスURL](https://docs.cloud.google.com/run/docs/triggering/https-request)
 - [Expo RouterのWeb出力](https://docs.expo.dev/router/web/hosting/)
 - [Better Authの公開URLとCookie設定](https://better-auth.com/docs/reference/options)

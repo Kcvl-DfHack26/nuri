@@ -10,6 +10,9 @@ for (const { name, viewport, firstRowCount } of [
   test(`open a recipe, finish its steps and use comparison on a ${name}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto('/');
+    const openApp = page.getByRole('link', { name: 'アプリで開く', exact: true });
+    await expect(openApp).toBeInViewport();
+    await expect(openApp).toHaveAttribute('href', 'com.kcvl.nuri:///(tabs)/(make)');
     const cards = page.getByRole('button', { name: /、いいね/ });
     await expect(cards.nth(5)).toBeVisible();
     await expect
@@ -23,6 +26,8 @@ for (const { name, viewport, firstRowCount } of [
 
     await page.getByRole('button', { name: /狐メイク、mio、いいね/ }).click();
     await expect(page).toHaveURL('/recipes/fox');
+    await expect(openApp).toBeInViewport();
+    await expect(openApp).toHaveAttribute('href', 'com.kcvl.nuri:///recipes/fox');
     const start = page.getByRole('button', { name: 'メイクをはじめる', exact: true });
     await expect(start).toBeInViewport();
     if (viewport === tablet) {

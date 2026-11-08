@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
+import { OpenNativeAppLink } from '@/components/open-native-app-link';
 import { RecipeList } from '@/components/recipe-list';
 import { partCards, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
@@ -74,44 +75,47 @@ function Header({ top, onHeight }: { top: number; onHeight: (height: number) => 
   const ink = useTokenColor('--color-ink-primary');
   return (
     <View
-      className="absolute inset-x-0 flex-row items-center gap-3 px-4"
+      className="absolute inset-x-0 gap-1 px-4"
       style={{ top: top + 6 }}
       onLayout={(event) => {
         onHeight(event.nativeEvent.layout.height);
       }}
     >
-      <Text className="font-maru-black text-display text-accent-rose">nuri</Text>
-      <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-full border border-black bg-white/55 py-1.5 pl-3.5 pr-1.5">
-        {/* The field opens the search screen, which owns the text input. */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="メイクを検索"
-          // The pill's padding extends the hit area to its 48pt height.
-          hitSlop={6}
-          onPress={() => {
-            router.push('/search');
-          }}
-          className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
-        >
-          <SocialIcon name={SEARCH} webGlyph="⌕" size={22} color={ink} />
-          <Text className="flex-1 font-maru text-ui text-ink-secondary" numberOfLines={1}>
-            メイクを検索
-          </Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="動画URLからレシピを作る"
-          // The 36pt chip keeps Plan A's look; the slop extends the hit area to 48pt.
-          hitSlop={6}
-          onPress={() => {
-            router.push('/import');
-          }}
-          className="min-h-9 flex-row items-center gap-1 rounded-full bg-neutral-soft pl-2.5 pr-3 active:opacity-70"
-        >
-          <SocialIcon name={LINK} webGlyph="↗" size={16} color={secondary} />
-          <Text className="font-maru-bold text-label text-ink-primary">動画URL</Text>
-        </Pressable>
+      <View className="flex-row items-center gap-3">
+        <Text className="font-maru-black text-display text-accent-rose">nuri</Text>
+        <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-full border border-black bg-white/55 py-1.5 pl-3.5 pr-1.5">
+          {/* The field opens the search screen, which owns the text input. */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="メイクを検索"
+            // The pill's padding extends the hit area to its 48pt height.
+            hitSlop={6}
+            onPress={() => {
+              router.push('/search');
+            }}
+            className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
+          >
+            <SocialIcon name={SEARCH} webGlyph="⌕" size={22} color={ink} />
+            <Text className="flex-1 font-maru text-ui text-ink-secondary" numberOfLines={1}>
+              メイクを検索
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="動画URLからレシピを作る"
+            // The 36pt chip keeps Plan A's look; the slop extends the hit area to 48pt.
+            hitSlop={6}
+            onPress={() => {
+              router.push('/import');
+            }}
+            className="min-h-9 flex-row items-center gap-1 rounded-full bg-neutral-soft pl-2.5 pr-3 active:opacity-70"
+          >
+            <SocialIcon name={LINK} webGlyph="↗" size={16} color={secondary} />
+            <Text className="font-maru-bold text-label text-ink-primary">動画URL</Text>
+          </Pressable>
+        </View>
       </View>
+      <OpenNativeAppLink />
     </View>
   );
 }

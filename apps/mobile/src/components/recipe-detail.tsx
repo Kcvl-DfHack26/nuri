@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { AccessibilityActionEvent } from 'react-native';
 
 import { Icon } from '@expo/ui';
@@ -18,6 +19,7 @@ import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
+import { OpenNativeAppLink } from '@/components/open-native-app-link';
 import { arPhotos, findProduct, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
@@ -99,7 +101,14 @@ type StepSummary = Pick<RecipeStep, 'part' | 'label'>;
 export function RecipeDetail({ id, onPost }: { id: string; onPost?: () => void }) {
   const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
   if (query.data) {
-    return <RecipeContent recipe={query.data} steps={query.data.steps} onPost={onPost} />;
+    return (
+      <RecipeContent
+        recipe={query.data}
+        steps={query.data.steps}
+        onPost={onPost}
+        appLink={onPost ? null : <OpenNativeAppLink recipeId={query.data.id} />}
+      />
+    );
   }
   return (
     <RecipeStatus
@@ -160,6 +169,7 @@ export function RecipeContent({
   steps,
   onPost,
   posting = false,
+  appLink,
 }: {
   recipe: RecipeData;
   /** Empty for a recipe without steps yet; it cannot start ⑦. */
@@ -167,6 +177,7 @@ export function RecipeContent({
   onPost: (() => void) | undefined;
   /** ⑫-8 is sending the post; 投稿 waits until it finishes. */
   posting?: boolean;
+  appLink?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const { width, height, onLayout } = useLayoutSize();
@@ -225,6 +236,7 @@ export function RecipeContent({
             >
               {recipe.title}
             </Text>
+            {appLink}
             <View className="flex-row flex-wrap gap-1.5">
               {tags.map((tag, index) => (
                 <View
