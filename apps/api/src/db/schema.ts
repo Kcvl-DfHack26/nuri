@@ -1,3 +1,5 @@
+import type { MakeupShape } from '@starter/shared';
+
 import { makeupParts, recipeSources } from '@starter/shared';
 import { sql } from 'drizzle-orm';
 import {
@@ -6,6 +8,7 @@ import {
   bytea,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -224,6 +227,8 @@ export const recipeStep = pgTable(
     product: text('product').notNull(),
     /** Recommended colors as #RRGGBB, shown as swatches. */
     colors: text('colors').array().notNull(),
+    /** Where ⑦ paints (`makeupShapeSchema`); null paints the part's standard texture. */
+    shape: jsonb('shape').$type<MakeupShape>(),
   },
   (table) => [primaryKey({ columns: [table.recipeId, table.position] })],
 );

@@ -1,0 +1,1 @@
+ALTER TABLE "recipe_step" ADD COLUMN "shape" jsonb;

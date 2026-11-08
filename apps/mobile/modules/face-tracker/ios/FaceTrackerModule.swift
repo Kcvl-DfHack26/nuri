@@ -21,6 +21,12 @@ public class FaceTrackerModule: Module {
       Prop("active") { (view: FaceTrackerView, active: Bool) in
         view.setActive(active)
       }
+
+      // The last frame with a face as a JPEG file URL in the app's caches with its landmarks, or nil
+      // before a face is found.
+      AsyncFunction("takeSnapshotAsync") { (view: FaceTrackerView) throws -> [String: Any]? in
+        try view.snapshot()
+      }
     }
   }
 }

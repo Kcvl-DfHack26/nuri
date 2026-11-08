@@ -1,3 +1,4 @@
+import { makeupShapeSchema } from '@starter/shared';
 import { afterAll, expect, test } from 'bun:test';
 import { count, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
@@ -59,6 +60,7 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
     hint: '自分の補足',
     product: 'リップ',
     colors: ['#C0505A'],
+    shape: null,
   };
   await db.insert(recipeStep).values(ownStep);
   const before = await db.select({ value: count() }).from(recipe);
@@ -119,10 +121,16 @@ test('shows the public recipe with ordered products and steps', async () => {
     },
   });
   const { recipe: fox } = z
-    .object({ recipe: z.object({ steps: z.array(z.object({ part: z.string() })) }) })
+    .object({
+      recipe: z.object({
+        steps: z.array(z.object({ part: z.string(), shape: makeupShapeSchema.nullable() })),
+      }),
+    })
     .parse(body);
   expect(fox.steps.map((step) => step.part)).toEqual(['brow', 'eye', 'lash', 'shading', 'cheek']);
-  expect(await (await app.request('/api/recipes/cat')).json()).toMatchObject({
+  // Every seeded step says where it paints.
+  expect(fox.steps.every((step) => step.shape !== null)).toBe(true);
+  expect(await (await app.request('/api/recipes/long')).json()).toMatchObject({
     recipe: { products: [], steps: [] },
   });
   expect((await app.request('/api/recipes/missing-recipe')).status).toBe(404);

@@ -1,0 +1,49 @@
+name: Preview Infrastructure
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan only, or apply to the isolated PR preview resources
+        type: choice
+        options: [plan, apply]
+        default: plan
+permissions:
+  contents: read
+concurrency:
+  group: nuri-preview-cloud
+  queue: max
+jobs:
+  opentofu:
+    name: Run OpenTofu
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      # 最新の main と CI の成功を確認してからクラウドへ認証する。
+      - name: Verify Current Main and CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/preview/bootstrap.ts verify
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_INFRA_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_INFRA_SERVICE_ACCOUNT }}
+      - name: Install Verified OpenTofu and Provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview/.terraform.lock.hcl
+      - name: Plan or Apply Preview Infrastructure
+        env:
+          OPERATION: ${{ inputs.operation }}
+          PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+        run: bun .github/scripts/preview/bootstrap.ts manage

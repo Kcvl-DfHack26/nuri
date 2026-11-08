@@ -8,6 +8,7 @@ import {
   preferencesSchema,
   profileInputSchema,
   profilePatchSchema,
+  makeupShapeSchema,
   purchaseUrlSchema,
   recipeInputSchema,
   recipeListQuerySchema,
@@ -136,4 +137,19 @@ test('accepts an analysis only with fixed words for the painted areas', () => {
   const millimetres = { ...step, regions: [{ ...step.regions[0], length: 5 }] };
   expect(postAnalysisSchema.safeParse({ ...analysis, steps: [millimetres] }).success).toBe(false);
   expect(postAnalysisVideoMaxBytes).toBeLessThan(32 * 1024 * 1024);
+});
+
+test('accepts makeup shapes on canonical landmarks and needs an area for a fill', () => {
+  const brow = [{ at: 70 }, { at: 105 }, { at: 107, dy: -0.01 }];
+  expect(
+    makeupShapeSchema.safeParse({ strokes: [{ fill: true, mirror: true, points: brow }] }).success,
+  ).toBe(true);
+  for (const strokes of [
+    [],
+    [{ fill: true, points: [{ at: 105 }] }],
+    [{ points: [{ at: 468 }] }],
+    [{ points: [{ at: 105, dx: 0.5 }] }],
+  ]) {
+    expect(makeupShapeSchema.safeParse({ strokes }).success).toBe(false);
+  }
 });
