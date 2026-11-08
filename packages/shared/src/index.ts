@@ -51,6 +51,42 @@ export const makeupParts = [
   'highlight',
   'lip',
 ] as const;
+/**
+ * Where a makeup step paints, drawn on device into MediaPipe's canonical face texture (UV, 0–1 across
+ * the texture, y downward). Each point is a face landmark's UV moved by dx, dy, so the area follows
+ * every face the landmarks fit. Strokes are smooth lines or filled outlines with a soft edge; with
+ * `mirror`, each is also drawn on the other half of the face (the canonical UV is symmetric at
+ * u = 0.5). A step without a shape uses its part's standard texture.
+ */
+export const makeupShapeSchema = z.object({
+  mirror: z.boolean(),
+  strokes: z
+    .array(
+      z.object({
+        points: z
+          .array(
+            z.object({
+              // The canonical mesh covers MediaPipe's first 468 landmarks; the irises are not in it.
+              at: z.int().min(0).max(467),
+              dx: z.number().min(-0.2).max(0.2).optional(),
+              dy: z.number().min(-0.2).max(0.2).optional(),
+            }),
+          )
+          .min(1)
+          .max(40),
+        /** Filled outline instead of a line through the points. */
+        fill: z.boolean().optional(),
+        /** Line width in UV; ignored for a fill. */
+        width: z.number().min(0).max(0.3).optional(),
+        /** Soft edge in UV. */
+        blur: z.number().min(0).max(0.1).optional(),
+        opacity: z.number().min(0).max(1).optional(),
+      }),
+    )
+    .min(1)
+    .max(8),
+});
+export type MakeupShape = z.infer<typeof makeupShapeSchema>;
 /** Longest recipe search term, shared by the API and the search field. */
 export const recipeSearchMaxLength = 50;
 /**
