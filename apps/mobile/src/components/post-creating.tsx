@@ -1,4 +1,4 @@
-import type { PostAnalysis } from '@starter/shared';
+import type { MakeupShape, PostAnalysis } from '@starter/shared';
 
 import { Icon } from '@expo/ui';
 import { recipeStepsMax } from '@starter/shared';
@@ -22,6 +22,7 @@ import { apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
 import { analyzePostVideo, shrinkVideo } from '@/lib/post-analysis';
 import { planSteps } from '@/lib/post-steps';
+import { regionShape } from '@/lib/region-shape';
 import { cn } from '@/lib/utils';
 
 const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
@@ -40,7 +41,11 @@ const shrinkStages = [
 ];
 
 /** A step ⑫-3 is about to make, with what the analysis found when there was one. */
-type Planned = PlannedStep & { description: string; cosmetics: Cosmetic[] };
+type Planned = PlannedStep & {
+  description: string;
+  cosmetics: Cosmetic[];
+  shape: MakeupShape | null;
+};
 type Plan = { steps: Planned[]; analyzed: boolean };
 
 function planFromMarks(video: NonNullable<PostDraft['video']>): Plan {
@@ -49,6 +54,7 @@ function planFromMarks(video: NonNullable<PostDraft['video']>): Plan {
       ...step,
       description: '',
       cosmetics: [],
+      shape: null,
     })),
     analyzed: false,
   };
@@ -68,6 +74,7 @@ function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Pl
         startMs: Math.round(step.start * 1000),
         endMs: durationMs === null ? endMs : Math.min(endMs, durationMs),
         description: step.description,
+        shape: regionShape(step.regions),
         // The cosmetics Gemini saw in the step start chosen; the user removes wrong ones on ⑫-5.
         cosmetics: step.cosmetics.flatMap((index) => {
           const found = analysis.cosmetics[index];
@@ -203,6 +210,7 @@ export function PostCreating() {
           cosmetics: step.cosmetics,
           segment: { startMs: step.startMs, endMs: step.endMs },
           image: images[index] ?? null,
+          shape: step.shape,
         })),
       }));
       router.replace('/post/review');

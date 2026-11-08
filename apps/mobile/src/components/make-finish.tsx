@@ -13,7 +13,7 @@ import { RecipeStatus } from '@/components/recipe-detail';
 import { arPhotos } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
-import { finishLayers } from '@/lib/face-makeup';
+import { finishLayers, recipeLayers } from '@/lib/face-makeup';
 import { backOrHome } from '@/lib/navigation';
 import { recipeOptions, shareRecipe } from '@/lib/recipes';
 
@@ -56,7 +56,7 @@ export function MakeFinish({ id }: { id: string }) {
       />
     );
   }
-  const layers = finishLayers(recipe?.steps ?? []);
+  const layers = recipeLayers(id, finishLayers(recipe?.steps ?? []));
   const fade = (
     <View
       pointerEvents="none"

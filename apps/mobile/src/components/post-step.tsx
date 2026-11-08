@@ -133,7 +133,8 @@ export function PostStepEdit({ index }: { index: string }) {
               appearance="menu"
               selectedValue={step.part}
               onValueChange={(part) => {
-                updateStep(position, { part });
+                // The area read from the video belongs to the old part.
+                updateStep(position, { part, shape: null });
               }}
             >
               {makeupParts.map((part) => (
