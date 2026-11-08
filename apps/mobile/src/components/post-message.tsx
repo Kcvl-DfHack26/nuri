@@ -16,6 +16,7 @@ import { usePostDraft } from '@/components/post-draft';
 import { arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { VideoBox } from '@/components/video-box';
 import { addTag, formatClock, lastFrameTime } from '@/lib/post-edit';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
@@ -243,13 +244,27 @@ function ThumbnailContent({
   frame,
   hasVideo,
   failed,
+  onSize,
 }: {
   frame: VideoFrame | null;
   hasVideo: boolean;
   failed: boolean;
+  /** The frame's size, so the box can take the video's shape. */
+  onSize: (width: number, height: number) => void;
 }) {
   if (frame) {
-    return <Image source={{ uri: frame.uri }} contentFit="cover" style={{ flex: 1 }} />;
+    return (
+      <Image
+        source={{ uri: frame.uri }}
+        contentFit="cover"
+        onLoad={({ source }) => {
+          if (source.width > 0 && source.height > 0) {
+            onSize(source.width, source.height);
+          }
+        }}
+        style={{ flex: 1 }}
+      />
+    );
   }
   if (!hasVideo) {
     return <CroppedPhoto source={arPhotos.finished} crop={portraitCrop} />;
@@ -286,28 +301,49 @@ function ThumbnailPicker() {
   const canEdit = Boolean(video?.durationMs) && (thumbnail !== null || defaultFailed);
   // 決定 keeps only the frame of the moment under the slider, not one still being replaced.
   const ready = preview?.timeMs === editingAt;
+  // The frame's shape, so a portrait video's thumbnail is shown portrait (#186).
+  const [aspect, setAspect] = useState<number | null>(null);
+  const picker = (
+    <Pressable
+      accessibilityRole={canEdit ? 'button' : 'image'}
+      accessibilityLabel={
+        shown ? `サムネイル ${formatClock(shown.timeMs)}の場面` : 'サムネイルの見本の写真'
+      }
+      accessibilityHint={canEdit ? 'サムネイルにする場面を変更します' : undefined}
+      disabled={!canEdit || editingAt !== null}
+      onPress={() => {
+        setEditingAt(thumbnail?.timeMs ?? 0);
+      }}
+      className={cn(
+        'overflow-hidden rounded-panel bg-bg-base active:opacity-90',
+        video ? 'flex-1' : 'h-55',
+      )}
+    >
+      <ThumbnailContent
+        frame={shown}
+        hasVideo={Boolean(video)}
+        failed={defaultFailed}
+        onSize={(width, height) => {
+          setAspect(width / height);
+        }}
+      />
+      {canEdit && editingAt === null ? (
+        <View className="absolute bottom-2.5 right-2.5 rounded-overlay-label bg-white/85 px-3 py-1.25">
+          <Text className="font-maru-bold text-label text-ink-primary">タップして変更</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
   return (
     <View className="gap-2">
       <Text className="font-maru-bold text-label text-ink-secondary">サムネイルの設定</Text>
-      <Pressable
-        accessibilityRole={canEdit ? 'button' : 'image'}
-        accessibilityLabel={
-          shown ? `サムネイル ${formatClock(shown.timeMs)}の場面` : 'サムネイルの見本の写真'
-        }
-        accessibilityHint={canEdit ? 'サムネイルにする場面を変更します' : undefined}
-        disabled={!canEdit || editingAt !== null}
-        onPress={() => {
-          setEditingAt(thumbnail?.timeMs ?? 0);
-        }}
-        className="h-55 overflow-hidden rounded-panel bg-bg-base active:opacity-90"
-      >
-        <ThumbnailContent frame={shown} hasVideo={Boolean(video)} failed={defaultFailed} />
-        {canEdit && editingAt === null ? (
-          <View className="absolute bottom-2.5 right-2.5 rounded-overlay-label bg-white/85 px-3 py-1.25">
-            <Text className="font-maru-bold text-label text-ink-primary">タップして変更</Text>
-          </View>
-        ) : null}
-      </Pressable>
+      {video ? (
+        <VideoBox aspect={aspect} maxHeight={360}>
+          {picker}
+        </VideoBox>
+      ) : (
+        picker
+      )}
       {editingAt !== null && video?.durationMs ? (
         <View className="gap-1 rounded-card bg-bg-base px-3.5 py-3">
           <NativeHost matchContents={{ vertical: true }} style={{ alignSelf: 'stretch' }}>

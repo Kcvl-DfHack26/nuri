@@ -502,6 +502,9 @@ test('asks before sending the video and fills the steps with what Gemini found',
   mockAnalyze.mockResolvedValue(analysis);
   const draft = await renderCreating();
   expect(alert.mock.calls.at(-1)?.[0]).toBe('動画を送って手順書を作りますか');
+  expect(alert.mock.calls.at(-1)?.[1]).toBe(
+    'サーバーに送信しGeminiで動画より手順と使ったコスメを読み取ります。動画はサーバーに残しません。',
+  );
   expect(mockAnalyze).not.toHaveBeenCalled();
   await pressAlertButton('送る');
   await waitFor(() => {
@@ -604,6 +607,55 @@ test('lists the steps made from the video with their segment lengths', async () 
     screen.getByRole('button', { name: '手順2 頬に高めに、ふんわりチーク、区間 1:00' }),
   );
   expect(router.push).toHaveBeenCalledWith('/post/step/1');
+});
+
+test('adds a step on ⑫-4 over the start and end picked on the bar, and opens it', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostReview />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  await fireEvent.press(screen.getByRole('button', { name: '手順を追加' }));
+  // It starts as the second half of the last step; a screen reader moves its start a second.
+  expect(screen.getByText('1:35 〜 2:05')).toBeOnTheScreen();
+  await fireEvent(screen.getByLabelText('区間の開始'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'decrement' },
+  });
+  expect(screen.getByText('1:34 〜 2:05')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '追加' }));
+  const steps = () => latest?.steps ?? [];
+  // The last step is cut back to meet the new one.
+  expect(steps().map((step) => [step.part, step.segment])).toEqual([
+    ['brow', { startMs: 0, endMs: 65_000 }],
+    ['cheek', { startMs: 65_000, endMs: 94_000 }],
+    ['cheek', { startMs: 94_000, endMs: 125_000 }],
+  ]);
+  expect(steps()[2]).toMatchObject({ title: '', description: '', cosmetics: [], shape: null });
+  expect(router.push).toHaveBeenCalledWith('/post/step/2');
+  await waitFor(() => {
+    expect(steps()[2]?.image).toBe('file:///frame-94000.jpg');
+  });
+  // The steps around it keep what they had.
+  expect(steps()[1]?.title).toBe('頬に高めに');
+});
+
+test('closes the panel without adding a step when canceled', async () => {
+  await renderSeeded(<PostReview />);
+  await fireEvent.press(screen.getByRole('button', { name: '手順を追加' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'キャンセル' }));
+  expect(screen.getByRole('button', { name: '手順を追加' })).toBeOnTheScreen();
+  expect(screen.getByText('動画から2つの手順を作りました')).toBeOnTheScreen();
+});
+
+test('cannot add a step without a video to split', async () => {
+  await renderSeeded(<PostReview />, { ...readyDraft, video: null });
+  expect(screen.getByRole('button', { name: '手順を追加（準備中）' })).toBeDisabled();
 });
 
 test('picks the part of a step on ⑫-5 and drops the area read for the old part', async () => {

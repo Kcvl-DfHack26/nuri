@@ -95,3 +95,49 @@ export function moveSegment(
     return segment;
   });
 }
+
+/**
+ * ⑫-4 (#186): 手順を追加 with the start and end the user picked. The new step takes that time; a
+ * step it overlaps is cut back to meet it, and a step it falls inside keeps the part before it.
+ * Returns the segments with the new one and its index, or null when the new step is shorter than
+ * `minSegmentMs`, would cover a whole step or leave one shorter than it, would pass
+ * `recipeStepsMax`, or lies outside the video.
+ */
+export function insertSegment(
+  segments: readonly Segment[],
+  range: { startMs: number; endMs: number },
+  durationMs: number | null,
+): { segments: Segment[]; index: number } | null {
+  const { startMs, endMs } = range;
+  if (
+    durationMs === null ||
+    segments.length >= recipeStepsMax ||
+    startMs < 0 ||
+    endMs > durationMs ||
+    endMs - startMs < minSegmentMs
+  ) {
+    return null;
+  }
+  const kept: Segment[] = [];
+  for (const segment of segments) {
+    const end = segment.endMs ?? durationMs;
+    if (end <= startMs || segment.startMs >= endMs) {
+      kept.push(segment);
+      continue;
+    }
+    if (segment.startMs >= startMs && end <= endMs) {
+      return null;
+    }
+    const trimmed =
+      segment.startMs < startMs ? { ...segment, endMs: startMs } : { ...segment, startMs: endMs };
+    if ((trimmed.endMs ?? durationMs) - trimmed.startMs < minSegmentMs) {
+      return null;
+    }
+    kept.push(trimmed);
+  }
+  const index = kept.filter((segment) => segment.startMs < startMs).length;
+  return {
+    segments: [...kept.slice(0, index), { startMs, endMs }, ...kept.slice(index)],
+    index,
+  };
+}

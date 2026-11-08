@@ -6,17 +6,17 @@ import { useEvent, useEventListener } from 'expo';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import type { PostStep } from '@/components/post-draft';
 import type { Segment } from '@/lib/post-steps';
 
-import { segmentLength, usePostDraft } from '@/components/post-draft';
+import { segmentLength, useCutStepFrame, usePostDraft } from '@/components/post-draft';
 import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { VideoBox } from '@/components/video-box';
 import { formatClock } from '@/lib/post-edit';
 import { minSegmentMs, moveSegment, segmentBounds } from '@/lib/post-steps';
 import { cn } from '@/lib/utils';
@@ -39,13 +39,9 @@ const PAUSE = Icon.select({
   android: import('@expo/material-symbols/pause.xml'),
 });
 
-type Edge = 'start' | 'end';
+export type Edge = 'start' | 'end';
 type Range = { startMs: number; endMs: number };
 
-// Plan A's landscape frame until the video's own shape is known.
-const defaultAspect = 358 / 190;
-// A portrait video is shown no taller than this, narrower and centered.
-const maxVideoHeight = 420;
 // How far one swipe of a screen reader's adjust gesture moves a boundary.
 const adjustStepMs = 1000;
 
@@ -60,7 +56,8 @@ function seekTo(player: VideoPlayer, ms: number) {
  * (`moveSegment`); a step whose start moved gets its frame cut again.
  */
 export function StepSegment({ step, position }: { step: PostStep; position: number }) {
-  const { draft, setDraft, trackFile } = usePostDraft();
+  const { draft, setDraft } = usePostDraft();
+  const cutFrame = useCutStepFrame();
   const video = draft.video;
   const durationMs = video?.durationMs ?? null;
   const ink = useTokenColor('--color-ink-primary');
@@ -69,7 +66,6 @@ export function StepSegment({ step, position }: { step: PostStep; position: numb
   // The frame stands in until the video is played or an end is moved.
   const [showVideo, setShowVideo] = useState(false);
   const [aspect, setAspect] = useState<number | null>(null);
-  const [width, setWidth] = useState(0);
   const segment: Segment = dragging ?? step.segment;
   const player = useVideoPlayer(video?.uri ?? null, (created) => {
     created.timeUpdateEventInterval = 0.1;
@@ -98,8 +94,6 @@ export function StepSegment({ step, position }: { step: PostStep; position: numb
     position,
     durationMs,
   );
-  const shape = aspect ?? defaultAspect;
-  const boxHeight = width > 0 ? Math.min(width / shape, maxVideoHeight) : undefined;
 
   const togglePlay = () => {
     if (isPlaying) {
@@ -136,72 +130,41 @@ export function StepSegment({ step, position }: { step: PostStep; position: numb
     }));
     // A step that starts elsewhere now shows the frame at its new start.
     after.forEach((moved, index) => {
-      if (moved.startMs === before[index]?.startMs) {
-        return;
+      if (moved.startMs !== before[index]?.startMs) {
+        cutFrame(index, moved.startMs);
       }
-      const update = (image: string | null) => {
-        setDraft((current) => ({
-          ...current,
-          steps: current.steps.map((item, at) =>
-            at === index && item.segment.startMs === moved.startMs ? { ...item, image } : item,
-          ),
-        }));
-      };
-      getThumbnailAsync(video.uri, { time: moved.startMs, quality: 0.7 }).then(
-        ({ uri }) => {
-          trackFile(uri);
-          update(uri);
-        },
-        () => {
-          update(null);
-        },
-      );
     });
   };
 
   return (
     <View className="gap-4">
-      <View
-        onLayout={(event: LayoutChangeEvent) => {
-          setWidth(event.nativeEvent.layout.width);
-        }}
-        className="w-full items-center"
-      >
-        <View
-          className="items-center justify-center overflow-hidden rounded-panel bg-ink-primary"
-          style={
-            boxHeight === undefined
-              ? { width: '100%', aspectRatio: shape }
-              : { height: boxHeight, width: boxHeight * shape }
-          }
+      <VideoBox aspect={aspect} className="items-center justify-center bg-ink-primary">
+        {showVideo && canPlay ? (
+          <VideoView
+            player={player}
+            nativeControls={false}
+            contentFit="contain"
+            style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+          />
+        ) : (
+          <Frame
+            step={step}
+            onSize={(frameWidth, frameHeight) => {
+              setAspect(frameWidth / frameHeight);
+            }}
+          />
+        )}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? '区間の再生を止める' : '区間を再生'}
+          accessibilityState={{ disabled: !canPlay }}
+          disabled={!canPlay}
+          onPress={togglePlay}
+          className="size-13 items-center justify-center rounded-full bg-bg-surface active:opacity-70 disabled:opacity-50"
         >
-          {showVideo && canPlay ? (
-            <VideoView
-              player={player}
-              nativeControls={false}
-              contentFit="contain"
-              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
-            />
-          ) : (
-            <Frame
-              step={step}
-              onSize={(frameWidth, frameHeight) => {
-                setAspect(frameWidth / frameHeight);
-              }}
-            />
-          )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={isPlaying ? '区間の再生を止める' : '区間を再生'}
-            accessibilityState={{ disabled: !canPlay }}
-            disabled={!canPlay}
-            onPress={togglePlay}
-            className="size-13 items-center justify-center rounded-full bg-bg-surface active:opacity-70 disabled:opacity-50"
-          >
-            <SocialIcon name={isPlaying ? PAUSE : PLAY} size={28} color={ink} />
-          </Pressable>
-        </View>
-      </View>
+          <SocialIcon name={isPlaying ? PAUSE : PLAY} size={28} color={ink} />
+        </Pressable>
+      </VideoBox>
       {failed ? (
         <Text accessibilityLiveRegion="polite" className="font-maru text-meta text-ink-secondary">
           動画を再生できませんでした
@@ -258,7 +221,7 @@ function Frame({
  * Where the step is in the whole video. With `bounds`, its two ends can be dragged, or adjusted a
  * second at a time with a screen reader, to move the step's start and end.
  */
-function RangeBar({
+export function RangeBar({
   segment,
   durationMs,
   bounds,

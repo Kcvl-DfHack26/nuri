@@ -1,11 +1,14 @@
 import { Icon } from '@expo/ui';
+import { recipeStepsMax } from '@starter/shared';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
 import type { PostStep } from '@/components/post-draft';
 
+import { AddStepPanel } from '@/components/post-add-step';
 import {
   BottomCta,
   DashedButton,
@@ -30,9 +33,11 @@ const MORE = Icon.select({
 });
 const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/add.xml') });
 
-// Plan A ⑫-4 手順書を確認.
+// Plan A ⑫-4 手順書を確認. 手順を追加 opens a panel to pick the moment of the new step (#186).
 export function PostReview() {
   const { draft } = usePostDraft();
+  const [adding, setAdding] = useState(false);
+  const canAdd = Boolean(draft.video?.durationMs) && draft.steps.length < recipeStepsMax && !adding;
   const ink = useTokenColor('--color-ink-primary');
   const pink = useTokenColor('--color-pastel-pink');
   const peach = useTokenColor('--color-pastel-peach');
@@ -66,7 +71,25 @@ export function PostReview() {
           // A post may work on the same part twice, so the position is the key.
           <StepCard key={index} step={step} index={index} />
         ))}
-        <DashedButton label="手順を追加" icon={addIcon} />
+        {adding ? (
+          <AddStepPanel
+            onClose={() => {
+              setAdding(false);
+            }}
+          />
+        ) : (
+          <DashedButton
+            label="手順を追加"
+            icon={addIcon}
+            {...(canAdd
+              ? {
+                  onPress: () => {
+                    setAdding(true);
+                  },
+                }
+              : {})}
+          />
+        )}
       </ScrollView>
       <BottomCta>
         <PrimaryButton
