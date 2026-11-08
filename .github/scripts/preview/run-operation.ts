@@ -4,6 +4,7 @@ type Event = {
   type?: string;
   changes?: { operation?: string; add?: number; change?: number; remove?: number };
   hook?: { resource?: { resource_type?: string; resource_name?: string }; action?: string };
+  diagnostic?: { severity?: string; summary?: string };
 };
 
 function eventLine(event: Event) {
@@ -17,7 +18,14 @@ function eventLine(event: Event) {
     }
   }
 
-  // リソースのID、インスタンスキー、診断メッセージ、出力値はPRへ転記しない。
+  if (event.type === 'diagnostic' && event.diagnostic?.severity === 'error') {
+    const code = /googleapi: Error ([45]\d{2}):/.exec(event.diagnostic.summary ?? '')?.[1];
+    return code
+      ? `Google Cloud API error: HTTP ${code}. See the Actions log for the full diagnostic.`
+      : 'OpenTofu reported an error. See the Actions log for the full diagnostic.';
+  }
+
+  // イベント由来のリソース識別子は型と宣言名だけを転記する。
   const { resource, action } = event.hook ?? {};
   const type = resource?.resource_type;
   const name = resource?.resource_name;
@@ -43,9 +51,17 @@ type Operation = {
   options: string[];
   env: Record<string, string | undefined>;
   events: string;
+  details: string[];
 };
 
-export async function executeOperation({ directory, operation, options, env, events }: Operation) {
+export async function executeOperation({
+  directory,
+  operation,
+  options,
+  env,
+  events,
+  details,
+}: Operation) {
   const result = await $`tofu -chdir=${directory} ${operation} -json-into=${events} ${options}`
     .env(env)
     .nothrow();
@@ -64,6 +80,8 @@ export async function executeOperation({ directory, operation, options, env, eve
 
   return {
     exitCode: result.exitCode,
-    log: [`tofu ${operation}`, ...excerpt, `Exit status: ${result.exitCode}`].join('\n'),
+    log: [`tofu ${operation}`, ...excerpt, `Exit status: ${result.exitCode}`, '', ...details]
+      .join('\n')
+      .trimEnd(),
   };
 }

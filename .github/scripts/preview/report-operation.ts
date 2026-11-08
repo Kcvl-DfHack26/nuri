@@ -23,8 +23,8 @@ export async function postOperationReport(
     exitCode !== 0
       ? `❌ 失敗（終了コード ${exitCode}）`
       : cleanupExitCode
-        ? `⚠️ Destroy 完了・後続の cleanup 失敗（終了コード ${cleanupExitCode}）`
-        : '✅ 完了';
+        ? `⚠️ Destroy 完了（終了コード 0）・後続の cleanup 失敗（終了コード ${cleanupExitCode}）`
+        : '✅ 完了（終了コード 0）';
   const excerpt =
     log.length > 58_000
       ? `${log.slice(0, 58_000)}\n… 続きは Actions の実行ログを参照`
@@ -34,9 +34,14 @@ export async function postOperationReport(
     '',
     status,
     '',
+    '<details>',
+    '<summary>実行ログとリソース設定</summary>',
+    '',
     '```text',
     excerpt || '実行ログなし。Actions で詳細を確認できます。',
     '```',
+    '',
+    '</details>',
     '',
     `[Actions の実行ログ](${runUrl})`,
   ].join('\n');
