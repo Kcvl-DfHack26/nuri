@@ -39,7 +39,36 @@ jest.mock('expo-file-system', () => ({
     base64: () => Promise.resolve(`/9j/${uri}`),
   })),
 }));
+// A stand-in video player that records what ⑫-5 asks of it and lets a test send its events.
+const mockPlayer = {
+  currentTime: 0,
+  status: 'readyToPlay',
+  playing: false,
+  timeUpdateEventInterval: 0,
+  play: jest.fn(),
+  pause: jest.fn(),
+  listeners: new Map<string, (payload: object) => void>(),
+  addListener(name: string, listener: (payload: object) => void) {
+    this.listeners.set(name, listener);
+    return { remove: () => this.listeners.delete(name) };
+  },
+};
+jest.mock('expo-video', () => ({
+  useVideoPlayer: (_source: unknown, setup?: (player: typeof mockPlayer) => void) => {
+    const { useState } = jest.requireActual<typeof import('react')>('react');
+    // Like expo-video, set the player up once.
+    const [player] = useState(() => {
+      setup?.(mockPlayer);
+      return mockPlayer;
+    });
+    return player;
+  },
+  VideoView: () => null,
+}));
 jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => (() => void) | undefined) => {
+    jest.requireActual<typeof import('react')>('react').useEffect(effect, [effect]);
+  },
   router: {
     push: jest.fn(),
     back: jest.fn(),
@@ -60,13 +89,19 @@ jest.mock('@expo/ui', () => {
   return {
     Icon: Object.assign(() => null, { select: () => 'icon' }),
     Host: View,
-    // Pressing the stand-in moves the slider to 2 seconds.
-    Slider: ({ onValueChange }: { onValueChange: (value: number) => void }) => (
+    // Pressing the stand-in moves the slider to `mockSlider.value`.
+    Slider: ({
+      testID,
+      onValueChange,
+    }: {
+      testID: string;
+      onValueChange: (value: number) => void;
+    }) => (
       <Pressable
         accessibilityRole="adjustable"
-        accessibilityLabel="サムネイルの時点"
+        accessibilityLabel={testID}
         onPress={() => {
-          onValueChange(2000);
+          onValueChange(mockSlider.value);
         }}
       />
     ),
@@ -115,9 +150,13 @@ jest.mock('@/lib/api', () => ({
   },
 }));
 const alert = jest.spyOn(Alert, 'alert');
+const mockSlider = { value: 2000 };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSlider.value = 2000;
+  mockPlayer.currentTime = 0;
+  mockPlayer.listeners.clear();
   mockApi.url = null;
   mockShrink.mockImplementation((uri) => Promise.resolve(uri));
   mockFileSize.mockImplementation(() => 1000);
@@ -419,6 +458,8 @@ const analysis: PostAnalysis = {
       ],
       cosmetics: [0],
     },
+    // Past the 60-second video: a misreading that is dropped.
+    { start: 70, end: 80, part: 'lip', description: '', regions: [], cosmetics: [] },
   ],
   cosmetics: [
     {
@@ -584,6 +625,67 @@ test('picks the part of a step on ⑫-5 and drops the area read for the old part
   await fireEvent.press(screen.getByRole('button', { name: '部位' }));
   expect(screen.getByLabelText('タイトル')).toHaveProp('placeholder', 'リップ');
   expect(shape()).toBeNull();
+});
+
+test('plays the step on ⑫-5 from its start and stops at its end', async () => {
+  await renderSeeded(<PostStepEdit index="1" />);
+  mockPlayer.currentTime = 0;
+  await fireEvent.press(screen.getByRole('button', { name: '区間を再生' }));
+  expect(mockPlayer.currentTime).toBe(65);
+  expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    mockPlayer.listeners.get('timeUpdate')?.({ currentTime: 125 });
+    await Promise.resolve();
+  });
+  expect(mockPlayer.pause).toHaveBeenCalled();
+});
+
+test('says so and cannot play when the video cannot be read', async () => {
+  await renderSeeded(<PostStepEdit index="0" />);
+  await act(async () => {
+    mockPlayer.listeners.get('statusChange')?.({ status: 'error' });
+    await Promise.resolve();
+  });
+  expect(screen.getByText('動画を再生できませんでした')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '区間を再生' })).toBeDisabled();
+});
+
+test('moves a step’s end on ⑫-5, moving the next step and cutting its frame again', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="0" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  // A screen reader moves the end of the bar a second at a time, as a drag would.
+  await fireEvent(screen.getByLabelText('区間の終了'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'increment' },
+  });
+  const steps = () => latest?.steps ?? [];
+  expect(steps().map((step) => step.segment)).toEqual([
+    { startMs: 0, endMs: 66_000 },
+    { startMs: 66_000, endMs: 125_000 },
+  ]);
+  expect(screen.getByText('0:00 〜 1:06')).toBeOnTheScreen();
+  await waitFor(() => {
+    expect(steps()[1]?.image).toBe('file:///frame-66000.jpg');
+  });
+  // The step that kept its start keeps its frame.
+  expect(steps()[0]?.image).toBe('file:///step-0.jpg');
+});
+
+test('keeps a step inside the video and at least a second long', async () => {
+  await renderSeeded(<PostStepEdit index="0" />);
+  await fireEvent(screen.getByLabelText('区間の開始'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'decrement' },
+  });
+  expect(screen.getByText('0:00 〜 1:05')).toBeOnTheScreen();
+  expect(getThumbnailAsync).not.toHaveBeenCalled();
 });
 
 test('asks before posting and sends the steps and thumbnail, never the video', async () => {

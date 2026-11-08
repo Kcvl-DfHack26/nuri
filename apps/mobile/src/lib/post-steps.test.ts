@@ -1,6 +1,6 @@
 import { recipeStepsMax } from '@starter/shared';
 
-import { planSteps } from './post-steps';
+import { minSegmentMs, moveSegment, planSteps, segmentBounds } from './post-steps';
 
 test('splits a recording at its marks, each step ending where the next starts', () => {
   expect(planSteps([4000, 1500], 9000)).toEqual([
@@ -42,4 +42,59 @@ test('ignores marks past the API step limit, so the last step runs to the end', 
   const steps = planSteps(marks, 40_000);
   expect(steps).toHaveLength(recipeStepsMax);
   expect(steps.at(-1)).toMatchObject({ startMs: (recipeStepsMax - 1) * 1000, endMs: 40_000 });
+});
+
+const steps = [
+  { startMs: 0, endMs: 4000 },
+  { startMs: 4000, endMs: 9000 },
+  { startMs: 9000, endMs: 15_000 },
+];
+
+test('lets a step move until each neighbor keeps the shortest length', () => {
+  expect(segmentBounds(steps, 1, 15_000)).toEqual({
+    minStartMs: minSegmentMs,
+    maxEndMs: 15_000 - minSegmentMs,
+  });
+  expect(segmentBounds(steps, 0, 15_000)).toEqual({ minStartMs: 0, maxEndMs: 8000 });
+  expect(segmentBounds(steps, 2, 15_000)).toEqual({ minStartMs: 5000, maxEndMs: 15_000 });
+  // Without the video's length, the end cannot be bounded.
+  expect(segmentBounds([{ startMs: 0, endMs: null }], 0, null)).toBeNull();
+});
+
+test('moves a step and cuts its neighbors back to meet it', () => {
+  expect(moveSegment(steps, 1, { startMs: 3000, endMs: 11_000 }, 15_000)).toEqual([
+    { startMs: 0, endMs: 3000 },
+    { startMs: 3000, endMs: 11_000 },
+    { startMs: 11_000, endMs: 15_000 },
+  ]);
+  // Shrinking a step leaves the neighbors as they are; the freed time belongs to no step.
+  expect(moveSegment(steps, 1, { startMs: 5000, endMs: 8000 }, 15_000)).toEqual([
+    { startMs: 0, endMs: 4000 },
+    { startMs: 5000, endMs: 8000 },
+    { startMs: 9000, endMs: 15_000 },
+  ]);
+});
+
+test('keeps every step at least the shortest length', () => {
+  const moved = moveSegment(steps, 1, { startMs: 0, endMs: 15_000 }, 15_000);
+  expect(moved).toEqual([
+    { startMs: 0, endMs: minSegmentMs },
+    { startMs: minSegmentMs, endMs: 14_000 },
+    { startMs: 14_000, endMs: 15_000 },
+  ]);
+  expect(moveSegment(steps, 1, { startMs: 6000, endMs: 6000 }, 15_000)[1]).toEqual({
+    startMs: 6000,
+    endMs: 6000 + minSegmentMs,
+  });
+});
+
+test('keeps a gap the analysis left between steps', () => {
+  const gapped = [
+    { startMs: 0, endMs: 3000 },
+    { startMs: 5000, endMs: 9000 },
+  ];
+  expect(moveSegment(gapped, 1, { startMs: 4000, endMs: 9000 }, 12_000)).toEqual([
+    { startMs: 0, endMs: 3000 },
+    { startMs: 4000, endMs: 9000 },
+  ]);
 });
