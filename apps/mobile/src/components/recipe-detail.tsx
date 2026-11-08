@@ -26,7 +26,7 @@ import { useFavorite } from '@/components/use-favorite';
 import { apiAssetUrl, apiUrl } from '@/lib/api';
 import { hasRoomForSidePanel, useLayoutSize } from '@/lib/layout';
 import { backOrHome } from '@/lib/navigation';
-import { formatCount, recipeOptions, shareRecipe, sourceLabels } from '@/lib/recipes';
+import { formatCount, recipeOptions, shareRecipe } from '@/lib/recipes';
 import { userOptions } from '@/lib/social';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
@@ -149,13 +149,6 @@ export function RecipeContent({
   const { width, height, onLayout } = useLayoutSize();
   const wide = hasRoomForSidePanel(width, height);
   const headerWidth = wide ? '48%' : '100%';
-  const profileAccessibility = onPost
-    ? undefined
-    : {
-        accessibilityRole: 'button' as const,
-        accessibilityHint: 'プロフィールと投稿したレシピを開きます',
-      };
-  const likes = formatCount(recipe.likeCount);
   const tags = [
     ...recipe.tags.map((tag) => `＃${tag}`),
     `＃${recipe.durationMinutes}分`,
@@ -225,31 +218,11 @@ export function RecipeContent({
               ))}
             </View>
           </View>
-          <View className="flex-row items-center gap-2.5">
-            <Pressable
-              // ⑫-8 previews the user's own draft; leaving for a profile would drop the post.
-              disabled={Boolean(onPost)}
-              {...profileAccessibility}
-              // The 36pt row keeps Plan A's look; hitSlop extends the target to 48pt.
-              hitSlop={6}
-              onPress={() => {
-                router.push({ pathname: '/users/[id]', params: { id: recipe.author.id } });
-              }}
-              className="flex-1 flex-row items-center gap-2.5 active:opacity-70"
-            >
-              <ProfilePhoto size={36} image={recipe.author.image} />
-              <View className="flex-1">
-                <Text className="font-maru-bold text-label text-ink-primary">
-                  {recipe.author.name}
-                </Text>
-                <Text className="font-maru text-meta text-ink-secondary">
-                  {recipe.source ? `${sourceLabels[recipe.source]}から取り込み・` : ''}お気に入り{' '}
-                  {likes}
-                </Text>
-              </View>
-            </Pressable>
-            <AuthorFollow authorId={recipe.author.id} preview={Boolean(onPost)} />
-          </View>
+          <AuthorRow
+            author={recipe.author}
+            likeCount={recipe.likeCount}
+            preview={Boolean(onPost)}
+          />
           {steps.length > 0 ? (
             <>
               <Text
@@ -537,10 +510,43 @@ function RecipeStartBar({
   );
 }
 
-// ⑤'s follow button reads the author's profile for whether the viewer follows them. A private
-// author has no profile to read, so the button stays hidden, as it does in ⑫-8's preview of the
-// user's own draft.
-function AuthorFollow({ authorId, preview }: { authorId: string; preview: boolean }) {
-  const author = useQuery({ ...userOptions(authorId), enabled: Boolean(apiUrl) && !preview });
-  return preview ? null : <FollowButton user={author.data} />;
+// ⑤'s author with their follower count and likes, and the follow button. The author's profile
+// gives the count and whether the viewer follows them. A private author has none to read, and ⑫-8
+// previews the user's own draft, so both show likes only.
+function AuthorRow({
+  author,
+  likeCount,
+  preview,
+}: {
+  author: RecipeData['author'];
+  likeCount: number;
+  preview: boolean;
+}) {
+  const profile = useQuery({ ...userOptions(author.id), enabled: Boolean(apiUrl) && !preview });
+  const followers = profile.data ? `フォロワー ${formatCount(profile.data.followerCount)}・` : '';
+  return (
+    <View className="flex-row items-center gap-2.5">
+      <Pressable
+        // ⑫-8 previews the user's own draft; leaving for a profile would drop the post.
+        disabled={preview}
+        accessibilityRole={preview ? undefined : 'button'}
+        accessibilityHint={preview ? undefined : 'プロフィールと投稿したレシピを開きます'}
+        // The 36pt row keeps Plan A's look; hitSlop extends the target to 48pt.
+        hitSlop={6}
+        onPress={() => {
+          router.push({ pathname: '/users/[id]', params: { id: author.id } });
+        }}
+        className="flex-1 flex-row items-center gap-2.5 active:opacity-70"
+      >
+        <ProfilePhoto size={36} image={author.image} />
+        <View className="flex-1">
+          <Text className="font-maru-bold text-label text-ink-primary">{author.name}</Text>
+          <Text className="font-maru text-meta text-ink-secondary">
+            {followers}お気に入り {formatCount(likeCount)}
+          </Text>
+        </View>
+      </Pressable>
+      {preview ? null : <FollowButton user={profile.data} />}
+    </View>
+  );
 }
