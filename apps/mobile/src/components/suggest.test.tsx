@@ -123,7 +123,13 @@ beforeEach(() => {
 
 test('diagnoses a chosen photo on device and opens the result', async () => {
   mockDetect.mockResolvedValue(landmarks);
-  diagnose.mockReturnValue({ kind: 'ok', faceType: 'round', brow: 'falling' });
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'round',
+    eye: 'droopy',
+    midface: 'short',
+    brow: 'falling',
+  });
   await render(<Suggest />);
   expect(screen.getByRole('button', { name: '前回の診断（まだありません）' })).toBeDisabled();
 
@@ -131,7 +137,13 @@ test('diagnoses a chosen photo on device and opens the result', async () => {
   await waitFor(() => {
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/diagnosis',
-      params: { face: 'round', brow: 'falling', photo: 'file:///face.jpg' },
+      params: {
+        face: 'round',
+        eye: 'droopy',
+        midface: 'short',
+        brow: 'falling',
+        photo: 'file:///face.jpg',
+      },
     });
   });
   expect(mockDetect).toHaveBeenCalledWith('file:///face.jpg');
@@ -169,11 +181,19 @@ test('diagnoses the saved camera frame with its own landmarks and shows it on th
   const saved = { points: [0.4, 0.6], width: 90, height: 160 };
   mockRequestCamera.mockResolvedValue(true);
   mockSnapshot.mockResolvedValue({ ...saved, uri: 'file:///frame.jpg' });
-  diagnose.mockReturnValue({ kind: 'ok', faceType: 'oval', brow: null });
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'oval',
+    eye: 'standard',
+    midface: 'standard',
+    brow: null,
+  });
   await render(<Suggest />);
   await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
-  // The shutter waits for a face.
-  expect(await screen.findByRole('button', { name: '撮影して診断' })).toBeDisabled();
+  // Without a face the shutter says so instead of doing nothing.
+  await fireEvent.press(await screen.findByRole('button', { name: '撮影して診断' }));
+  expect(await screen.findByText('顔を枠に合わせてください')).toBeOnTheScreen();
+  expect(diagnose).not.toHaveBeenCalled();
   await act(async () => {
     mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
     await Promise.resolve();
@@ -186,7 +206,7 @@ test('diagnoses the saved camera frame with its own landmarks and shows it on th
   await waitFor(() => {
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/diagnosis',
-      params: { face: 'oval', photo: 'file:///frame.jpg' },
+      params: { face: 'oval', eye: 'standard', midface: 'standard', photo: 'file:///frame.jpg' },
     });
   });
   expect(mockDetect).not.toHaveBeenCalled();
@@ -195,7 +215,13 @@ test('diagnoses the saved camera frame with its own landmarks and shows it on th
 
 test('deletes a camera frame that is not shown and keeps the adopted one', async () => {
   mockRequestCamera.mockResolvedValue(true);
-  diagnose.mockReturnValue({ kind: 'ok', faceType: 'oval', brow: null });
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'oval',
+    eye: 'standard',
+    midface: 'standard',
+    brow: null,
+  });
   await render(<Suggest />);
   const shoot = async (uri: string) => {
     await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
@@ -220,7 +246,7 @@ test('deletes a camera frame that is not shown and keeps the adopted one', async
   await fireEvent.press(screen.getByRole('button', { name: '前回の診断' }));
   expect(router.push).toHaveBeenLastCalledWith({
     pathname: '/diagnosis',
-    params: { face: 'oval', photo: 'file:///kept.jpg' },
+    params: { face: 'oval', eye: 'standard', midface: 'standard', photo: 'file:///kept.jpg' },
   });
   // A photo from the library replaces the result, so the camera frame is let go.
   await fireEvent.press(screen.getByRole('button', { name: '写真から診断' }));
@@ -245,16 +271,60 @@ test('explains when the camera is not allowed or the face is lost, and closes th
     await Promise.resolve();
   });
   expect(await screen.findByText('顔を枠に合わせてください')).toBeOnTheScreen();
-  expect(screen.getByRole('button', { name: '撮影して診断' })).toBeDisabled();
   await fireEvent.press(screen.getByRole('button', { name: 'やめる' }));
   expect(screen.getByRole('button', { name: 'カメラで診断' })).toBeEnabled();
   expect(router.push).not.toHaveBeenCalled();
 });
 
+test('still diagnoses a face the tracker missed for a moment, but not an old one', async () => {
+  const now = jest.spyOn(Date, 'now');
+  now.mockReturnValue(10_000);
+  mockRequestCamera.mockResolvedValue(true);
+  // No saved frame, so the landmarks the screen kept are diagnosed.
+  mockSnapshot.mockResolvedValue(null);
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'oval',
+    eye: 'standard',
+    midface: 'standard',
+    brow: null,
+  });
+  await render(<Suggest />);
+  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+  await act(async () => {
+    mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
+    mockTracker.props?.onStatus?.({ nativeEvent: { status: 'noFace' } });
+    await Promise.resolve();
+  });
+  // Two seconds later the face is too old to diagnose.
+  now.mockReturnValue(12_000);
+  await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
+  expect(diagnose).not.toHaveBeenCalled();
+  // Within a second it still counts.
+  now.mockReturnValue(10_800);
+  await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
+  await waitFor(() => {
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+  expect(diagnose).toHaveBeenCalledWith(expect.objectContaining(landmarks));
+  now.mockRestore();
+});
+
 test('shows the face type, the brows and recipes for that face type first', async () => {
-  params.mockReturnValue({ face: 'round', brow: 'falling', photo: 'file:///face.jpg' });
+  params.mockReturnValue({
+    face: 'round',
+    eye: 'droopy',
+    midface: 'short',
+    brow: 'falling',
+    photo: 'file:///face.jpg',
+  });
   await render(<Diagnosis />, { wrapper: TestQueryProvider });
-  expect(screen.getByText('丸顔')).toBeOnTheScreen();
+  expect(screen.getByRole('header', { name: '丸顔' })).toBeOnTheScreen();
+  expect(screen.getByText('たれ目・中顔面短め')).toBeOnTheScreen();
+  // Each result shows the definition it was given by.
+  expect(screen.getByText('縦と横の長さが近く、輪郭に丸みがある')).toBeOnTheScreen();
+  expect(screen.getByText('目尻が目頭より下がっている')).toBeOnTheScreen();
+  expect(screen.getByText('中顔面短め（目安）')).toBeOnTheScreen();
   expect(screen.getByText('下がり眉')).toBeOnTheScreen();
   expect(screen.getByText('アーチ眉')).toBeOnTheScreen();
 

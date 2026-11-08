@@ -11,13 +11,13 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PhotoCrop } from '@/components/recipes';
-import type { BrowShape, FaceType } from '@/lib/face-diagnosis';
+import type { DiagnosisResult } from '@/lib/face-diagnosis';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { arPhotos } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { diagnoseFace } from '@/lib/face-diagnosis';
+import { diagnoseFace, resultParams } from '@/lib/face-diagnosis';
 import { deleteFile } from '@/lib/files';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
@@ -55,27 +55,21 @@ const heroCrop: PhotoCrop = {
   top: '-9.75%',
 };
 
-type Result = { faceType: FaceType; brow: BrowShape | null; photo: string | undefined };
+// How old the last face may be when 撮影する is pressed, like the tracker's snapshot.
+const faceMaxAgeMs = 1500;
 
 // Where the face tracker saves camera frames in the app's cache (FaceTrackerView on both platforms).
 const savedFrameFolder = 'face-tracker';
 
 // The photo's local URI is passed to ⑭ only to show it; it stays on the device.
-function openResult(result: Result) {
-  router.push({
-    pathname: '/diagnosis',
-    params: {
-      face: result.faceType,
-      ...(result.photo ? { photo: result.photo } : {}),
-      ...(result.brow ? { brow: result.brow } : {}),
-    },
-  });
+function openResult(result: DiagnosisResult) {
+  router.push({ pathname: '/diagnosis', params: resultParams(result) });
 }
 
 function outcomeOf(
   landmarks: FacePhotoLandmarks | null | undefined,
   photo: string | undefined,
-): Result | { message: string } {
+): DiagnosisResult | { message: string } {
   const diagnosis = landmarks ? diagnoseFace(landmarks) : undefined;
   if (!diagnosis) {
     return { message: '顔が見つかりませんでした。顔全体が写った写真で試してください' };
@@ -83,10 +77,11 @@ function outcomeOf(
   if (diagnosis.kind === 'notFrontal') {
     return { message: '正面を向いた写真で試してください' };
   }
-  return { faceType: diagnosis.faceType, brow: diagnosis.brow, photo };
+  const { kind: _kind, ...found } = diagnosis;
+  return { ...found, photo };
 }
 
-async function diagnosePhoto(uri: string): Promise<Result | { message: string }> {
+async function diagnosePhoto(uri: string): Promise<DiagnosisResult | { message: string }> {
   try {
     return outcomeOf(await FaceTracker?.detectFaceAsync(uri), uri);
   } catch {
@@ -106,7 +101,7 @@ export function Suggest() {
   const [photo, setPhoto] = useState<string>();
   const [analyzing, setAnalyzing] = useState(false);
   const [message, setMessage] = useState<string>();
-  const [last, setLast] = useState<Result>();
+  const [last, setLast] = useState<DiagnosisResult>();
 
   // カメラで診断 shows the same live face tracking as ⑦ in the hero, and 撮影する diagnoses the
   // landmarks of the frame on screen and saves that frame in the app's cache to show on ⑭. The
@@ -115,7 +110,9 @@ export function Suggest() {
   const tracker = useRef<FaceTrackerViewRef>(null);
   const [capturing, setCapturing] = useState(false);
   const [faceFound, setFaceFound] = useState(false);
-  const latest = useRef<FacePhotoLandmarks | null>(null);
+  // The last landmarks with a face and when they came. The tracker misses a face for single
+  // frames, so landmarks from just before still count when 撮影する is pressed.
+  const latest = useRef<{ landmarks: FacePhotoLandmarks; at: number } | null>(null);
   // The camera frame saved for the adopted result, deleted once another result replaces it.
   const savedFrame = useRef<string | null>(null);
   // The last result lives only while the app runs, so frames a previous run saved are not shown.
@@ -131,7 +128,7 @@ export function Suggest() {
   }, []);
 
   /** Shows a result and lets go of the camera frame the previous one showed. */
-  function adopt(result: Result, frame: string | null) {
+  function adopt(result: DiagnosisResult, frame: string | null) {
     if (savedFrame.current && savedFrame.current !== frame) {
       deleteFile(savedFrame.current);
     }
@@ -203,6 +200,14 @@ export function Suggest() {
   }
 
   async function diagnoseFrame() {
+    const recent =
+      latest.current && Date.now() - latest.current.at <= faceMaxAgeMs
+        ? latest.current.landmarks
+        : null;
+    if (!recent) {
+      setMessage('顔を枠に合わせてください');
+      return;
+    }
     const session = cameraSession.current;
     setMessage(undefined);
     setAnalyzing(true);
@@ -210,7 +215,7 @@ export function Suggest() {
       // The saved frame is diagnosed with the landmarks found in it, so the result and its photo
       // match. Without a saved frame the latest landmarks are diagnosed, only without a photo.
       const snapshot = await tracker.current?.takeSnapshotAsync().catch(() => null);
-      const outcome = outcomeOf(snapshot ?? latest.current, snapshot?.uri);
+      const outcome = outcomeOf(snapshot ?? recent, snapshot?.uri);
       // A frame that is not shown is deleted right away, so it never stays on the device.
       if (session !== cameraSession.current || 'message' in outcome) {
         if (snapshot) {
@@ -242,7 +247,7 @@ export function Suggest() {
               active={focused}
               style={StyleSheet.absoluteFill}
               onLandmarks={(event) => {
-                latest.current = event.nativeEvent;
+                latest.current = { landmarks: event.nativeEvent, at: Date.now() };
                 if (!faceFound) {
                   setFaceFound(true);
                   setMessage(undefined);
@@ -253,7 +258,6 @@ export function Suggest() {
                 if (status === 'tracking') {
                   return;
                 }
-                latest.current = null;
                 setFaceFound(false);
                 if (status === 'noFace') {
                   setMessage('顔を枠に合わせてください');
@@ -313,13 +317,9 @@ export function Suggest() {
         onCamera={() => {
           void openCamera();
         }}
-        onCapture={
-          faceFound
-            ? () => {
-                void diagnoseFrame();
-              }
-            : undefined
-        }
+        onCapture={() => {
+          void diagnoseFrame();
+        }}
         onCancel={closeCamera}
         onLast={
           last && !analyzing
@@ -350,8 +350,8 @@ function Controls({
   capturing: boolean;
   onPick: () => void;
   onCamera: () => void;
-  /** Diagnoses the frame on screen; undefined until a face is found. */
-  onCapture: (() => void) | undefined;
+  /** Diagnoses the frame on screen. */
+  onCapture: () => void;
   onCancel: () => void;
   onLast: (() => void) | undefined;
 }) {
@@ -512,7 +512,11 @@ function Action({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      className="w-26.75 items-center justify-end gap-1.5 active:opacity-70"
+      // A disabled control looks it, so a tap that does nothing is not a surprise.
+      className={cn(
+        'w-26.75 items-center justify-end gap-1.5 active:opacity-70',
+        disabled && 'opacity-40',
+      )}
     >
       {children}
       <Text className="text-center font-maru-bold text-label text-ink-primary">{label}</Text>

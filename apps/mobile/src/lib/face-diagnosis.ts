@@ -1,16 +1,113 @@
-// Face type and brow shape from one photo's MediaPipe Face Landmarker points (#84).
-// Everything here runs on device; the photo and its points are never sent anywhere.
+// Face type, eye shape, midface and brow shape from MediaPipe Face Landmarker points (#84). To add,
+// remove or change a type, edit its entry in the definitions below.
 
-export type FaceType = 'round' | 'long' | 'square' | 'heart' | 'oval';
 export type BrowShape = 'straight' | 'softArch' | 'arch' | 'rising' | 'falling';
 
-export const faceTypes: Record<FaceType, { label: string; suitedBrow: BrowShape }> = {
-  round: { label: '丸顔', suitedBrow: 'arch' },
-  long: { label: '面長', suitedBrow: 'straight' },
-  square: { label: 'ベース型', suitedBrow: 'arch' },
-  heart: { label: '逆三角形', suitedBrow: 'straight' },
-  oval: { label: '卵型', suitedBrow: 'softArch' },
+/** Proportions of one face, measured with the head's tilt removed. */
+export type FaceMetrics = {
+  /** Top of the forehead to the chin (10–152) over the cheek width (234–454). */
+  length: number;
+  /** Jaw width at the angles (172–397) over the cheek width. */
+  jaw: number;
+  /** Temple width (54–284) over the cheek width. */
+  forehead: number;
+  /** Angle at the chin between the jaw angles (172–152–397), in degrees; wide for a square jaw. */
+  chinAngle: number;
+  /** How far the outer eye corners sit above the inner ones, in degrees; negative is droopy. */
+  eyeTilt: number;
+  /** Eye centres to the top of the upper lip (0) over the upper lip to the chin (152). */
+  midface: number;
 };
+
+/**
+ * One result of a classification: its label, the definition shown as its reason, and the condition
+ * on the metrics. Entries are tried in their order; the one without a condition is the default.
+ */
+type Definition = { label: string; basis: string; matches?: (metrics: FaceMetrics) => boolean };
+
+// The definitions follow beauty media and face shape tools (docs/requirements.md F7). The numbers
+// are provisional (#47): they are set around MediaPipe's canonical face, taken as an average 卵型,
+// where length is 1.15, jaw 0.78, forehead 0.82, chinAngle 124°, eyeTilt 1.7° and midface 1.00.
+export const faceTypes = {
+  long: {
+    label: '面長',
+    basis: '横幅より縦の長さがはっきり長い',
+    suitedBrow: 'straight',
+    matches: (m) => m.length >= 1.25,
+  },
+  square: {
+    label: 'ベース型',
+    basis: '額・頬・あごの幅がほぼ同じで、エラが角ばっている',
+    suitedBrow: 'arch',
+    matches: (m) => m.jaw >= 0.82 && m.forehead >= 0.78 && m.chinAngle >= 124,
+  },
+  round: {
+    label: '丸顔',
+    basis: '縦と横の長さが近く、輪郭に丸みがある',
+    suitedBrow: 'arch',
+    matches: (m) => m.length < 1.1 && m.chinAngle >= 124,
+  },
+  heart: {
+    label: '逆三角形',
+    basis: '額が広く、あごが細くとがっている',
+    suitedBrow: 'straight',
+    matches: (m) => m.forehead - m.jaw >= 0.1 && m.chinAngle < 118,
+  },
+  oval: {
+    label: '卵型',
+    basis: '縦が横より少し長く、あごに向かってなだらかに細くなる',
+    suitedBrow: 'softArch',
+  },
+} satisfies Record<string, Definition & { suitedBrow: BrowShape }>;
+export type FaceType = keyof typeof faceTypes;
+
+export const eyeShapes = {
+  droopy: { label: 'たれ目', basis: '目尻が目頭より下がっている', matches: (m) => m.eyeTilt < -1 },
+  upturned: {
+    label: 'つり目',
+    basis: '目尻がはっきり上がっている',
+    matches: (m) => m.eyeTilt >= 5,
+  },
+  standard: { label: '標準的な目', basis: '目頭と目尻がほぼ水平' },
+} satisfies Record<string, Definition>;
+export type EyeShape = keyof typeof eyeShapes;
+
+// No source defines the midface in numbers, so it is shown as a rough guide.
+export const midfaces = {
+  short: {
+    label: '中顔面短め',
+    basis: '目から口までが、口からあごまでより短い',
+    matches: (m) => m.midface < 0.92,
+  },
+  long: {
+    label: '中顔面長め',
+    basis: '目から口までが、口からあごまでより長い',
+    matches: (m) => m.midface > 1.08,
+  },
+  standard: { label: '中顔面は標準', basis: '目から口までと、口からあごまでがほぼ同じ' },
+} satisfies Record<string, Definition>;
+export type Midface = keyof typeof midfaces;
+
+/** The first definition whose condition the metrics meet, or the one without a condition. */
+function classify<K extends string>(definitions: Record<K, Definition>, metrics: FaceMetrics): K {
+  const ids = Object.keys(definitions).filter((id) => isKey(definitions, id));
+  const fallback = ids.find((id) => !definitions[id].matches);
+  const matched = ids.find((id) => definitions[id].matches?.(metrics) ?? false);
+  const result = matched ?? fallback;
+  if (result === undefined) {
+    throw new Error('Definitions need one entry without a condition');
+  }
+  return result;
+}
+
+/** The face type, eye shape and midface of measured proportions. */
+export function classifyFace(metrics: FaceMetrics) {
+  return {
+    faceType: classify(faceTypes, metrics),
+    eye: classify(eyeShapes, metrics),
+    midface: classify(midfaces, metrics),
+  };
+}
 
 export const browShapes: Record<BrowShape, string> = {
   straight: '平行眉',
@@ -20,19 +117,52 @@ export const browShapes: Record<BrowShape, string> = {
   falling: '下がり眉',
 };
 
-export function isFaceType(value: string): value is FaceType {
-  return Object.hasOwn(faceTypes, value);
+/** A diagnosis shown on ⑭. The photo is a file on the device and only shown there. */
+export type DiagnosisResult = Omit<Extract<Diagnosis, { kind: 'ok' }>, 'kind'> & {
+  photo: string | undefined;
+};
+
+/** A result as route params for ⑭. */
+export function resultParams(result: DiagnosisResult): Record<string, string> {
+  return {
+    face: result.faceType,
+    eye: result.eye,
+    midface: result.midface,
+    ...(result.brow ? { brow: result.brow } : {}),
+    ...(result.photo ? { photo: result.photo } : {}),
+  };
 }
 
-export function isBrowShape(value: string): value is BrowShape {
-  return Object.hasOwn(browShapes, value);
+/** A result read back from ⑭'s route params; null when the face type is missing or unknown. */
+export function readResultParams(params: Partial<Record<string, string>>): DiagnosisResult | null {
+  const { face, eye, midface, brow, photo } = params;
+  if (!face || !isKey(faceTypes, face)) {
+    return null;
+  }
+  return {
+    faceType: face,
+    eye: eye && isKey(eyeShapes, eye) ? eye : 'standard',
+    midface: midface && isKey(midfaces, midface) ? midface : 'standard',
+    brow: brow && isKey(browShapes, brow) ? brow : null,
+    photo,
+  };
+}
+
+function isKey<K extends string>(record: Record<K, unknown>, value: string): value is K {
+  return Object.hasOwn(record, value);
 }
 
 type Landmarks = { points: number[]; width: number; height: number };
 type Point = { x: number; y: number };
 
 export type Diagnosis =
-  | { kind: 'ok'; faceType: FaceType; brow: BrowShape | null }
+  | {
+      kind: 'ok';
+      faceType: FaceType;
+      eye: EyeShape;
+      midface: Midface;
+      brow: BrowShape | null;
+    }
   | { kind: 'notFrontal' };
 
 // MediaPipe landmark indices. "Right" is the person's right, on the left of the photo.
@@ -42,18 +172,12 @@ const cheek = [234, 454] as const;
 const jaw = [172, 397] as const;
 const temple = [54, 284] as const;
 const noseTip = 1;
+const upperLip = 0;
 const rightEye = { outer: 33, inner: 133, iris: [469, 470, 471, 472] };
 const leftEye = { outer: 263, inner: 362, iris: [474, 475, 476, 477] };
 // Upper and lower brow outlines, from the tail to the head, paired point by point.
 const rightBrow = { upper: [70, 63, 105, 66, 107], lower: [46, 53, 52, 65, 55] };
 const leftBrow = { upper: [300, 293, 334, 296, 336], lower: [276, 283, 282, 295, 285] };
-
-/**
- * Face type thresholds are provisional (#84): the team has not decided them yet (#47). They are
- * set around MediaPipe's canonical face, taken as an average 卵型, whose length (points 10–152)
- * is 1.15 cheek widths (234–454), jaw (172–397) 0.78 and temples (54–284) 0.82 of it.
- */
-const faceTypeThresholds = { short: 1.1, long: 1.25, wideJaw: 0.82, narrowJaw: 0.1 };
 
 /**
  * Brow thresholds from #47 (docs/requirements.md F7), in eye widths above the brow head.
@@ -76,37 +200,29 @@ export function diagnoseFace(landmarks: Landmarks): Diagnosis {
   }
   return {
     kind: 'ok',
-    faceType: classifyFace({
-      length: distance(at(forehead), at(chin)) / cheekWidth,
-      jaw: distance(at(jaw[0]), at(jaw[1])) / cheekWidth,
-      temple: distance(at(temple[0]), at(temple[1])) / cheekWidth,
-    }),
+    ...classifyFace(measureFace(at, cheekWidth)),
     brow: classifyBrow(browHeights(at)),
   };
 }
 
-export function classifyFace({
-  length,
-  jaw: jawWidth,
-  temple: templeWidth,
-}: {
-  length: number;
-  jaw: number;
-  temple: number;
-}): FaceType {
-  if (length >= faceTypeThresholds.long) {
-    return 'long';
-  }
-  if (jawWidth >= faceTypeThresholds.wideJaw) {
-    return 'square';
-  }
-  if (length < faceTypeThresholds.short) {
-    return 'round';
-  }
-  if (templeWidth - jawWidth >= faceTypeThresholds.narrowJaw) {
-    return 'heart';
-  }
-  return 'oval';
+/** The proportions the definitions use, from upright points. */
+function measureFace(at: (index: number) => Point, cheekWidth: number): FaceMetrics {
+  const rightCentre = midpoint(at(rightEye.outer), at(rightEye.inner));
+  const leftCentre = midpoint(at(leftEye.outer), at(leftEye.inner));
+  const eyes = midpoint(rightCentre, leftCentre);
+  // Each eye's slope from the inner to the outer corner, positive when the outer corner is higher.
+  const slope = (eye: { outer: number; inner: number }) =>
+    (Math.atan2(at(eye.inner).y - at(eye.outer).y, Math.abs(at(eye.inner).x - at(eye.outer).x)) *
+      180) /
+    Math.PI;
+  return {
+    length: distance(at(forehead), at(chin)) / cheekWidth,
+    jaw: distance(at(jaw[0]), at(jaw[1])) / cheekWidth,
+    forehead: distance(at(temple[0]), at(temple[1])) / cheekWidth,
+    chinAngle: angle(at(jaw[0]), at(chin), at(jaw[1])),
+    eyeTilt: (slope(rightEye) + slope(leftEye)) / 2,
+    midface: (at(upperLip).y - eyes.y) / (at(chin).y - at(upperLip).y),
+  };
 }
 
 /** Classifies bias-corrected heights of the brow peak and tail; null when none fits. */
@@ -204,6 +320,14 @@ function upright({ points, width, height }: Landmarks): Point[] {
 
 function distance(a: Point, b: Point) {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+/** The angle at `vertex` between the lines to `a` and `b`, in degrees. */
+function angle(a: Point, vertex: Point, b: Point) {
+  const turn =
+    Math.atan2(b.y - vertex.y, b.x - vertex.x) - Math.atan2(a.y - vertex.y, a.x - vertex.x);
+  const degrees = Math.abs((turn * 180) / Math.PI) % 360;
+  return degrees > 180 ? 360 - degrees : degrees;
 }
 
 function midpoint(a: Point, b: Point): Point {
