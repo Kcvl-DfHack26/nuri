@@ -80,17 +80,32 @@ export function renderPreviewComment(input: {
   const go = deployment
     ? `\`exps://${new URL(deployment.origin).host}\`<br><img src="${deployment.origin}/expo-go/qr.svg?sha=${sha}" alt="Expo Goで開くQR" width="128">`
     : '—';
+  const sharedCost = '🔥 Hono API行と共通';
+  const gcpRates = [
+    '**3つのプレビューで共通**',
+    '[Cloud Run（東京）](https://cloud.google.com/run/pricing)：CPU $0.00144 / vCPU・分',
+    'メモリ $0.00015 / GiB・分',
+    'リクエスト $0.40 / 100万件',
+    '[Artifact Registry](https://cloud.google.com/artifact-registry/pricing)：$0.10 / GiB・月',
+    '[Cloud Storage](https://cloud.google.com/storage/pricing)（state）：$0.023 / GiB・月',
+    '共有無料枠の適用前。外向き通信とstate操作は別',
+  ].join('<br>');
+  const expoCost = [
+    sharedCost,
+    '**EAS消費**：Build 0件 · Workflows 0分 · Update 0 MAU',
+    '[Expo Free月間枠](https://expo.dev/pricing)：iOS・Android各15ビルド · 60分 · 1,000 MAU',
+  ].join('<br>');
 
   return [
     previewMarker,
     `<!-- nuri-preview-sha: ${sha} -->`,
     `### 🚀 ${heading}${runUrl ? ` · [Actions ↗](${runUrl})` : ''}`,
     '',
-    '| プレビュー | ビルド・デプロイ | デプロイ日時 (JST) |',
-    '| --- | --- | --- |',
-    `| 🌐 **Expo Web**<br>${webUrl ? `[${webUrl}](${webUrl})` : '—'} | ${status} | ${time} |`,
-    `| ⚡ **Hono API**<br>${apiUrl ? `[${apiUrl}](${apiUrl})` : '—'} | ${status} | ${time} |`,
-    `| 📱 **Expo Go**<br>${go} | ${status} | ${time} |`,
+    '| プレビュー | ビルド・デプロイ | デプロイ日時 (JST) | 💰 費用・利用枠 |',
+    '| --- | --- | --- | --- |',
+    `| 🌐 **Expo Web**<br>${webUrl ? `[${webUrl}](${webUrl})` : '—'} | ${status} | ${time} | ${sharedCost} |`,
+    `| 🔥 **Hono API**<br>${apiUrl ? `[${apiUrl}](${apiUrl})` : '—'} | ${status} | ${time} | ${gcpRates} |`,
+    `| 📱 **Expo Go**<br>${go} | ${status} | ${time} | ${expoCost} |`,
     '',
     ...(canRequest
       ? [requestLine, '', 'write権限を持つ人がチェックすると、3つのプレビューを一緒に配信します。']
@@ -98,14 +113,6 @@ export function renderPreviewComment(input: {
     ...(deployment
       ? ['Expo Goはプロジェクトと同じSDKを使ってください。初回起動時はバンドルを生成します。']
       : []),
-    '',
-    '#### 💰 利用枠と費用の目安',
-    '',
-    '- **Expo Freeの月間枠** Android 15ビルド · iOS 15ビルド · Workflows 60分 · Update 1,000 MAU [Expo料金表](https://expo.dev/pricing)',
-    '- **プレビューでのExpo消費** 0ビルド · 0分 · 0 MAU',
-    '- **Cloud Run（東京）** 約 $0.017（1 vCPU・2 GiB × 課金時間10分、最小0台） [Cloud Run料金表](https://cloud.google.com/run/pricing)',
-    '- **Artifact Registry** 約 $0.023（1 GiB × 7日間） [Registry料金表](https://cloud.google.com/artifact-registry/pricing)',
-    '- **GCP合計** 約 $0.040（共有無料枠の差し引き前、リクエストと外向き通信は別）',
     '',
     '#### 🧹 Cleanup',
     '',

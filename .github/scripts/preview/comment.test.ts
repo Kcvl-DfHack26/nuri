@@ -65,7 +65,7 @@ describe('preview request', () => {
     });
     const api = `${origin}/api/recipes?offset=0`;
     expect(comment).toContain(`[${origin}/](${origin}/)`);
-    expect(comment).toContain(`[${api}](${api})`);
+    expect(comment).toContain(`| 🔥 **Hono API**<br>[${api}](${api}) |`);
     expect(comment).toContain(
       `| 📱 **Expo Go**<br>\`exps://${new URL(origin).host}\`<br><img src="${origin}/expo-go/qr.svg?sha=${sha}" alt="Expo Goで開くQR" width="128"> | ✅ 完了 | 2026-11-09 06:10 |`,
     );
@@ -76,9 +76,14 @@ describe('preview request', () => {
     const pending = renderPreviewComment({ sha, canRequest: false });
     expect(pending).toContain(previewSetupPendingMarker);
     expect(pending).toContain('| 🌐 **Expo Web**<br>— | 🔧 設定待ち | — |');
-    expect(pending).toContain('| ⚡ **Hono API**<br>— | 🔧 設定待ち | — |');
+    expect(pending).toContain('| 🔥 **Hono API**<br>— | 🔧 設定待ち | — |');
     expect(pending).toContain('| 📱 **Expo Go**<br>— | 🔧 設定待ち | — |');
-    expect(pending).toContain('- **GCP合計**');
+    expect(pending).toContain('| デプロイ日時 (JST) | 💰 費用・利用枠 |');
+    const apiRow = pending.split('\n').find((line) => line.startsWith('| 🔥 **Hono API**'));
+    expect(apiRow).toContain('$0.00144 / vCPU・分');
+    expect(apiRow).toContain('$0.00015 / GiB・分');
+    expect(apiRow).toContain('$0.10 / GiB・月');
+    expect(pending).toContain('**EAS消費**：Build 0件 · Workflows 0分 · Update 0 MAU');
     expect(pending).toContain('- **マージ・クローズ後**');
     expect(pending).not.toContain('<details>');
     expect(pending).not.toContain('- [ ]');
