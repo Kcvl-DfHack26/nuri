@@ -1,6 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { Home } from './home';
 
@@ -68,20 +69,13 @@ const mockGetRecipes = jest.fn(async () =>
   ]),
 );
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 test('retries a failed recipe list and opens a recipe from its card', async () => {
   mockGetRecipes.mockRejectedValueOnce(new Error('通信エラー'));
-  await render(<Home />, { wrapper });
+  await render(<Home />, { wrapper: TestQueryProvider });
   expect(
     await screen.findByText('レシピを読み込めませんでした。通信状況を確認してお試しください。'),
   ).toBeOnTheScreen();
@@ -91,19 +85,19 @@ test('retries a failed recipe list and opens a recipe from its card', async () =
 });
 
 test('opens the search screen from the search field', async () => {
-  await render(<Home />, { wrapper });
+  await render(<Home />, { wrapper: TestQueryProvider });
   await fireEvent.press(screen.getByRole('button', { name: 'メイクを検索' }));
   expect(router.push).toHaveBeenCalledWith('/search');
 });
 
 test('shows an empty recipe list', async () => {
   mockGetRecipes.mockResolvedValueOnce(page([]));
-  await render(<Home />, { wrapper });
+  await render(<Home />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('レシピはまだありません')).toBeOnTheScreen();
 });
 
 test('opens the brow list from the part cards', async () => {
-  await render(<Home />, { wrapper });
+  await render(<Home />, { wrapper: TestQueryProvider });
   await fireEvent.press(screen.getByRole('tab', { name: '部位 パーツ別' }));
 
   await fireEvent.press(await screen.findByRole('button', { name: '眉、6レシピ' }));

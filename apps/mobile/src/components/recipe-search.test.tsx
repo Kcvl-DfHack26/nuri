@@ -1,6 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { RecipeSearch } from './recipe-search';
 
@@ -57,13 +58,6 @@ const mockGetRecipes = jest.fn(async (_args: unknown) =>
   ]),
 );
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
 });
@@ -71,7 +65,7 @@ beforeEach(() => {
 test('searches once typing pauses and opens a result', async () => {
   jest.useFakeTimers();
   try {
-    await render(<RecipeSearch />, { wrapper });
+    await render(<RecipeSearch />, { wrapper: TestQueryProvider });
     expect(screen.getByText('レシピのタイトルやタグで探せます')).toBeOnTheScreen();
 
     await fireEvent.changeText(screen.getByLabelText('メイクを検索'), ' 狐 ');
@@ -90,7 +84,7 @@ test('searches once typing pauses and opens a result', async () => {
 
 test('shows when nothing matches and goes back to home', async () => {
   mockGetRecipes.mockResolvedValueOnce(page([]));
-  await render(<RecipeSearch />, { wrapper });
+  await render(<RecipeSearch />, { wrapper: TestQueryProvider });
   await fireEvent(screen.getByLabelText('メイクを検索'), 'changeText', '猫');
   await fireEvent(screen.getByLabelText('メイクを検索'), 'submitEditing');
   expect(await screen.findByText('「猫」に合うレシピはありません')).toBeOnTheScreen();
@@ -101,7 +95,7 @@ test('shows when nothing matches and goes back to home', async () => {
 
 test('retries a failed search', async () => {
   mockGetRecipes.mockRejectedValueOnce(new Error('通信エラー'));
-  await render(<RecipeSearch />, { wrapper });
+  await render(<RecipeSearch />, { wrapper: TestQueryProvider });
   await fireEvent(screen.getByLabelText('メイクを検索'), 'changeText', '狐');
   await fireEvent(screen.getByLabelText('メイクを検索'), 'submitEditing');
   expect(

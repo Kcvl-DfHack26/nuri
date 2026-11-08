@@ -1,9 +1,9 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { diagnoseFace } from '@/lib/face-diagnosis';
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { Diagnosis } from './diagnosis';
 import { Suggest } from './suggest';
@@ -89,13 +89,6 @@ const pick = jest.mocked(launchImageLibraryAsync);
 const diagnose = jest.mocked(diagnoseFace);
 const params = jest.mocked(useLocalSearchParams);
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
   pick.mockResolvedValue({
@@ -150,7 +143,7 @@ test('explains when the photo cannot be taken or picked', async () => {
 
 test('shows the face type, the brows and recipes for that face type first', async () => {
   params.mockReturnValue({ face: 'round', brow: 'falling', photo: 'file:///face.jpg' });
-  await render(<Diagnosis />, { wrapper });
+  await render(<Diagnosis />, { wrapper: TestQueryProvider });
   expect(screen.getByText('丸顔')).toBeOnTheScreen();
   expect(screen.getByText('下がり眉')).toBeOnTheScreen();
   expect(screen.getByText('アーチ眉')).toBeOnTheScreen();
@@ -166,7 +159,7 @@ test('shows the face type, the brows and recipes for that face type first', asyn
 
 test('says when no diagnosis was made and goes back', async () => {
   params.mockReturnValue({});
-  await render(<Diagnosis />, { wrapper });
+  await render(<Diagnosis />, { wrapper: TestQueryProvider });
   expect(
     screen.getByText('まだ診断していません。提案のタブで写真を撮るか選んでください'),
   ).toBeOnTheScreen();

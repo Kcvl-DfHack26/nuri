@@ -59,6 +59,7 @@ export default [
       ],
       'boundaries/files': [
         { pattern: '**/*.test.{ts,tsx}', category: 'test' },
+        { pattern: 'apps/mobile/src/lib/test/**', category: 'test' },
         { pattern: 'apps/mobile/global.css', category: 'mobile-style' },
         { pattern: '**/index.ts', category: 'public' },
         { pattern: 'apps/api/src/contract.ts', category: 'contract' },

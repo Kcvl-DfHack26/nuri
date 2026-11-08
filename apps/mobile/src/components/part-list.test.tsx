@@ -1,6 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { PartList } from './part-list';
 
@@ -49,19 +50,12 @@ const mockGetRecipes = jest.fn(async () => ({
   }),
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 test('opens the recipe of the selected brow style', async () => {
-  await render(<PartList part="brow" />, { wrapper });
+  await render(<PartList part="brow" />, { wrapper: TestQueryProvider });
   expect(screen.getByRole('header', { name: '眉' })).toBeOnTheScreen();
   // The first recipe starts selected.
   expect(await screen.findByRole('radio', { name: '平行眉、やさしく若見え' })).toBeChecked();
@@ -72,7 +66,7 @@ test('opens the recipe of the selected brow style', async () => {
 });
 
 test('filters the recipes with the chips by their tags', async () => {
-  await render(<PartList part="brow" />, { wrapper });
+  await render(<PartList part="brow" />, { wrapper: TestQueryProvider });
   expect(await screen.findAllByRole('radio')).toHaveLength(3);
 
   await fireEvent.press(screen.getByRole('radio', { name: '微アーチ眉、自然で垢抜け' }));
@@ -95,13 +89,13 @@ test('shows that a part has no recipes yet', async () => {
     ok: true,
     json: async () => ({ items: [], nextOffset: null }),
   });
-  await render(<PartList part="lip" />, { wrapper });
+  await render(<PartList part="lip" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('リップのレシピはまだありません')).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: 'メイクをはじめる（準備中）' })).toBeDisabled();
 });
 
 test('shows a way back for an unknown part', async () => {
-  await render(<PartList part="nose" />, { wrapper });
+  await render(<PartList part="nose" />, { wrapper: TestQueryProvider });
   expect(screen.getByText('部位が見つかりません')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '戻る' }));
   expect(router.back).toHaveBeenCalled();

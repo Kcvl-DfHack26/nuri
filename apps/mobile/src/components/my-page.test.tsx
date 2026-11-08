@@ -1,6 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { MyPage } from './my-page';
 
@@ -67,12 +68,6 @@ const page = (items: unknown[], nextOffset: number | null = null) => ({
 const mockPosted = jest.fn(async () => page([recipe('own', '自分のメイク')]));
 const mockFavorites = jest.fn(async () => page([recipe('fox', '狐メイク')]));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
 type Session = { data: { user: { id: string; name: string; email: string } } | null };
 const viewer: Session = {
   data: { user: { id: 'viewer', name: 'はなこ', email: 'hanako@example.com' } },
@@ -89,7 +84,7 @@ afterEach(() => {
 });
 
 test('shows the signed-in profile with posted and favorite recipes and opens them', async () => {
-  await render(<MyPage />, { wrapper });
+  await render(<MyPage />, { wrapper: TestQueryProvider });
   expect(screen.getByText('はなこ')).toBeOnTheScreen();
   // Following and likes are not built, so Plan A's sample counts are not shown.
   for (const label of ['フォロワー', 'フォロー中', 'いいね', '328', '96', '2.4k']) {
@@ -112,7 +107,7 @@ test('loads more favorites past the first page', async () => {
   mockFavorites
     .mockResolvedValueOnce(page([recipe('fox', '狐メイク')], 20))
     .mockResolvedValueOnce(page([recipe('cat', '猫メイク')]));
-  await render(<MyPage />, { wrapper });
+  await render(<MyPage />, { wrapper: TestQueryProvider });
   await fireEvent.press(await screen.findByRole('button', { name: 'もっと見る' }));
   expect(
     await screen.findByRole('button', { name: '猫メイク、はなこ、いいね1.2k' }),
@@ -123,7 +118,7 @@ test('loads more favorites past the first page', async () => {
 test('shows empty sections and retries a failed list', async () => {
   mockPosted.mockResolvedValueOnce(page([]));
   mockFavorites.mockRejectedValueOnce(new Error('通信エラー'));
-  await render(<MyPage />, { wrapper });
+  await render(<MyPage />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('まだ投稿したレシピはありません')).toBeOnTheScreen();
   expect(
     await screen.findByText('お気に入りを読み込めませんでした。通信状況を確認してお試しください。'),
@@ -136,7 +131,7 @@ test('shows empty sections and retries a failed list', async () => {
 
 test('asks a guest to log in instead of showing a profile', async () => {
   signOutForTest();
-  await render(<MyPage />, { wrapper });
+  await render(<MyPage />, { wrapper: TestQueryProvider });
   expect(screen.getByText('ゲスト')).toBeOnTheScreen();
   expect(screen.queryByText('投稿')).not.toBeOnTheScreen();
 

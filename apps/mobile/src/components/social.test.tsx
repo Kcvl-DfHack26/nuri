@@ -1,10 +1,11 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import type { FeedData } from '@/lib/social';
 
 import { feedOptions } from '@/lib/social';
+import { createTestQueryClient } from '@/lib/test/query-client';
 
 import { Compose } from './compose';
 import { Feed } from './feed';
@@ -112,16 +113,7 @@ const mockGetPosts = jest.fn(async () => ({
 const mockLike = jest.fn(async () => ({ ok: true }));
 const mockCreatePost = jest.fn(async () => ({ status: 201 }));
 
-function queryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: Infinity },
-      mutations: { retry: false, gcTime: Infinity },
-    },
-  });
-}
-
-function wrapper(client = queryClient()) {
+function wrapper(client = createTestQueryClient()) {
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -160,7 +152,7 @@ test('keeps a failed post draft and allows a successful retry before dismissing'
 
 test('optimistically updates only the liked row and cached profile without fetching the feed again', async () => {
   mockLoggedIn = true;
-  const client = queryClient();
+  const client = createTestQueryClient();
   await render(<Feed />, { wrapper: wrapper(client) });
   await screen.findByText('こんにちは');
   const homeKey = feedOptions('viewer').queryKey;

@@ -1,6 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { Account } from './account';
 
@@ -55,18 +56,7 @@ const mockGetSession = jest.fn(async (): Promise<{ data: { user: { id: string } 
 const mockMagicLink = jest.fn(async () => ({ error: null }));
 
 function renderAccount() {
-  const client = new QueryClient({
-    // No garbage-collection timers, so Jest can exit after the run.
-    defaultOptions: {
-      queries: { retry: false, gcTime: Infinity },
-      mutations: { retry: false, gcTime: Infinity },
-    },
-  });
-  return render(
-    <QueryClientProvider client={client}>
-      <Account />
-    </QueryClientProvider>,
-  );
+  return render(<Account />, { wrapper: TestQueryProvider });
 }
 
 test('returns to the previous screen after a social login', async () => {

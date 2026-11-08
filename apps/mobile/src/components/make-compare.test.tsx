@@ -1,7 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { Share } from 'react-native';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { MakeCompare } from './make-compare';
 import { MakeFinish } from './make-finish';
@@ -10,7 +11,6 @@ import { MakeFinish } from './make-finish';
 jest.mock('@/components/face-makeup-camera', () => ({
   canTrackFace: false,
   FaceMakeupCamera: () => null,
-  paintColor: (colors: string[]) => colors[0],
 }));
 jest.mock('@expo/ui', () => {
   const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
@@ -69,16 +69,11 @@ const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
   }),
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 test('shares the recipe as text from the finish screen, as Plan A has no way to ⑪', async () => {
   const share = jest
     .spyOn(Share, 'share')
     .mockResolvedValue({ action: 'sharedAction', activityType: undefined });
-  await render(<MakeFinish id="fox" />, { wrapper });
+  await render(<MakeFinish id="fox" />, { wrapper: TestQueryProvider });
   expect(screen.queryByRole('button', { name: /メイク前と比べる/ })).toBeNull();
   expect(screen.getByRole('button', { name: '写真を保存（準備中）' })).toBeDisabled();
   await fireEvent.press(await screen.findByRole('button', { name: '共有', disabled: false }));
@@ -86,7 +81,7 @@ test('shares the recipe as text from the finish screen, as Plan A has no way to 
 });
 
 test('moves the divider with accessibility actions and goes back', async () => {
-  await render(<MakeCompare id="fox" />, { wrapper });
+  await render(<MakeCompare id="fox" />, { wrapper: TestQueryProvider });
   const divider = screen.getByRole('adjustable', { name: 'メイク前とメイク後の境目' });
   expect(divider).toHaveAccessibilityValue({ text: 'メイク前50% メイク後50%' });
 
@@ -101,7 +96,7 @@ test('moves the divider with accessibility actions and goes back', async () => {
 });
 
 test('shows unbuilt actions and layer toggles as disabled', async () => {
-  await render(<MakeCompare id="fox" />, { wrapper });
+  await render(<MakeCompare id="fox" />, { wrapper: TestQueryProvider });
   expect(screen.getByRole('button', { name: '共有（準備中）' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '写真を保存（準備中）' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'レシピを投稿する（準備中）' })).toBeDisabled();
@@ -111,7 +106,7 @@ test('shows unbuilt actions and layer toggles as disabled', async () => {
 
 test('retries the step layers when they fail to load', async () => {
   mockGetRecipe.mockRejectedValueOnce(new Error('通信エラー'));
-  await render(<MakeCompare id="fox" />, { wrapper });
+  await render(<MakeCompare id="fox" />, { wrapper: TestQueryProvider });
   expect(
     await screen.findByText('手順を読み込めませんでした。通信状況を確認してお試しください。'),
   ).toBeOnTheScreen();
