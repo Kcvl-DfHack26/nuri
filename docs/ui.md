@@ -11,7 +11,7 @@ Googleは公式の多色ロゴ付き白ボタン、AppleはiOSの公式AppleAuth
 ## 構成
 
 - Uniwind Free **1.13.2**、Tailwind CSS **4.3.4**。Expo SDK 58、React 19、React Native 0.88を維持する。NativeWind、追加Babel preset、Tailwind v3用configは使わない。
-- `apps/mobile/metro.config.mjs` でExpoの標準Metro設定を `withUniwindConfig` で包む。`global.css` をRoot Layoutで読み、Tailwindの探索元はモバイルの `src` に限定する。
+- `apps/mobile/metro.config.cts` でExpoの標準Metro設定を `withUniwindConfig` で包む。`global.css` をRoot Layoutで読み、Tailwindの探索元はモバイルの `src` に限定する。
 - `apps/mobile/src/components/ui` の `Text` と `Button` は、[React Native ReusablesのUniwind registry](https://github.com/founded-labs/react-native-reusables/tree/385834c2196f8a303cbc9057d1ac768f3bde0a3b/packages/registry/src/uniwind/components/ui)を基にしたソース。隣の `LICENSE` を維持する。
 - 上流からの調整は、import先、React 19のref型・Context、未対応roleの型キャスト除去、ネイティブの最小48pt/dp・可変高・文字の折り返し。`style`、`className`、accessibility propsは通常どおり渡せる。
 - `Button` は `variant`／`size`／`onPress`／`disabled`、`Text` は `variant`／`asChild` を提供する。ラベルにはローカルの `Text` を使うとButtonのvariantに追従する。アイコンのみの操作には明示的なaccessibilityLabelを付ける。

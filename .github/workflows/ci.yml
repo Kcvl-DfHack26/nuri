@@ -9,11 +9,71 @@ permissions:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+env:
+  CI: '1'
 jobs:
-  quality:
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - &setup-bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - &install
+        name: Install Workspace Dependencies
+        run: bun install --frozen-lockfile
+      - name: Verify Generated Uniwind Types
+        run: |
+          bun run --bun --cwd apps/mobile styles:generate
+          git diff --exit-code -- apps/mobile/uniwind-types.d.ts
+      - name: Check Formatting, Lint, Types, and Dead Code
+        run: bun run --bun --parallel format:check lint typecheck deadcode
+      - name: Check Commit Messages
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bun run --bun commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
+  unit:
+    name: Unit Tests (Bun)
+    runs-on: ubuntu-latest
+    steps:
+      - &checkout
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - *setup-bun
+      - *install
+      - name: Run Bun Unit Tests
+        run: bun run --bun turbo run test test:scripts --filter='!@starter/mobile' --log-order=stream
+
+  mobile-unit:
+    name: Unit Tests (Jest, Shard ${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - *checkout
+      - *setup-bun
+      - *install
+      - name: Run Jest Shard
+        env:
+          SHARD: ${{ matrix.shard }}/2
+        run: bun run --bun --cwd apps/mobile test --shard="$SHARD"
+
+  api-integration:
+    name: API Integration Tests (PostgreSQL)
     runs-on: ubuntu-latest
     services:
-      postgres:
+      postgres: &postgres
         image: postgres:17.7-bookworm
         env:
           POSTGRES_USER: expo-hono-opentofu-starter
@@ -23,41 +83,34 @@ jobs:
         options: >-
           --health-cmd "pg_isready -h 127.0.0.1 -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter"
           --health-interval 5s --health-timeout 5s --health-retries 12
-    env:
-      CI: '1'
     steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-      - run: bun install --frozen-lockfile
-      - name: Commit conventions
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
-      - name: Verify generated UI types
-        run: |
-          bun run --cwd apps/mobile styles:generate
-          git diff --exit-code -- apps/mobile/uniwind-types.d.ts
-      - run: bun run check
-      - name: Test the API against PostgreSQL
+      - *checkout
+      - *setup-bun
+      - *install
+      - name: Migrate Test Database
         env:
           DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
-        run: bun run --cwd apps/api db:migrate && bun run --cwd apps/api test:integration
-      - name: Install browsers for Web E2E
-        run: bunx playwright install --with-deps --no-shell chromium webkit
-      - name: Test Expo Web with the API
+        run: bun run --cwd apps/api src/db/migrate.ts
+      - name: Run API Integration Tests
+        env:
+          DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
+        run: bun run --cwd apps/api test:integration
+
+  web-e2e:
+    name: Web E2E (Chromium)
+    runs-on: ubuntu-latest
+    services:
+      postgres: *postgres
+    steps:
+      - *checkout
+      - *setup-bun
+      - *install
+      - name: Install Chromium
+        run: bun run --bun playwright install --with-deps --no-shell chromium
+      - name: Run Web E2E
         env:
           NURI_E2E_DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
-        run: bun run test:e2e
+        run: bun run --bun test:e2e
       - uses: actions/upload-artifact@v7.0.2
         if: failure()
         with:
@@ -65,29 +118,46 @@ jobs:
           path: .artifacts/playwright
           if-no-files-found: ignore
           retention-days: 7
-  mobile-bundle:
+
+  mobile-export:
+    name: Native Bundle Build
     runs-on: ubuntu-latest
-    env:
-      CI: '1'
     steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-      - run: bun install --frozen-lockfile
-      - run: bun run doctor
-      - run: bun run export:mobile
+      - *checkout
+      - *setup-bun
+      - *install
+      - name: Verify Expo Dependencies
+        run: bun run --bun doctor
+      - name: Export iOS and Android Bundles
+        run: bun run --bun --cwd apps/mobile expo export --platform ios --platform android
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: mobile-bundles
           path: apps/mobile/dist
           retention-days: 7
+
+  all-checks:
+    name: All CI Checks
+    needs:
+      [
+        static-analysis,
+        unit,
+        mobile-unit,
+        api-integration,
+        web-e2e,
+        mobile-export,
+        infrastructure,
+        container,
+      ]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require All Jobs to Pass
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: jq -e 'all(.[]; .result == "success")' <<< "$RESULTS"
   infrastructure:
+    name: Infrastructure Validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
@@ -108,12 +178,12 @@ jobs:
       - run: tflint --chdir=infra --config="$GITHUB_WORKSPACE/.tflint.hcl"
       - run: tflint --chdir=infra/bootstrap --config="$GITHUB_WORKSPACE/.tflint.hcl"
   container:
+    name: Container Smoke Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - name: Validate local Compose configurations
+      - *checkout
+      - *setup-bun
+      - name: Validate Compose Configurations
         env:
           DEVICE_API_ORIGIN: https://api.nuri.localhost
           DEVICE_METRO_ORIGIN: https://metro.nuri.localhost
@@ -121,21 +191,7 @@ jobs:
           DEVICE_GOOGLE_ORIGIN: https://google.nuri.localhost
           DEVICE_APPLE_ORIGIN: https://apple.nuri.localhost
           DEVICE_MAIL_ORIGIN: https://mail.nuri.localhost
-        run: |
-          sh scripts/worktree-init.sh
-          docker compose config --quiet
-          docker compose --profile editor --profile tunnel config --quiet
-          docker compose -f compose.yaml -f compose.go.yaml config --quiet
-          docker compose -f compose.yaml -f compose.devices.yaml config --quiet
+        run: bun .github/scripts/ci/check-compose.ts
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
-      - name: Run Hono and Expo Web container smoke test
-        run: |
-          docker run -d --name api -p 8080:8080 \
-            -e DATABASE_URL=postgresql://unused:unused@localhost:5432/unused \
-            -e BETTER_AUTH_SECRET=ci-only-secret-not-for-real-deployments \
-            -e BETTER_AUTH_URL=https://example.com expo-hono-opentofu-starter-api
-          if ! curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 1 --max-time 5 http://localhost:8080/health ||
-             ! bash scripts/check-expo-web.sh http://localhost:8080; then
-            docker logs api
-            exit 1
-          fi
+      - name: Run Container Smoke Test
+        run: bun .github/scripts/ci/check-container.ts
