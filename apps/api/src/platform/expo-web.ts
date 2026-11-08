@@ -7,7 +7,6 @@ const pages = [
   '/',
   '/account',
   '/auth-callback',
-  '/compose',
   '/diagnosis',
   '/import',
   '/import/steps',
@@ -31,7 +30,6 @@ const pages = [
   '/search',
   '/settings',
   '/suggest',
-  '/timeline',
   '/users/:id',
 ];
 

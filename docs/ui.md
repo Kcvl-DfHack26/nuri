@@ -2,9 +2,9 @@
 
 設定フォーム、Picker、Switch、Slider、Menu、BottomSheetは共通 `@expo/ui` を優先する。Native Tabs・Stack・戻る操作はExpo Routerが担当する。独自の配色や見た目が必要な部分は、React Native ReusablesのローカルコンポーネントとUniwindで実装する。
 
-主要SNS機能はXを参考にした独自UIを使う。タイムラインは左にアバター、右に名前・日時・本文・いいね／共有を配置する。本文・反応はReusables／Uniwind、プロフィールは独立したユーザーの概要とネイティブ編集ボタンを使う。投稿者のアイコンからユーザー→投稿一覧へ移動できる。投稿カードは外側の横余白12pt・カード間8pt・角丸16pt、内側は横と上12pt。40ptアバターと8ptの間隔で密度を保ち、いいね・共有は右寄せで4pt間隔にする。操作のタップ領域は48pt/dp以上にする。未実装の返信・リポスト・フォローを操作可能なボタンとして置かない。
+操作のタップ領域は48pt/dp以上にする。未実装の操作を操作可能なボタンとして置かない。
 
-Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、AndroidはPlan Aの `TabBar/Glass` を `expo-router/ui` で描く（[architecture](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。投稿シートは65%の高さから開く。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。iOS 26の投稿導線はタイムライン（`/timeline`）を開いている間だけタブ直上のBottomAccessory、それ以前とAndroidはツールバー。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigma Plan AのFoundationsに従い、アプリ全体はライト配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
+Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、AndroidはPlan Aの `TabBar/Glass` を `expo-router/ui` で描く（[architecture](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigma Plan AのFoundationsに従い、アプリ全体はライト配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
 
 Googleは公式の多色ロゴ付き白ボタンを使う。ログイン（⑱）はPlan Aに合わせてライト配色で表示し、Googleとパスキーを提供し、メールは送信ドメインとログイン完了を確認してから再開する（#177）。出典は `apps/mobile/assets/auth/README.md` にある。
 
@@ -102,6 +102,5 @@ JestはButtonの操作・disabled、Textのアクセシビリティ、プロフ�
 - [Uniwindの型生成](https://docs.uniwind.dev/api/generate-artifacts)
 - [Expo UI SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/ui/)
 
-- [MobbinのXタイムライン参照](https://mobbin.com/screens/ef7b7aa6-f2ae-4957-a3e2-6271022bad6c)
 - [Apple HIG Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
 - [Google Sign-In branding](https://developers.google.com/identity/branding-guidelines)
