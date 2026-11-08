@@ -174,7 +174,7 @@ export function PostCreating() {
     };
     Alert.alert(
       '動画を送って手順書を作りますか',
-      'メイクの動画をサーバーに送り、Geminiで手順と使ったコスメを読み取ります。動画には顔と声が入っています。読み取りが終わったら、動画はサーバーに残しません。',
+      'サーバーに送信しGeminiで動画より手順と使ったコスメを読み取ります。動画はサーバーに残しません。',
       [
         { text: 'やめる', style: 'cancel', onPress: backOrHome },
         { text: '送る', onPress: send },

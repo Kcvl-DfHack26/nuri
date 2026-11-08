@@ -97,21 +97,47 @@ export function moveSegment(
 }
 
 /**
- * ⑫-4 (#186): 手順を追加 splits the last step at the middle of its segment; the user moves the new
- * boundary on ⑫-5. Null when another step would pass `recipeStepsMax`, when either half would be
- * shorter than `minSegmentMs`, or when the video's length is unknown.
+ * ⑫-4 (#186): 手順を追加 with the start and end the user picked. The new step takes that time; a
+ * step it overlaps is cut back to meet it, and a step it falls inside keeps the part before it.
+ * Returns the segments with the new one and its index, or null when the new step is shorter than
+ * `minSegmentMs`, would cover a whole step or leave one shorter than it, would pass
+ * `recipeStepsMax`, or lies outside the video.
  */
-export function splitLastSegment(segments: readonly Segment[]): [Segment, Segment] | null {
-  const last = segments.at(-1);
-  if (!last || last.endMs === null || segments.length >= recipeStepsMax) {
+export function insertSegment(
+  segments: readonly Segment[],
+  range: { startMs: number; endMs: number },
+  durationMs: number | null,
+): { segments: Segment[]; index: number } | null {
+  const { startMs, endMs } = range;
+  if (
+    durationMs === null ||
+    segments.length >= recipeStepsMax ||
+    startMs < 0 ||
+    endMs > durationMs ||
+    endMs - startMs < minSegmentMs
+  ) {
     return null;
   }
-  if (last.endMs - last.startMs < minSegmentMs * 2) {
-    return null;
+  const kept: Segment[] = [];
+  for (const segment of segments) {
+    const end = segment.endMs ?? durationMs;
+    if (end <= startMs || segment.startMs >= endMs) {
+      kept.push(segment);
+      continue;
+    }
+    if (segment.startMs >= startMs && end <= endMs) {
+      return null;
+    }
+    const trimmed =
+      segment.startMs < startMs ? { ...segment, endMs: startMs } : { ...segment, startMs: endMs };
+    if ((trimmed.endMs ?? durationMs) - trimmed.startMs < minSegmentMs) {
+      return null;
+    }
+    kept.push(trimmed);
   }
-  const middle = Math.round((last.startMs + last.endMs) / 2);
-  return [
-    { startMs: last.startMs, endMs: middle },
-    { startMs: middle, endMs: last.endMs },
-  ];
+  const index = kept.filter((segment) => segment.startMs < startMs).length;
+  return {
+    segments: [...kept.slice(0, index), { startMs, endMs }, ...kept.slice(index)],
+    index,
+  };
 }
