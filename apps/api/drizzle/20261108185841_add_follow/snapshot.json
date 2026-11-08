@@ -1,0 +1,243 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "23d8595d-f323-4caf-b16c-eb48ec664e58",
+  "prevIds": [
+    "0ad5252d-a7c2-4233-976a-a236278b3012"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "follow"
+      ],
+      "writes": [
+        "s|tbl|public.follow",
+        "n|tbl|public.follow",
+        "e|tbl|public.follow",
+        "n|rel|public.follow",
+        "n|type|public.follow",
+        "n|rel|public.follow_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "follow",
+        "follow_followee_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.follow_followee_id_idx",
+        "n|idx|public.follow_followee_id_idx",
+        "e|idx|public.follow_followee_id_idx",
+        "n|rel|public.follow_followee_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.follow",
+        "n|sch|public",
+        "n|col|public.follow.followee_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "follow"
+      ],
+      "writes": [
+        "s|fk|public.follow.follow_follower_id_user_id_fkey",
+        "n|fk|public.follow.follow_follower_id_user_id_fkey",
+        "e|fk|public.follow.follow_follower_id_user_id_fkey",
+        "n|con|public.follow.follow_follower_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.follow",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.follow.follower_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "follow"
+      ],
+      "writes": [
+        "s|fk|public.follow.follow_followee_id_user_id_fkey",
+        "n|fk|public.follow.follow_followee_id_user_id_fkey",
+        "e|fk|public.follow.follow_followee_id_user_id_fkey",
+        "n|con|public.follow.follow_followee_id_user_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.follow",
+        "n|sch|public",
+        "n|tbl|public.user",
+        "n|sch|public",
+        "n|col|public.follow.followee_id",
+        "n|col|public.user.id",
+        "e|uniqueness|public.user.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "follow",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "follower_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "followee_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "follow_followee_id_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "followee_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "follow_follower_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "follower_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "follow_followee_id_user_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "followee_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "user",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "follow_pkey",
+        "columns": [
+          "follower_id",
+          "followee_id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "follow",
+        "name": "follow_not_self",
+        "value": "\"follower_id\" <> \"followee_id\"",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

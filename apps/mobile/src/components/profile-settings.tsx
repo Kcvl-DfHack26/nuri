@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { Host, Icon, Switch as NativeSwitch } from '@expo/ui';
-import { profileInputSchema, profilePatchSchema } from '@starter/shared';
+import { Host, Icon, Picker, Switch as NativeSwitch } from '@expo/ui';
+import { faceTypeIds, profileInputSchema, profilePatchSchema } from '@starter/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,15 +9,21 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import type { FaceType } from '@/lib/face-diagnosis';
+import type { MyProfile } from '@/lib/social';
+
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
 import { BottomCta, PrimaryButton } from '@/components/post-chrome';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { api, apiUrl, authClient } from '@/lib/api';
+import { apiUrl, authClient } from '@/lib/api';
+import { faceTypes } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
 import { addPasskey, passkeyListOptions, passkeysAvailable } from '@/lib/passkeys';
+import { recipeKeys } from '@/lib/recipes';
+import { changeProfile, myProfileKeys, myProfileOptions, userKeys } from '@/lib/social';
 import { useTokenColor } from '@/theme/tokens';
 
 const BACK = Icon.select({
@@ -33,24 +39,14 @@ const NEXT = Icon.select({
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
 
-// Plan A ⑰-2 プロフィール設定. Face type, photo and notifications remain samples.
+// Plan A ⑰-2 プロフィール設定. Photo and notifications remain samples.
 export function ProfileSettings() {
   const insets = useSafeAreaInsets();
   const session = authClient.useSession();
   // The header floats over the form; measure it so larger text never covers the first field.
   const [headerHeight, setHeaderHeight] = useState(44);
   const user = session.data?.user;
-  const profile = useQuery({
-    queryKey: ['my-profile', user?.id],
-    enabled: Boolean(user && apiUrl),
-    queryFn: async () => {
-      const response = await api.api.me.profile.$get();
-      if (response.status !== 200) {
-        throw new Error('プロフィールを読み込めませんでした。');
-      }
-      return (await response.json()).profile;
-    },
-  });
+  const profile = useQuery({ ...myProfileOptions(user?.id), enabled: Boolean(user && apiUrl) });
   return (
     <View className="flex-1 bg-white">
       <ProfileStatusBar />
@@ -154,7 +150,7 @@ function Editor({
   refreshError,
   onRetry,
 }: {
-  profile: { name: string; handle: string | null; bio: string; isPublic: boolean };
+  profile: MyProfile;
   userId: string;
   email: string;
   image: string | null | undefined;
@@ -168,6 +164,7 @@ function Editor({
     handle: form.draft.handle === form.base.handle ? profile.handle : form.draft.handle,
     bio: form.draft.bio === form.base.bio ? profile.bio : form.draft.bio,
     isPublic: form.draft.isPublic === form.base.isPublic ? profile.isPublic : form.draft.isPublic,
+    faceType: form.draft.faceType === form.base.faceType ? profile.faceType : form.draft.faceType,
   };
   const change = (patch: Partial<typeof current>) => {
     setForm({ base: profile, draft: { ...current, ...patch } });
@@ -181,25 +178,18 @@ function Editor({
     ...(input.handle !== profile.handle ? { handle: input.handle } : {}),
     ...(input.bio !== profile.bio ? { bio: input.bio } : {}),
     ...(input.isPublic !== profile.isPublic ? { isPublic: input.isPublic } : {}),
+    ...(input.faceType !== profile.faceType ? { faceType: input.faceType } : {}),
   };
   const handleInvalid =
     input.handle !== null && !profileInputSchema.shape.handle.safeParse(input.handle).success;
   const save = useMutation({
-    mutationFn: async () => {
-      const response = await api.api.me.profile.$patch({ json: changes });
-      if (response.status === 409) {
-        throw new Error('このユーザーIDは既に使われています。');
-      }
-      if (response.status !== 200) {
-        throw new Error('変更を保存できませんでした。もう一度お試しください。');
-      }
-    },
+    mutationFn: () => changeProfile(changes),
     onSuccess: async () => {
       authClient.$store.notify('$sessionSignal');
       await Promise.all([
-        client.invalidateQueries({ queryKey: ['posts'] }),
-        client.invalidateQueries({ queryKey: ['user'] }),
-        client.invalidateQueries({ queryKey: ['my-profile'] }),
+        client.invalidateQueries({ queryKey: recipeKeys.all }),
+        client.invalidateQueries({ queryKey: userKeys.all }),
+        client.invalidateQueries({ queryKey: myProfileKeys.all }),
       ]);
       backOrHome();
     },
@@ -308,7 +298,13 @@ function Editor({
           </Field>
         </View>
         <Section title="メイクの情報">
-          <Row label="顔タイプ" value="丸顔×イエベ" />
+          <FaceTypeRow
+            value={current.faceType}
+            onChange={(faceType) => {
+              change({ faceType });
+            }}
+            disabled={save.isPending}
+          />
         </Section>
         <Section title="公開と通知">
           <SwitchRow
@@ -400,6 +396,44 @@ function Field({
           {caption}
         </Text>
       ) : null}
+    </View>
+  );
+}
+
+const noFaceType = 'none';
+
+/**
+ * ⑰-2's face type (#194): the saved one or 未設定, chosen from the five types in a native menu. ⑭ can
+ * save the diagnosed one too. Skin tone is not diagnosed, so it is never shown.
+ */
+function FaceTypeRow({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: FaceType | null;
+  onChange: (faceType: FaceType | null) => void;
+  disabled: boolean;
+}) {
+  return (
+    <View className={rowClassName}>
+      <Text className="flex-1 font-maru-bold text-label text-ink-primary">顔タイプ</Text>
+      <Host colorScheme="light" matchContents style={{ minHeight: 48 }}>
+        <Picker
+          testID="顔タイプ"
+          appearance="menu"
+          enabled={!disabled}
+          selectedValue={value ?? noFaceType}
+          onValueChange={(id) => {
+            onChange(faceTypeIds.find((faceType) => faceType === id) ?? null);
+          }}
+        >
+          {faceTypeIds.map((id) => (
+            <Picker.Item key={id} label={faceTypes[id].label} value={id} />
+          ))}
+          <Picker.Item label="未設定" value={noFaceType} />
+        </Picker>
+      </Host>
     </View>
   );
 }

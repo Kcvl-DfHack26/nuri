@@ -2,9 +2,9 @@
 
 設定フォーム、Picker、Switch、Slider、Menu、BottomSheetは共通 `@expo/ui` を優先する。Native Tabs・Stack・戻る操作はExpo Routerが担当する。独自の配色や見た目が必要な部分は、React Native ReusablesのローカルコンポーネントとUniwindで実装する。
 
-主要SNS機能はXを参考にした独自UIを使う。タイムラインは左にアバター、右に名前・日時・本文・いいね／共有を配置する。本文・反応はReusables／Uniwind、プロフィールは独立したユーザーの概要とネイティブ編集ボタンを使う。投稿者のアイコンからユーザー→投稿一覧へ移動できる。投稿カードは外側の横余白12pt・カード間8pt・角丸16pt、内側は横と上12pt。40ptアバターと8ptの間隔で密度を保ち、いいね・共有は右寄せで4pt間隔にする。操作のタップ領域は48pt/dp以上にする。未実装の返信・リポスト・フォローを操作可能なボタンとして置かない。
+操作のタップ領域は48pt/dp以上にする。未実装の操作を操作可能なボタンとして置かない。
 
-Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、AndroidはPlan Aの `TabBar/Glass` を `expo-router/ui` で描く（[architecture](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。投稿シートは65%の高さから開く。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。iOS 26の投稿導線はタイムライン（`/timeline`）を開いている間だけタブ直上のBottomAccessory、それ以前とAndroidはツールバー。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigma Plan AのFoundationsに従い、アプリ全体はライト配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
+Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、AndroidはPlan Aの `TabBar/Glass` を `expo-router/ui` で描く（[architecture](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigma Plan AのFoundationsに従い、アプリ全体はライト配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
 
 Googleは公式の多色ロゴ付き白ボタンを使う。ログイン（⑱）はPlan Aに合わせてライト配色で表示し、Googleとパスキーを提供し、メールは送信ドメインとログイン完了を確認してから再開する（#177）。出典は `apps/mobile/assets/auth/README.md` にある。
 
@@ -91,7 +91,7 @@ bun run doctor
 bun run export:mobile
 ```
 
-いいねは行ごとの `useMutation` で対象投稿IDを楽観更新し、ホーム／プロフィールのTanStack Queryキャッシュに反映する。`onError` はその投稿だけ復元し、別投稿の並行操作を巻き戻さない。成功時の全件invalidateを行わず、未変更オブジェクトの参照を保ってmemo化したPostRowの再描画を省く。FlatListの `refreshing` を立てない。pull-to-refresh専用状態を持ち、背景の再取得で画面が下へずれないことをRNTLと実画面で確認する。
+お気に入りは `useFavorite` で対象レシピを楽観更新し、一覧・詳細・お気に入り一覧のTanStack Queryキャッシュに反映する。失敗時は変更したキャッシュだけを復元し、別レシピの並行操作を巻き戻さない。処理後は対象の詳細を、最後の操作が終わった時点でお気に入り一覧とユーザー情報を再取得する。プロフィール保存後は `recipeKeys.all` を無効化し、レシピの作者名も再取得する。FlatListの `refreshing` はpull-to-refresh専用状態とし、背景の再取得では立てない。
 
 JestはButtonの操作・disabled、Textのアクセシビリティ、プロフィール設定内のパスキー操作を検証する。MetroによるclassName変換とネイティブ描画はJestだけでは検証できないため、iOS／AndroidのExpo Goでライト配色、大きな文字、標準UIとの併用を確認する。bundle成功を端末確認の代わりにはしない。
 
@@ -102,6 +102,5 @@ JestはButtonの操作・disabled、Textのアクセシビリティ、プロフ�
 - [Uniwindの型生成](https://docs.uniwind.dev/api/generate-artifacts)
 - [Expo UI SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/ui/)
 
-- [MobbinのXタイムライン参照](https://mobbin.com/screens/ef7b7aa6-f2ae-4957-a3e2-6271022bad6c)
 - [Apple HIG Layout](https://developer.apple.com/design/human-interface-guidelines/layout)
 - [Google Sign-In branding](https://developers.google.com/identity/branding-guidelines)

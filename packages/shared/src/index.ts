@@ -1,18 +1,12 @@
 import { z } from 'zod';
 
-export const postInputSchema = z.object({
-  body: z
-    .string()
-    .trim()
-    .min(1, '本文を入力してください')
-    .max(500, '500文字以内で入力してください'),
-});
-export const postParamsSchema = z.object({ id: z.uuid() });
 export const userParamsSchema = z.object({ id: z.string().min(1).max(128) });
 export const feedQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(10000).default(0),
   author: z.string().min(1).max(128).optional(),
 });
+/** The face types ⑭ diagnoses, in the order it tries them (#47, #194). */
+export const faceTypeIds = ['long', 'square', 'round', 'heart', 'oval'] as const;
 export const profileInputSchema = z.object({
   name: z.string().trim().min(1).max(40),
   handle: z
@@ -22,6 +16,8 @@ export const profileInputSchema = z.object({
     .nullable(),
   bio: z.string().trim().max(42, '自己紹介は42文字以内で入力してください'),
   isPublic: z.boolean(),
+  /** Chosen on ⑰-2 or saved from ⑭; null until then. Skin tone is never stored (not diagnosed). */
+  faceType: z.enum(faceTypeIds).nullable(),
 });
 export const profilePatchSchema = profileInputSchema
   .partial()

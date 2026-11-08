@@ -10,6 +10,7 @@ import {
   recipeOptions,
   setCachedFavorite,
 } from '@/lib/recipes';
+import { userKeys } from '@/lib/social';
 
 const favoriteMutations = ['favorite'];
 
@@ -45,11 +46,13 @@ export function useFavorite(recipe: { id: string; favorited: boolean }) {
     },
     onSettled: () => {
       // ⑤ of this recipe, the one screen showing it alone, is fetched again. Of the lists only the
-      // favorites list changes membership; it is fetched after the last pending heart so the result
-      // never undoes another change. Nothing here waits, so that count drops right away.
+      // favorites list changes membership; it and the profiles, whose いいね add up these hearts,
+      // are fetched after the last pending heart so the result never undoes another change.
+      // Nothing here waits, so that count drops right away.
       void client.invalidateQueries({ queryKey: recipeOptions(recipe.id).queryKey });
       if (client.isMutating({ mutationKey: favoriteMutations }) === 1) {
         void client.invalidateQueries({ queryKey: recipeKeys.favorites });
+        void client.invalidateQueries({ queryKey: userKeys.all });
       }
     },
   });

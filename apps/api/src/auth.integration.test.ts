@@ -23,6 +23,10 @@ const email = `auth-${unique}@example.com`;
 const secondEmail = `other-${unique}@example.com`;
 const favoriteEmail = `favorite-${unique}@example.com`;
 const posterEmail = `poster-${unique}@example.com`;
+const followeeEmail = `followee-${unique}@example.com`;
+// A new user's profile counts before anyone follows them or favorites their recipes.
+const noFollowsOrLikes = { followerCount: 0, followingCount: 0, likeCount: 0, following: false };
+const hiddenEmail = `hidden-${unique}@example.com`;
 const baseURL = 'http://localhost:8080';
 const origin = 'http://localhost:8081';
 const google = await createEmulator({
@@ -82,7 +86,16 @@ function request(path: string, body: unknown, cookie = '', method = 'POST') {
 afterAll(async () => {
   await db
     .delete(user)
-    .where(inArray(user.email, [email, secondEmail, favoriteEmail, posterEmail]));
+    .where(
+      inArray(user.email, [
+        email,
+        secondEmail,
+        favoriteEmail,
+        posterEmail,
+        followeeEmail,
+        hiddenEmail,
+      ]),
+    );
   await db
     .delete(rateLimit)
     .where(
@@ -205,7 +218,7 @@ test('Apple OAuth is unavailable and Google rejects a forged native ID token', a
   }
 });
 
-test('magic links are single-use and sessions protect posts, likes and deletion', async () => {
+test('magic links are single-use and sessions protect profile updates', async () => {
   const handle = `h_${unique.replaceAll('-', '').slice(0, 18)}`;
   const link = await emailLink(email.toUpperCase());
   const signedIn = await appRequest(link.href);
@@ -243,46 +256,14 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     (await request('/api/auth/mobile-magic-link', { token: nativeLink.searchParams.get('token') }))
       .status,
   ).toBe(400);
-  const created = await request('/api/posts', { body: '  今日もいい日でした。  ' }, cookie);
-  expect(created.status).toBe(201);
-  const { id } = z.object({ id: z.uuid() }).parse(await created.json());
-  expect((await request(`/api/posts/${id}`, {}, other, 'DELETE')).status).toBe(404);
-  await Promise.all([
-    request(`/api/posts/${id}/like`, {}, other, 'PUT'),
-    request(`/api/posts/${id}/like`, {}, other, 'PUT'),
-  ]);
-  const feedSchema = z.object({
-    items: z.array(
-      z.object({
-        id: z.string(),
-        body: z.string(),
-        likeCount: z.number(),
-        liked: z.boolean(),
-        author: z
-          .object({ id: z.string(), name: z.string(), image: z.string().nullable() })
-          .strict(),
-      }),
-    ),
-  });
-  const feed = feedSchema.parse(
-    await (await appRequest('/api/posts', { headers: { cookie: other } })).json(),
-  );
-  expect(feed.items.find((item) => item.id === id)).toMatchObject({
-    body: '今日もいい日でした。',
-    likeCount: 1,
-    liked: true,
-  });
-  const guestFeed = feedSchema.parse(await (await appRequest('/api/posts')).json());
-  expect(guestFeed.items.find((item) => item.id === id)).toMatchObject({
-    likeCount: 1,
-    liked: false,
-  });
-  const author = feed.items.find((item) => item.id === id)?.author;
-  expect(author).toBeDefined();
-  const publicProfile = await appRequest(`/api/users/${author?.id}`);
+  const publicProfile = await appRequest(`/api/users/${first.user.id}`);
   expect(publicProfile.status).toBe(200);
-  expect(await publicProfile.json()).toEqual({
-    user: { ...author, handle: null, bio: '', isPublic: true },
+  const profileJson: unknown = await publicProfile.json();
+  const author = z
+    .object({ user: z.object({ id: z.string(), name: z.string(), image: z.string().nullable() }) })
+    .parse(profileJson).user;
+  expect(profileJson).toEqual({
+    user: { ...author, handle: null, bio: '', isPublic: true, ...noFollowsOrLikes },
   });
   expect((await appRequest('/api/me/profile')).status).toBe(401);
   expect(
@@ -305,20 +286,53 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
       )
     ).status,
   ).toBe(200);
-  const privateProfile = await appRequest(`/api/users/${author?.id}`, { headers: { cookie } });
+  const privateProfile = await appRequest(`/api/users/${author.id}`, { headers: { cookie } });
   expect(privateProfile.status).toBe(200);
   expect(await privateProfile.json()).toEqual({
-    user: { ...author, name: 'はな', handle, bio: 'よろしく', isPublic: false },
+    user: {
+      ...author,
+      name: 'はな',
+      handle,
+      bio: 'よろしく',
+      isPublic: false,
+      ...noFollowsOrLikes,
+    },
   });
   expect((await request('/api/me/profile', { name: '更新後' }, cookie, 'PATCH')).status).toBe(200);
-  const afterPartialUpdate = await appRequest(`/api/users/${author?.id}`, { headers: { cookie } });
-  expect(await afterPartialUpdate.json()).toEqual({
-    user: { ...author, name: '更新後', handle, bio: 'よろしく', isPublic: false },
-  });
-  expect((await appRequest(`/api/users/${author?.id}`)).status).toBe(404);
+  // The face type (#194) is the owner's own: saved, cleared, validated, and not on /users/:id.
+  const myFaceType = async () =>
+    z
+      .object({ profile: z.object({ faceType: z.string().nullable() }) })
+      .parse(await (await appRequest('/api/me/profile', { headers: { cookie } })).json()).profile
+      .faceType;
+  expect(await myFaceType()).toBeNull();
+  expect((await request('/api/me/profile', { faceType: 'round' }, cookie, 'PATCH')).status).toBe(
+    200,
+  );
+  expect(await myFaceType()).toBe('round');
   expect(
-    (await appRequest(`/api/users/${author?.id}`, { headers: { cookie: other } })).status,
-  ).toBe(404);
+    (await request('/api/me/profile', { faceType: 'round_yellow' }, cookie, 'PATCH')).status,
+  ).toBe(400);
+  expect(await myFaceType()).toBe('round');
+  const afterFaceType = await appRequest(`/api/users/${author.id}`, { headers: { cookie } });
+  expect(await afterFaceType.json()).not.toHaveProperty('user.faceType');
+  expect((await request('/api/me/profile', { faceType: null }, cookie, 'PATCH')).status).toBe(200);
+  expect(await myFaceType()).toBeNull();
+  const afterPartialUpdate = await appRequest(`/api/users/${author.id}`, { headers: { cookie } });
+  expect(await afterPartialUpdate.json()).toEqual({
+    user: {
+      ...author,
+      name: '更新後',
+      handle,
+      bio: 'よろしく',
+      isPublic: false,
+      ...noFollowsOrLikes,
+    },
+  });
+  expect((await appRequest(`/api/users/${author.id}`)).status).toBe(404);
+  expect((await appRequest(`/api/users/${author.id}`, { headers: { cookie: other } })).status).toBe(
+    404,
+  );
   expect(
     (
       await request(
@@ -330,15 +344,12 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     ).status,
   ).toBe(409);
   expect((await appRequest('/api/users/missing-sample-user')).status).toBe(404);
-  expect((await request('/api/posts', { body: ' '.repeat(5) }, cookie)).status).toBe(400);
   expect((await request('/api/auth/update-user', { name: 'x'.repeat(41) }, cookie)).status).toBe(
     400,
   );
-  expect((await request(`/api/posts/${id}/like`, {}, other, 'DELETE')).status).toBe(200);
-  expect((await request(`/api/posts/${id}`, {}, cookie, 'DELETE')).status).toBe(200);
   expect((await request('/api/auth/sign-out', {}, cookie)).status).toBe(200);
   expect((await appRequest('/api/me', { headers: { cookie } })).status).toBe(401);
-  expect((await request('/api/posts', { body: 'expired session' }, cookie)).status).toBe(401);
+  expect((await request('/api/me/profile', { name: '失効後' }, cookie, 'PATCH')).status).toBe(401);
 }, 20000);
 
 test('passkeys require a session to register, verify signatures/origin, and can be removed', async () => {
@@ -464,6 +475,59 @@ test('favorites are idempotent and only visible to the user who added them', asy
   expect(list.parse(await (await authored(me.id, { cookie })).json()).items).toEqual([
     { id: recipeId, favorited: false, likeCount: 0 },
   ]);
+}, 20000);
+
+test('follows are idempotent, only for public profiles and counted on profiles', async () => {
+  const { cookie, me } = await signInRecipeUser();
+  const followeeId = `followee-${unique}`;
+  const hiddenId = `hidden-${unique}`;
+  const recipeId = `followee-recipe-${unique}`;
+  await db.insert(user).values([
+    { id: followeeId, name: 'フォローされる人', email: followeeEmail },
+    { id: hiddenId, name: '非公開の人', email: hiddenEmail, isPublic: false },
+  ]);
+  await db.insert(recipe).values({
+    id: recipeId,
+    authorId: followeeId,
+    title: 'フォローのテスト',
+    image: 'https://example.com/followee.jpg',
+    durationMinutes: 5,
+    likeCount: 10,
+  });
+  expect((await request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'PUT')).status).toBe(200);
+  expect((await request(`/api/users/${me.id}/follow`, {}, cookie, 'PUT')).status).toBe(400);
+  expect((await request(`/api/users/${hiddenId}/follow`, {}, cookie, 'PUT')).status).toBe(404);
+  expect((await request('/api/users/missing-user/follow', {}, cookie, 'PUT')).status).toBe(404);
+  expect((await request(`/api/users/${followeeId}/follow`, {}, '', 'PUT')).status).toBe(401);
+  const followed = await Promise.all([
+    request(`/api/users/${followeeId}/follow`, {}, cookie, 'PUT'),
+    request(`/api/users/${followeeId}/follow`, {}, cookie, 'PUT'),
+  ]);
+  expect(followed.map((response) => response.status)).toEqual([200, 200]);
+
+  const profile = z.object({
+    user: z.object({
+      followerCount: z.number(),
+      followingCount: z.number(),
+      likeCount: z.number(),
+      following: z.boolean(),
+    }),
+  });
+  const read = async (id: string, headers?: { cookie: string }) =>
+    profile.parse(await (await appRequest(`/api/users/${id}`, headers ? { headers } : {})).json())
+      .user;
+  // 10 carried over plus this user's favorite.
+  expect(await read(followeeId, { cookie })).toEqual({
+    followerCount: 1,
+    followingCount: 0,
+    likeCount: 11,
+    following: true,
+  });
+  expect((await read(followeeId)).following).toBe(false);
+  expect(await read(me.id, { cookie })).toMatchObject({ followingCount: 1, following: false });
+
+  expect((await request(`/api/users/${followeeId}/follow`, {}, cookie, 'DELETE')).status).toBe(200);
+  expect(await read(followeeId, { cookie })).toMatchObject({ followerCount: 0, following: false });
 }, 20000);
 
 test('posting a recipe validates and stores the latest draft and serves its thumbnail', async () => {

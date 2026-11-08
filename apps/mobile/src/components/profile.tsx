@@ -1,38 +1,34 @@
-import { Button as NativeButton } from '@expo/ui';
+import { Icon } from '@expo/ui';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Avatar } from '@/components/avatar';
-import { Feed } from '@/components/feed';
 import { Feedback } from '@/components/feedback';
-import { RecipeSection } from '@/components/my-page';
-import { NativeHost } from '@/components/native-host';
+import { FollowButton } from '@/components/follow-button';
+import { GlassIconButton } from '@/components/glass-icon-button';
+import { ProfileCounts, ProfilePhoto, RecipeSection } from '@/components/my-page';
 import { Text } from '@/components/ui/text';
-import { api, apiUrl, authClient } from '@/lib/api';
+import { apiUrl, authClient } from '@/lib/api';
 import { recipeListOptions } from '@/lib/recipes';
-import { colors } from '@/theme/colors';
-import { avatarSize } from '@/theme/metrics';
+import { userOptions } from '@/lib/social';
 
-// Another user's profile opened from a post or a recipe's author (⑤), with the recipes they
-// posted and their posts. Your own profile is the マイ tab (⑰).
+const SETTINGS = Icon.select({
+  ios: 'gearshape.fill',
+  android: import('@expo/material-symbols/settings.xml'),
+});
+
+// Another user's profile, opened from a recipe's author (⑤): the same look as ⑰ with a follow
+// button, their counts and the recipes they posted (#195). Plan A has no design for it. Opened for
+// yourself, it offers プロフィール設定 instead of following.
 export function Profile({ id }: { id: string }) {
+  const insets = useSafeAreaInsets();
   const { data: session } = authClient.useSession();
   const recipes = useInfiniteQuery({
     ...recipeListOptions({ author: id }),
     enabled: Boolean(apiUrl),
   });
-  const profile = useQuery({
-    queryKey: ['user', id],
-    enabled: Boolean(apiUrl),
-    queryFn: async () => {
-      const response = await api.api.users[':id'].$get({ param: { id } });
-      if (response.status !== 200) {
-        throw new Error('プロフィールを読み込めませんでした。');
-      }
-      return await response.json();
-    },
-  });
+  const profile = useQuery({ ...userOptions(id), enabled: Boolean(apiUrl) });
   if (!apiUrl) {
     return <Feedback fullScreen message="接続先が未設定です。" />;
   }
@@ -50,56 +46,51 @@ export function Profile({ id }: { id: string }) {
       />
     );
   }
-  const person = profile.data.user;
+  const person = profile.data;
   return (
-    <Feed
-      authorId={person.id}
-      header={
-        <View style={{ paddingTop: 20, backgroundColor: colors.background }}>
-          <View
-            style={{
-              marginHorizontal: 20,
-              padding: 24,
-              borderRadius: 20,
-              backgroundColor: colors.card,
-              gap: 16,
-              alignItems: 'center',
-            }}
-          >
-            <Avatar size={avatarSize * 2} image={person.image} />
-            <Text variant="h3" className="text-center font-bold">
-              {person.name}
-            </Text>
-            {person.handle ? <Text className="text-muted-foreground">@{person.handle}</Text> : null}
-            {person.bio ? <Text className="text-center">{person.bio}</Text> : null}
-            {session?.user.id === person.id ? (
-              <NativeHost matchContents={{ vertical: true }} style={{ alignSelf: 'stretch' }}>
-                <NativeButton
-                  label="プロフィールを編集"
-                  variant="outlined"
-                  onPress={() => {
-                    router.push('/profile-settings');
-                  }}
-                />
-              </NativeHost>
-            ) : null}
-          </View>
-          {/* Recipes use Plan A's light palette, so they keep a white card in dark mode too. */}
-          <View className="mx-5 mt-4 rounded-panel bg-white px-3 pb-4 pt-1">
-            <RecipeSection
-              title="レシピ"
-              empty="まだ投稿したレシピはありません"
-              failure="レシピを読み込めませんでした。通信状況を確認してお試しください。"
-              query={recipes}
-            />
-          </View>
-          <View style={{ paddingHorizontal: 20, paddingTop: 28, paddingBottom: 12 }}>
-            <Text accessibilityRole="header" className="font-semibold text-muted-foreground">
-              投稿
-            </Text>
-          </View>
+    <ScrollView
+      className="flex-1 bg-white"
+      contentContainerClassName="px-4"
+      contentContainerStyle={{ paddingTop: 16, paddingBottom: insets.bottom + 28 }}
+    >
+      <View className="flex-row items-center gap-3.5">
+        <View className="size-16 items-center justify-center overflow-hidden rounded-full border-3 border-accent-pink">
+          <ProfilePhoto size={58} image={person.image} />
         </View>
-      }
-    />
+        <View className="flex-1 gap-0.5">
+          <Text
+            accessibilityRole="header"
+            className="font-maru-bold text-headline text-ink-primary"
+          >
+            {person.name}
+          </Text>
+          {person.handle ? (
+            <Text className="font-maru text-meta text-ink-secondary">@{person.handle}</Text>
+          ) : null}
+        </View>
+        {session?.user.id === person.id ? (
+          <GlassIconButton
+            icon={SETTINGS}
+            label="プロフィール設定"
+            className="border-black/8 bg-white"
+            onPress={() => {
+              router.push('/profile-settings');
+            }}
+          />
+        ) : (
+          <FollowButton user={person} />
+        )}
+      </View>
+      {person.bio ? (
+        <Text className="mt-3 font-maru text-ui text-ink-primary">{person.bio}</Text>
+      ) : null}
+      <ProfileCounts profile={person} />
+      <RecipeSection
+        title="レシピ"
+        empty="まだ投稿したレシピはありません"
+        failure="レシピを読み込めませんでした。通信状況を確認してお試しください。"
+        query={recipes}
+      />
+    </ScrollView>
   );
 }

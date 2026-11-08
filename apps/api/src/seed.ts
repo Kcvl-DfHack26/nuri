@@ -9,9 +9,7 @@ if (env.NODE_ENV !== 'development' || !env.AUTH_EMULATE) {
 const { db, pool } = connectDatabase(env.DATABASE_URL);
 try {
   const counts = await seedSampleData(db);
-  console.log(
-    `Local sample data ready: ${counts.users} users, ${counts.posts} posts and ${counts.recipes} recipes`,
-  );
+  console.log(`Local sample data ready: ${counts.users} users and ${counts.recipes} recipes`);
 } finally {
   await pool.end();
 }

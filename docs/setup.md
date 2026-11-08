@@ -90,7 +90,7 @@ bun run devices      # ホストのExpo Device Hub
 bun run dev:go       # API・DBとExpo Go用トンネル付きMetro
 bun run services:up  # API・DB・Metroをバックグラウンド起動
 bun run db:migrate
-bun run db:seed      # 4ユーザーの画像・8投稿・いいね。既存の利用者データは保持
+bun run db:seed      # サンプルのユーザー・レシピ。既存の利用者データは保持
 bun run test:integration # 起動済みのDBを使用
 bun run services:down
 ```
@@ -146,7 +146,7 @@ PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose \
 
 標準構成のMetroは `--lan`、`apps/mobile` には `tunnel` / `go` コマンドも残す。コンテナのLANアドレスは実機から直接到達できないため、実機はトンネル構成を使う。ホストブラウザではPortlessのMetro URLを開く。端末に `.localhost` を設定しない。
 
-Composeでは空の `EXPO_PUBLIC_API_URL` を `app.config.ts` が開発API originで補う。Compose外でAPI未設定の場合、ホームには接続案内を表示する。タイムライン・投稿・いいねにはAPIが必要で、外観・触覚だけが端末内設定。
+Composeでは空の `EXPO_PUBLIC_API_URL` を `app.config.ts` が開発API originで補う。Compose外でAPI未設定の場合、ホームには接続案内を表示する。レシピ・投稿・お気に入り・フォローにはAPIが必要で、外観・触覚だけが端末内設定。
 
 ### ローカルAPIも実機から使う
 
@@ -166,7 +166,7 @@ portless compose logs api-tunnel
 
 `portless compose restart api metro` で環境ファイルを読み直す。APIの `.env.example` には開発専用の `exp://**` originが含まれている。共有の本番APIにこのワイルドカードを入れない。実機の `localhost` は端末自身を指すため、localhost URLをモバイルへ設定しない。
 
-Cloudflareトンネルは外向きTCP 7844が必要。`curl https://....trycloudflare.com/ready` が `{"status":"ready"}` になれば、タイムラインの閲覧・投稿を確認できる。GoogleのローカルEmulateは `.localhost` のため、APIトンネルだけでは実機OAuthを完了できない。実機認証には到達可能な検証APIと実プロバイダ設定を用意する。トンネルを作り直すとURLが変わる。普段は安定したstaging Cloud Run URLも使える。実機・公開トンネルの確認範囲は [docs/testing.md](testing.md) に記録する。
+Cloudflareトンネルは外向きTCP 7844が必要。`curl https://....trycloudflare.com/ready` が `{"status":"ready"}` になれば、レシピの閲覧・投稿を確認できる。GoogleのローカルEmulateは `.localhost` のため、APIトンネルだけでは実機OAuthを完了できない。実機認証には到達可能な検証APIと実プロバイダ設定を用意する。トンネルを作り直すとURLが変わる。普段は安定したstaging Cloud Run URLも使える。実機・公開トンネルの確認範囲は [docs/testing.md](testing.md) に記録する。
 
 ### Development BuildとPRプレビュー
 

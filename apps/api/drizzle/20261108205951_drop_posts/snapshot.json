@@ -1,0 +1,128 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "a40c33d0-57d0-4f44-a13b-e3ec8a11a963",
+  "prevIds": [
+    "ba00eef9-bfc1-4ed4-b8e4-c6f8f3a78eaf"
+  ],
+  "footprints": [
+    {
+      "statementType": "drop_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "like"
+      ],
+      "writes": [
+        "s|fk|public.like.like_post_id_post_id_fkey",
+        "n|fk|public.like.like_post_id_post_id_fkey",
+        "e|fk|public.like.like_post_id_post_id_fkey",
+        "n|con|public.like.like_post_id_post_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.like",
+        "n|sch|public",
+        "e|col|public.like.post_id"
+      ]
+    },
+    {
+      "statementType": "drop_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "like"
+      ],
+      "writes": [
+        "s|tbl|public.like",
+        "n|tbl|public.like",
+        "e|tbl|public.like",
+        "n|rel|public.like",
+        "n|type|public.like"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "drop_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "post"
+      ],
+      "writes": [
+        "s|tbl|public.post",
+        "n|tbl|public.post",
+        "e|tbl|public.post",
+        "n|rel|public.post",
+        "n|type|public.post"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "drop",
+      "key": "tables\u0000[\"public\",\"like\"]"
+    },
+    {
+      "op": "drop",
+      "key": "tables\u0000[\"public\",\"post\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"like\",\"post_id\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"like\",\"user_id\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"post\",\"id\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"post\",\"user_id\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"post\",\"body\"]"
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"post\",\"created_at\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"post_created_at_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "indexes\u0000[\"public\",\"post_user_id_idx\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"like\",\"like_post_id_post_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"like\",\"like_user_id_user_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"post\",\"post_user_id_user_id_fkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "pks\u0000[\"public\",\"like\",\"like_pkey\"]"
+    },
+    {
+      "op": "drop",
+      "key": "pks\u0000[\"public\",\"post\",\"post_pkey\"]"
+    }
+  ]
+}
