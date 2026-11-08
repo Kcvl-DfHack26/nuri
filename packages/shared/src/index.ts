@@ -1,13 +1,5 @@
 import { z } from 'zod';
 
-export const postInputSchema = z.object({
-  body: z
-    .string()
-    .trim()
-    .min(1, '本文を入力してください')
-    .max(500, '500文字以内で入力してください'),
-});
-export const postParamsSchema = z.object({ id: z.uuid() });
 export const userParamsSchema = z.object({ id: z.string().min(1).max(128) });
 export const feedQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).max(10000).default(0),

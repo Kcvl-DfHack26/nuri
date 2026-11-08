@@ -256,45 +256,13 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     (await request('/api/auth/mobile-magic-link', { token: nativeLink.searchParams.get('token') }))
       .status,
   ).toBe(400);
-  const created = await request('/api/posts', { body: '  今日もいい日でした。  ' }, cookie);
-  expect(created.status).toBe(201);
-  const { id } = z.object({ id: z.uuid() }).parse(await created.json());
-  expect((await request(`/api/posts/${id}`, {}, other, 'DELETE')).status).toBe(404);
-  await Promise.all([
-    request(`/api/posts/${id}/like`, {}, other, 'PUT'),
-    request(`/api/posts/${id}/like`, {}, other, 'PUT'),
-  ]);
-  const feedSchema = z.object({
-    items: z.array(
-      z.object({
-        id: z.string(),
-        body: z.string(),
-        likeCount: z.number(),
-        liked: z.boolean(),
-        author: z
-          .object({ id: z.string(), name: z.string(), image: z.string().nullable() })
-          .strict(),
-      }),
-    ),
-  });
-  const feed = feedSchema.parse(
-    await (await appRequest('/api/posts', { headers: { cookie: other } })).json(),
-  );
-  expect(feed.items.find((item) => item.id === id)).toMatchObject({
-    body: '今日もいい日でした。',
-    likeCount: 1,
-    liked: true,
-  });
-  const guestFeed = feedSchema.parse(await (await appRequest('/api/posts')).json());
-  expect(guestFeed.items.find((item) => item.id === id)).toMatchObject({
-    likeCount: 1,
-    liked: false,
-  });
-  const author = feed.items.find((item) => item.id === id)?.author;
-  expect(author).toBeDefined();
-  const publicProfile = await appRequest(`/api/users/${author?.id}`);
+  const publicProfile = await appRequest(`/api/users/${first.user.id}`);
   expect(publicProfile.status).toBe(200);
-  expect(await publicProfile.json()).toEqual({
+  const profileJson: unknown = await publicProfile.json();
+  const author = z
+    .object({ user: z.object({ id: z.string(), name: z.string(), image: z.string().nullable() }) })
+    .parse(profileJson).user;
+  expect(profileJson).toEqual({
     user: { ...author, handle: null, bio: '', isPublic: true, ...noFollowsOrLikes },
   });
   expect((await appRequest('/api/me/profile')).status).toBe(401);
@@ -318,7 +286,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
       )
     ).status,
   ).toBe(200);
-  const privateProfile = await appRequest(`/api/users/${author?.id}`, { headers: { cookie } });
+  const privateProfile = await appRequest(`/api/users/${author.id}`, { headers: { cookie } });
   expect(privateProfile.status).toBe(200);
   expect(await privateProfile.json()).toEqual({
     user: {
@@ -346,11 +314,11 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     (await request('/api/me/profile', { faceType: 'round_yellow' }, cookie, 'PATCH')).status,
   ).toBe(400);
   expect(await myFaceType()).toBe('round');
-  const afterFaceType = await appRequest(`/api/users/${author?.id}`, { headers: { cookie } });
+  const afterFaceType = await appRequest(`/api/users/${author.id}`, { headers: { cookie } });
   expect(await afterFaceType.json()).not.toHaveProperty('user.faceType');
   expect((await request('/api/me/profile', { faceType: null }, cookie, 'PATCH')).status).toBe(200);
   expect(await myFaceType()).toBeNull();
-  const afterPartialUpdate = await appRequest(`/api/users/${author?.id}`, { headers: { cookie } });
+  const afterPartialUpdate = await appRequest(`/api/users/${author.id}`, { headers: { cookie } });
   expect(await afterPartialUpdate.json()).toEqual({
     user: {
       ...author,
@@ -361,10 +329,10 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
       ...noFollowsOrLikes,
     },
   });
-  expect((await appRequest(`/api/users/${author?.id}`)).status).toBe(404);
-  expect(
-    (await appRequest(`/api/users/${author?.id}`, { headers: { cookie: other } })).status,
-  ).toBe(404);
+  expect((await appRequest(`/api/users/${author.id}`)).status).toBe(404);
+  expect((await appRequest(`/api/users/${author.id}`, { headers: { cookie: other } })).status).toBe(
+    404,
+  );
   expect(
     (
       await request(
@@ -376,15 +344,12 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     ).status,
   ).toBe(409);
   expect((await appRequest('/api/users/missing-sample-user')).status).toBe(404);
-  expect((await request('/api/posts', { body: ' '.repeat(5) }, cookie)).status).toBe(400);
   expect((await request('/api/auth/update-user', { name: 'x'.repeat(41) }, cookie)).status).toBe(
     400,
   );
-  expect((await request(`/api/posts/${id}/like`, {}, other, 'DELETE')).status).toBe(200);
-  expect((await request(`/api/posts/${id}`, {}, cookie, 'DELETE')).status).toBe(200);
   expect((await request('/api/auth/sign-out', {}, cookie)).status).toBe(200);
   expect((await appRequest('/api/me', { headers: { cookie } })).status).toBe(401);
-  expect((await request('/api/posts', { body: 'expired session' }, cookie)).status).toBe(401);
+  expect((await request('/api/me/profile', { name: '失効後' }, cookie, 'PATCH')).status).toBe(401);
 }, 20000);
 
 test('passkeys require a session to register, verify signatures/origin, and can be removed', async () => {
