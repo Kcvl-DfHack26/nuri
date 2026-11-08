@@ -55,7 +55,7 @@ type TrackerProps = {
 };
 const mockTracker: { props: TrackerProps | null } = { props: null };
 const mockRequestCamera = jest.fn<Promise<boolean>, []>();
-const mockSnapshot = jest.fn<Promise<string | null>, []>();
+const mockSnapshot = jest.fn<Promise<(typeof landmarks & { uri: string }) | null>, []>();
 // Lets the test send frames and statuses like the native view.
 jest.mock('../../modules/face-tracker/src/FaceTrackerView', () => ({
   __esModule: true,
@@ -159,9 +159,10 @@ test('explains when the photo cannot be taken or picked', async () => {
   expect(screen.getByRole('button', { name: '写真から診断' })).toBeEnabled();
 });
 
-test('diagnoses the live camera frame on screen and shows that frame on the result', async () => {
+test('diagnoses the saved camera frame with its own landmarks and shows it on the result', async () => {
+  const saved = { points: [0.4, 0.6], width: 90, height: 160 };
   mockRequestCamera.mockResolvedValue(true);
-  mockSnapshot.mockResolvedValue('file:///frame.jpg');
+  mockSnapshot.mockResolvedValue({ ...saved, uri: 'file:///frame.jpg' });
   diagnose.mockReturnValue({ kind: 'ok', faceType: 'oval', brow: null });
   await render(<Suggest />);
   await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
@@ -172,7 +173,10 @@ test('diagnoses the live camera frame on screen and shows that frame on the resu
     await Promise.resolve();
   });
   await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
-  expect(diagnose).toHaveBeenCalledWith(expect.objectContaining(landmarks));
+  // The landmarks of the saved frame, not the last ones the screen received.
+  await waitFor(() => {
+    expect(diagnose).toHaveBeenCalledWith(expect.objectContaining(saved));
+  });
   await waitFor(() => {
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/diagnosis',

@@ -29,12 +29,18 @@ export type FaceTrackerStatusEvent = {
 };
 
 /** Methods of a mounted FaceTrackerView. */
+/** A frame saved on the device with the landmarks found in it. */
+export type FaceSnapshot = FacePhotoLandmarks & {
+  /** The JPEG's file URI, mirrored like the preview. */
+  uri: string;
+};
+
 export type FaceTrackerViewRef = {
   /**
-   * Saves the frame of the landmarks sent last as a JPEG in the app's cache, mirrored like the
-   * preview; null when no face was found yet.
+   * Saves the last frame with a face as a JPEG in the app's cache and returns it with that frame's
+   * landmarks (upright and unmirrored, like onLandmarks); null when no face was found yet.
    */
-  takeSnapshotAsync(): Promise<string | null>;
+  takeSnapshotAsync(): Promise<FaceSnapshot | null>;
 };
 
 export type FaceTrackerViewProps = {

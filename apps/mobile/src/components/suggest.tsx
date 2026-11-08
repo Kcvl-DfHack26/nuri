@@ -154,8 +154,14 @@ export function Suggest() {
 
   async function openCamera() {
     setMessage(undefined);
+    const session = cameraSession.current;
     try {
-      if (!(await FaceTracker?.requestCameraPermissionAsync())) {
+      const granted = await FaceTracker?.requestCameraPermissionAsync();
+      // Leaving ⑬ while the permission was asked cancels opening the camera.
+      if (session !== cameraSession.current) {
+        return;
+      }
+      if (!granted) {
         setMessage('カメラを使う許可がありません。設定から許可してください');
         return;
       }
@@ -169,24 +175,25 @@ export function Suggest() {
   }
 
   async function diagnoseFrame() {
-    const outcome = outcomeOf(latest.current, undefined);
-    if ('message' in outcome) {
-      setMessage(outcome.message);
-      return;
-    }
     const session = cameraSession.current;
+    setMessage(undefined);
     setAnalyzing(true);
     try {
-      // Without a saved frame the result still opens, only without its photo.
+      // The saved frame is diagnosed with the landmarks found in it, so the result and its photo
+      // match. Without a saved frame the latest landmarks are diagnosed, only without a photo.
       const snapshot = await tracker.current?.takeSnapshotAsync().catch(() => null);
       if (session !== cameraSession.current) {
         return;
       }
-      const result = { ...outcome, photo: snapshot ?? undefined };
+      const outcome = outcomeOf(snapshot ?? latest.current, snapshot?.uri);
+      if ('message' in outcome) {
+        setMessage(outcome.message);
+        return;
+      }
       closeCamera();
-      setPhoto(result.photo);
-      setLast(result);
-      openResult(result);
+      setPhoto(outcome.photo);
+      setLast(outcome);
+      openResult(outcome);
     } finally {
       setAnalyzing(false);
     }

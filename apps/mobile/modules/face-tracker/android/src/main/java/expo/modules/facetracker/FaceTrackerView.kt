@@ -77,10 +77,11 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private var lastStatus: String? = null
   private var lastMessage: String? = null
 
-  // Frames sent to MediaPipe by timestamp, and the one whose landmarks were sent last, kept only so
-  // a snapshot shows the same frame that was diagnosed.
+  // Frames sent to MediaPipe by timestamp, and the last frame with a face together with its
+  // landmarks, kept only so a snapshot and the landmarks it is diagnosed with come from one frame.
   private val pendingFrames = ConcurrentSkipListMap<Long, Bitmap>()
-  @Volatile private var landmarkedFrame: Bitmap? = null
+  private class LandmarkedFrame(val bitmap: Bitmap, val points: List<Double>)
+  @Volatile private var landmarkedFrame: LandmarkedFrame? = null
   @Volatile private var frameWidth = 0
   @Volatile private var frameHeight = 0
 
@@ -188,20 +189,27 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   }
 
   /**
-   * Saves the frame of the landmarks sent last as a JPEG in the app's cache and returns its file
-   * URI, or null when no face was found yet. It is mirrored like the preview, so it looks as the
-   * person saw it. Older snapshots are deleted once it is written, so at most one stays on the
+   * Saves the last frame with a face as a JPEG in the app's cache and returns its file URI with
+   * that frame's landmarks, or null when no face was found yet. The photo is mirrored like the
+   * preview, so it looks as the person saw it; the landmarks stay upright and unmirrored, like
+   * onLandmarks. Older snapshots are deleted once it is written, so at most one stays on the
    * device. Nothing is sent anywhere.
    */
-  fun snapshot(): String? {
-    val upright = landmarkedFrame ?: return null
+  fun snapshot(): Map<String, Any>? {
+    val landmarked = landmarkedFrame ?: return null
+    val upright = landmarked.bitmap
     val mirror = Matrix().apply { preScale(-1f, 1f) }
     val frame = Bitmap.createBitmap(upright, 0, 0, upright.width, upright.height, mirror, true)
     val folder = File(context.cacheDir, "face-tracker").apply { mkdirs() }
     val file = File(folder, "${UUID.randomUUID()}.jpg")
     file.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 85, it) }
     folder.listFiles()?.filter { it != file }?.forEach { it.delete() }
-    return Uri.fromFile(file).toString()
+    return mapOf(
+      "uri" to Uri.fromFile(file).toString(),
+      "points" to landmarked.points,
+      "width" to upright.width.toDouble(),
+      "height" to upright.height.toDouble()
+    )
   }
 
   // Analysis thread.
@@ -331,8 +339,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val frame = pendingFrames.remove(result.timestampMs())
     pendingFrames.headMap(result.timestampMs()).clear()
     val face = result.faceLandmarks().firstOrNull()
-    landmarkedFrame = if (face.isNullOrEmpty()) null else frame
     if (face.isNullOrEmpty()) {
+      landmarkedFrame = null
       post {
         if (result.timestampMs() > discardResultsBeforeMs) setStatus("noFace")
       }
@@ -343,6 +351,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       points.add(landmark.x().toDouble())
       points.add(landmark.y().toDouble())
     }
+    if (frame != null) landmarkedFrame = LandmarkedFrame(frame, points)
     val latencyMs = (SystemClock.uptimeMillis() - result.timestampMs()).toDouble()
     val width = frameWidth.toDouble()
     val height = frameHeight.toDouble()
@@ -371,6 +380,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     // About 5 s at 30 fps: long enough for a GPU to prepare its first result, while a slow but
     // working GPU (the emulator's, about 0.5 s per result) answers within a dozen frames.
     const val GPU_SILENT_FRAME_LIMIT = 150
-    const val MAX_PENDING_FRAMES = 4
+    // Enough for the frames sent while a slow CPU result (about 0.5 s on the emulator) is pending.
+    const val MAX_PENDING_FRAMES = 8
   }
 }
