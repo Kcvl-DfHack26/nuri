@@ -40,7 +40,13 @@ jest.mock('expo-file-system', () => ({
 }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  router: {
+    back: jest.fn(),
+    push: jest.fn(),
+    replace: jest.fn(),
+    navigate: jest.fn(),
+    canGoBack: () => true,
+  },
   useFocusEffect: () => {},
   useIsFocused: () => true,
   useLocalSearchParams: jest.fn(),
@@ -340,6 +346,32 @@ test('shows the face type, the brows and recipes for that face type first', asyn
   expect(cards[0]).toHaveProp('accessibilityLabel', '丸顔メイク、mio、丸顔向け');
   await fireEvent.press(screen.getByRole('button', { name: '狐メイク、mio' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
+});
+
+test('fills the recommendations with up to ten recipes and opens the full list', async () => {
+  params.mockReturnValue({ face: 'round', eye: 'droopy', midface: 'short', brow: 'falling' });
+  // Twelve newest recipes; the last one is the only one tagged for a round face.
+  const items = Array.from({ length: 12 }, (_, index) => ({
+    id: `recipe-${index}`,
+    title: `メイク${index}`,
+    image: `/sample-recipes/${index}.jpg`,
+    tags: index === 11 ? ['丸顔向け'] : [],
+    likeCount: 0,
+    author: { id: 'sample-mio', name: 'mio' },
+  }));
+  mockGetRecipes.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ items, nextOffset: null }),
+  });
+  await render(<Diagnosis />, { wrapper: TestQueryProvider });
+
+  const cards = await screen.findAllByRole('button', { name: /^メイク\d+、mio/ });
+  expect(cards).toHaveLength(10);
+  expect(cards[0]).toHaveProp('accessibilityLabel', 'メイク11、mio、丸顔向け');
+  expect(cards[1]).toHaveProp('accessibilityLabel', 'メイク0、mio');
+
+  await fireEvent.press(screen.getByRole('button', { name: 'おすすめメイクをすべて見る' }));
+  expect(router.navigate).toHaveBeenCalledWith('/');
 });
 
 test('says when no diagnosis was made and goes back', async () => {

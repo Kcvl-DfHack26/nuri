@@ -175,6 +175,9 @@ export function Diagnosis() {
   );
 }
 
+// Enough cards to swipe through; all fit in the first page of the recipe list.
+const recommendationCount = 10;
+
 // Recipes tagged for this face type come first; the rest of the newest recipes fill the row.
 function Recommendations({ faceType }: { faceType: FaceType }) {
   const list = useInfiniteQuery({ ...recipeListOptions(), enabled: Boolean(apiUrl) });
@@ -183,21 +186,24 @@ function Recommendations({ faceType }: { faceType: FaceType }) {
   const recipes = [
     ...items.filter((recipe) => recipe.tags.includes(tag)),
     ...items.filter((recipe) => !recipe.tags.includes(tag)),
-  ].slice(0, 3);
+  ].slice(0, recommendationCount);
   return (
     <View className="gap-2.5">
       <View className="flex-row items-center justify-between px-5">
         <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
           おすすめメイク!!
         </Text>
-        <View
-          accessible
+        <Pressable
           accessibilityRole="button"
-          accessibilityLabel="おすすめメイクをすべて見る（準備中）"
-          accessibilityState={{ disabled: true }}
+          accessibilityLabel="おすすめメイクをすべて見る"
+          className="min-h-12 justify-center pl-3 active:opacity-70"
+          onPress={() => {
+            // ① lists every whole-face recipe, newest first.
+            router.navigate('/');
+          }}
         >
           <Text className="font-maru-bold text-label text-accent-rose">すべて見る</Text>
-        </View>
+        </Pressable>
       </View>
       {!apiUrl ? (
         <View className="px-5">
