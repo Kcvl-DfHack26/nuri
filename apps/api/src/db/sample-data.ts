@@ -3,6 +3,19 @@ import { eq } from 'drizzle-orm';
 
 import type { Database } from './client';
 
+import {
+  browShapes,
+  catEyeShape,
+  catLinerShape,
+  foxCheekShape,
+  foxEyeShape,
+  foxLinerShape,
+  foxShadingShape,
+  koreanBaseShape,
+  koreanCheekShape,
+  koreanHighlightShape,
+  koreanLipShape,
+} from './sample-shapes';
 import { like, post, product, recipe, recipeProduct, recipeStep, user } from './schema';
 
 // Development sample data. Every row has a stable ID and is upserted, so running the seed again
@@ -89,6 +102,7 @@ const foxSteps: SeedStep[] = [
     hint: 'スクリューブラシで眉頭の毛を立てる',
     product: 'アイブロウ（微アーチ眉）',
     colors: ['#79513A'],
+    shape: browShapes.softArch,
   },
   {
     part: 'eye',
@@ -97,6 +111,7 @@ const foxSteps: SeedStep[] = [
     hint: '中間・締め色は目頭側へ薄く',
     product: 'アイシャドウ（ベース・中間・締め）',
     colors: ['#E5B58A', '#C56D42', '#713E2C'],
+    shape: foxEyeShape,
   },
   {
     part: 'lash',
@@ -105,6 +120,7 @@ const foxSteps: SeedStep[] = [
     hint: '目尻は斜め上に跳ね上げ三角を埋める',
     product: 'アイライン',
     colors: ['#38251D'],
+    shape: foxLinerShape,
   },
   {
     part: 'shading',
@@ -113,6 +129,7 @@ const foxSteps: SeedStep[] = [
     hint: '外側から内側へ境目を馴染ませる',
     product: 'シェーディング',
     colors: ['#A17B60'],
+    shape: foxShadingShape,
   },
   {
     part: 'cheek',
@@ -121,13 +138,92 @@ const foxSteps: SeedStep[] = [
     hint: '頬骨の高い位置から丸く広げない',
     product: 'チーク',
     colors: ['#B8754F'],
+    shape: foxCheekShape,
+  },
+];
+
+// Sample steps so the seeded recipes cover every part. Texts and colors are sample values.
+const catSteps: SeedStep[] = [
+  {
+    part: 'brow',
+    label: '眉',
+    title: '眉尻まで同じ太さでまっすぐ',
+    hint: '眉山は作らずにすっきりと',
+    product: 'アイブロウ（ストレート眉）',
+    colors: ['#5E4636'],
+    shape: browShapes.straight,
+  },
+  {
+    part: 'eye',
+    label: 'シャドウ',
+    title: '目尻の外側だけに締め色',
+    hint: '下まぶたの目尻にも少し入れる',
+    product: 'アイシャドウ（締め色）',
+    colors: ['#B88B78', '#8A5A52', '#4F3330'],
+    shape: catEyeShape,
+  },
+  {
+    part: 'lash',
+    label: 'ライン',
+    title: '目尻から長く跳ね上げる',
+    hint: 'まぶたを閉じて角度を確かめる',
+    product: 'アイライン',
+    colors: ['#1F1717'],
+    shape: catLinerShape,
+  },
+];
+
+const koreanSteps: SeedStep[] = [
+  {
+    part: 'base',
+    label: 'ベース',
+    title: '顔の中心から薄く広げる',
+    hint: '輪郭は塗らずにぼかすだけ',
+    product: 'クッションファンデ',
+    colors: ['#F1D3BF'],
+    shape: koreanBaseShape,
+  },
+  {
+    part: 'highlight',
+    label: 'ハイライト',
+    title: '鼻筋と頬の高い位置に光',
+    hint: '指でぽんぽんと置く',
+    product: 'ハイライト',
+    colors: ['#FFF1DE'],
+    shape: koreanHighlightShape,
+  },
+  {
+    part: 'cheek',
+    label: 'チーク',
+    title: '頬の中心に丸く',
+    hint: '笑ったときに高くなる位置',
+    product: 'チーク',
+    colors: ['#F2A5A8'],
+    shape: koreanCheekShape,
+  },
+  {
+    part: 'lip',
+    label: 'リップ',
+    title: '内側を濃く、外へぼかす',
+    hint: '輪郭はとらずに指でなじませる',
+    product: 'リップティント',
+    colors: ['#D9475B'],
+    shape: koreanLipShape,
   },
 ];
 
 // ③'s brow styles, one step each. Their photos are cells of Plan A's brow style sheet. Plan A
 // recommends アーチ眉 for round faces (#47); the other tags are sample values.
-function browStep(title: string, hint: string): SeedStep {
-  return { part: 'brow', label: '眉', title, hint, product: 'アイブロウ', colors: ['#79513A'] };
+function browStep(title: string, hint: string, shape: SeedStep['shape']): SeedStep {
+  return {
+    part: 'brow',
+    label: '眉',
+    title,
+    hint,
+    product: 'アイブロウ',
+    colors: ['#79513A'],
+    shape,
+  };
 }
 // Newest first, in Plan A's ① order. Only fox has Plan A detail data; the other tags,
 // durations, sources and counts are sample values.
@@ -166,7 +262,7 @@ const recipes = [
     likeCount: 1200,
     source: 'instagram' as const,
     products: [],
-    steps: [],
+    steps: catSteps,
   },
   {
     id: 'long',
@@ -199,7 +295,7 @@ const recipes = [
     likeCount: 3400,
     source: 'tiktok' as const,
     products: [],
-    steps: [],
+    steps: koreanSteps,
   },
   {
     id: 'brow-straight-flat',
@@ -212,7 +308,7 @@ const recipes = [
     likeCount: 96,
     source: null,
     products: [],
-    steps: [browStep('眉山を作らず平行に描く', '眉頭から眉尻まで高さをそろえる')],
+    steps: [browStep('眉山を作らず平行に描く', '眉頭から眉尻まで高さをそろえる', browShapes.flat)],
   },
   {
     id: 'brow-soft-arch',
@@ -225,7 +321,7 @@ const recipes = [
     likeCount: 412,
     source: null,
     products: [],
-    steps: [browStep('眉山をほんの少しだけ上げる', '眉尻は眉頭より下げない')],
+    steps: [browStep('眉山をほんの少しだけ上げる', '眉尻は眉頭より下げない', browShapes.softArch)],
   },
   {
     id: 'brow-arch',
@@ -238,7 +334,9 @@ const recipes = [
     likeCount: 188,
     source: null,
     products: [],
-    steps: [browStep('眉山をなだらかな弧でつなぐ', '眉頭は淡く、眉山から眉尻へ細くする')],
+    steps: [
+      browStep('眉山をなだらかな弧でつなぐ', '眉頭は淡く、眉山から眉尻へ細くする', browShapes.arch),
+    ],
   },
   {
     id: 'brow-straight',
@@ -251,7 +349,13 @@ const recipes = [
     likeCount: 73,
     source: null,
     products: [],
-    steps: [browStep('眉頭から眉尻へまっすぐ描く', '下側のラインをそろえて直線にする')],
+    steps: [
+      browStep(
+        '眉頭から眉尻へまっすぐ描く',
+        '下側のラインをそろえて直線にする',
+        browShapes.straight,
+      ),
+    ],
   },
   {
     id: 'brow-rising',
@@ -264,7 +368,9 @@ const recipes = [
     likeCount: 254,
     source: null,
     products: [],
-    steps: [browStep('眉尻に向かって角度をつける', '眉山を外側に置き、縦の印象を足す')],
+    steps: [
+      browStep('眉尻に向かって角度をつける', '眉山を外側に置き、縦の印象を足す', browShapes.rising),
+    ],
   },
   {
     id: 'brow-falling',
@@ -277,7 +383,7 @@ const recipes = [
     likeCount: 61,
     source: null,
     products: [],
-    steps: [browStep('眉尻をやや下げて描く', '眉頭はふんわり、眉尻は細く')],
+    steps: [browStep('眉尻をやや下げて描く', '眉頭はふんわり、眉尻は細く', browShapes.falling)],
   },
 ];
 
