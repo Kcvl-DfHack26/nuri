@@ -51,6 +51,26 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 8. メールの単回リンク、失効・他端末の拒否、パスキー登録・ログイン・削除を確認する。Expo Goではnative passkeyが利用不可であることを表示する。
 9. API停止時のエラーと再試行。OS関連付け・実プロバイダでの認証はローカルEmulate／仮想WebAuthnの検証と別に記録する。
 
+## Expo WebのE2E
+
+Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgreSQLを経由してサンプルレシピを読む。ChromiumとWebKitでスマートフォン・横向きタブレットの一覧、URL直アクセス、手順と完成、比較のドラッグを検査する。Chromiumではカメラ拒否後の見本と、仮想カメラの開始・停止も検査する。CIでは既存の使い捨てPostgreSQLサービスを使い、失敗時にPlaywrightのトレースを保存する。
+
+ローカルでは次のように専用DBを起動する。停止するとこのコンテナのデータは消える。
+
+```sh
+docker run --rm --publish 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data \
+  -e POSTGRES_USER=nuri_e2e -e POSTGRES_PASSWORD=nuri_e2e postgres:17.7-bookworm
+```
+
+DBが起動したら別のターミナルで実行する。
+
+```sh
+bunx playwright install --no-shell chromium webkit
+bun run test:e2e
+```
+
+テストはDBへmigrationとseedを実行し、APIを49116、Webを49117で起動する。別の使い捨てローカルDBを使う場合は `NURI_E2E_DATABASE_URL` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
+
 ## Maestro
 
 `apps/mobile/.maestro/showcase.yaml` が未ログイン時のホーム・プロフィール・設定フローを検証する。開発サーバーを必要としないpreview/simulatorビルドで実行する。

@@ -52,6 +52,19 @@ jobs:
         env:
           DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
         run: bun run --cwd apps/api db:migrate && bun run --cwd apps/api test:integration
+      - name: Install browsers for Web E2E
+        run: bunx playwright install --with-deps --no-shell chromium webkit
+      - name: Test Expo Web with the API
+        env:
+          NURI_E2E_DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
+        run: bun run test:e2e
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: web-e2e-traces
+          path: .artifacts/playwright
+          if-no-files-found: ignore
+          retention-days: 7
   mobile-bundle:
     runs-on: ubuntu-latest
     env:
