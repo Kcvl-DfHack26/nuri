@@ -847,6 +847,40 @@ test('says why the area cannot be shown', async () => {
   expect(screen.getByText('この環境では塗る範囲を表示できません')).toBeOnTheScreen();
 });
 
+test('deletes a step on ⑫-5 after asking and returns to ⑫-4', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="0" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  const steps = () => latest?.steps ?? [];
+  await fireEvent.press(screen.getByRole('button', { name: 'この手順を削除' }));
+  expect(alert.mock.calls.at(-1)?.[0]).toBe('この手順を削除しますか？');
+  await pressAlertButton('キャンセル');
+  expect(steps()).toHaveLength(2);
+  await fireEvent.press(screen.getByRole('button', { name: 'この手順を削除' }));
+  await pressAlertButton('削除');
+  // The cheek step is left, with its own segment; the brow's time is covered by no step.
+  expect(steps().map((step) => [step.part, step.segment])).toEqual([
+    ['cheek', { startMs: 65_000, endMs: 125_000 }],
+  ]);
+  expect(router.back).toHaveBeenCalled();
+});
+
+test('keeps the last step of a recipe', async () => {
+  await renderSeeded(<PostStepEdit index="0" />, {
+    ...readyDraft,
+    steps: (readyDraft.steps ?? []).slice(0, 1),
+  });
+  expect(screen.getByRole('button', { name: 'この手順を削除' })).toBeDisabled();
+});
+
 test('asks before posting and sends the steps and thumbnail, never the video', async () => {
   const { invalidate } = await renderSeeded(<PostPreview />);
   expect(screen.getByText('狐メイク')).toBeOnTheScreen();
