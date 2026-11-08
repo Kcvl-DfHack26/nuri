@@ -2,9 +2,9 @@
 
 nuriのGitHubは [Kcvl-DfHack26/nuri](https://github.com/Kcvl-DfHack26/nuri)、Expoは [@kcvlb4/nuri](https://expo.dev/accounts/kcvlb4/projects/nuri)。Expo project IDは `78c53f89-e14a-4458-b16e-fe31cea9381d`。
 
-この文書はスターター（[ReoHakase/expo-hono-opentofu-starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)、2026年11月6日）の手順を引き継いでいる。「完了済み」「登録済み」やtoken名はスターターでの記録で、nuriのGitHub・Expo・Google Cloudでの設定状況は未確認。
+この文書は[スターター](https://github.com/ReoHakase/expo-hono-opentofu-starter)の手順を引き継いでいる。nuriの共有APIはGoogle Cloudプロジェクト `kcvlb4` の `nuri-staging`。公開サービスとDBを共有しているため、この文書では本番として扱う。
 
-Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel EmulateでGoogle／Apple OAuthとメールを試せる。[認証とseed](auth.md)を参照。クラウドの初期構築にはログイン済みのGoogleアカウントと課金を有効化したプロジェクト、CIにはWorkload Identity Federationを使う。長期のサービスアカウントJSONキーは作らない。
+Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel EmulateでGoogle／Apple OAuthとメールを試せる。[認証とseed](auth.md)を参照。本番を変更する GitHub Actions は Workload Identity Federation（WIF）を使う。
 
 ## 1. cloneとworktreeの準備
 
@@ -55,7 +55,17 @@ foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存�
 
 **API・Metroをplainな `docker compose up` で作り直すとPortlessのポート割当が失われるため、起動・再作成・終了は `portless compose` を使う。** `logs`、`exec`、`ps`、`restart` は通常のComposeでも使える。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。
 
-`setup` は既存アプリenvとsecretを保持する。ルート `.env` はCompose用の生成設定専用。トンネルURL等は `apps/api/.env` / `apps/mobile/.env` に置く。ローカルDBの `DATABASE_URL` はComposeが注入する。CI/Cloud Runでは明示した `DATABASE_URL` を使い、`bun run --cwd apps/api db:migrate` / `bun run --cwd apps/api test:integration` を直接実行する。
+### 開発用の環境変数
+
+ホストにBunがある場合は `bun run setup` で先に作成できる。Composeから起動する場合も同じ初期化が走る。既存のアプリ設定は保持する。
+
+| ファイル           | ローカル開発の設定                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env`             | worktreeのmount先。`scripts/worktree-init.sh` が生成する                                                                              |
+| `apps/api/.env`    | worktree固有の `BETTER_AUTH_SECRET` を生成する。`DATABASE_URL` と `BETTER_AUTH_URL` は空欄にし、ComposeのPostgreSQLとAPI originを使う |
+| `apps/mobile/.env` | `EXPO_PUBLIC_API_URL` は空欄にし、ComposeのAPIへ接続する。実機から自分のAPIを使う場合は到達可能なHTTPS URLを設定する                  |
+
+3ファイルはGit管理外。Google・Apple・メールはローカルの認証エミュレーターを使う。公開APIへの接続が必要な確認では、Expoのdevelopment環境に登録した公開URLを使う。[Expo GitHub連携・環境変数](#expo-github連携環境変数)
 
 ### Dev Containerで編集・検査する
 
@@ -271,29 +281,105 @@ gh secret set EXPO_TOKEN --env preview
 
 `apps/mobile/.eas/workflows/native-builds.yml` は手動でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら `ios_profile=development-simulator`（Simulator）または `development`（実機）、Androidは `android_profile=development` を選ぶ。iOS実機用にはApple署名が必要。本番は従来どおり、APIデプロイ成功後だけ `production-update.yml` を呼び出す。両方ともExpo Workflows側の実行となる。
 
-Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出は自動実行しない。初期設定のビルド・端末確認記録は [検証](testing.md) を参照する。
-
-## 4. Google Cloudの準備（認証情報が用意できてから）
-
-### プロジェクト・課金・ローカル認証
-
-Google Cloud Consoleでプロジェクトを作成して課金アカウントを接続する。初期構築担当には、API有効化、IAM/サービスアカウント、Cloud SQL、Run、Secret Manager、Storage、Artifact Registryを作成できる権限が必要。組織ポリシーでpublic Cloud RunやWIFが禁止されている場合は管理者側の設定が必要。
+`@kcvlb4/nuri` のdevelopment環境には、共有APIの `EXPO_PUBLIC_API_URL` が登録されている。依存導入済みのworktreeで、Expo CLIのログインと設定を確認できる。
 
 ```sh
-gcloud auth login --no-launch-browser
-gcloud auth application-default login --no-launch-browser
-gcloud config set project YOUR_PROJECT_ID
-gcloud auth application-default set-quota-project YOUR_PROJECT_ID
-gcloud services enable serviceusage.googleapis.com cloudresourcemanager.googleapis.com storage.googleapis.com
+cd apps/mobile
+bunx eas whoami
+bunx eas project:info
+bunx eas env:list development --format short
 ```
 
-認証済みGCPプロジェクトへの変更はこの手順以降で発生し、Cloud SQL等に料金がかかる。`kcvlb4` の `nuri-staging` は2026年11月7日に作成した。別環境で再実行する前に既存のstateとリソースを確認する。
+CLIが未認証なら `bunx eas login` を実行する。公開APIで実機を確認するときだけ、development環境の `EXPO_PUBLIC_API_URL` を `apps/mobile/.env` に設定する。ローカルAPIに戻すときは空欄に戻す。`eas env:pull` の既定出力 `.env.local` はアプリの `.env` より優先されるため、確認用に取得する場合は `--path` でアプリの外に保存する。[Expoの環境変数](https://docs.expo.dev/eas/environment-variables/manage/)
 
-### 適用の時期・規模・費用
+Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出は自動実行しない。初期設定のビルド・端末確認記録は [検証](testing.md) を参照する。
+
+## 4. Google CloudとOpenTofu
+
+### ローカルのCLIを設定する
+
+Dev Containerにはgcloud、OpenTofu 1.13.8、TFLintが入っている。ホストで使う場合は、[Google Cloud CLI](https://docs.cloud.google.com/sdk/docs/install-sdk)と[OpenTofu 1.13.8](https://github.com/opentofu/opentofu/releases/tag/v1.13.8)をインストールする。Google Cloud Consoleのブラウザログインとは別にCLIのログインが必要。`kcvlb4` を閲覧できるGoogleアカウントを選ぶ。
+
+```sh
+gcloud config configurations create nuri-kcvlb4 --no-activate
+gcloud --configuration=nuri-kcvlb4 auth login
+gcloud --configuration=nuri-kcvlb4 config set project kcvlb4
+gcloud --configuration=nuri-kcvlb4 config set run/region asia-northeast1
+gcloud --configuration=nuri-kcvlb4 run services describe nuri-staging --format='value(status.url)'
+```
+
+設定が既にあれば作成は省く。名前付き設定をコマンドごとに指定すると、他のリポジトリで使うgcloudの既定プロジェクトに影響しない。この設定は `describe`、ログ、公開URLの確認に使う。開発者のGCP権限も閲覧に絞る。ローカルのOpenTofuは認証なしで検証できる。
+
+```sh
+tofu fmt -check -recursive infra
+tofu -chdir=infra init -backend=false -lockfile=readonly
+tofu -chdir=infra validate
+tofu -chdir=infra/bootstrap init -backend=false -lockfile=readonly
+tofu -chdir=infra/bootstrap validate
+tflint --init
+tflint --chdir=infra --config="$PWD/.tflint.hcl"
+tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
+```
+
+ローカルで本番のGCS backendへ接続する設定やADCを作る必要はない。独立した開発用GCPプロジェクトでADCが必要な場合は、そのプロジェクトに絞った開発用の権限を使う。[Google CloudのADC](https://docs.cloud.google.com/docs/terraform/authentication)
+
+### 本番のOpenTofuをGitHub Actionsで適用する
+
+`kcvlb4` の `nuri-staging`、Cloud SQL、Secret Manager、GCS stateは本番扱い。ローカルでの `tofu apply`／`destroy`、`gcloud` による公開設定・トラフィック・secretの変更は禁止する。インフラ変更は **Manage production infrastructure**、アプリ配信は **Deploy API, Expo Web and mobile update** を使う。2つのワークフローは同じconcurrency groupを使う。
+
+**Manage production infrastructure** は、push時のCIに成功した最新の `main` から手動実行する。既定の `plan` で差分を確認し、承認を得て `apply` を実行する。`apply` はその実行内でplanを取り直し、削除・置換を含む場合は停止する。既存の `gs://kcvlb4-tofu-state/nuri/staging` を使うため、初回構築・state移行・廃止は管理者が別の手順をレビューし、承認済みのGitHub Actionsで行う。
+
+```sh
+gh workflow run infra-production.yml --ref main -f operation=plan
+# planをレビューしてから実行する
+gh workflow run infra-production.yml --ref main -f operation=apply
+```
+
+稼働開始前に、管理者が承認済みの管理用GitHub Actionsから以下を用意する。既存のアプリ配信用サービスアカウントには、OpenTofuの適用権限を付けない。
+
+- IaC専用のWIF pool／providerとサービスアカウント。別poolに分け、OIDCの条件でリポジトリID `1447386190`、`refs/heads/main`、`production` Environment、`Kcvl-DfHack26/nuri/.github/workflows/infra-production.yml@refs/heads/main` を照合する。GitHub Environmentの許可ブランチは `main`。本番のリソース変更はActionsのサービスアカウントに限定する。[Google Cloudのデプロイパイプライン用WIF](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines)
+- IaC用アカウントには、対象のstateをロック・更新するGCS権限と、`infra/` が管理するGCPリソースの変更に必要な権限を付ける。既存DBパスワードは `nuri-staging-database-url` のSecret Manager参照からrunner内で渡す。このsecretだけに `roles/secretmanager.secretAccessor` を付ける。DBパスワードはGitHub変数・ファイル・stateに転記しない。
+- GitHubの `production` Environmentに `TOFU_WORKLOAD_IDENTITY_PROVIDER`（providerの完全なリソース名）、`TOFU_SERVICE_ACCOUNT`（専用アカウントのメール）、`TOFU_VARIABLES_JSON`（既存環境のsecretを含まないOpenTofu入力）を設定する。JSONでは `deploy_application` と `deletion_protection` を `true`、`image` をdigest付き、`api_origin` を正規の公開URLにする。`database_password_version`、DBのtier、OAuth・メール有効化と送信元、許可originは、既存の入力と照合する。project、region、service、GitHubリポジトリはワークフローが固定する。
+
+### CIからのデプロイを有効にする
+
+GitHub Environment `production` には、`kcvlb4` のサービスとmigration Job、配信用WIFが登録されている。[GitHub Actionsの設定](#github-actions)に変数一覧がある。`GCP_DEPLOY_ENABLED=true` なら、mainのCI成功後に「Expo Webを同梱するイメージの作成 → migration Job → candidateの `/ready` とWeb配信の検査 → トラフィック切替」を実行する。手動で配信する場合も同じActionsを使う。
+
+```sh
+gh workflow run deploy.yml --ref main
+```
+
+OpenTofuでサービス設定を変えて新しいrevisionができた場合も、トラフィックの切替はこの配信フローを使う。`EXPO_UPDATE_ENABLED=true` の場合、APIの確認後にGitHub ActionsがExpoの本番Updateを呼び出す。本番のOAuthやメール設定を変更するときは、[認証設定](auth.md#android仮想端末でgoogleとメールを試す51)を参照する。
+
+### Webを開く
+
+```sh
+API_ORIGIN=$(gcloud --configuration=nuri-kcvlb4 run services describe nuri-staging --format='value(status.url)')
+bash scripts/check-expo-web.sh "$API_ORIGIN"
+```
+
+Cloud Runの既定HTTPS URLをブラウザで開く。Web同梱イメージの配備後は、同じホストの `/` がExpo Web、`/api/**` がHono、`/_expo/static/**` と `/assets/**` が静的ファイルになる。レシピ直リンクはSPAで開ける。将来のLP用 `/about/` は現時点では404を返す。WebはアクセスしたホストのAPIを使い、共有する正規URLはOpenTofuの `api_origin` と揃える。Google OAuthのリダイレクト先は既存どおり正規URLの `/api/auth/callback/google` を使う。
+
+アプリから読むには、ExpoのEnvironment Variablesの `EXPO_PUBLIC_API_URL`（previewとproduction）に `service_uri` を設定する（[Expo GitHub連携・環境変数](#expo-github連携環境変数)）。
+
+2026年11月7日の初回公開では、このブランチのOpenTofu設定を適用してmigration jobとCloud Runサービスを作成した。その後、[mainのデプロイ](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42372457055)（`ce37dd2`）でmigration・candidateの `/ready`・トラフィック切替が成功した。CIはOpenTofuの変更を適用しないため、IaCの検証結果とは分けて扱う。実サービスのstartup probeが `/ready` であることを確認し、`https://nuri-staging-v3kjfarita-an.a.run.app` の `/health`・`/ready`・`/api/recipes` が200で応答した。Expoのdevelopment・preview・production環境の `EXPO_PUBLIC_API_URL` もこのURLに設定した。Androidエミュレーターの開発ビルドでメイク画面の空状態を確認し、Cloud Runのログでアプリからの `GET /api/recipes?offset=0` が200で応答した。iOS実機は未確認。DBはmigrationのみで、レシピ一覧は空。開発用seedを本番DBへ実行せず、アプリでレシピを表示するためのデータは #30 の方針に従って用意する。
+
+### 稼働の確認
+
+```sh
+API_ORIGIN=$(gcloud --configuration=nuri-kcvlb4 run services describe nuri-staging --format='value(status.url)')
+curl --fail "$API_ORIGIN/health"
+curl --fail "$API_ORIGIN/ready"
+curl --fail "$API_ORIGIN/api/recipes"
+gcloud --configuration=nuri-kcvlb4 run services describe nuri-staging --format='yaml(status.traffic)'
+gcloud --configuration=nuri-kcvlb4 logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="nuri-staging"' --limit=50
+gcloud --configuration=nuri-kcvlb4 run jobs executions list --job=nuri-staging-migrate --limit=5
+```
+
+### 現行環境の規模と費用
 
 nuriは作成済みのプロジェクト（クレジット約$40）を使う。
 
-- 時期：11月8〜9日に適用する。P0はレシピをサーバーのデータで出すため、11月10日19:00の提出時点でCloud RunのAPIが動いている必要がある。最初は `deploy_application=false` でCloud SQL等を作り、APIのイメージができたら `true` にする。
 - 規模：`infra/` の既定値のまま使う。Cloud SQLは `db-f1-micro`（共有コア、ZONAL、SSD 10GB）、Cloud Runは1 vCPU・512MiB・0〜3台。APIの接続プールは1台あたり5本なので、3台でも15本で `db-f1-micro` の上限25本に収まる。`db-f1-micro` はCloud SQLのSLAの対象外だが、審査のデモには足りる。
 - 止める時期：11月14日（Regional Day）の後。決勝に進んだら11月27日（Demo Day）の後。Cloud SQLは停止中もストレージとIPv4アドレスに課金されるため、残す必要がなければ削除する。手順は[止め方](#止め方)に書いた。クレジットの有効期限が先に来る場合は、その前に止める。
 
@@ -310,180 +396,9 @@ nuriは作成済みのプロジェクト（クレジット約$40）を使う。
 
 料金表：[Cloud SQL](https://cloud.google.com/sql/pricing)、[Cloud Run](https://cloud.google.com/run/pricing)、[Artifact Registry](https://cloud.google.com/artifact-registry/pricing)、[Secret Manager](https://cloud.google.com/secret-manager/pricing)。
 
-### State bucketのbootstrap
-
-```sh
-tofu -chdir=infra/bootstrap init
-tofu -chdir=infra/bootstrap plan -var='project_id=YOUR_PROJECT_ID'
-tofu -chdir=infra/bootstrap apply -var='project_id=YOUR_PROJECT_ID'
-```
-
-bootstrapのstateもbucketへ移す。`backend.tf` は生成ファイルとしてGit対象外。
-
-```sh
-cp infra/bootstrap/backend.tf.example infra/bootstrap/backend.tf
-tofu -chdir=infra/bootstrap init -migrate-state \
-  -backend-config='bucket=YOUR_PROJECT_ID-tofu-state' \
-  -backend-config='prefix=bootstrap'
-```
-
-### アプリ用リソースの作成
-
-```sh
-cp infra/backend.hcl.example infra/backend.hcl
-cp infra/terraform.tfvars.example infra/terraform.tfvars
-# bucket/project_id/region/nameを編集
-# github_repository_id はこのリポジトリでは 1447386190
-# フォークでは gh api repos/OWNER/REPO --jq .id で取得
-```
-
-stagingとproductionは別のstate prefix、resource name、認証secret、DBを使う。最初は例の `nuri-staging` / `nuri/staging` を作成する。productionを用意するときは別の作業コピーで `name=nuri-production`、prefix `nuri/production` を設定し、stagingのstateを上書きしない。
-
-```sh
-tofu -chdir=infra init -backend-config=backend.hcl
-# 一度生成した値はpassword managerへ保存し、以後のplan/applyでも同じ値を使用する
-export TF_VAR_database_password="$(openssl rand -hex 32)"
-tofu -chdir=infra plan
-tofu -chdir=infra apply
-```
-
-初回は `deploy_application=false`。Cloud SQL、DBユーザー、Artifact Registry、Secret Managerの器、WIF/IAMまで作成し、未準備のイメージをCloud Runへ起動しない。
-
-DBパスワードはephemeral/write-onlyのためstateに保存しない。次回は保存したパスワードを `TF_VAR_database_password` に設定する。ローテーション時は `database_password_version` も増やし、対応するSecret Manager値とアプリのrevisionも更新する。
-
-### IaCで管理しないsecretの値
-
-以下は自分のproject/nameへ置き換える。DB URLにはCloud SQLのUnix socketを使い、一般公開のDB接続許可は作らない。
-
-```sh
-export GCP_PROJECT=YOUR_PROJECT_ID
-export RESOURCE_NAME=nuri-staging
-SQL_CONNECTION=$(tofu -chdir=infra output -raw sql_connection_name)
-printf 'postgresql://expo-hono-opentofu-starter:%s@localhost/expo-hono-opentofu-starter?host=/cloudsql/%s' \
-  "$TF_VAR_database_password" "$SQL_CONNECTION" | \
-  gcloud secrets versions add "$RESOURCE_NAME-database-url" --project="$GCP_PROJECT" --data-file=-
-openssl rand -hex 32 | tr -d '\n' | \
-  gcloud secrets versions add "$RESOURCE_NAME-auth-secret" --project="$GCP_PROJECT" --data-file=-
-```
-
-値はstdoutへ出さずstdinで渡す。`.tfvars`、GitHub、ExpoへDBパスワードを転記しない。
-
-Google・メールのログインは、Google OAuthクライアントとResendの送信設定を用意した後に有効にする。OpenTofuでsecretの器を作り、各値をSecret Managerのバージョンへ入れてから、`google_oauth_enabled`・`email_login_enabled`と`email_from`を設定して再適用する。Android仮想端末での手順、戻り先リンクの制約は[認証の設定と検証](auth.md#android仮想端末でgoogleとメールを試す51)を参照する。
-
-### 初回イメージ・サービス・migration
-
-Docker操作はDockerを使えるホストで行う。Dev Container内にはホストのDocker socketを渡していない。
-
-```sh
-REGISTRY=$(tofu -chdir=infra output -raw registry)
-gcloud auth configure-docker asia-northeast1-docker.pkg.dev
-# Cloud Run向けはホストCPUにかかわらずlinux/amd64を生成する
-docker buildx build --platform linux/amd64 -f apps/api/Dockerfile \
-  -t "$REGISTRY/api:bootstrap" --push .
-gcloud artifacts docker images describe "$REGISTRY/api:bootstrap" \
-  --format='value(image_summary.digest)'
-```
-
-表示されたdigestを使い、`terraform.tfvars` の `image` を `<registry>/api@sha256:...`、`deploy_application=true` に設定する。トラフィックを受けるサービスより先にmigrationを行うため、最初の適用だけはmigrationのjobを先に作る。
-
-```sh
-# 1. migrationのjobだけを作り、DBへmigrationを適用する
-#    DBとDBユーザーは deploy_application=false の適用で作成済みであることが前提
-tofu -chdir=infra plan -target='google_cloud_run_v2_job.migrate[0]'
-tofu -chdir=infra apply -target='google_cloud_run_v2_job.migrate[0]'
-gcloud run jobs execute nuri-staging-migrate --region=asia-northeast1 --wait
-# 2. サービスと公開設定を作る
-tofu -chdir=infra plan
-tofu -chdir=infra apply
-API_ORIGIN=$(tofu -chdir=infra output -raw service_uri)
-curl --fail "$API_ORIGIN/ready"
-```
-
-サービスのstartup probeは `/ready`（DBへ `SELECT 1`）を使う。DB URLやsecretが誤っているとrevisionが起動せず、applyが失敗する。このときCloud Runのサービスだけが作られ、OpenTofuのstateには残らない。secretを直してから `gcloud run services delete nuri-staging --region=asia-northeast1` で消し、もう一度applyする（`deletion_protection` はOpenTofu側の設定なので、gcloudでは消せる）。liveness probeは `/health` のままにし、DBが一時的に落ちてもインスタンスを再起動しない。
-
-初回の `api_origin` はサービス作成前に実URLが分からないため暫定値になる。`service_uri` と一致しなければ、`terraform.tfvars` の `api_origin` に `service_uri` を設定し、再度 `tofu plan` と `tofu apply` を行う。これでCloud Runの `BETTER_AUTH_URL` も実URLに変わる。`kcvlb4` では初回の推定URLと実URLが異なったため、この2回目の適用を行った。最後に両方の出力が一致することを確認する。custom domainを使う場合はDNS/ドメインマッピングを別途設定し、`api_origin`にそのHTTPS URLを渡す。
-
-### CIからのデプロイを有効にする
-
-nuriのリポジトリには、2026年11月7日にGitHub Environment `production` を作成し、利用可能なブランチをmainだけに制限した。別のリポジトリで未作成なら、先に同じ設定で作る。
-
-```sh
-gh api -X PUT repos/Kcvl-DfHack26/nuri/environments/production \
-  -F 'deployment_branch_policy[protected_branches]=false' \
-  -F 'deployment_branch_policy[custom_branch_policies]=true'
-gh api -X POST repos/Kcvl-DfHack26/nuri/environments/production/deployment-branch-policies \
-  -f name=main -f type=branch
-```
-
-production Environmentの変数をOpenTofuの出力から設定する。値を確認してから実行する。
-
-```sh
-gh variable set GCP_PROJECT_ID --env production --body YOUR_PROJECT_ID
-gh variable set GCP_REGION --env production --body asia-northeast1
-gh variable set CLOUD_RUN_SERVICE --env production --body "$(tofu -chdir=infra output -raw cloud_run_service)"
-gh variable set ARTIFACT_REPOSITORY --env production --body "$(tofu -chdir=infra output -raw artifact_repository)"
-gh variable set CLOUD_RUN_MIGRATION_JOB --env production --body "$(tofu -chdir=infra output -raw migration_job)"
-gh variable set GCP_WORKLOAD_IDENTITY_PROVIDER --env production --body "$(tofu -chdir=infra output -raw workload_identity_provider)"
-gh variable set GCP_SERVICE_ACCOUNT --env production --body "$(tofu -chdir=infra output -raw deploy_service_account)"
-gh variable set GCP_DEPLOY_ENABLED --body true
-gh workflow run deploy.yml --ref main
-```
-
-以後、mainの成功したCIから「Expo Webを同梱したイメージ作成 → migrationのjob → candidateで `/ready` とWeb配信の検査 → トラフィック切替」の順に動く。migrationが失敗したらデプロイは止まり、今のrevisionがトラフィックを受け続ける。Expo側にproduction API URLとビルドを用意してから `EXPO_UPDATE_ENABLED=true` を設定すると、最後にExpo Updateを配信する。
-
-### Webを開く
-
-```sh
-tofu -chdir=infra output -raw expo_web_url
-bash scripts/check-expo-web.sh "$(tofu -chdir=infra output -raw service_uri)"
-```
-
-`expo_web_url` は既存のCloud Runサービスの既定HTTPS URLを指す。Web同梱イメージの配備後は、同じホストの `/` がExpo Web、`/api/**` がHono、`/_expo/static/**` と `/assets/**` が静的ファイルになる。レシピ直リンクはSPAで開ける。将来のLP用 `/about/` は現時点では404を返す。WebはアクセスしたホストのAPIを使い、共有する正規URLはOpenTofuの `api_origin` と揃える。Google OAuthのリダイレクト先は既存どおり正規URLの `/api/auth/callback/google` を使う。
-
-アプリから読むには、ExpoのEnvironment Variablesの `EXPO_PUBLIC_API_URL`（previewとproduction）に `service_uri` を設定する（[Expo GitHub連携・環境変数](#expo-github連携環境変数)）。
-
-2026年11月7日の初回公開では、このブランチのOpenTofu設定を適用してmigration jobとCloud Runサービスを作成した。その後、[mainのデプロイ](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42372457055)（`ce37dd2`）でmigration・candidateの `/ready`・トラフィック切替が成功した。CIはOpenTofuの変更を適用しないため、IaCの検証結果とは分けて扱う。実サービスのstartup probeが `/ready` であることを確認し、`https://nuri-staging-v3kjfarita-an.a.run.app` の `/health`・`/ready`・`/api/recipes` が200で応答した。Expoのdevelopment・preview・production環境の `EXPO_PUBLIC_API_URL` もこのURLに設定した。Androidエミュレーターの開発ビルドでメイク画面の空状態を確認し、Cloud Runのログでアプリからの `GET /api/recipes?offset=0` が200で応答した。iOS実機は未確認。DBはmigrationのみで、レシピ一覧は空。開発用seedを本番DBへ実行せず、アプリでレシピを表示するためのデータは #30 の方針に従って用意する。
-
-CIはトラフィックを特定のrevisionへ固定する。そのため、CIのデプロイ後に `tofu apply` で環境変数などを変えると、新しいrevisionはトラフィック0%で作られる。変更後は `gh workflow run deploy.yml --ref main` で配信し直すか、`gcloud run services update-traffic nuri-staging --region=asia-northeast1 --to-latest` で切り替える。
-
-### 稼働の確認
-
-`tofu` のstateを読めない人は `gcloud run services describe nuri-staging --region=asia-northeast1 --format='value(status.url)'` でURLを得る。
-
-```sh
-API_ORIGIN=$(tofu -chdir=infra output -raw service_uri)
-curl --fail "$API_ORIGIN/health"       # {"status":"ok"}：プロセスが応答する
-curl --fail "$API_ORIGIN/ready"        # {"status":"ready"}：DBへ接続できる
-curl --fail "$API_ORIGIN/api/recipes"  # アプリが読むレシピ一覧
-# どのrevisionがトラフィックを受けているか
-gcloud run services describe nuri-staging --region=asia-northeast1 --format='yaml(status.traffic)'
-# 直近のログとmigrationの実行結果
-gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="nuri-staging"' --limit=50
-gcloud run jobs executions list --job=nuri-staging-migrate --region=asia-northeast1 --limit=5
-```
-
-GitHub Actionsの **Deploy API and mobile update** の実行結果でも、migrationと `/ready` の成否を確かめられる。最後にアプリでレシピ一覧が表示されることを確かめる。Cloud Runは0台まで縮むため、しばらくアクセスがないと最初の応答に数秒かかる。
-
 ### 止め方
 
-止める度合いに応じて選ぶ。上から順に影響が大きくなる。
-
-1. **CIからのデプロイだけ止める**：`gh variable set GCP_DEPLOY_ENABLED --body false`。動いているAPIはそのまま残る。
-2. **APIの公開を一時的に止める**：`gcloud run services update nuri-staging --region=asia-northeast1 --ingress=internal`。外部からのリクエストは届かなくなる。次の `tofu apply` で公開に戻る（`ingress` をOpenTofuが管理しているため）。
-3. **Cloud SQLを一時的に止める**：`gcloud sql instances patch nuri-staging --activation-policy=NEVER`。APIもDBへ接続できなくなり、新しいインスタンスは `/ready` を通らないため、リクエストはすべて失敗する。時間課金は止まるが、ストレージとIPv4アドレスの課金は続く。再開は `--activation-policy=ALWAYS`。次の `tofu apply` でも起動する。
-4. **すべて削除する**（11月14日の後。決勝に進んだら11月27日の後）：DBのデータは戻せない。残す必要があれば先に書き出す。
-
-```sh
-gh variable set GCP_DEPLOY_ENABLED --body false
-# plan/applyと同じDBパスワードを、shellの履歴に残さず入力する
-read -rs TF_VAR_database_password && export TF_VAR_database_password
-# deletion_protection 以外の変更が出ていないことをplanで確かめてからapplyする
-tofu -chdir=infra plan -var=deletion_protection=false
-tofu -chdir=infra apply -var=deletion_protection=false
-tofu -chdir=infra destroy -var=deletion_protection=false
-```
-
-`deletion_protection` はCloud SQL・Cloud Runのサービス・migrationのjobのOpenTofuからの削除を防ぎ、Cloud SQLではGCP側の削除防止も有効にする。`false` で一度applyして両方を解除してからdestroyする。stateのbucket（`infra/bootstrap`）は `prevent_destroy` のため残る。費用は月数セント以下。削除するとstateも失うため、不要になったときに手動で消す。Workload Identity Poolは削除後30日間は同じIDで作り直せない（`gcloud iam workload-identity-pools undelete` で戻す）。Cloud SQLのインスタンス名も削除後しばらく再利用できない。
+新規配信の停止はGitHubのRepository Variable `GCP_DEPLOY_ENABLED` を `false` にする。稼働中のrevisionは配信を続ける。API停止、Cloud SQL停止、リソース削除が必要な場合は、影響とデータ保全をレビューし、承認済みのGitHub Actionsから実施する。
 
 ## 5. ハーネスと検証
 

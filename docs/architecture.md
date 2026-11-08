@@ -112,7 +112,7 @@ Jestのtransform設定にはBunのisolated配置も許可している。React Na
 
 OpenTofuはAPI有効化、Artifact Registry、Cloud SQL、DB、DBユーザー、サービスアカウント、IAM、WIF、Secret Managerの器、Cloud Runサービスとmigration Jobを管理する。
 
-DBパスワードはOpenTofuのephemeral変数とGoogle providerのwrite-only引数を使用する。Secret Managerの**値**は手動投入し、コードやstateへ複製しない。bootstrap用GCS bucketはversioning、public access prevention、削除防止付き。
+DBパスワードはOpenTofuのephemeral変数とGoogle providerのwrite-only引数を使用する。Secret Managerの**値**は管理者が承認済みのGitHub Actionsで登録し、コードやstateへ複製しない。bootstrap用GCS bucketはversioning、public access prevention、削除防止付き。 本番のOpenTofuはアプリ配信と分けたGitHub Actionsで実行する。両方の同時実行を防ぎ、専用のWIFで権限を分ける。[本番インフラの適用手順](setup.md#本番のopentofuをgithub-actionsで適用する)
 
 GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする。コンテナをdigestで指定し、migration Jobを完了させ、トラフィックなしでrevisionを作る。その後、そのイメージのdigestで作ったrevisionを探してcandidateタグを付け、`/ready` を確認してから切り替える。`latestReadyRevisionName` はOpenTofuの適用でrevisionの番号が巻き戻ると古いrevisionを指し続け、古いコードを昇格していたため使わない（#92）。イメージ・トラフィックはCIが管理し、OpenTofuの差分対象から外す。revision名はOpenTofuの設定変更時に再生成できるよう差分対象に残す。CIでrevisionを作るときにタグも同時指定すると、OpenTofuの次回planに不要なrevision差分が出るため、タグ付けを別の操作にする。その後に同じSHAのExpo Workflowを呼ぶ。本番配信には別途有効化フラグが必要。
 
