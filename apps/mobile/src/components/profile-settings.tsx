@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { Host, Icon, Switch as NativeSwitch } from '@expo/ui';
+import { Host, Icon, Picker, Switch as NativeSwitch } from '@expo/ui';
 import { faceTypeIds, profileInputSchema, profilePatchSchema } from '@starter/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useIsFocused } from 'expo-router';
@@ -23,7 +23,6 @@ import { faceTypes } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
 import { addPasskey, passkeyListOptions, passkeysAvailable } from '@/lib/passkeys';
 import { changeProfile, myProfileKeys, myProfileOptions, userKeys } from '@/lib/social';
-import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
 const BACK = Icon.select({
@@ -39,7 +38,7 @@ const NEXT = Icon.select({
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
 
-// Plan A ⑰-2 プロフィール設定. Face type, photo and notifications remain samples.
+// Plan A ⑰-2 プロフィール設定. Photo and notifications remain samples.
 export function ProfileSettings() {
   const insets = useSafeAreaInsets();
   const session = authClient.useSession();
@@ -400,8 +399,10 @@ function Field({
   );
 }
 
+const noFaceType = 'none';
+
 /**
- * ⑰-2's face type (#194): the saved one or 未設定, opening the five types to choose from. ⑭ can
+ * ⑰-2's face type (#194): the saved one or 未設定, chosen from the five types in a native menu. ⑭ can
  * save the diagnosed one too. Skin tone is not diagnosed, so it is never shown.
  */
 function FaceTypeRow({
@@ -413,61 +414,26 @@ function FaceTypeRow({
   onChange: (faceType: FaceType | null) => void;
   disabled: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const options: { id: FaceType | null; label: string }[] = [
-    ...faceTypeIds.map((id) => ({ id, label: faceTypes[id].label })),
-    { id: null, label: '未設定' },
-  ];
   return (
-    <>
-      <Row
-        label="顔タイプ"
-        value={value ? faceTypes[value].label : '未設定'}
-        expanded={expanded}
-        onPress={() => {
-          setExpanded((open) => !open);
-        }}
-      />
-      {expanded ? (
-        <>
-          <Divider />
-          <View
-            accessibilityRole="radiogroup"
-            accessibilityLabel="顔タイプ"
-            className="px-3.5 py-2"
-          >
-            <Text className="pb-1 font-maru text-meta text-ink-secondary">
-              提案タブの診断結果からも保存できます
-            </Text>
-            {options.map((option) => {
-              const selected = option.id === value;
-              return (
-                <Pressable
-                  key={option.label}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected, disabled }}
-                  disabled={disabled}
-                  onPress={() => {
-                    onChange(option.id);
-                  }}
-                  className="min-h-12 flex-row items-center gap-2.5 active:opacity-70"
-                >
-                  <View
-                    className={cn(
-                      'size-5 items-center justify-center rounded-full border-2',
-                      selected ? 'border-accent-rose' : 'border-line-soft',
-                    )}
-                  >
-                    {selected ? <View className="size-2.5 rounded-full bg-accent-rose" /> : null}
-                  </View>
-                  <Text className="font-maru-bold text-label text-ink-primary">{option.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
-      ) : null}
-    </>
+    <View className={rowClassName}>
+      <Text className="flex-1 font-maru-bold text-label text-ink-primary">顔タイプ</Text>
+      <Host colorScheme="light" matchContents style={{ minHeight: 48 }}>
+        <Picker
+          testID="顔タイプ"
+          appearance="menu"
+          enabled={!disabled}
+          selectedValue={value ?? noFaceType}
+          onValueChange={(id) => {
+            onChange(faceTypeIds.find((faceType) => faceType === id) ?? null);
+          }}
+        >
+          {faceTypeIds.map((id) => (
+            <Picker.Item key={id} label={faceTypes[id].label} value={id} />
+          ))}
+          <Picker.Item label="未設定" value={noFaceType} />
+        </Picker>
+      </Host>
+    </View>
   );
 }
 

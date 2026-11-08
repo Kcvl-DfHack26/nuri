@@ -195,6 +195,10 @@ function SaveFaceType({ faceType }: { faceType: FaceType }) {
     onSuccess: () => client.invalidateQueries({ queryKey: myProfileKeys.all }),
   });
   const saved = profile.data?.faceType === faceType;
+  // Without an API there is nowhere to save to, like the other server actions.
+  if (!apiUrl) {
+    return null;
+  }
   return (
     <View className="mx-4 gap-1.5">
       <PrimaryButton

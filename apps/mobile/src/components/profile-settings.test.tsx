@@ -8,6 +8,33 @@ import { ProfileSettings } from './profile-settings';
 
 jest.mock('@expo/ui', () => ({
   Icon: Object.assign(() => null, { select: () => 'icon' }),
+  // The stand-in shows the selected item's label; pressing it picks 丸顔.
+  Picker: Object.assign(
+    ({
+      testID,
+      selectedValue,
+      onValueChange,
+      children,
+    }: {
+      testID: string;
+      selectedValue: string;
+      onValueChange: (value: string) => void;
+      children: { props: { label: string; value: string } }[];
+    }) => {
+      const { Pressable } = jest.requireActual<typeof import('react-native')>('react-native');
+      const selected = children.flat().find((item) => item.props.value === selectedValue);
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${testID} ${selected?.props.label ?? ''}`}
+          onPress={() => {
+            onValueChange('round');
+          }}
+        />
+      );
+    },
+    { Item: () => null },
+  ),
   Host: jest.requireActual<typeof import('react-native')>('react-native').View,
   Switch: ({
     label,
@@ -163,17 +190,11 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
   expect(mockNotify).toHaveBeenCalled();
 });
 
-test('chooses a face type from the five and saves it, never showing a skin tone', async () => {
+test('chooses a face type and saves it, never showing a skin tone', async () => {
   await renderWithClient(<ProfileSettings />);
-  const row = await screen.findByRole('button', { name: '顔タイプ 未設定' });
+  const picker = await screen.findByRole('button', { name: '顔タイプ 未設定' });
   expect(screen.queryByText(/イエベ/)).toBeNull();
-  await fireEvent.press(row);
-  for (const label of ['面長', 'ベース型', '丸顔', '逆三角形', '卵型', '未設定']) {
-    expect(screen.getByRole('radio', { name: label })).toBeOnTheScreen();
-  }
-  expect(screen.getByRole('radio', { name: '未設定' })).toBeChecked();
-  await fireEvent.press(screen.getByRole('radio', { name: '丸顔' }));
-  expect(screen.getByRole('radio', { name: '丸顔' })).toBeChecked();
+  await fireEvent.press(picker);
   expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeOnTheScreen();
   await saveProfile();
   expect(mockPutProfile).toHaveBeenCalledWith({ json: { faceType: 'round' } });
