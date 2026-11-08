@@ -61,8 +61,11 @@ test('writes seconds as m:ss for the instructions', () => {
 test('turns the steps’ times into seconds and leaves out a step whose time cannot be read', () => {
   expect(
     answerSteps([
-      { start: '0:58', end: '1:07', part: 'cheek' },
-      { start: '107', end: '115', part: 'shading' },
+      { start: '0:58', end: '1:07', part: 'cheek', color: '#e8968a' },
+      { start: '107', end: '115', part: 'shading', color: null },
     ]),
-  ).toEqual([{ start: 58, end: 67, part: 'cheek' }]);
+  ).toEqual([{ start: 58, end: 67, part: 'cheek', color: '#E8968A' }]);
+  // A malformed color is unknown, not a failed answer.
+  expect(answerSteps([{ start: '0:01', end: '0:05', color: '#000' }])[0]?.color).toBeNull();
+  expect(answerSteps([{ start: '0:01', end: '0:05', color: null }])[0]?.color).toBeNull();
 });

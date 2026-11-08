@@ -214,6 +214,7 @@ const brow: PostDraft['steps'][number] = {
   segment: { startMs: 0, endMs: 65_000 },
   image: 'file:///step-0.jpg',
   shape: { strokes: [{ mirror: true, points: [{ at: 46 }, { at: 52 }] }] },
+  color: null,
 };
 const readyDraft: Partial<PostDraft> = {
   video: { uri: 'file:///video.mov', marks: [65_000], durationMs: 125_000 },
@@ -471,6 +472,7 @@ const analysis: PostAnalysis = {
       end: 62,
       part: 'lash',
       description: '目尻にラインを引く',
+      color: '#1A1A1A',
       regions: [],
       cosmetics: [1],
     },
@@ -479,6 +481,7 @@ const analysis: PostAnalysis = {
       end: 26,
       part: 'brow',
       description: '眉尻を描き足す',
+      color: '#5A3D2B',
       regions: [
         {
           detail: '眉尻を外へ描き足す',
@@ -493,8 +496,6 @@ const analysis: PostAnalysis = {
       ],
       cosmetics: [0],
     },
-    // Past the 60-second video: a misreading that is dropped.
-    { start: 70, end: 80, part: 'lip', description: '', regions: [], cosmetics: [] },
   ],
   cosmetics: [
     {
@@ -597,7 +598,17 @@ test('says so and makes the steps from the marks when Gemini finds no makeup', a
   mockAnalyze.mockResolvedValue({
     ...analysis,
     // A step that ends before it starts is dropped like no step at all.
-    steps: [{ start: 30, end: 10, part: 'brow', description: '', regions: [], cosmetics: [] }],
+    steps: [
+      {
+        start: 30,
+        end: 10,
+        part: 'brow',
+        description: '',
+        color: null,
+        regions: [],
+        cosmetics: [],
+      },
+    ],
   });
   const draft = await renderCreating();
   await pressAlertButton('送る');
@@ -845,6 +856,42 @@ test('says why the area cannot be shown', async () => {
   mockTracker.value = null;
   await renderSeeded(<PostStepEdit index="0" />);
   expect(screen.getByText('この環境では塗る範囲を表示できません')).toBeOnTheScreen();
+});
+
+test('shows the color read from the video on ⑫-5 and keeps the one picked', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="0" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+    {
+      ...readyDraft,
+      steps: (readyDraft.steps ?? []).map((step) => ({
+        ...step,
+        color: { hex: '#5A3D2B', picked: false },
+      })),
+    },
+  );
+  expect(screen.getByText(/動画から読み取った色です/)).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '色を選ぶ' }));
+  // The stand-in slider moves lightness to 50.
+  mockSlider.value = 50;
+  await fireEvent.press(screen.getByLabelText('明るさ'));
+  await fireEvent.press(screen.getByRole('button', { name: '決定' }));
+  const first = () => (latest ?? null)?.steps[0];
+  expect(first()?.color?.picked).toBe(true);
+  expect(first()?.color?.hex).not.toBe('#5A3D2B');
+  expect(screen.getByText('選んだ色で塗ります')).toBeOnTheScreen();
+});
+
+test('asks to pick a color the video did not show', async () => {
+  await renderSeeded(<PostStepEdit index="0" />);
+  expect(screen.getByText(/動画から色を読み取れませんでした/)).toBeOnTheScreen();
 });
 
 test('deletes a step on ⑫-5 after asking and returns to ⑫-4', async () => {

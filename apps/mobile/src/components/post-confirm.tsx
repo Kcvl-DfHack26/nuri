@@ -1,7 +1,6 @@
 import { Alert } from 'react-native';
 
-export const postConfirmTitle = 'レシピを投稿しますか？';
-export const postConfirmMessage = 'サムネイルと手順が、だれでも見られるように公開されます。';
+import { postConfirmMessage, postConfirmTitle } from './post-confirm-text';
 
 /**
  * ⑫-8 (#182, #196): asks before the post is sent. Pressing 投稿する is the explicit choice to send

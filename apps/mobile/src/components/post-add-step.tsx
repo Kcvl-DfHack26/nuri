@@ -77,6 +77,7 @@ export function AddStepPanel({ onClose }: { onClose: () => void }) {
             segment: segments[index] ?? range,
             image: null,
             shape: null,
+            color: null,
           },
           ...steps.slice(index),
         ],

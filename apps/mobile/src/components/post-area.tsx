@@ -9,8 +9,7 @@ import type { PostStep } from '@/components/post-draft';
 import type { Point } from '@/lib/face-landmarks';
 
 import { FaceTexture } from '@/components/face-texture';
-import { usePostDraft } from '@/components/post-draft';
-import { partColors } from '@/components/recipes';
+import { stepColor, usePostDraft } from '@/components/post-draft';
 import { useShapeTexture } from '@/components/shape-texture';
 import { Text } from '@/components/ui/text';
 import {
@@ -102,7 +101,7 @@ export function AreaEditor({ step, position }: { step: PostStep; position: numbe
   const handles = shape ? shapeHandles(shape) : [];
   const pickedIndex = Math.max(0, Math.min(picked, handles.length - 1));
   const selected = handles[pickedIndex];
-  const color = step.cosmetics[0]?.color ?? partColors[step.part];
+  const color = stepColor(step);
 
   const header = (
     <View className="gap-0.5">
