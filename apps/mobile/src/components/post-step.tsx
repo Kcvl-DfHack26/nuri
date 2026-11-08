@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { Cosmetic } from '@/components/post-draft';
@@ -70,6 +70,7 @@ function MissingStep() {
 // on the device (#181); dragging the area handles is not built.
 export function PostStepEdit({ index }: { index: string }) {
   const { step, position, updateStep } = useStep(index);
+  const { draft, setDraft } = usePostDraft();
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
   const addIcon = <SocialIcon name={ADD} size={20} color={ink} />;
@@ -166,6 +167,17 @@ export function PostStepEdit({ index }: { index: string }) {
             }}
           />
         </View>
+        <DeleteStepButton
+          // A recipe needs at least one step, so the last one stays.
+          canDelete={draft.steps.length > 1}
+          onDelete={() => {
+            setDraft((current) => ({
+              ...current,
+              steps: current.steps.filter((_, at) => at !== position),
+            }));
+            router.back();
+          }}
+        />
       </ScrollView>
       <BottomCta>
         <PrimaryButton
@@ -176,6 +188,32 @@ export function PostStepEdit({ index }: { index: string }) {
         />
       </BottomCta>
     </View>
+  );
+}
+
+/**
+ * ⑫-5 (#201): deletes the step after asking. Its segment becomes time no step covers; its frame is
+ * deleted with the draft's other files when the flow closes.
+ */
+function DeleteStepButton({ canDelete, onDelete }: { canDelete: boolean; onDelete: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !canDelete }}
+      disabled={!canDelete}
+      onPress={() => {
+        Alert.alert('この手順を削除しますか？', undefined, [
+          { text: 'キャンセル', style: 'cancel' },
+          { text: '削除', style: 'destructive', onPress: onDelete },
+        ]);
+      }}
+      className={cn(
+        'min-h-12 items-center justify-center rounded-full active:opacity-70',
+        !canDelete && 'opacity-50',
+      )}
+    >
+      <Text className="font-maru-bold text-label text-accent-rose">この手順を削除</Text>
+    </Pressable>
   );
 }
 
