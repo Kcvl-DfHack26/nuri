@@ -17,7 +17,7 @@ import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl } from '@/lib/api';
-import { browShapes, faceTypes, isBrowShape, isFaceType } from '@/lib/face-diagnosis';
+import { browShapes, eyeShapes, faceTypes, midfaces, readResultParams } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
 import { formatCount, recipeListOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
@@ -56,27 +56,13 @@ const browAdvice: Record<BrowShape, string> = {
   falling: '眉尻を下げてやさしく見せます',
 };
 
-type Result = { faceType: FaceType; brow: BrowShape | null; photo: string | undefined };
-
-function readResult(params: { face?: string; brow?: string; photo?: string }): Result | null {
-  if (!params.face || !isFaceType(params.face)) {
-    return null;
-  }
-  return {
-    faceType: params.face,
-    brow: params.brow && isBrowShape(params.brow) ? params.brow : null,
-    photo: params.photo,
-  };
-}
-
 // Plan A ⑭ 診断結果・おすすめメイク.
 export function Diagnosis() {
   const insets = useSafeAreaInsets();
   const focused = useIsFocused();
   const pink = useTokenColor('--color-pastel-pink');
   const peach = useTokenColor('--color-base-peach');
-  const result =
-    readResult(useLocalSearchParams<{ face?: string; brow?: string; photo?: string }>());
+  const result = readResultParams(useLocalSearchParams());
   // The header floats over the feed; measure it so larger text never covers the first card.
   const [headerHeight, setHeaderHeight] = useState(44);
   // iOS insets the tab's first ScrollView for the status bar and tab bar; Android adds both here.
@@ -118,12 +104,18 @@ export function Diagnosis() {
                 >
                   {faceType.label}
                 </Text>
+                <Text className="font-maru-bold text-label text-ink-primary">
+                  {eyeShapes[result.eye].label}・{midfaces[result.midface].label}
+                </Text>
               </View>
             </View>
-            {/* The face type rules are provisional until the team settles them (#47). */}
-            <Text className="-mt-3 mx-5 font-maru text-meta text-ink-secondary">
-              顔タイプは仮の基準で判定しています。写真はこの端末の中だけで使い、送信しません
-            </Text>
+            <Basis
+              rows={[
+                faceType,
+                eyeShapes[result.eye],
+                { ...midfaces[result.midface], label: `${midfaces[result.midface].label}（目安）` },
+              ]}
+            />
             <View className="mx-4 gap-2.5">
               <View className="gap-0.5 pl-1">
                 <Text
@@ -246,6 +238,23 @@ function Recommendations({ faceType }: { faceType: FaceType }) {
           ))}
         </ScrollView>
       )}
+    </View>
+  );
+}
+
+// Why each result was given: its definition. The numbers behind them are provisional (#47).
+function Basis({ rows }: { rows: { label: string; basis: string }[] }) {
+  return (
+    <View className="-mt-2 mx-4 gap-2 rounded-2xl border border-line-soft bg-bg-surface px-4 py-3">
+      {rows.map((row) => (
+        <View key={row.label} className="gap-0.5">
+          <Text className="font-maru-bold text-label text-ink-primary">{row.label}</Text>
+          <Text className="font-maru text-meta text-ink-secondary">{row.basis}</Text>
+        </View>
+      ))}
+      <Text className="font-maru text-micro text-ink-secondary">
+        顔の点の比率から仮の基準で判定しています。写真はこの端末の中だけで使い、送信しません
+      </Text>
     </View>
   );
 }

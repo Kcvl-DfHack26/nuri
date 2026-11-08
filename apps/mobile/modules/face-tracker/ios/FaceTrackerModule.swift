@@ -22,9 +22,12 @@ public class FaceTrackerModule: Module {
         view.setActive(active)
       }
 
-      // The last frame with a face as a JPEG file URL in the app's caches with its landmarks, or nil
-      // before a face is found.
-      AsyncFunction("takeSnapshotAsync") { (view: FaceTrackerView) throws -> [String: Any]? in
+      Prop("trackLandmarks") { (view: FaceTrackerView, enabled: Bool) in
+        view.setTrackLandmarks(enabled)
+      }
+
+      // The current frame as a JPEG file URL in the app's cache, or nil before a frame arrives.
+      AsyncFunction("takeSnapshotAsync") { (view: FaceTrackerView) throws -> String? in
         try view.snapshot()
       }
     }

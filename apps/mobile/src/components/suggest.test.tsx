@@ -6,6 +6,8 @@ import { diagnoseFace } from '@/lib/face-diagnosis';
 import { deleteFile } from '@/lib/files';
 import { TestQueryProvider } from '@/lib/test/query-client';
 
+import type { FaceTrackerViewProps } from '../../modules/face-tracker/src/FaceTracker.types';
+
 import { Diagnosis } from './diagnosis';
 import { Suggest } from './suggest';
 
@@ -54,19 +56,13 @@ jest.mock('../../modules/face-tracker/src/FaceTrackerModule', () => ({
     requestCameraPermissionAsync: () => mockRequestCamera(),
   },
 }));
-type TrackerProps = {
-  ref?: React.Ref<unknown>;
-  onLandmarks?: (event: { nativeEvent: typeof landmarks & { latencyMs: number } }) => void;
-  onStatus?: (event: { nativeEvent: { status: string } }) => void;
-};
-const mockTracker: { props: TrackerProps | null } = { props: null };
+let mockTrackerProps: FaceTrackerViewProps | undefined;
 const mockRequestCamera = jest.fn<Promise<boolean>, []>();
-const mockSnapshot = jest.fn<Promise<(typeof landmarks & { uri: string }) | null>, []>();
-// Lets the test send frames and statuses like the native view.
+const mockSnapshot = jest.fn<Promise<string | null>, []>();
 jest.mock('../../modules/face-tracker/src/FaceTrackerView', () => ({
   __esModule: true,
-  default: (props: TrackerProps) => {
-    mockTracker.props = props;
+  default: (props: FaceTrackerViewProps) => {
+    mockTrackerProps = props;
     jest
       .requireActual<typeof import('react')>('react')
       .useImperativeHandle(props.ref, () => ({ takeSnapshotAsync: mockSnapshot }));
@@ -115,6 +111,7 @@ const params = jest.mocked(useLocalSearchParams);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockTrackerProps = undefined;
   pick.mockResolvedValue({
     canceled: false,
     assets: [{ uri: 'file:///face.jpg', width: 100, height: 100 }],
@@ -123,7 +120,13 @@ beforeEach(() => {
 
 test('diagnoses a chosen photo on device and opens the result', async () => {
   mockDetect.mockResolvedValue(landmarks);
-  diagnose.mockReturnValue({ kind: 'ok', faceType: 'round', brow: 'falling' });
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'round',
+    eye: 'droopy',
+    midface: 'short',
+    brow: 'falling',
+  });
   await render(<Suggest />);
   expect(screen.getByRole('button', { name: '前回の診断（まだありません）' })).toBeDisabled();
 
@@ -131,7 +134,13 @@ test('diagnoses a chosen photo on device and opens the result', async () => {
   await waitFor(() => {
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/diagnosis',
-      params: { face: 'round', brow: 'falling', photo: 'file:///face.jpg' },
+      params: {
+        face: 'round',
+        eye: 'droopy',
+        midface: 'short',
+        brow: 'falling',
+        photo: 'file:///face.jpg',
+      },
     });
   });
   expect(mockDetect).toHaveBeenCalledWith('file:///face.jpg');
@@ -165,54 +174,56 @@ test('explains when the photo cannot be taken or picked', async () => {
   expect(screen.getByRole('button', { name: '写真から診断' })).toBeEnabled();
 });
 
-test('diagnoses the saved camera frame with its own landmarks and shows it on the result', async () => {
-  const saved = { points: [0.4, 0.6], width: 90, height: 160 };
+test('diagnoses a camera photo without requiring a live tracking result', async () => {
   mockRequestCamera.mockResolvedValue(true);
-  mockSnapshot.mockResolvedValue({ ...saved, uri: 'file:///frame.jpg' });
-  diagnose.mockReturnValue({ kind: 'ok', faceType: 'oval', brow: null });
+  mockSnapshot.mockResolvedValue('file:///frame.jpg');
+  mockDetect.mockResolvedValue(landmarks);
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'oval',
+    eye: 'standard',
+    midface: 'standard',
+    brow: null,
+  });
   await render(<Suggest />);
   await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
-  // The shutter waits for a face.
-  expect(await screen.findByRole('button', { name: '撮影して診断' })).toBeDisabled();
-  await act(async () => {
-    mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
-    await Promise.resolve();
-  });
-  await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
-  // The landmarks of the saved frame, not the last ones the screen received.
+  await fireEvent.press(await screen.findByRole('button', { name: '撮影して診断' }));
   await waitFor(() => {
-    expect(diagnose).toHaveBeenCalledWith(expect.objectContaining(saved));
-  });
-  await waitFor(() => {
+    expect(mockDetect).toHaveBeenCalledWith('file:///frame.jpg');
+    expect(diagnose).toHaveBeenCalledWith(expect.objectContaining(landmarks));
     expect(router.push).toHaveBeenCalledWith({
       pathname: '/diagnosis',
-      params: { face: 'oval', photo: 'file:///frame.jpg' },
+      params: { face: 'oval', eye: 'standard', midface: 'standard', photo: 'file:///frame.jpg' },
     });
   });
-  expect(mockDetect).not.toHaveBeenCalled();
   expect(deleteFile).not.toHaveBeenCalled();
 });
 
-test('deletes a camera frame that is not shown and keeps the adopted one', async () => {
+test('deletes a camera photo that is not shown and keeps the adopted one', async () => {
   mockRequestCamera.mockResolvedValue(true);
-  diagnose.mockReturnValue({ kind: 'ok', faceType: 'oval', brow: null });
+  mockSnapshot
+    .mockResolvedValueOnce('file:///kept.jpg')
+    .mockResolvedValueOnce('file:///turned.jpg');
+  mockDetect.mockResolvedValue(landmarks);
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'oval',
+    eye: 'standard',
+    midface: 'standard',
+    brow: null,
+  });
   await render(<Suggest />);
-  const shoot = async (uri: string) => {
+  const shoot = async () => {
     await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
-    await act(async () => {
-      mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
-      await Promise.resolve();
-    });
-    mockSnapshot.mockResolvedValueOnce({ ...landmarks, uri });
-    await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
+    await fireEvent.press(await screen.findByRole('button', { name: '撮影して診断' }));
   };
-  await shoot('file:///kept.jpg');
+  await shoot();
   await waitFor(() => {
     expect(router.push).toHaveBeenCalledTimes(1);
   });
   // A turned face is not adopted: its frame is deleted and the previous result keeps its photo.
   diagnose.mockReturnValueOnce({ kind: 'notFrontal' });
-  await shoot('file:///turned.jpg');
+  await shoot();
   expect(await screen.findByText('正面を向いた写真で試してください')).toBeOnTheScreen();
   expect(deleteFile).toHaveBeenCalledWith('file:///turned.jpg');
   expect(deleteFile).not.toHaveBeenCalledWith('file:///kept.jpg');
@@ -220,7 +231,7 @@ test('deletes a camera frame that is not shown and keeps the adopted one', async
   await fireEvent.press(screen.getByRole('button', { name: '前回の診断' }));
   expect(router.push).toHaveBeenLastCalledWith({
     pathname: '/diagnosis',
-    params: { face: 'oval', photo: 'file:///kept.jpg' },
+    params: { face: 'oval', eye: 'standard', midface: 'standard', photo: 'file:///kept.jpg' },
   });
   // A photo from the library replaces the result, so the camera frame is let go.
   await fireEvent.press(screen.getByRole('button', { name: '写真から診断' }));
@@ -229,32 +240,96 @@ test('deletes a camera frame that is not shown and keeps the adopted one', async
   });
 });
 
-test('explains when the camera is not allowed or the face is lost, and closes the camera', async () => {
-  mockRequestCamera.mockResolvedValueOnce(false);
+test('explains when camera permission or a camera frame is unavailable', async () => {
+  mockRequestCamera.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+  mockSnapshot.mockResolvedValue(null);
   await render(<Suggest />);
   await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
   expect(
     await screen.findByText('カメラを使う許可がありません。設定から許可してください'),
   ).toBeOnTheScreen();
 
-  mockRequestCamera.mockResolvedValueOnce(true);
   await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
-  await act(async () => {
-    mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
-    mockTracker.props?.onStatus?.({ nativeEvent: { status: 'noFace' } });
-    await Promise.resolve();
-  });
-  expect(await screen.findByText('顔を枠に合わせてください')).toBeOnTheScreen();
-  expect(screen.getByRole('button', { name: '撮影して診断' })).toBeDisabled();
+  await fireEvent.press(await screen.findByRole('button', { name: '撮影して診断' }));
+  expect(
+    await screen.findByText('カメラの映像を保存できませんでした。もう一度お試しください'),
+  ).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: 'やめる' }));
   expect(screen.getByRole('button', { name: 'カメラで診断' })).toBeEnabled();
   expect(router.push).not.toHaveBeenCalled();
 });
 
+test('explains camera startup failures and permits retry without requiring a live face', async () => {
+  mockRequestCamera.mockResolvedValue(true);
+  await render(<Suggest />);
+  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+  await act(() => {
+    mockTrackerProps?.onStatus?.({ nativeEvent: { status: 'noFace' } });
+  });
+  expect(screen.getByRole('button', { name: '撮影して診断' })).toBeEnabled();
+  expect(screen.queryByText('顔を枠に合わせてください')).not.toBeOnTheScreen();
+
+  await act(() => {
+    mockTrackerProps?.onStatus?.({ nativeEvent: { status: 'error' } });
+  });
+  expect(screen.getByText('カメラを開けませんでした。もう一度お試しください')).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: '撮影して診断' })).not.toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+  expect(
+    screen.queryByText('カメラを開けませんでした。もう一度お試しください'),
+  ).not.toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '撮影して診断' })).toBeEnabled();
+
+  await act(() => {
+    mockTrackerProps?.onStatus?.({ nativeEvent: { status: 'permissionDenied' } });
+  });
+  expect(
+    screen.getByText('カメラを使う許可がありません。設定から許可してください'),
+  ).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'カメラで診断' })).toBeEnabled();
+});
+
+test('retries a camera photo when still-image detection finds no face', async () => {
+  mockRequestCamera.mockResolvedValue(true);
+  mockSnapshot
+    .mockResolvedValueOnce('file:///no-face.jpg')
+    .mockResolvedValueOnce('file:///face.jpg');
+  mockDetect.mockResolvedValueOnce(null).mockResolvedValueOnce(landmarks);
+  diagnose.mockReturnValue({
+    kind: 'ok',
+    faceType: 'oval',
+    eye: 'standard',
+    midface: 'standard',
+    brow: null,
+  });
+  await render(<Suggest />);
+  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+  await fireEvent.press(await screen.findByRole('button', { name: '撮影して診断' }));
+  expect(
+    await screen.findByText('顔が見つかりませんでした。顔全体が写った写真で試してください'),
+  ).toBeOnTheScreen();
+  expect(deleteFile).toHaveBeenCalledWith('file:///no-face.jpg');
+  await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
+  await waitFor(() => {
+    expect(router.push).toHaveBeenCalledTimes(1);
+  });
+});
+
 test('shows the face type, the brows and recipes for that face type first', async () => {
-  params.mockReturnValue({ face: 'round', brow: 'falling', photo: 'file:///face.jpg' });
+  params.mockReturnValue({
+    face: 'round',
+    eye: 'droopy',
+    midface: 'short',
+    brow: 'falling',
+    photo: 'file:///face.jpg',
+  });
   await render(<Diagnosis />, { wrapper: TestQueryProvider });
-  expect(screen.getByText('丸顔')).toBeOnTheScreen();
+  expect(screen.getByRole('header', { name: '丸顔' })).toBeOnTheScreen();
+  expect(screen.getByText('たれ目・中顔面短め')).toBeOnTheScreen();
+  // Each result shows the definition it was given by.
+  expect(screen.getByText('縦と横の長さが近く、輪郭に丸みがある')).toBeOnTheScreen();
+  expect(screen.getByText('目尻が目頭より下がっている')).toBeOnTheScreen();
+  expect(screen.getByText('中顔面短め（目安）')).toBeOnTheScreen();
   expect(screen.getByText('下がり眉')).toBeOnTheScreen();
   expect(screen.getByText('アーチ眉')).toBeOnTheScreen();
 
