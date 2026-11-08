@@ -16,10 +16,12 @@ import {
 
 import type { PartId } from '@/components/recipes';
 import type { Point, Size } from '@/lib/face-landmarks';
+import type { MakeupLayer } from '@/lib/face-makeup';
 
 import { FaceTexture } from '@/components/face-texture';
 import { Text } from '@/components/ui/text';
 import { toViewPoints } from '@/lib/face-landmarks';
+import { canonicalVertexCount } from '@/lib/face-mesh';
 
 import type { FaceTrackerStatusEvent } from '../../modules/face-tracker/src/FaceTracker.types';
 
@@ -37,14 +39,6 @@ import FaceTrackerView from '../../modules/face-tracker/src/FaceTrackerView';
 /** Whether this build has the face tracker; Expo Go does not. */
 export const canTrackFace = Boolean(FaceTracker);
 
-/** One part painted over the face in a color. */
-export type MakeupLayer = { part: PartId; color: string };
-
-/** The color a step paints with: the middle of its recommended colors, e.g. a shadow's mid tone. */
-export function paintColor(colors: readonly string[]) {
-  return colors[Math.floor(colors.length / 2)] ?? '#000000';
-}
-
 /** A pin and its label on the face, at the part's landmark. */
 export type FaceAnnotation = { part: PartId; label: string };
 
@@ -60,18 +54,6 @@ const opacity: Record<PartId, number> = {
   highlight: 0.6,
   lip: 0.85,
 };
-
-// Layers are drawn in this order whatever the recipe order, so lines and brows stay on top.
-const paintOrder: readonly PartId[] = [
-  'base',
-  'shading',
-  'highlight',
-  'cheek',
-  'eye',
-  'lip',
-  'lash',
-  'brow',
-];
 
 // A MediaPipe landmark inside each part's painted area, for the annotation pin.
 const anchors: Record<PartId, number> = {
@@ -95,6 +77,7 @@ export function FaceMakeupCamera({
   annotation,
   children,
 }: {
+  /** One layer per part, in paint order. */
   layers: readonly MakeupLayer[];
   annotation?: FaceAnnotation | undefined;
   /** Drawn over the camera, under the guidance. */
@@ -187,6 +170,7 @@ export function FaceMakeupCamera({
 
   const cameraDenied = permission === 'denied' || status?.status === 'permissionDenied';
   const tracking = active && status?.status === 'tracking' && points.length > 0;
+  const meshReady = tracking && points.length === canonicalVertexCount && layers.length > 0;
   const message = cameraDenied
     ? 'カメラを使う許可がありません'
     : status?.status === 'noFace'
@@ -215,7 +199,8 @@ export function FaceMakeupCamera({
           if (status?.status !== 'tracking') {
             setStatus({ status: 'tracking' });
           }
-          setPoints(toViewPoints(event.nativeEvent.points, event.nativeEvent, view));
+          const frame = event.nativeEvent;
+          setPoints(toViewPoints(frame.points, frame, view, canonicalVertexCount));
         }}
         onStatus={(event) => {
           if (!active) {
@@ -227,12 +212,11 @@ export function FaceMakeupCamera({
           }
         }}
       />
-      {tracking ? (
+      {meshReady ? (
         <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-          {paintOrder.map((part) => {
-            const layer = layers.find((candidate) => candidate.part === part);
+          {layers.map(({ part, color }) => {
             const texture = textures[part];
-            if (!layer || !texture) {
+            if (!texture) {
               return null;
             }
             return (
@@ -240,7 +224,7 @@ export function FaceMakeupCamera({
                 key={part}
                 points={points}
                 texture={texture}
-                color={layer.color}
+                color={color}
                 opacity={opacity[part]}
               />
             );

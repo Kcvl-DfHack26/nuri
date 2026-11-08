@@ -5,11 +5,11 @@ import { useMemo } from 'react';
 
 import type { Point } from '@/lib/face-landmarks';
 
-import { canonicalFaceMesh, canonicalVertexCount } from '@/lib/face-mesh';
+import { canonicalFaceMesh } from '@/lib/face-mesh';
 
 type FaceTextureProps = {
-  /** Landmarks in view coordinates, in MediaPipe's order. Only the mesh's 468 vertices are used. */
-  points: readonly Point[];
+  /** The mesh's 468 vertices in view coordinates, in MediaPipe's order. */
+  points: Point[];
   /** A transparent image painted in the canonical face mesh's texture space. */
   texture: SkImage;
   /** The finish color the texture is multiplied by. */
@@ -34,12 +34,9 @@ export function FaceTexture({ points, texture, color, opacity }: FaceTextureProp
       })),
     [textureWidth, textureHeight],
   );
-  if (points.length < canonicalVertexCount) {
-    return null;
-  }
   return (
     <Vertices
-      vertices={points.slice(0, canonicalVertexCount)}
+      vertices={points}
       textures={texturePixels}
       indices={canonicalFaceMesh.triangles}
       opacity={opacity}

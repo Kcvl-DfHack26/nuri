@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { RecipeStep } from '@/lib/recipes';
 
-import { canTrackFace, FaceMakeupCamera, paintColor } from '@/components/face-makeup-camera';
+import { canTrackFace, FaceMakeupCamera } from '@/components/face-makeup-camera';
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { RecipeStatus } from '@/components/recipe-detail';
@@ -17,6 +17,7 @@ import { arOverlays, arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
+import { paintColor } from '@/lib/face-makeup';
 import { backOrHome } from '@/lib/navigation';
 import { recipeOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';

@@ -37,11 +37,25 @@ test('crops the top and bottom when the frame is taller than the view', () => {
   expect(bottom?.y).toBeCloseTo(555.56, 1);
 });
 
-test('returns nothing before the frame size is known or for an odd trailing value', () => {
+test('ignores unknown frame sizes and incomplete coordinate pairs', () => {
   expect(toViewPoints([0.5, 0.5], { width: 0, height: 0 }, { width: 100, height: 100 })).toEqual(
     [],
   );
   expect(
     toViewPoints([0.5, 0.5, 0.1], { width: 100, height: 100 }, { width: 100, height: 100 }),
   ).toHaveLength(1);
+});
+
+test('projects only the points needed for the mesh', () => {
+  expect(
+    toViewPoints(
+      [0, 0, 0.25, 0.5, 1, 1],
+      { width: 720, height: 1280 },
+      { width: 360, height: 640 },
+      2,
+    ),
+  ).toEqual([
+    { x: 360, y: 0 },
+    { x: 270, y: 320 },
+  ]);
 });
