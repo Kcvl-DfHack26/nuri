@@ -88,3 +88,9 @@ variable "email_from" {
   type        = string
   default     = ""
 }
+
+variable "push_notifications_enabled" {
+  description = "Reference the Expo Push Service access token in Cloud Run after adding its Secret Manager version."
+  type        = bool
+  default     = false
+}

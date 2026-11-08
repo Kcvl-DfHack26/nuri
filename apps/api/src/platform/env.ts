@@ -16,6 +16,7 @@ const schema = z.object({
   GOOGLE_EMULATOR_PUBLIC_URL: z.url().optional(),
   RESEND_API_URL: z.url().default('https://api.resend.com'),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
+  EXPO_PUSH_ACCESS_TOKEN: z.string().trim().min(1).optional(),
   EMAIL_FROM: z.string().trim().min(1).default('nuri <login@example.com>'),
   GOOGLE_CLIENT_ID: z.string().trim().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().trim().min(1).optional(),

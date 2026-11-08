@@ -13,6 +13,7 @@ import type { Environment } from './platform/env';
 
 import { authCapabilities, authRoutes, requireSession } from './modules/auth';
 import { postAnalysisRoutes } from './modules/post-analysis';
+import { createPushSender, pushRoutes } from './modules/push';
 import { recipeRoutes } from './modules/recipes';
 import { socialRoutes } from './modules/social';
 import { expoWebRoutes } from './platform/expo-web';
@@ -101,7 +102,8 @@ export function createApp(
       )
       .get('/api/auth-capabilities', (c) => c.json(authCapabilities(env)))
       .route('/api/auth', authRoutes(auth, env.BETTER_AUTH_URL))
-      .route('/api', socialRoutes(db, auth))
+      .route('/api', pushRoutes(db, auth, env.EXPO_PUSH_ACCESS_TOKEN))
+      .route('/api', socialRoutes(db, auth, createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN)))
       .route('/api', recipeRoutes(db, auth))
       .route('/api', postAnalysisRoutes(requireSession(auth), analyzePost))
       .route('/', expoWebRoutes(env.EXPO_WEB_ROOT))

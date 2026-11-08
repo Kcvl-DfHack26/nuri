@@ -11,11 +11,16 @@ import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
 import type { Auth, AuthenticatedEnv } from '../auth';
+import type { createPushSender } from '../push';
 
 import { like, post, user } from '../../db/schema';
 import { requireSession } from '../auth';
 
-export function socialRoutes(db: Database, auth: Auth) {
+export function socialRoutes(
+  db: Database,
+  auth: Auth,
+  sendPush: ReturnType<typeof createPushSender>,
+) {
   return new Hono<AuthenticatedEnv>()
     .get('/users/:id', zValidator('param', userParamsSchema), async (c) => {
       const session = await auth.api.getSession({ headers: c.req.raw.headers });
@@ -133,16 +138,18 @@ export function socialRoutes(db: Database, auth: Auth) {
       requireSession(auth),
       zValidator('param', postParamsSchema),
       async (c) => {
-        const existing = await db
-          .select({ id: post.id })
+        const postId = c.req.valid('param').id;
+        const actorId = c.get('currentUser').id;
+        const [existing] = await db
+          .select({ userId: post.userId })
           .from(post)
-          .where(eq(post.id, c.req.valid('param').id));
-        if (!existing.length) {
+          .where(eq(post.id, postId));
+        if (!existing) {
           return c.json({ error: 'not_found' as const }, 404);
         }
         // INSERT ... SELECT avoids a foreign-key race with deletion. The unique
         // key makes repeated taps and network retries idempotent.
-        await db
+        const [added] = await db
           .insert(like)
           .select(
             db
@@ -154,9 +161,13 @@ export function socialRoutes(db: Database, auth: Auth) {
                   .as(like.userId.name),
               })
               .from(post)
-              .where(eq(post.id, c.req.valid('param').id)),
+              .where(eq(post.id, postId)),
           )
-          .onConflictDoNothing();
+          .onConflictDoNothing()
+          .returning({ postId: like.postId });
+        if (added && existing.userId !== actorId) {
+          await sendPush({ kind: 'post-liked', recipientId: existing.userId });
+        }
         return c.json({ success: true });
       },
     )

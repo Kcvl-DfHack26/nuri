@@ -45,6 +45,17 @@ export const session = pgTable(
   (table) => [index('session_user_id_idx').on(table.userId)],
 );
 
+export const pushSubscription = pgTable(
+  'push_subscription',
+  {
+    token: text('token').primaryKey(),
+    sessionId: text('session_id')
+      .notNull()
+      .references(() => session.id, { onDelete: 'cascade' }),
+  },
+  (table) => [index('push_subscription_session_id_idx').on(table.sessionId)],
+);
+
 export const account = pgTable(
   'account',
   {

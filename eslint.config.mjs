@@ -112,6 +112,14 @@ export default [
               allow: { to: { element: { type: 'api-module', captured: { module: 'auth' } } } },
             },
             {
+              from: { element: { type: 'api-module', captured: { module: 'social' } } },
+              allow: { to: { element: { type: 'api-module', captured: { module: 'push' } } } },
+            },
+            {
+              from: { element: { type: 'api-module', captured: { module: 'push' } } },
+              allow: { to: { element: { type: 'api-module', captured: { module: 'auth' } } } },
+            },
+            {
               from: { element: { type: ['api-db', 'api-platform'] } },
               allow: { to: { element: { type: 'shared' } } },
             },

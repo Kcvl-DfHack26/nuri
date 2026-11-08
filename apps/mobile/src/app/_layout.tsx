@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { Uniwind } from 'uniwind';
 
+import { PushNotifications } from '@/components/push-notifications';
 import { Launch } from '@/components/launch';
 import { stackOptions } from '@/theme/navigation';
 
@@ -69,6 +70,7 @@ function Navigation() {
         <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
         <Stack.Screen name="auth-callback" options={{ title: 'ログイン' }} />
       </Stack>
+      <PushNotifications />
       <StatusBar style="dark" />
     </ThemeProvider>
   );

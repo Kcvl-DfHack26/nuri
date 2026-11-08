@@ -235,3 +235,19 @@ export const postAnalysisSchema = z.object({
     .max(10),
 });
 export type PostAnalysis = z.infer<typeof postAnalysisSchema>;
+export const pushChannels = {
+  likes: 'いいね',
+  'recipe-import': '動画レシピの作成',
+} as const;
+
+const pushRecipient = z.object({ recipientId: userParamsSchema.shape.id });
+
+export const pushDataSchema = z.discriminatedUnion('kind', [
+  pushRecipient.extend({ kind: z.literal('post-liked') }),
+  pushRecipient.extend({ kind: z.literal('recipe-started') }),
+  pushRecipient.extend({
+    kind: z.literal('recipe-ready'),
+    recipeId: recipeParamsSchema.shape.id.optional(),
+  }),
+  pushRecipient.extend({ kind: z.literal('recipe-failed') }),
+]);
