@@ -2,6 +2,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
+import type { RecipeDetail } from '@/lib/recipes';
+
+import { favoriteListOptions, recipeListOptions, recipeOptions } from '@/lib/recipes';
 import { createTestQueryClient } from '@/lib/test/query-client';
 
 import { ProfileSettings } from './profile-settings';
@@ -120,6 +123,21 @@ type Session = { data: { user: { id: string; name: string; email: string } } | n
 const viewer: Session = {
   data: { user: { id: 'viewer', name: 'はなこ', email: 'hanako@example.com' } },
 };
+const cachedRecipe: RecipeDetail = {
+  id: 'fox',
+  title: '狐メイク',
+  image: '/sample-recipes/fox.jpg',
+  tags: [],
+  durationMinutes: 10,
+  source: null,
+  part: null,
+  summary: null,
+  likeCount: 0,
+  favorited: false,
+  author: { id: 'viewer', name: 'はなこ', image: null },
+  products: [],
+  steps: [],
+};
 const mockUseSession = jest.fn((): Session & { isPending: boolean } => ({
   ...viewer,
   isPending: false,
@@ -188,6 +206,36 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
     json: { name: 'はな', handle: 'hana_1', bio: 'よろしく', isPublic: false },
   });
   expect(mockNotify).toHaveBeenCalled();
+});
+
+test('refreshes cached recipe authors after saving a profile', async () => {
+  const client = createTestQueryClient();
+  const detail = recipeOptions('fox').queryKey;
+  const lists = [recipeListOptions({}).queryKey, favoriteListOptions('viewer').queryKey];
+  for (const key of lists) {
+    client.setQueryData(key, { pages: [], pageParams: [] });
+  }
+  client.setQueryData(detail, cachedRecipe);
+  client.setQueryData(['unrelated'], []);
+  await renderWithClient(<ProfileSettings />, client);
+  await screen.findByLabelText('表示名');
+  await fireEvent.changeText(screen.getByLabelText('表示名'), '更新した名前');
+  await saveProfile();
+
+  for (const key of [detail, ...lists]) {
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  }
+  expect(client.getQueryState(['unrelated'])?.isInvalidated).toBe(false);
+  // Even a fresh cached detail must fetch the saved author's name when opened again.
+  const updated = await client.fetchQuery({
+    queryKey: detail,
+    staleTime: Infinity,
+    queryFn: async () => ({
+      ...cachedRecipe,
+      author: { ...cachedRecipe.author, name: '更新した名前' },
+    }),
+  });
+  expect(updated.author.name).toBe('更新した名前');
 });
 
 test('chooses a face type and saves it, never showing a skin tone', async () => {
@@ -316,9 +364,12 @@ test('lets a guest log in from the profile settings', async () => {
 });
 
 test('keeps the edited name and shows why saving or logging out failed', async () => {
+  const client = createTestQueryClient();
+  const detail = recipeOptions('fox').queryKey;
+  client.setQueryData(detail, cachedRecipe);
   mockPutProfile.mockResolvedValueOnce({ status: 500 });
   mockSignOut.mockResolvedValueOnce({ error: { message: 'failed' } });
-  await renderWithClient(<ProfileSettings />);
+  await renderWithClient(<ProfileSettings />, client);
   await screen.findByLabelText('表示名');
   await fireEvent.changeText(screen.getByLabelText('表示名'), 'はな');
   await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
@@ -327,6 +378,7 @@ test('keeps the edited name and shows why saving or logging out failed', async (
   ).toBeOnTheScreen();
   expect(screen.getByLabelText('表示名')).toHaveProp('value', 'はな');
   expect(screen.getByRole('button', { name: '保存する' })).toBeEnabled();
+  expect(client.getQueryState(detail)?.isInvalidated).toBe(false);
 
   await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
   expect(

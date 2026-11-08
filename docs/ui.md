@@ -91,7 +91,7 @@ bun run doctor
 bun run export:mobile
 ```
 
-いいねは行ごとの `useMutation` で対象投稿IDを楽観更新し、ホーム／プロフィールのTanStack Queryキャッシュに反映する。`onError` はその投稿だけ復元し、別投稿の並行操作を巻き戻さない。成功時の全件invalidateを行わず、未変更オブジェクトの参照を保ってmemo化したPostRowの再描画を省く。FlatListの `refreshing` を立てない。pull-to-refresh専用状態を持ち、背景の再取得で画面が下へずれないことをRNTLと実画面で確認する。
+お気に入りは `useFavorite` で対象レシピを楽観更新し、一覧・詳細・お気に入り一覧のTanStack Queryキャッシュに反映する。失敗時は変更したキャッシュだけを復元し、別レシピの並行操作を巻き戻さない。処理後は対象の詳細を、最後の操作が終わった時点でお気に入り一覧とユーザー情報を再取得する。プロフィール保存後は `recipeKeys.all` を無効化し、レシピの作者名も再取得する。FlatListの `refreshing` はpull-to-refresh専用状態とし、背景の再取得では立てない。
 
 JestはButtonの操作・disabled、Textのアクセシビリティ、プロフィール設定内のパスキー操作を検証する。MetroによるclassName変換とネイティブ描画はJestだけでは検証できないため、iOS／AndroidのExpo Goでライト配色、大きな文字、標準UIとの併用を確認する。bundle成功を端末確認の代わりにはしない。
 

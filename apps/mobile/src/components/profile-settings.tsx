@@ -22,6 +22,7 @@ import { apiUrl, authClient } from '@/lib/api';
 import { faceTypes } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
 import { addPasskey, passkeyListOptions, passkeysAvailable } from '@/lib/passkeys';
+import { recipeKeys } from '@/lib/recipes';
 import { changeProfile, myProfileKeys, myProfileOptions, userKeys } from '@/lib/social';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -186,7 +187,7 @@ function Editor({
     onSuccess: async () => {
       authClient.$store.notify('$sessionSignal');
       await Promise.all([
-        client.invalidateQueries({ queryKey: ['posts'] }),
+        client.invalidateQueries({ queryKey: recipeKeys.all }),
         client.invalidateQueries({ queryKey: userKeys.all }),
         client.invalidateQueries({ queryKey: myProfileKeys.all }),
       ]);

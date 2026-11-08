@@ -28,7 +28,6 @@ const pages = [
   '/recipes/:id/steps',
   '/record',
   '/search',
-  '/settings',
   '/suggest',
   '/users/:id',
 ];

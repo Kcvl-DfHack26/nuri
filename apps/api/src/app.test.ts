@@ -120,6 +120,7 @@ test('serves the Expo SPA without rewriting API, missing assets, or the future L
       '/recipes/fox/unknown',
       '/about/',
       '/unknown',
+      '/settings',
     ]) {
       expect((await hosted.request(path)).status).toBe(404);
     }
