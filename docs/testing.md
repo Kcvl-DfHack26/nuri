@@ -12,6 +12,8 @@ bun run export:mobile
 
 APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。
 
+GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ブラウザ別のWeb E2E、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。必須チェックの `quality` はすべての結果を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
+
 | 検査                | 確認すること                                                  |
 | ------------------- | ------------------------------------------------------------- |
 | ESLint・型・Bun     | workspace間の依存方向、環境設定、HTTP契約、Gitと起動CLIの境界 |
@@ -53,7 +55,7 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 
 ## Expo WebのE2E
 
-Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgreSQLを経由してサンプルレシピを読む。ChromiumとWebKitでスマートフォン・横向きタブレットの一覧、URL直アクセス、手順と完成、比較のドラッグを検査する。Chromiumではカメラ拒否後の見本と、仮想カメラの開始・停止も検査する。CIでは既存の使い捨てPostgreSQLサービスを使い、失敗時にPlaywrightのトレースを保存する。
+Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgreSQLを経由してサンプルレシピを読む。ChromiumとWebKitでスマートフォン・横向きタブレットの一覧、URL直アクセス、手順と完成、比較のドラッグを検査する。Chromiumではカメラ拒否後の見本と、仮想カメラの開始・停止も検査する。CIではブラウザごとの使い捨てPostgreSQLサービスを使い、失敗時にブラウザ別のトレースを保存する。
 
 ローカルでは次のように専用DBを起動する。停止するとこのコンテナのデータは消える。
 
