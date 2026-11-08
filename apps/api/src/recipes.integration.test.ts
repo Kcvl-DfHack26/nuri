@@ -94,23 +94,18 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
   ).toEqual([{ value: 5 }]);
 });
 
-test('lists and shows recipes without a session', async () => {
-  const list = await app.request('/api/recipes');
-  expect(list.status).toBe(200);
-  const { items } = z
-    .object({ items: z.array(z.object({ id: z.string() })) })
-    .parse(await list.json());
-  expect(items.map((item) => item.id)).toContain('fox');
-
+test('shows the public recipe with ordered products and steps', async () => {
   const detail = await app.request('/api/recipes/fox');
   expect(detail.status).toBe(200);
-  expect(await detail.json()).toMatchObject({
+  const body: unknown = await detail.json();
+  expect(body).toMatchObject({
     recipe: {
       id: 'fox',
       title: '狐メイク',
       tags: ['丸顔向け'],
       durationMinutes: 15,
       source: 'instagram',
+      favorited: false,
       author: { name: 'mio', image: '/sample-avatars/mio.png' },
       products: [
         { id: 'celane-brow-pencil', usage: '眉・モカブラウン', purchaseUrl: null },
@@ -125,10 +120,10 @@ test('lists and shows recipes without a session', async () => {
   });
   const { recipe: fox } = z
     .object({ recipe: z.object({ steps: z.array(z.object({ part: z.string() })) }) })
-    .parse(await (await app.request('/api/recipes/fox')).json());
+    .parse(body);
   expect(fox.steps.map((step) => step.part)).toEqual(['brow', 'eye', 'lash', 'shading', 'cheek']);
   expect(await (await app.request('/api/recipes/cat')).json()).toMatchObject({
-    recipe: { steps: [] },
+    recipe: { products: [], steps: [] },
   });
   expect((await app.request('/api/recipes/missing-recipe')).status).toBe(404);
 });
@@ -136,11 +131,11 @@ test('lists and shows recipes without a session', async () => {
 test('lists whole-face recipes by default and part recipes by part', async () => {
   const schema = z.object({ items: z.array(z.object({ id: z.string() })) });
   const whole = schema.parse(await (await app.request('/api/recipes')).json());
+  expect(whole.items.map((item) => item.id)).toContain('fox');
   expect(whole.items.map((item) => item.id)).not.toContain('brow-soft-arch');
   const brows = schema.parse(await (await app.request('/api/recipes?part=brow')).json());
   expect(brows.items.map((item) => item.id)).toContain('brow-soft-arch');
   expect(brows.items.map((item) => item.id)).not.toContain('fox');
-  expect((await app.request('/api/recipes?part=nose')).status).toBe(400);
   const counts = z
     .object({ items: z.array(z.object({ part: z.string().nullable(), count: z.number() })) })
     .parse(await (await app.request('/api/recipe-parts')).json());
@@ -174,30 +169,35 @@ test('searches recipes of every kind by title and tag with paging', async () => 
     .insert(user)
     .values({ id: searchUserId, name: 'けんさく', email: `${searchUserId}@example.com` });
   try {
+    const matchingRecipes = Array.from({ length: 20 }, (_, index) => ({
+      id: `search-${unique}-${String(index).padStart(2, '0')}`,
+      authorId: searchUserId,
+      title: `検索用${index}`,
+      image: 'https://example.com/search.jpg',
+      tags: [token.toUpperCase()],
+      durationMinutes: 3,
+    }));
+    const wildcardId = `search-${unique}-wild`;
+    const createdAt = new Date('2026-01-01T00:00:00Z');
     await db.insert(recipe).values([
-      ...Array.from({ length: 20 }, (_, index) => ({
-        id: `search-${unique}-${index}`,
-        authorId: searchUserId,
-        title: `検索用${index}`,
-        image: 'https://example.com/search.jpg',
-        tags: [token.toUpperCase()],
-        durationMinutes: 3,
-      })),
+      ...matchingRecipes.map((row) => ({ ...row, createdAt })),
       {
-        id: `search-${unique}-wild`,
+        id: wildcardId,
         authorId: searchUserId,
         title: `100%_${token}`,
         image: 'https://example.com/search.jpg',
-        part: 'lip' as const,
+        part: 'lip',
         durationMinutes: 3,
+        createdAt,
       },
     ]);
-    // Case-insensitive, across whole-face and part recipes, 20 per page.
+    // Equal timestamps require a stable ID tie-breaker across pages.
+    const expectedIds = [wildcardId, ...matchingRecipes.map(({ id }) => id).reverse()];
     const first = await search(`q=${token}`);
-    expect(first.items).toHaveLength(20);
+    expect(first.items.map(({ id }) => id)).toEqual(expectedIds.slice(0, 20));
     expect(first.nextOffset).toBe(20);
     const second = await search(`q=${token}&offset=20`);
-    expect(second.items).toHaveLength(1);
+    expect(second.items.map(({ id }) => id)).toEqual(expectedIds.slice(20));
     expect(second.nextOffset).toBeNull();
     // LIKE wildcards in the term match literally.
     expect((await search(`q=${encodeURIComponent(`0%_${token}`)}`)).items).toHaveLength(1);
@@ -206,6 +206,4 @@ test('searches recipes of every kind by title and tag with paging', async () => 
   } finally {
     await db.delete(user).where(eq(user.id, searchUserId));
   }
-  expect((await app.request('/api/recipes?q=%20')).status).toBe(400);
-  expect((await app.request(`/api/recipes?q=${'a'.repeat(51)}`)).status).toBe(400);
 });

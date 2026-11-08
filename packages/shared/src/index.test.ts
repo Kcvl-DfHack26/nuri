@@ -10,6 +10,7 @@ import {
   recipeInputSchema,
   recipeListQuerySchema,
   recipeParamsSchema,
+  recipeSearchMaxLength,
   recipeThumbnailMaxBytes,
 } from './index';
 
@@ -40,13 +41,25 @@ test('preserves appearance preferences while removing obsolete ritual data', () 
   });
   expect(preferencesSchema.safeParse({ appearance: 'unknown' }).success).toBe(false);
 });
-test('accepts only slug recipe IDs and bounded recipe pages', () => {
+test('accepts only slug recipe IDs and bounded recipe searches', () => {
   expect(recipeParamsSchema.parse({ id: 'fox' }).id).toBe('fox');
   for (const id of ['', 'Fox', 'a b', '../fox', 'a'.repeat(65)]) {
     expect(recipeParamsSchema.safeParse({ id }).success).toBe(false);
   }
   expect(recipeListQuerySchema.parse({})).toEqual({ offset: 0 });
+  expect(recipeListQuerySchema.parse({ part: 'brow', q: ' 猫 ' })).toEqual({
+    offset: 0,
+    part: 'brow',
+    q: '猫',
+  });
   expect(recipeListQuerySchema.safeParse({ offset: '-1' }).success).toBe(false);
+  expect(recipeListQuerySchema.safeParse({ part: 'nose' }).success).toBe(false);
+  expect(recipeListQuerySchema.safeParse({ q: '猫'.repeat(recipeSearchMaxLength) }).success).toBe(
+    true,
+  );
+  for (const q of [' ', '猫'.repeat(recipeSearchMaxLength + 1)]) {
+    expect(recipeListQuerySchema.safeParse({ q }).success).toBe(false);
+  }
 });
 test('accepts only https shop links', () => {
   expect(purchaseUrlSchema.safeParse('https://www.amazon.co.jp/s?k=cheek').success).toBe(true);

@@ -1,8 +1,9 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { openBrowserAsync } from 'expo-web-browser';
 import { Alert } from 'react-native';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { RecipeDetail } from './recipe-detail';
 
@@ -96,19 +97,12 @@ const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
   json: async () => ({ recipe: fox }),
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-  });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 test('shows the recipe from the API and opens the product sheet from a product row', async () => {
-  await render(<RecipeDetail id="fox" />, { wrapper });
+  await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('狐メイク')).toBeOnTheScreen();
   expect(screen.getByText('＃丸顔向け')).toBeOnTheScreen();
   expect(screen.getByText('＃15分')).toBeOnTheScreen();
@@ -143,7 +137,7 @@ test('keeps the start action disabled for a recipe without steps', async () => {
       recipe: { ...fox, id: 'round', title: '丸顔メイク', products: [], steps: [] },
     }),
   });
-  await render(<RecipeDetail id="round" />, { wrapper });
+  await render(<RecipeDetail id="round" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('丸顔メイク')).toBeOnTheScreen();
   expect(screen.queryByText('使うメイク品')).toBeNull();
   expect(screen.queryByText('手順')).toBeNull();
@@ -152,7 +146,7 @@ test('keeps the start action disabled for a recipe without steps', async () => {
 
 test('retries a failed load and reports a missing recipe without retrying', async () => {
   mockGetRecipe.mockRejectedValueOnce(new Error('通信エラー'));
-  await render(<RecipeDetail id="fox" />, { wrapper });
+  await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
   expect(
     await screen.findByText('レシピを読み込めませんでした。通信状況を確認してお試しください。'),
   ).toBeOnTheScreen();
@@ -160,14 +154,14 @@ test('retries a failed load and reports a missing recipe without retrying', asyn
   expect(await screen.findByText('狐メイク')).toBeOnTheScreen();
 
   mockGetRecipe.mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) });
-  await render(<RecipeDetail id="missing" />, { wrapper });
+  await render(<RecipeDetail id="missing" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('レシピが見つかりません')).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'もう一度試す' })).toBeNull();
 });
 
 test('sends a guest to log in before keeping a favorite', async () => {
   mockSignedIn = false;
-  await render(<RecipeDetail id="fox" />, { wrapper });
+  await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
   await fireEvent.press(await screen.findByRole('button', { name: 'お気に入り' }));
   expect(router.push).toHaveBeenCalledWith('/account');
   expect(mockFavorite).not.toHaveBeenCalled();
@@ -175,7 +169,7 @@ test('sends a guest to log in before keeping a favorite', async () => {
 
 test('keeps a favorite at once and rolls it back when the server refuses', async () => {
   mockSignedIn = true;
-  await render(<RecipeDetail id="fox" />, { wrapper });
+  await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
   const favorite = await screen.findByRole('button', { name: 'お気に入り' });
   expect(favorite).not.toBeSelected();
   await fireEvent.press(favorite);

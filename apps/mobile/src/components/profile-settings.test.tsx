@@ -1,6 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
+
+import { createTestQueryClient } from '@/lib/test/query-client';
 
 import { ProfileSettings } from './profile-settings';
 
@@ -88,7 +90,12 @@ const mockUseSession = jest.fn((): Session & { isPending: boolean } => ({
 function signOutForTest() {
   mockUseSession.mockImplementation(() => ({ data: null, isPending: false }));
 }
+beforeEach(() => {
+  // Let Testing Library flush React Query's scheduled notifications inside act.
+  jest.useFakeTimers();
+});
 afterEach(() => {
+  jest.useRealTimers();
   mockUseSession.mockImplementation(() => ({ ...viewer, isPending: false }));
 });
 const mockGetProfile = jest.fn(async () => ({
@@ -101,18 +108,16 @@ const mockSignOut = jest.fn(async (): Promise<{ error: { message: string } | nul
   error: null,
 }));
 
-function createTestClient() {
-  return new QueryClient({
-    // No garbage-collection timers, so Jest can exit after the run.
-    defaultOptions: {
-      queries: { retry: false, gcTime: Infinity },
-      mutations: { retry: false, gcTime: Infinity },
-    },
-  });
+function renderWithClient(element: React.ReactElement, client = createTestQueryClient()) {
+  return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
 }
 
-function renderWithClient(element: React.ReactElement, client = createTestClient()) {
-  return render(<QueryClientProvider client={client}>{element}</QueryClientProvider>);
+async function saveProfile() {
+  await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
+  await waitFor(() => {
+    expect(router.back).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '保存する' })).toBeOnTheScreen();
+  });
 }
 
 test('saves profile fields and keeps unbuilt settings disabled', async () => {
@@ -129,10 +134,7 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
   await fireEvent.changeText(screen.getByLabelText('ユーザーID'), 'hana_1');
   await fireEvent.changeText(screen.getByLabelText('自己紹介'), 'よろしく');
   await fireEvent(screen.getByLabelText('プロフィールを公開'), 'valueChange', false);
-  await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
-  await waitFor(() => {
-    expect(router.back).toHaveBeenCalled();
-  });
+  await saveProfile();
   expect(mockPutProfile).toHaveBeenCalledWith({
     json: { name: 'はな', handle: 'hana_1', bio: 'よろしく', isPublic: false },
   });
@@ -148,6 +150,7 @@ test('opens the app settings and logs out from the profile settings', async () =
   await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
   await waitFor(() => {
     expect(router.dismissTo).toHaveBeenCalledWith('/');
+    expect(screen.getByRole('button', { name: 'ログアウト' })).toBeEnabled();
   });
   expect(mockSignOut).toHaveBeenCalled();
 });
@@ -163,7 +166,7 @@ test('explains invalid user IDs before saving', async () => {
 });
 
 test('keeps a remote privacy change when saving only an edited name', async () => {
-  const client = createTestClient();
+  const client = createTestQueryClient();
   await renderWithClient(<ProfileSettings />, client);
   await screen.findByLabelText('表示名');
   await act(async () => {
@@ -178,10 +181,8 @@ test('keeps a remote privacy change when saving only an edited name', async () =
     expect(screen.getByLabelText('プロフィールを公開')).toHaveProp('value', false);
   });
   await fireEvent.changeText(screen.getByLabelText('表示名'), '更新した名前');
-  await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
-  await waitFor(() => {
-    expect(mockPutProfile).toHaveBeenLastCalledWith({ json: { name: '更新した名前' } });
-  });
+  await saveProfile();
+  expect(mockPutProfile).toHaveBeenLastCalledWith({ json: { name: '更新した名前' } });
 });
 
 test('saves a privacy change when the existing display name exceeds the edit limit', async () => {
@@ -194,14 +195,12 @@ test('saves a privacy change when the existing display name exceeds the edit lim
   await renderWithClient(<ProfileSettings />);
   await screen.findByLabelText('表示名');
   await fireEvent(screen.getByLabelText('プロフィールを公開'), 'valueChange', false);
-  await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
-  await waitFor(() => {
-    expect(mockPutProfile).toHaveBeenLastCalledWith({ json: { isPublic: false } });
-  });
+  await saveProfile();
+  expect(mockPutProfile).toHaveBeenLastCalledWith({ json: { isPublic: false } });
 });
 
 test('blocks saving a draft until a failed refresh is retried', async () => {
-  const client = createTestClient();
+  const client = createTestQueryClient();
   await renderWithClient(<ProfileSettings />, client);
   await screen.findByLabelText('表示名');
   await fireEvent.changeText(screen.getByLabelText('表示名'), '編集中');

@@ -1,12 +1,14 @@
 import type { AlertButton } from 'react-native';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { useEffect } from 'react';
 import { Alert } from 'react-native';
+
+import { createTestQueryClient } from '@/lib/test/query-client';
 
 import type { PostDraft } from './post-draft';
 
@@ -155,9 +157,7 @@ async function renderSeeded(
   screenElement: React.ReactElement,
   change: Partial<PostDraft> = readyDraft,
 ) {
-  const client = new QueryClient({
-    defaultOptions: { mutations: { retry: false, gcTime: Infinity } },
-  });
+  const client = createTestQueryClient();
   const invalidate = jest.spyOn(client, 'invalidateQueries');
   const view = await render(
     <QueryClientProvider client={client}>

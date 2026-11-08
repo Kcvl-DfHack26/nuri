@@ -37,6 +37,12 @@ jobs:
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
+      - name: Commit conventions
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
       - name: Verify generated UI types
         run: |
           bun run --cwd apps/mobile styles:generate
@@ -46,14 +52,23 @@ jobs:
         env:
           DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
         run: bun run --cwd apps/api db:migrate && bun run --cwd apps/api test:integration
+  mobile-bundle:
+    runs-on: ubuntu-latest
+    env:
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - run: bun install --frozen-lockfile
       - run: bun run doctor
       - run: bun run export:mobile
-      - name: Commit conventions
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: bunx commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: mobile-bundles

@@ -6,15 +6,14 @@ import { StatusBar } from 'expo-status-bar';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { MakeupLayer } from '@/components/face-makeup-camera';
-
-import { canTrackFace, FaceMakeupCamera, paintColor } from '@/components/face-makeup-camera';
+import { canTrackFace, FaceMakeupCamera } from '@/components/face-makeup-camera';
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { RecipeStatus } from '@/components/recipe-detail';
 import { arPhotos } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
+import { finishLayers } from '@/lib/face-makeup';
 import { backOrHome } from '@/lib/navigation';
 import { recipeOptions, shareRecipe } from '@/lib/recipes';
 
@@ -142,21 +141,6 @@ export function MakeFinish({ id }: { id: string }) {
       </View>
     </View>
   );
-}
-
-/** Every step's part in its color; a part painted twice keeps the later step's color. */
-function finishLayers(steps: readonly { part: MakeupLayer['part']; colors: string[] }[]) {
-  const layers: MakeupLayer[] = [];
-  for (const step of steps) {
-    const layer = { part: step.part, color: paintColor(step.colors) };
-    const existing = layers.findIndex((candidate) => candidate.part === step.part);
-    if (existing === -1) {
-      layers.push(layer);
-    } else {
-      layers[existing] = layer;
-    }
-  }
-  return layers;
 }
 
 function finishStatusMessage({

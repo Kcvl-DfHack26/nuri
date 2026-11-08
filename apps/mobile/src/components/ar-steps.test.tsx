@@ -1,6 +1,7 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+
+import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { ArSteps } from './ar-steps';
 
@@ -8,7 +9,6 @@ import { ArSteps } from './ar-steps';
 jest.mock('@/components/face-makeup-camera', () => ({
   canTrackFace: false,
   FaceMakeupCamera: () => null,
-  paintColor: (colors: string[]) => colors[0],
 }));
 jest.mock('@expo/ui', () => {
   const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
@@ -83,17 +83,12 @@ const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
   json: async () => ({ recipe: fox }),
 }));
 
-function wrapper({ children }: { children: React.ReactNode }) {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
 test('moves through the API steps with next, previous and the step list', async () => {
-  await render(<ArSteps id="fox" />, { wrapper });
+  await render(<ArSteps id="fox" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('眉尻を濃く、眉頭は淡く')).toBeOnTheScreen();
   expect(screen.getByText('1/3')).toBeOnTheScreen();
   expect(screen.getByText('おすすめ色 #79513A')).toBeOnTheScreen();
@@ -111,7 +106,7 @@ test('moves through the API steps with next, previous and the step list', async 
 });
 
 test('opens the finish screen after the last step', async () => {
-  await render(<ArSteps id="fox" />, { wrapper });
+  await render(<ArSteps id="fox" />, { wrapper: TestQueryProvider });
   await fireEvent.press(await screen.findByRole('button', { name: '3 チーク' }));
   expect(router.replace).not.toHaveBeenCalled();
 
@@ -121,7 +116,7 @@ test('opens the finish screen after the last step', async () => {
 
 test('shows a way back for a recipe that is missing or has no steps', async () => {
   mockGetRecipe.mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) });
-  await render(<ArSteps id="missing" />, { wrapper });
+  await render(<ArSteps id="missing" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('手順が見つかりません')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '戻る' }));
   expect(router.back).toHaveBeenCalled();
@@ -131,13 +126,13 @@ test('shows a way back for a recipe that is missing or has no steps', async () =
     status: 200,
     json: async () => ({ recipe: { ...fox, id: 'round', steps: [] } }),
   });
-  await render(<ArSteps id="round" />, { wrapper });
+  await render(<ArSteps id="round" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('手順が見つかりません')).toBeOnTheScreen();
 });
 
 test('retries a failed load', async () => {
   mockGetRecipe.mockRejectedValueOnce(new Error('通信エラー'));
-  await render(<ArSteps id="fox" />, { wrapper });
+  await render(<ArSteps id="fox" />, { wrapper: TestQueryProvider });
   expect(
     await screen.findByText('手順を読み込めませんでした。通信状況を確認してお試しください。'),
   ).toBeOnTheScreen();

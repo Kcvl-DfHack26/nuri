@@ -10,7 +10,7 @@ bun run doctor
 bun run export:mobile
 ```
 
-APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。統合テストは一意なメールアドレスを使い、終了時にそのユーザーだけを削除する。開発・CI用DBに対して実行する。
+APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。
 
 | 検査                | 確認すること                                                  |
 | ------------------- | ------------------------------------------------------------- |
@@ -19,6 +19,10 @@ APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integ
 | Jest・jest-expo     | ネイティブ境界を差し替えた画面の状態と操作                    |
 | 実Compose・Portless | 各構成の解決、起動、HTTPS、worktree間の分離と永続化           |
 | 開発ビルド          | 仮想端末でのTLS、Metro、Fast Refresh、認証の戻り先            |
+
+GitHub Actionsの `quality` は生成型・静的検査・Bun/Jest・PostgreSQL統合テストを実行する。`quality` と並行して動く `mobile-bundle` はExpo DoctorとiOS／Androidのexportを行い、`mobile-bundles` を保存する。
+
+React Queryを使う画面テストでは `apps/mobile/src/lib/test/query-client.tsx` のfixtureを使う。テストごとにキャッシュを分離し、`gcTime: Infinity` でJest終了を妨げるタイマーの登録を防ぐ。
 
 PRに確認したSHA・実行コマンドと環境・結果・未確認項目を記録する。過去の検証記録には旧project名や当時の構成を含む。
 
