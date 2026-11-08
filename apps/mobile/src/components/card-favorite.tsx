@@ -1,16 +1,10 @@
-import { Icon } from '@expo/ui';
 import { Pressable } from 'react-native';
 
+import { HEART, HEART_FILLED } from '@/components/favorite-icons';
 import { SocialIcon } from '@/components/social-icon';
 import { useFavorite } from '@/components/use-favorite';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
-
-const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
-const HEART_FILLED = Icon.select({
-  ios: 'heart.fill',
-  android: import('@expo/material-symbols/favorite.xml'),
-});
 
 /**
  * The heart on a recipe card's photo (①, ⑭). Place it beside the card's own button, not inside
@@ -43,7 +37,6 @@ export function CardFavorite({
         className,
       )}
     >
-      {/* Android ships only outlined symbols, so the rose color also marks a favorite. */}
       <SocialIcon
         name={favorite.favorited ? HEART_FILLED : HEART}
         webGlyph={favorite.favorited ? '♥' : '♡'}

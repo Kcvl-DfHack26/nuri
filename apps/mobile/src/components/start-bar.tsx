@@ -1,20 +1,13 @@
-import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { Pressable, View } from 'react-native';
 
+import { HEART, HEART_FILLED } from '@/components/favorite-icons';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
 import sparkleWhite from '../../assets/plan-a/icons/sparkle-white.svg';
-
-const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
-
-const HEART_FILLED = Icon.select({
-  ios: 'heart.fill',
-  android: import('@expo/material-symbols/favorite.xml'),
-});
 
 // Plan A bottom bar shared by ③ and ⑤: favorite and the main start action.
 export function StartBar({
@@ -44,7 +37,6 @@ export function StartBar({
           onPress={favorite.onPress}
           className="size-13 items-center justify-center rounded-full bg-white active:opacity-70"
         >
-          {/* Android ships only outlined symbols, so the rose color also marks a favorite. */}
           <SocialIcon
             name={favorite.favorited ? HEART_FILLED : HEART}
             webGlyph={favorite.favorited ? '♥' : '♡'}
