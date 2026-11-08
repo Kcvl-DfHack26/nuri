@@ -120,9 +120,13 @@ export function Suggest() {
   const savedFrame = useRef<string | null>(null);
   // The last result lives only while the app runs, so frames a previous run saved are not shown.
   useEffect(() => {
-    const folder = new Directory(Paths.cache, savedFrameFolder);
-    if (folder.exists) {
-      folder.delete();
+    try {
+      const folder = new Directory(Paths.cache, savedFrameFolder);
+      if (folder.exists) {
+        folder.delete();
+      }
+    } catch {
+      // Tried again the next time ⑬ mounts.
     }
   }, []);
 
