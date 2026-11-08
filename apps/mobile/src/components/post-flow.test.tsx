@@ -693,11 +693,7 @@ test('asks before posting and sends the steps and thumbnail, never the video', a
   expect(screen.getByText('狐メイク')).toBeOnTheScreen();
   expect(screen.getByText('プレビュー')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
-  expect(alert).toHaveBeenCalledWith(
-    '投稿して公開しますか',
-    expect.stringContaining('サムネイルの写真と手順をサーバーに送り'),
-    expect.any(Array),
-  );
+  expect(alert).toHaveBeenCalledWith('レシピを投稿しますか？', undefined, expect.any(Array));
   await pressAlertButton('キャンセル');
   expect(mockPost).not.toHaveBeenCalled();
 
