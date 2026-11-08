@@ -67,8 +67,10 @@ jobs:
             const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number });
             let comment = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(`${previewMarker}\n`));
             if (isComment && (!comment || comment.id !== payload.comment.id || comment.body !== payload.comment.body || previewSha(comment.body) !== pr.head.sha)) throw new Error('最新のpreviewコメントから実行してください');
+            // A legacy comment can match the SHA and still need to be replaced with the table.
+            const currentTable = comment?.body?.split('\n', 2)[1] === `<!-- nuri-preview-sha: ${pr.head.sha} -->`;
             const activateRequest = canRequest && comment?.body?.includes(previewSetupPendingMarker);
-            if (commentOnly && comment?.body && previewSha(comment.body) === pr.head.sha && !activateRequest) return;
+            if (commentOnly && currentTable && !activateRequest) return;
             const body = renderPreviewComment({
               sha: pr.head.sha,
               pullRequest: { number: pr.number, url: pr.html_url },
