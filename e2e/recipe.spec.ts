@@ -58,20 +58,37 @@ for (const { name, viewport, firstRowCount } of [
     // Comparison is available by URL. The finish screen currently has no link to it.
     await page.setViewportSize(tablet);
     await page.goto('/recipes/fox/compare');
-    const handle = page.getByLabel('メイク前とメイク後の境目');
+    const handle = page.getByRole('slider', { name: 'メイク前とメイク後の境目' });
     await expect(handle).toBeVisible();
+    // The preview initially spans the viewport. Wait for the tablet layout before measuring.
+    await expect
+      .poll(
+        async () => {
+          const box = await handle.boundingBox();
+          if (!box) {
+            return false;
+          }
+          const center = box.x + box.width / 2;
+          return center > tablet.width / 5 && center < tablet.width / 2;
+        },
+        { message: 'The comparison handle starts near the center of the left pane' },
+      )
+      .toBe(true);
     const bounds = await handle.boundingBox();
     if (!bounds) {
       throw new Error('Comparison handle has no layout');
     }
-    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + bounds.height / 2;
+    await page.mouse.move(x, y);
     await page.mouse.down();
-    await page.mouse.move(bounds.x + bounds.width / 2 + 60, bounds.y + bounds.height / 2, {
-      steps: 4,
-    });
-    await page.mouse.up();
-    await expect
-      .poll(async () => Math.round((await handle.boundingBox())?.x ?? 0))
-      .toBeCloseTo(Math.round(bounds.x + 60), -1);
+    try {
+      await page.mouse.move(x + 60, y, { steps: 4 });
+      await expect
+        .poll(async () => Math.round((await handle.boundingBox())?.x ?? 0))
+        .toBeCloseTo(Math.round(bounds.x + 60), -1);
+    } finally {
+      await page.mouse.up();
+    }
   });
 }
