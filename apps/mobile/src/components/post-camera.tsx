@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
-import { recipeStepsMax } from '@starter/shared';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
@@ -19,14 +18,13 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
-import { formatElapsed, spokenElapsed, stepLengths } from '@/lib/recording';
+import { formatElapsed, spokenElapsed } from '@/lib/recording';
 import { useTokenColor } from '@/theme/tokens';
 
 import drafts from '../../assets/plan-a/post/drafts.png';
 
 const IMAGE = Icon.select({ ios: 'photo', android: import('@expo/material-symbols/image.xml') });
 const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
-const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/add.xml') });
 
 // The system picker hands over only the chosen video, so no photo library permission is asked.
 async function pickVideo() {
@@ -250,11 +248,12 @@ function CameraAction({
   );
 }
 
-/** How a recording ends: kept for ⑫-3 with its marks, or deleted from the device. */
-type Ending = { kind: 'finish'; marks: number[]; durationMs: number } | { kind: 'discard' };
+/** How a recording ends: kept for ⑫-3, or deleted from the device. */
+type Ending = { kind: 'finish'; durationMs: number } | { kind: 'discard' };
 
-// Plan A ⑫-2 録画中. Recording starts once the camera is ready. 撮影を終える keeps the video and
-// its marks in the post's data; closing or leaving deletes the video, so nothing is sent.
+// Plan A ⑫-2 録画中. Recording starts once the camera is ready. 撮影を終える keeps the video in the
+// post's data; closing or leaving deletes the video, so nothing is sent. Plan A's 手順を区切る and
+// its step bar are left out (#186): Gemini finds the steps, and ⑫-4/⑫-5 add and move them.
 export function PostRecording() {
   const insets = useSafeAreaInsets();
   const { setDraft } = usePostDraft();
@@ -262,7 +261,6 @@ export function PostRecording() {
   const ending = useRef<Ending | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [marks, setMarks] = useState<number[]>([]);
   // Leaving ⑫-2 in any way (closing, Android's back, finishing) first closes this camera, so ⑫-1's
   // camera is never released by this one closing after it opened (see PostCamera).
   const navigation = useNavigation();
@@ -299,7 +297,6 @@ export function PostRecording() {
     };
   }, [startedAt]);
   const elapsed = startedAt === null ? 0 : Math.max(now - startedAt, 0);
-  const steps = stepLengths(marks, elapsed);
 
   const stopUnexpectedly = (title: string) => {
     ending.current = { kind: 'discard' };
@@ -324,7 +321,7 @@ export function PostRecording() {
         if (end?.kind === 'finish') {
           setDraft((current) => ({
             ...current,
-            video: { uri: result.uri, marks: end.marks, durationMs: end.durationMs },
+            video: { uri: result.uri, marks: [], durationMs: end.durationMs },
           }));
           router.replace('/post/creating');
           return;
@@ -398,11 +395,6 @@ export function PostRecording() {
                   {formatElapsed(elapsed)}
                 </Text>
               </View>
-              <View className="rounded-2xl bg-bg-surface px-3 py-1.5">
-                <Text className="font-maru text-meta text-ink-primary">
-                  手順{steps.length} を撮影中
-                </Text>
-              </View>
             </View>
           </View>
         </View>
@@ -412,19 +404,6 @@ export function PostRecording() {
           className="gap-3.5 rounded-t-sheet bg-post-panel px-5 pt-4"
           style={{ paddingBottom: Math.max(insets.bottom, 12) }}
         >
-          <View className="h-2 flex-row gap-0.75" accessible={false}>
-            {steps.map((length, index) => (
-              <View
-                key={index}
-                className={
-                  index === steps.length - 1
-                    ? 'rounded bg-accent-rose/45'
-                    : 'rounded bg-accent-rose'
-                }
-                style={{ flex: Math.max(length, 1) }}
-              />
-            ))}
-          </View>
           <View className="flex-row items-center justify-between">
             <CameraAction label="一時停止">
               <View className="size-13 flex-row items-center justify-center gap-1.25 rounded-full border border-ink-primary">
@@ -438,11 +417,7 @@ export function PostRecording() {
                 startedAt === null
                   ? undefined
                   : () => {
-                      ending.current = {
-                        kind: 'finish',
-                        marks,
-                        durationMs: Date.now() - startedAt,
-                      };
+                      ending.current = { kind: 'finish', durationMs: Date.now() - startedAt };
                       camera.current?.stopRecording();
                     }
               }
@@ -451,21 +426,8 @@ export function PostRecording() {
                 <View className="size-6.5 rounded-md bg-accent-rose" />
               </View>
             </CameraAction>
-            <CameraAction
-              label="手順を区切る"
-              // A post has at most recipeStepsMax steps, so marks stop one short of it.
-              onPress={
-                startedAt === null || marks.length >= recipeStepsMax - 1
-                  ? undefined
-                  : () => {
-                      setMarks((current) => [...current, Date.now() - startedAt]);
-                    }
-              }
-            >
-              <View className="size-13 items-center justify-center rounded-full bg-accent-rose">
-                <SocialIcon name={ADD} size={26} color="white" />
-              </View>
-            </CameraAction>
+            {/* Keeps 撮影を終える in the middle now that 手順を区切る is gone. */}
+            <View className="w-24 shrink" />
           </View>
         </View>
       }

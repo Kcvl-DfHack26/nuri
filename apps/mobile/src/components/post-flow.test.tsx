@@ -606,6 +606,46 @@ test('lists the steps made from the video with their segment lengths', async () 
   expect(router.push).toHaveBeenCalledWith('/post/step/1');
 });
 
+test('adds a step on ⑫-4 by splitting the last one and opens it on ⑫-5', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostReview />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  await fireEvent.press(screen.getByRole('button', { name: '手順を追加' }));
+  const steps = () => latest?.steps ?? [];
+  expect(steps().map((step) => step.segment)).toEqual([
+    { startMs: 0, endMs: 65_000 },
+    { startMs: 65_000, endMs: 95_000 },
+    { startMs: 95_000, endMs: 125_000 },
+  ]);
+  // The new step starts empty on the split step's part, with the frame at its start.
+  expect(steps()[2]).toMatchObject({
+    part: 'cheek',
+    title: '',
+    description: '',
+    cosmetics: [],
+    shape: null,
+  });
+  expect(router.push).toHaveBeenCalledWith('/post/step/2');
+  await waitFor(() => {
+    expect(steps()[2]?.image).toBe('file:///frame-95000.jpg');
+  });
+  // The split step keeps what the user wrote.
+  expect(steps()[1]?.title).toBe('頬に高めに');
+});
+
+test('cannot add a step without a video to split', async () => {
+  await renderSeeded(<PostReview />, { ...readyDraft, video: null });
+  expect(screen.getByRole('button', { name: '手順を追加（準備中）' })).toBeDisabled();
+});
+
 test('picks the part of a step on ⑫-5 and drops the area read for the old part', async () => {
   let latest: PostDraft | null = null;
   await renderSeeded(

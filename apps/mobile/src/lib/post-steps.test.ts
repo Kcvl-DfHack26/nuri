@@ -1,6 +1,12 @@
 import { recipeStepsMax } from '@starter/shared';
 
-import { minSegmentMs, moveSegment, planSteps, segmentBounds } from './post-steps';
+import {
+  minSegmentMs,
+  moveSegment,
+  planSteps,
+  segmentBounds,
+  splitLastSegment,
+} from './post-steps';
 
 test('splits a recording at its marks, each step ending where the next starts', () => {
   expect(planSteps([4000, 1500], 9000)).toEqual([
@@ -97,4 +103,22 @@ test('keeps a gap the analysis left between steps', () => {
     { startMs: 0, endMs: 3000 },
     { startMs: 4000, endMs: 9000 },
   ]);
+});
+
+test('splits the last step at its middle to add one', () => {
+  expect(splitLastSegment(steps)).toEqual([
+    { startMs: 9000, endMs: 12_000 },
+    { startMs: 12_000, endMs: 15_000 },
+  ]);
+});
+
+test('adds no step that would be too short, past the limit, or of unknown length', () => {
+  expect(splitLastSegment([{ startMs: 0, endMs: minSegmentMs * 2 - 1 }])).toBeNull();
+  expect(splitLastSegment([{ startMs: 0, endMs: null }])).toBeNull();
+  expect(splitLastSegment([])).toBeNull();
+  const full = Array.from({ length: recipeStepsMax }, (_, index) => ({
+    startMs: index * 5000,
+    endMs: (index + 1) * 5000,
+  }));
+  expect(splitLastSegment(full)).toBeNull();
 });

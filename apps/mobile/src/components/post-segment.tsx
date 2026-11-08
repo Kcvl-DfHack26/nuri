@@ -6,14 +6,13 @@ import { useEvent, useEventListener } from 'expo';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { useCallback, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import type { PostStep } from '@/components/post-draft';
 import type { Segment } from '@/lib/post-steps';
 
-import { segmentLength, usePostDraft } from '@/components/post-draft';
+import { segmentLength, useCutStepFrame, usePostDraft } from '@/components/post-draft';
 import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
@@ -60,7 +59,8 @@ function seekTo(player: VideoPlayer, ms: number) {
  * (`moveSegment`); a step whose start moved gets its frame cut again.
  */
 export function StepSegment({ step, position }: { step: PostStep; position: number }) {
-  const { draft, setDraft, trackFile } = usePostDraft();
+  const { draft, setDraft } = usePostDraft();
+  const cutFrame = useCutStepFrame();
   const video = draft.video;
   const durationMs = video?.durationMs ?? null;
   const ink = useTokenColor('--color-ink-primary');
@@ -136,26 +136,9 @@ export function StepSegment({ step, position }: { step: PostStep; position: numb
     }));
     // A step that starts elsewhere now shows the frame at its new start.
     after.forEach((moved, index) => {
-      if (moved.startMs === before[index]?.startMs) {
-        return;
+      if (moved.startMs !== before[index]?.startMs) {
+        cutFrame(index, moved.startMs);
       }
-      const update = (image: string | null) => {
-        setDraft((current) => ({
-          ...current,
-          steps: current.steps.map((item, at) =>
-            at === index && item.segment.startMs === moved.startMs ? { ...item, image } : item,
-          ),
-        }));
-      };
-      getThumbnailAsync(video.uri, { time: moved.startMs, quality: 0.7 }).then(
-        ({ uri }) => {
-          trackFile(uri);
-          update(uri);
-        },
-        () => {
-          update(null);
-        },
-      );
     });
   };
 

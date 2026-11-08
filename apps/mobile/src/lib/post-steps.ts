@@ -95,3 +95,23 @@ export function moveSegment(
     return segment;
   });
 }
+
+/**
+ * ⑫-4 (#186): 手順を追加 splits the last step at the middle of its segment; the user moves the new
+ * boundary on ⑫-5. Null when another step would pass `recipeStepsMax`, when either half would be
+ * shorter than `minSegmentMs`, or when the video's length is unknown.
+ */
+export function splitLastSegment(segments: readonly Segment[]): [Segment, Segment] | null {
+  const last = segments.at(-1);
+  if (!last || last.endMs === null || segments.length >= recipeStepsMax) {
+    return null;
+  }
+  if (last.endMs - last.startMs < minSegmentMs * 2) {
+    return null;
+  }
+  const middle = Math.round((last.startMs + last.endMs) / 2);
+  return [
+    { startMs: last.startMs, endMs: middle },
+    { startMs: middle, endMs: last.endMs },
+  ];
+}
