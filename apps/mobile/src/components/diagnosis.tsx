@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { BrowShape, FaceType } from '@/lib/face-diagnosis';
+import type { BrowShape, DiagnosisResult, FaceType } from '@/lib/face-diagnosis';
 import type { RecipeSummary } from '@/lib/recipes';
 
 import { Feedback } from '@/components/feedback';
@@ -23,6 +23,9 @@ import { formatCount, recipeListOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
+import balanceDiagram from '../../assets/plan-a/diagnosis/balance.svg';
+import contourDiagram from '../../assets/plan-a/diagnosis/contour.svg';
+import eyeTiltDiagram from '../../assets/plan-a/diagnosis/eye-tilt.svg';
 import sparkleRose from '../../assets/plan-a/icons/sparkle-rose.svg';
 
 const BACK = Icon.select({
@@ -109,13 +112,7 @@ export function Diagnosis() {
                 </Text>
               </View>
             </View>
-            <Basis
-              rows={[
-                faceType,
-                eyeShapes[result.eye],
-                { ...midfaces[result.midface], label: `${midfaces[result.midface].label}（目安）` },
-              ]}
-            />
+            <Basis result={result} />
             <View className="mx-4 gap-2.5">
               <View className="gap-0.5 pl-1">
                 <Text
@@ -243,18 +240,50 @@ function Recommendations({ faceType }: { faceType: FaceType }) {
 }
 
 // Why each result was given: its definition. The numbers behind them are provisional (#47).
-function Basis({ rows }: { rows: { label: string; basis: string }[] }) {
+function Basis({ result }: { result: DiagnosisResult }) {
+  const rows = [
+    {
+      ...faceTypes[result.faceType],
+      category: '輪郭',
+      diagram: contourDiagram,
+      background: 'bg-pastel-pink',
+    },
+    {
+      ...eyeShapes[result.eye],
+      category: '目の傾き',
+      diagram: eyeTiltDiagram,
+      background: 'bg-pastel-lilac',
+    },
+    {
+      ...midfaces[result.midface],
+      label: `${midfaces[result.midface].label}（目安）`,
+      category: '顔のバランス',
+      diagram: balanceDiagram,
+      background: 'bg-pastel-peach',
+    },
+  ];
   return (
-    <View className="-mt-2 mx-4 gap-2 rounded-2xl border border-line-soft bg-bg-surface px-4 py-3">
+    <View className="mx-4 gap-4 px-1">
+      <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
+        あなたの顔の特徴
+      </Text>
       {rows.map((row) => (
-        <View key={row.label} className="gap-0.5">
-          <Text className="font-maru-bold text-label text-ink-primary">{row.label}</Text>
-          <Text className="font-maru text-meta text-ink-secondary">{row.basis}</Text>
+        <View key={row.category} className="min-h-21 flex-row items-center gap-3.5">
+          <View
+            className={cn(
+              'size-18 shrink-0 overflow-hidden rounded-control-compact',
+              row.background,
+            )}
+          >
+            <Image accessible={false} source={row.diagram} style={{ width: 72, height: 72 }} />
+          </View>
+          <View className="flex-1 gap-0.75">
+            <Text className="font-maru text-meta text-ink-secondary">{row.category}</Text>
+            <Text className="font-maru-bold text-heading text-ink-primary">{row.label}</Text>
+            <Text className="font-maru text-meta text-ink-secondary">{row.basis}</Text>
+          </View>
         </View>
       ))}
-      <Text className="font-maru text-micro text-ink-secondary">
-        顔の点の比率から仮の基準で判定しています。写真はこの端末の中だけで使い、送信しません
-      </Text>
     </View>
   );
 }
