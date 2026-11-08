@@ -214,7 +214,7 @@ adb reverse tcp:8081 tcp:8081
 
 ### GitHub Actions
 
-通常のCIはsecretなしで動く。GitHub Actionsは有効で、mainはPR経由の変更と `quality`、`infrastructure`、`container` の成功を必須に設定済み。最新mainへの追従、会話の解決も必要で、管理者にも適用する。承認人数は0、force pushとブランチ削除は禁止。フォーク時は初回CI成功後に同じ保護を設定する。
+通常のCIはsecretなしで動く。PRで静的検査、テスト、バンドル、コンテナ、OpenTofuの結果を確認できる。
 
 **Settings → Environments → production** は作成済みで、利用できるブランチをmainだけに制限している。フォーク時は作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
 
@@ -325,9 +325,9 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 
 ### 本番のOpenTofuをGitHub Actionsで適用する
 
-`kcvlb4` の `nuri-staging`、Cloud SQL、Secret Manager、GCS stateは本番扱い。ローカルでの `tofu apply`／`destroy`、`gcloud` による公開設定・トラフィック・secretの変更は禁止する。インフラ変更は **Manage production infrastructure**、アプリ配信は **Deploy API, Expo Web and mobile update** を使う。2つのワークフローは同じconcurrency groupを使う。
+`kcvlb4` の `nuri-staging`、Cloud SQL、Secret Manager、GCS stateは本番扱い。ローカルでの `tofu apply`／`destroy`、`gcloud` による公開設定・トラフィック・secretの変更は禁止する。インフラ変更は **Production Infrastructure**、アプリ配信は **Deploy API, Expo Web and mobile update** を使う。2つのワークフローは同じconcurrency groupを使う。
 
-**Manage production infrastructure** は、push時のCIに成功した最新の `main` から手動実行する。既定の `plan` で差分を確認し、承認を得て `apply` を実行する。`pr` にはmainへマージ済みの関連PR番号を指定する。そのPRに **🧱 OpenTofu Apply** のコメントを実行ごとに追加する。コードブロックにはリソースの操作と件数を載せる。診断の詳細はActionsの実行ログで確認できる。
+**Production Infrastructure** は、push時のCIに成功した最新の `main` から手動実行する。既定の `plan` で差分を確認し、承認を得て `apply` を実行する。`pr` にはmainへマージ済みの関連PR番号を指定する。そのPRに **🧱 OpenTofu Apply** のコメントを実行ごとに追加する。コードブロックにはリソースの操作と件数を載せる。診断の詳細はActionsの実行ログで確認できる。
 
 `apply` はその実行内でplanを取り直し、削除・置換を含む場合は停止する。既存の `gs://kcvlb4-tofu-state/nuri/staging` を使うため、初回構築・state移行・廃止は管理者が別の手順をレビューし、承認済みのGitHub Actionsで行う。廃止のワークフローでも共通の通知を使うと、同じ形式で **🧱 OpenTofu Destroy** を投稿できる。
 

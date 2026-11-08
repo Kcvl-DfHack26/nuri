@@ -17,5 +17,5 @@
     "esModuleInterop": true,
     "types": ["node", "bun"]
   },
-  "include": ["scripts/**/*.ts", "e2e/**/*.ts", "*.config.ts"]
+  "include": [".github/scripts/**/*.ts", "scripts/**/*.ts", "e2e/**/*.ts", "*.config.ts"]
 }

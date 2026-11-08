@@ -1,4 +1,4 @@
-name: Report OpenTofu operation
+name: OpenTofu Report
 on:
   workflow_call:
     inputs:
@@ -18,49 +18,27 @@ on:
         type: string
         required: false
 permissions:
+  contents: read
   pull-requests: write
 jobs:
   comment:
+    name: Post OpenTofu Comment
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/github-script@v9.0.0
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Post OpenTofu Result
         env:
+          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ inputs.pr }}
           TARGET: ${{ inputs.target }}
           OPERATION: ${{ inputs.operation }}
           RESULT: ${{ inputs.result }}
           OPERATION_LOG: ${{ inputs.log }}
-        with:
-          script: |
-            const { PR_NUMBER, TARGET, OPERATION, RESULT, OPERATION_LOG } = process.env;
-            if (!/^[1-9]\d{0,8}$/.test(PR_NUMBER)) throw new Error('Invalid PR number');
-            if (!['nuri-staging', 'nuri-preview'].includes(TARGET)) throw new Error('Invalid target');
-            if (!['apply', 'destroy'].includes(OPERATION)) throw new Error('Invalid operation');
-            const number = Number(PR_NUMBER);
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
-            if (!pr.merged || pr.base.ref !== 'main') throw new Error('OpenTofu results require a PR merged into main');
-            const action = OPERATION === 'apply' ? 'Apply' : 'Destroy';
-            const result = RESULT === 'success'
-              ? '✅ 完了'
-              : RESULT === 'cancelled'
-                ? '⏹️ 実行中止'
-                : '❌ ワークフロー失敗';
-            const log = OPERATION_LOG || '実行ログなし。Actionsで停止箇所を確認。';
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
-            await github.rest.issues.createComment({
-              ...context.repo,
-              issue_number: number,
-              body: [
-                `### 🧱 OpenTofu ${action} · \`${TARGET}\``,
-                '',
-                result,
-                '',
-                '```text',
-                log,
-                '```',
-                '',
-                `SHA \`${context.sha}\` · [Actions 実行ログ](${runUrl})`,
-              ].join('\n'),
-            });
+        run: bun .github/scripts/opentofu/report.ts
