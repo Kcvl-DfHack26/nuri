@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import type { Database } from '../../db/client';
 import type { Auth, AuthenticatedEnv } from '../auth';
 
+import { likeCountOf } from '../../db/like-count';
 import { recipe, recipeFavorite, recipeImage, recipeStep, user } from '../../db/schema';
 import { requireSession } from '../auth';
 
@@ -41,19 +42,13 @@ export function recipeRoutes(db: Database, auth: Auth) {
           ),
         ),
     ).mapWith(Boolean);
-  /** The heart's count: a sample's carried-over popularity plus its favorites in nuri (#191). */
-  const likeCountOf = (recipeId: Column, carriedOver: Column) =>
-    sql<number>`${carriedOver} + (${db
-      .select({ count: count() })
-      .from(recipeFavorite)
-      .where(eq(recipeFavorite.recipeId, recipeId))})`.mapWith(Number);
   const summaryFields = (viewerId: string | null) => ({
     id: recipe.id,
     title: recipe.title,
     image: recipe.image,
     tags: recipe.tags,
     summary: recipe.summary,
-    likeCount: likeCountOf(recipe.id, recipe.likeCount),
+    likeCount: likeCountOf(db, recipe.id, recipe.likeCount),
     favorited: favoritedBy(recipe.id, viewerId),
     author: { id: user.id, name: user.name },
   });
@@ -258,7 +253,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
             summary: true,
           },
           extras: {
-            likeCount: (row) => likeCountOf(row.id, row.likeCount),
+            likeCount: (row) => likeCountOf(db, row.id, row.likeCount),
             favorited: (row) => favoritedBy(row.id, viewerId),
           },
           with: {

@@ -18,6 +18,7 @@ import { Text } from '@/components/ui/text';
 import { api, apiUrl, authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
 import { addPasskey, passkeyListOptions, passkeysAvailable } from '@/lib/passkeys';
+import { userKeys } from '@/lib/social';
 import { useTokenColor } from '@/theme/tokens';
 
 const BACK = Icon.select({
@@ -198,7 +199,7 @@ function Editor({
       authClient.$store.notify('$sessionSignal');
       await Promise.all([
         client.invalidateQueries({ queryKey: ['posts'] }),
-        client.invalidateQueries({ queryKey: ['user'] }),
+        client.invalidateQueries({ queryKey: userKeys.all }),
         client.invalidateQueries({ queryKey: ['my-profile'] }),
       ]);
       backOrHome();

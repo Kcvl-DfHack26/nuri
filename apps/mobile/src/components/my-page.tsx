@@ -1,7 +1,7 @@
 import type { InfiniteData } from '@tanstack/react-query';
 
 import { Icon } from '@expo/ui';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -9,6 +9,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, View } from 'react-
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { RecipePage, RecipeSummary } from '@/lib/recipes';
+import type { UserProfile } from '@/lib/social';
 
 import { Avatar } from '@/components/avatar';
 import { Feedback } from '@/components/feedback';
@@ -18,6 +19,7 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, authClient } from '@/lib/api';
 import { favoriteListOptions, formatCount, recipeListOptions } from '@/lib/recipes';
+import { userOptions } from '@/lib/social';
 import { useTokenColor } from '@/theme/tokens';
 
 const SETTINGS = Icon.select({
@@ -30,9 +32,8 @@ const PERSON = Icon.select({
   android: import('@expo/material-symbols/person.xml'),
 });
 
-// Plan A ⑰ マイページ. The name and photo come from the session, and the recipes the user posted
-// and kept as favorites from the API. Plan A's follower, following and like counts are left out
-// until following and likes are built.
+// Plan A ⑰ マイページ. The name and photo come from the session; the follow and like counts, the
+// recipes the user posted and kept as favorites come from the API.
 export function MyPage() {
   const insets = useSafeAreaInsets();
   // The tab stays mounted under other tabs; only claim the status bar while it is shown.
@@ -47,6 +48,7 @@ export function MyPage() {
     ...favoriteListOptions(user?.id ?? ''),
     enabled: Boolean(user),
   });
+  const profile = useQuery({ ...userOptions(user?.id ?? ''), enabled: Boolean(user) });
   // iOS insets the tab's first ScrollView for the status bar and tab bar; Android adds both here.
   const scrollTop = Platform.OS === 'ios' ? 0 : insets.top;
   const scrollBottom = Platform.OS === 'ios' ? 0 : insets.bottom;
@@ -92,6 +94,16 @@ export function MyPage() {
         </View>
         {user ? (
           <>
+            {profile.isError ? (
+              <Feedback
+                message="フォロワーなどの数を読み込めませんでした。"
+                onRetry={() => {
+                  void profile.refetch();
+                }}
+              />
+            ) : (
+              <ProfileCounts profile={profile.data} />
+            )}
             <RecipeSection
               title="投稿"
               empty="まだ投稿したレシピはありません"
@@ -141,6 +153,40 @@ export function ProfilePhoto({ size, image }: { size: number; image?: string | n
       style={{ width: size, height: size }}
     >
       <SocialIcon name={PERSON} size={Math.round(size * 0.5)} color={secondary} />
+    </View>
+  );
+}
+
+/**
+ * Plan A's フォロワー・フォロー中・いいね under the name (⑰ and other profiles). いいね is how often
+ * the user's recipes were favorited. Dashes stand in until the profile loads.
+ */
+export function ProfileCounts({
+  profile,
+}: {
+  profile: Pick<UserProfile, 'followerCount' | 'followingCount' | 'likeCount'> | undefined;
+}) {
+  const counts = [
+    { label: 'フォロワー', value: profile?.followerCount },
+    { label: 'フォロー中', value: profile?.followingCount },
+    { label: 'いいね', value: profile?.likeCount },
+  ];
+  return (
+    <View className="mt-4 flex-row gap-2.5">
+      {counts.map(({ label, value }) => {
+        const shown = value === undefined ? '—' : formatCount(value);
+        return (
+          <View
+            key={label}
+            accessible
+            accessibilityLabel={`${label} ${shown}`}
+            className="flex-1 items-center gap-0.5 rounded-card bg-bg-base px-2 py-3"
+          >
+            <Text className="font-maru-bold text-headline text-ink-primary">{shown}</Text>
+            <Text className="font-maru text-meta text-ink-secondary">{label}</Text>
+          </View>
+        );
+      })}
     </View>
   );
 }

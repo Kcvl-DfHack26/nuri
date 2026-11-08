@@ -17,6 +17,7 @@ import type { RecipeDetail as RecipeData, RecipeStep } from '@/lib/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
+import { FollowButton } from '@/components/follow-button';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
 import { OpenNativeAppLink } from '@/components/open-native-app-link';
@@ -29,6 +30,7 @@ import { apiAssetUrl, apiUrl } from '@/lib/api';
 import { hasRoomForSidePanel, useLayoutSize } from '@/lib/layout';
 import { backOrHome } from '@/lib/navigation';
 import { formatCount, recipeOptions, shareRecipe, sourceLabels } from '@/lib/recipes';
+import { userOptions } from '@/lib/social';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -275,15 +277,7 @@ export function RecipeContent({
                 </Text>
               </View>
             </Pressable>
-            <View
-              accessible
-              accessibilityRole="button"
-              accessibilityLabel="フォロー（準備中）"
-              accessibilityState={{ disabled: true }}
-              className="min-h-8 justify-center rounded-full border border-accent-rose bg-white px-4"
-            >
-              <Text className="font-maru-bold text-label text-accent-rose">フォロー</Text>
-            </View>
+            <AuthorFollow authorId={recipe.author.id} preview={Boolean(onPost)} />
           </View>
           {steps.length > 0 ? (
             <>
@@ -619,4 +613,12 @@ function RecipeStartBar({
       }
     />
   );
+}
+
+// ⑤'s follow button reads the author's profile for whether the viewer follows them. A private
+// author has no profile to read, so the button stays hidden, as it does in ⑫-8's preview of the
+// user's own draft.
+function AuthorFollow({ authorId, preview }: { authorId: string; preview: boolean }) {
+  const author = useQuery({ ...userOptions(authorId), enabled: Boolean(apiUrl) && !preview });
+  return preview ? null : <FollowButton user={author.data} />;
 }

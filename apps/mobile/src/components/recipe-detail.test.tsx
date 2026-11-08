@@ -51,6 +51,12 @@ jest.mock('@/lib/api', () => ({
           favorite: { $put: () => mockFavorite(true), $delete: () => mockFavorite(false) },
         },
       },
+      users: {
+        ':id': {
+          $get: () => mockGetAuthor(),
+          follow: { $put: () => mockFollow(true), $delete: () => mockFollow(false) },
+        },
+      },
     },
   },
 }));
@@ -61,6 +67,25 @@ const mockFavorite = jest.fn(async (favorited: boolean) => {
   mockServerFavorited = favorited;
   return { ok: true, status: 200 };
 });
+// The author's profile follows what the server accepted, as the refetch after a follow reads it.
+let mockFollowing = false;
+const mockFollow = jest.fn(async (following: boolean) => {
+  mockFollowing = following;
+  return { ok: true, status: 200 };
+});
+let mockAuthorId = 'sample-mio';
+const mockGetAuthor = jest.fn(async () => ({
+  status: 200,
+  json: async () => ({
+    user: {
+      id: mockAuthorId,
+      following: mockFollowing,
+      followerCount: mockFollowing ? 4 : 3,
+      followingCount: 0,
+      likeCount: 1200,
+    },
+  }),
+}));
 const fox = {
   id: 'fox',
   title: '狐メイク',
@@ -198,4 +223,50 @@ test('keeps a favorite at once and rolls it back when the server refuses', async
     expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
   });
   mockSignedIn = false;
+});
+
+test('follows the author from ⑤ at once and rolls it back when the server refuses', async () => {
+  mockSignedIn = true;
+  await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
+  const follow = await screen.findByRole('button', { name: 'フォロー' });
+  expect(follow).not.toBeSelected();
+  await fireEvent.press(follow);
+  await waitFor(() => {
+    expect(screen.getByRole('button', { name: 'フォロー' })).toBeSelected();
+  });
+  expect(screen.getByText('フォロー中')).toBeOnTheScreen();
+  expect(mockFollow).toHaveBeenCalledTimes(1);
+
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  mockFollow.mockImplementationOnce(async () => ({ ok: false, status: 500 }));
+  await fireEvent.press(screen.getByRole('button', { name: 'フォロー' }));
+  await waitFor(() => {
+    expect(alert).toHaveBeenCalledWith(
+      'フォローを変更できませんでした',
+      'フォローを変更できませんでした。',
+    );
+  });
+  expect(screen.getByRole('button', { name: 'フォロー' })).toBeSelected();
+  mockSignedIn = false;
+  mockFollowing = false;
+});
+
+test('sends a guest to log in before following and hides the button on your own recipe', async () => {
+  mockSignedIn = false;
+  const view = await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
+  await fireEvent.press(await screen.findByRole('button', { name: 'フォロー' }));
+  expect(router.push).toHaveBeenCalledWith('/account');
+  expect(mockFollow).not.toHaveBeenCalled();
+  await view.unmount();
+
+  mockSignedIn = true;
+  mockAuthorId = 'viewer';
+  await render(<RecipeDetail id="fox" />, { wrapper: TestQueryProvider });
+  await screen.findByRole('header', { name: '狐メイク' });
+  await waitFor(() => {
+    expect(mockGetAuthor).toHaveBeenCalled();
+  });
+  expect(screen.queryByRole('button', { name: 'フォロー' })).toBeNull();
+  mockSignedIn = false;
+  mockAuthorId = 'sample-mio';
 });
