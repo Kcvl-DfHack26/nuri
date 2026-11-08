@@ -34,6 +34,7 @@ import { backOrHome } from '@/lib/navigation';
 import {
   changeFavorite,
   formatCount,
+  recipeKeys,
   recipeOptions,
   shareRecipe,
   sourceLabels,
@@ -609,7 +610,7 @@ function useFavorite(recipe: RecipeData) {
       Alert.alert('お気に入りを変更できませんでした', error.message);
     },
     onSettled: () => {
-      void client.invalidateQueries({ queryKey: ['recipes', 'favorites'] });
+      void client.invalidateQueries({ queryKey: recipeKeys.favorites });
     },
   });
   return {
