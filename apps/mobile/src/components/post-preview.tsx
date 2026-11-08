@@ -9,6 +9,7 @@ import { Alert } from 'react-native';
 import type { PostDraft } from '@/components/post-draft';
 import type { RecipeDetail, RecipeInput } from '@/lib/recipes';
 
+import { usePostConfirm } from '@/components/post-confirm';
 import { stepTitle, usePostDraft } from '@/components/post-draft';
 import { RecipeContent } from '@/components/recipe-detail';
 import { partColors, parts } from '@/components/recipes';
@@ -114,6 +115,9 @@ export function PostPreview() {
     },
   });
   const fields = postFields(draft);
+  const confirm = usePostConfirm(() => {
+    post.mutate(draft);
+  });
   const recipe: RecipeDetail = {
     id: 'preview',
     title: draft.title.trim(),
@@ -150,18 +154,17 @@ export function PostPreview() {
       Alert.alert('投稿できません', 'サムネイルにする場面を選んでください。');
       return;
     }
-    // Pressing 投稿する is the explicit choice to send the thumbnail and steps (#182).
-    Alert.alert('レシピを投稿しますか？', undefined, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '投稿する',
-        onPress: () => {
-          post.mutate(draft);
-        },
-      },
-    ]);
+    confirm.ask();
   };
   return (
-    <RecipeContent recipe={recipe} steps={fields.steps} onPost={onPost} posting={post.isPending} />
+    <>
+      <RecipeContent
+        recipe={recipe}
+        steps={fields.steps}
+        onPost={onPost}
+        posting={post.isPending}
+      />
+      {confirm.dialog}
+    </>
   );
 }
