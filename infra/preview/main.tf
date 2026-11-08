@@ -158,13 +158,13 @@ resource "google_tags_tag_key" "preview" {
 }
 
 resource "google_tags_tag_value" "preview" {
-  parent     = google_tags_tag_key.preview.name
+  parent     = google_tags_tag_key.preview.id
   short_name = "service"
 }
 
 # 作成ジョブは新規サービスにタグを付ける。既存サービスの更新・削除権限は持たない。
 resource "google_tags_tag_value_iam_member" "creator" {
-  tag_value = google_tags_tag_value.preview.name
+  tag_value = google_tags_tag_value.preview.id
   role      = "roles/resourcemanager.tagUser"
   member    = "serviceAccount:${google_service_account.automation["preview-create"].email}"
 }
@@ -220,7 +220,7 @@ resource "google_project_iam_member" "read_service" {
   member   = "serviceAccount:${each.value.email}"
   condition {
     title      = "nuri-preview-services"
-    expression = "resource.matchTagId('${google_tags_tag_key.preview.name}', '${google_tags_tag_value.preview.name}')"
+    expression = "resource.matchTagId('${google_tags_tag_key.preview.id}', '${google_tags_tag_value.preview.id}')"
   }
 }
 
@@ -244,7 +244,7 @@ resource "google_project_iam_member" "publisher" {
   member  = "serviceAccount:${google_service_account.automation["preview"].email}"
   condition {
     title      = "nuri-preview-services"
-    expression = "resource.matchTagId('${google_tags_tag_key.preview.name}', '${google_tags_tag_value.preview.name}')"
+    expression = "resource.matchTagId('${google_tags_tag_key.preview.id}', '${google_tags_tag_value.preview.id}')"
   }
 }
 
@@ -270,10 +270,10 @@ output "preview_creator_service_account" {
 
 output "preview_run_tag_key" {
   description = "GitHub repository variable PREVIEW_RUN_TAG_KEY."
-  value       = google_tags_tag_key.preview.name
+  value       = google_tags_tag_key.preview.id
 }
 
 output "preview_run_tag_value" {
   description = "GitHub repository variable PREVIEW_RUN_TAG_VALUE."
-  value       = google_tags_tag_value.preview.name
+  value       = google_tags_tag_value.preview.id
 }
