@@ -44,49 +44,22 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - uses: actions/github-script@v9.0.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: プレビューコメントを準備する
         id: request
         env:
-          REQUEST_PR: ${{ inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_PR: ${{ github.event.issue.number || inputs.pr }}
           PREVIEW_OPERATION: ${{ inputs.operation }}
           PREVIEW_CAN_PUBLISH: ${{ github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' }}
-        with:
-          script: |
-            const { assertPreviewTarget, parsePreviewRequest, previewMarker, previewSetupPendingMarker, previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
-            const commentOnly = context.eventName === 'workflow_dispatch' && process.env.PREVIEW_OPERATION === 'comment';
-            const canRequest = !commentOnly || process.env.PREVIEW_CAN_PUBLISH === 'true';
-            const isComment = context.eventName === 'issue_comment';
-            const payload = context.payload;
-            const requestedSha = isComment ? parsePreviewRequest({ author: payload.comment.user.login, body: payload.comment.body, before: payload.changes?.body?.from }) : undefined;
-            if (isComment && !requestedSha) return;
-            const number = isComment ? String(payload.issue.number) : process.env.REQUEST_PR;
-            if (!/^[1-9]\d{0,8}$/.test(number ?? '')) throw new Error('PR番号が不正です');
-            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: context.actor });
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
-            assertPreviewTarget({ actorType: payload.sender?.type, permission: permission.permission, repository: `${context.repo.owner}/${context.repo.repo}`, headRepository: pr.head.repo?.full_name, state: pr.state, sha: pr.head.sha, requestedSha });
-            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number });
-            let comment = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(`${previewMarker}\n`));
-            if (isComment && (!comment || comment.id !== payload.comment.id || comment.body !== payload.comment.body || previewSha(comment.body) !== pr.head.sha)) throw new Error('最新のpreviewコメントから実行してください');
-            // A legacy comment can match the SHA and still need to be replaced with the table.
-            const currentTable = comment?.body?.split('\n', 2)[1] === `<!-- nuri-preview-sha: ${pr.head.sha} -->`;
-            const activateRequest = canRequest && comment?.body?.includes(previewSetupPendingMarker);
-            if (commentOnly && currentTable && !activateRequest) return;
-            const body = renderPreviewComment({
-              sha: pr.head.sha,
-              pullRequest: { number: pr.number, url: pr.html_url },
-              canRequest,
-              status: commentOnly ? undefined : '⏳ 配信中',
-              runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            });
-            if (comment) {
-              await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });
-            } else {
-              ({ data: comment } = await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body }));
-            }
-            if (commentOnly) return;
-            core.setOutput('pr', String(pr.number));
-            core.setOutput('sha', pr.head.sha);
-            core.setOutput('comment', String(comment.id));
+          SENDER_TYPE: ${{ github.event.sender.type }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_BEFORE: ${{ github.event.changes.body.from }}
+        run: bun .github/scripts/preview/request.ts
 
   publish:
     needs: request
@@ -109,12 +82,15 @@ jobs:
           ref: ${{ github.workflow_sha }}
           path: controller
           persist-credentials: false
-      # This directory is only the Docker build context. Its code never runs on the host.
+      # PR のコードは Docker のビルドコンテキストに限定し、ランナー上では実行しない。
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.request.outputs.sha }}
           path: source
           persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: controller/.bun-version
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
@@ -127,7 +103,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
-        run: bash scripts/preview-cloud.sh publish "$PREVIEW_PR" "$PREVIEW_SHA" "$GITHUB_WORKSPACE/source"
+        run: bun .github/scripts/preview/cloud.ts publish "$PREVIEW_PR" "$PREVIEW_SHA" "$GITHUB_WORKSPACE/source"
 
   cleanup:
     if: >-
@@ -148,6 +124,9 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
@@ -159,17 +138,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ github.event.pull_request.number }}
           PREVIEW_CLEANUP_REPORTS: ${{ runner.temp }}/preview-cleanup.ndjson
-        run: |
-          result=0
-          if [[ "$GITHUB_EVENT_NAME" == schedule ]]; then
-            bash scripts/preview-cloud.sh sweep || result=$?
-          else
-            bash scripts/preview-cloud.sh cleanup "$PREVIEW_PR" || result=$?
-          fi
-          if [[ -s "$PREVIEW_CLEANUP_REPORTS" ]]; then
-            echo 'has_reports=true' >> "$GITHUB_OUTPUT"
-          fi
-          exit "$result"
+        run: bun .github/scripts/preview/cloud.ts cleanup "$PREVIEW_PR"
       - uses: actions/upload-artifact@v7.0.2
         id: logs
         if: always() && steps.cleanup.outputs.has_reports == 'true'
@@ -185,29 +154,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      contents: read
       pull-requests: write
     steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - uses: actions/download-artifact@v8.0.2
         with:
           artifact-ids: ${{ needs.cleanup.outputs.logs }}
           path: ${{ runner.temp }}/preview-cleanup
-      - uses: actions/github-script@v9.0.0
-        with:
-          script: |
-            const { readFile } = await import('node:fs/promises');
-            const reports = await readFile(`${process.env.RUNNER_TEMP}/preview-cleanup/preview-cleanup.ndjson`, 'utf8');
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
-            for (const line of reports.trimEnd().split('\n')) {
-              const { pr, log, exitCode } = JSON.parse(line);
-              const result = exitCode === 0 ? '✅ 削除完了' : `❌ 失敗（終了コード ${exitCode}）`;
-              const excerpt = log.length > 58_000 ? `${log.slice(0, 58_000)}\n… 続きは Actions の実行ログを参照` : log.trimEnd();
-              const body = ['### 🧹 Preview Cleanup', '', result, '', '```text', excerpt, '```', '', `[Actions の実行ログ](${runUrl})`].join('\n');
-              try {
-                await github.rest.issues.createComment({ ...context.repo, issue_number: pr, body });
-              } catch (error) {
-                core.setFailed(`PR #${pr} の cleanup コメントを投稿できませんでした。${error.message}`);
-              }
-            }
+      - name: Post the cleanup log to each closed PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/preview/report-cleanup.ts "$RUNNER_TEMP/preview-cleanup/preview-cleanup.ndjson"
 
   report:
     needs: [request, publish]
@@ -218,27 +182,21 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # Render from the trusted workflow revision, not from the published PR.
+      # 配信対象のPRではなく、信頼済みのワークフローの版でコメントを作る。
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - uses: actions/github-script@v9.0.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: 配信結果をコメントに反映する
         env:
+          GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
           PREVIEW_COMMENT: ${{ needs.request.outputs.comment }}
           PREVIEW_RESULT: ${{ needs.publish.result }}
           PREVIEW_ORIGIN: ${{ needs.publish.outputs.origin }}
           PREVIEW_DEPLOYED_AT: ${{ needs.publish.outputs.deployed_at }}
-        with:
-          script: |
-            const { previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PREVIEW_PR) });
-            const { data: comment } = await github.rest.issues.getComment({ ...context.repo, comment_id: Number(process.env.PREVIEW_COMMENT) });
-            if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA || previewSha(comment.body) !== pr.head.sha) return;
-            const success = process.env.PREVIEW_RESULT === 'success';
-            const skipped = process.env.PREVIEW_RESULT === 'skipped';
-            const status = success ? '✅ 完了' : skipped ? undefined : '❌ 失敗';
-            const body = renderPreviewComment({ sha: pr.head.sha, pullRequest: { number: pr.number, url: pr.html_url }, status, canRequest: !skipped, runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`, deployment: success ? { origin: process.env.PREVIEW_ORIGIN, createdAt: process.env.PREVIEW_DEPLOYED_AT } : undefined });
-            await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });
+        run: bun .github/scripts/preview/report.ts

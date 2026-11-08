@@ -36,16 +36,13 @@ jobs:
         with:
           ref: ${{ env.TARGET_SHA }}
           persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - name: Check deployment configuration and current main
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          for name in PROJECT_ID REGION SERVICE REPOSITORY MIGRATION_JOB; do
-            test -n "${!name}" || { echo "Missing $name"; exit 1; }
-          done
-          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$TARGET_SHA"
-          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$TARGET_SHA&status=success" --jq '[.workflow_runs[] | select(.event == "push")] | length')
-          test "$passed" -gt 0 || { echo 'This SHA has not passed the main CI workflow'; exit 1; }
+        run: bun .github/scripts/deploy/staging.ts check
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -53,74 +50,24 @@ jobs:
       - uses: google-github-actions/setup-gcloud@v3.0.1
       - name: Resolve the staging API and Web image
         id: image
-        run: |
-          key=$(git ls-tree -r "$TARGET_SHA" -- apps/api apps/mobile apps/emulate/package.json packages/shared \
-            package.json bun.lock bunfig.toml tsconfig.json .dockerignore | sha256sum | cut -d' ' -f1)
-          repository="$REGION-docker.pkg.dev/$PROJECT_ID/$REPOSITORY/api"
-          image="$repository:tree-$key"
-          digest=$(gcloud artifacts docker images describe "$image" --format='value(image_summary.digest)' 2>/dev/null || true)
-          if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
-            docker build -f apps/api/Dockerfile -t "$image" .
-            docker push "$image"
-            digest=$(gcloud artifacts docker images describe "$image" --format='value(image_summary.digest)')
-          fi
-          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]
-          uri="$repository@$digest"
-          echo "uri=$uri" >> "$GITHUB_OUTPUT"
-          if [[ "$GITHUB_EVENT_NAME" == workflow_run ]]; then
-            live=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format=json)
-            revision=$(jq -r '.status.traffic[] | select(.percent == 100) | .revisionName' <<< "$live")
-            if [[ -n "$revision" ]] && [[ "$(gcloud run revisions describe "$revision" --project="$PROJECT_ID" --region="$REGION" --format='value(spec.containers[0].image)')" == "$uri" ]]; then
-              url=$(jq -er .status.url <<< "$live")
-              if curl --fail --silent --show-error --max-time 15 "$url/ready" && bash scripts/check-expo-web.sh "$url"; then
-                echo 'Staging already serves the checked image.'
-                echo 'skip=true' >> "$GITHUB_OUTPUT"
-              fi
-            fi
-          fi
+        run: bun .github/scripts/deploy/staging.ts image
       - name: Migrate before deploying
         if: steps.image.outputs.skip != 'true'
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
-        run: |
-          gcloud run jobs update "$MIGRATION_JOB" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --quiet
-          gcloud run jobs execute "$MIGRATION_JOB" --project="$PROJECT_ID" --region="$REGION" --wait --quiet
+        run: bun .github/scripts/deploy/staging.ts migrate
       - name: Deploy candidate without traffic and check API and Web
         if: steps.image.outputs.skip != 'true'
         id: candidate
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
-        run: |
-          gcloud run deploy "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --image="$IMAGE_URI" --no-traffic --quiet
-          # Pick the revision this deploy created by its image digest. latestReadyRevisionName kept
-          # naming an older revision after an OpenTofu apply reset revision numbers (#92).
-          revision=$(gcloud run revisions list --service="$SERVICE" --project="$PROJECT_ID" --region="$REGION" --filter="spec.containers.image=$IMAGE_URI" --sort-by=~metadata.creationTimestamp --limit=1 --format='value(metadata.name)')
-          test -n "$revision" || { echo "No revision runs $IMAGE_URI"; exit 1; }
-          gcloud run services update-traffic "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --update-tags="candidate=$revision" --quiet
-          candidate_url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format=json | jq -r '.status.traffic[] | select(.tag == "candidate") | .url')
-          curl --fail --retry 6 --retry-all-errors --retry-delay 5 "$candidate_url/ready"
-          bash scripts/check-expo-web.sh "$candidate_url"
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+        run: bun .github/scripts/deploy/staging.ts candidate
       - name: Promote tested revision
         if: steps.image.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REVISION: ${{ steps.candidate.outputs.revision }}
-        run: |
-          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$TARGET_SHA"
-          gcloud run services update-traffic "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --to-revisions="$REVISION=100" --remove-tags=candidate --quiet
-          url=$(gcloud run services describe "$SERVICE" --project="$PROJECT_ID" --region="$REGION" --format='value(status.url)')
-          curl --fail --retry 3 --retry-all-errors "$url/ready"
-          bash scripts/check-expo-web.sh "$url"
-      - uses: actions/setup-node@v7.1.0
-        if: vars.EXPO_UPDATE_ENABLED == 'true' && steps.image.outputs.skip != 'true'
-        with:
-          node-version-file: .node-version
-      - uses: oven-sh/setup-bun@v2
-        if: vars.EXPO_UPDATE_ENABLED == 'true' && steps.image.outputs.skip != 'true'
-        with:
-          bun-version-file: .bun-version
+        run: bun .github/scripts/deploy/staging.ts promote
       - if: vars.EXPO_UPDATE_ENABLED == 'true' && steps.image.outputs.skip != 'true'
         run: bun install --frozen-lockfile
       - name: Publish matching production update through Expo Workflows
@@ -128,4 +75,4 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: bunx eas workflow:run .eas/workflows/production-update.yml --ref "$TARGET_SHA" --non-interactive --wait
+        run: bun run --bun eas workflow:run .eas/workflows/production-update.yml --ref "$TARGET_SHA" --non-interactive --wait

@@ -188,9 +188,8 @@ jobs:
   container:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
+      - *checkout
+      - *setup-bun
       - name: Validate local Compose configurations
         env:
           DEVICE_API_ORIGIN: https://api.nuri.localhost
@@ -199,21 +198,7 @@ jobs:
           DEVICE_GOOGLE_ORIGIN: https://google.nuri.localhost
           DEVICE_APPLE_ORIGIN: https://apple.nuri.localhost
           DEVICE_MAIL_ORIGIN: https://mail.nuri.localhost
-        run: |
-          sh scripts/worktree-init.sh
-          docker compose config --quiet
-          docker compose --profile editor --profile tunnel config --quiet
-          docker compose -f compose.yaml -f compose.go.yaml config --quiet
-          docker compose -f compose.yaml -f compose.devices.yaml config --quiet
+        run: bun .github/scripts/ci/check-compose.ts
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
       - name: Run Hono and Expo Web container smoke test
-        run: |
-          docker run -d --name api -p 8080:8080 \
-            -e DATABASE_URL=postgresql://unused:unused@localhost:5432/unused \
-            -e BETTER_AUTH_SECRET=ci-only-secret-not-for-real-deployments \
-            -e BETTER_AUTH_URL=https://example.com expo-hono-opentofu-starter-api
-          if ! curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 1 --max-time 5 http://localhost:8080/health ||
-             ! bash scripts/check-expo-web.sh http://localhost:8080; then
-            docker logs api
-            exit 1
-          fi
+        run: bun .github/scripts/ci/check-container.ts

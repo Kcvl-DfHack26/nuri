@@ -414,7 +414,7 @@ gh workflow run deploy.yml --ref main
 
 ```sh
 tofu -chdir=infra output -raw expo_web_url
-bash scripts/check-expo-web.sh "$(tofu -chdir=infra output -raw service_uri)"
+bun .github/scripts/check-expo-web.ts "$(tofu -chdir=infra output -raw service_uri)"
 ```
 
 `expo_web_url` は既存のCloud Runサービスの既定HTTPS URLを指す。Web同梱イメージの配備後は、同じホストの `/` がExpo Web、`/api/**` がHono、`/_expo/static/**` と `/assets/**` が静的ファイルになる。レシピ直リンクはSPAで開ける。将来のLP用 `/about/` は現時点では404を返す。WebはアクセスしたホストのAPIを使い、共有する正規URLはOpenTofuの `api_origin` と揃える。Google OAuthのリダイレクト先は既存どおり正規URLの `/api/auth/callback/google` を使う。

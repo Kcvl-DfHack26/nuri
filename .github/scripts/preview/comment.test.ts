@@ -6,7 +6,7 @@ import {
   previewSetupPendingMarker,
   previewSha,
   renderPreviewComment,
-} from './preview-comment';
+} from './comment';
 
 const sha = 'a'.repeat(40);
 const before = renderPreviewComment({ sha });
