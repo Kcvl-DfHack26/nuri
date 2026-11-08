@@ -44,6 +44,6 @@ Expo Free の月間枠は Android 15／iOS 15 ビルド、Workflows 60分、Upda
 3. OpenTofuの出力 `preview_wif_provider` を、GitHubの `preview` と `preview-create` の両Environmentに `PREVIEW_WIF_PROVIDER` として登録する。`PREVIEW_SERVICE_ACCOUNT` には、それぞれ `preview_service_account` と `preview_creator_service_account` を登録する。`preview_run_tag_key` と `preview_run_tag_value` はRepository Variable `PREVIEW_RUN_TAG_KEY` と `PREVIEW_RUN_TAG_VALUE` に登録する。
 4. Repository Variable `PREVIEW_GCP_ENABLED=true` を設定し、テスト用PRを作成する。設定前から開いていたPRは手動で起動できる。Web、API、Expo Goと **🧱 OpenTofu Apply** を確認したらPRを閉じ、サービスとイメージの削除および **🧱 OpenTofu Destroy** のコメントを確認する。
 
-作成ジョブは新規Cloud Runサービスを作ってプレビュー専用タグを付ける。配信・回収ジョブの更新・削除権限はそのタグ付きサービスに限られ、タグを付与する権限は持たない。コンテナが使う実行用サービスアカウントには、Cloud SQLやSecret Managerへの権限を付与しない。[Cloud Runのタグ](https://docs.cloud.google.com/run/docs/configuring/tags)
+作成ジョブはOpenTofuでCloud Runサービスを作成したあと、Resource Manager APIでプレビュー専用タグを付ける。OpenTofuが作成直後にサービスの状態を取得するため、作成用アカウントには`kcvlb4`内のCloud Runサービス情報を取得する`run.services.get`を付与する。配信・回収ジョブの更新・削除権限はそのタグ付きサービスに限られる。コンテナの実行用アカウントにCloud SQLやSecret Managerの権限は付与しない。[Cloud Runのタグ](https://docs.cloud.google.com/run/docs/configuring/tags)
 
 `PREVIEW_GCP_ENABLED` を無効にすると新規の公開と自動cleanupを停止する。利用終了時は有効な間にPRを閉じ、回収を確認する。

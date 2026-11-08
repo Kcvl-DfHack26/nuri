@@ -29,26 +29,6 @@ variable "project_id" {
   }
 }
 
-variable "tag_key" {
-  description = "Permanent ID of the Resource Manager key marking preview services."
-  type        = string
-  nullable    = false
-  validation {
-    condition     = can(regex("^tagKeys/[0-9]+$", var.tag_key))
-    error_message = "Use the permanent preview tag key ID."
-  }
-}
-
-variable "tag_value" {
-  description = "Permanent ID of the Resource Manager value marking preview services."
-  type        = string
-  nullable    = false
-  validation {
-    condition     = can(regex("^tagValues/[0-9]+$", var.tag_value))
-    error_message = "Use the permanent preview tag value ID."
-  }
-}
-
 locals {
   project = var.project_id
   region  = "asia-northeast1"
@@ -67,7 +47,6 @@ resource "google_cloud_run_v2_service" "preview" {
   ingress              = "INGRESS_TRAFFIC_ALL"
   deletion_protection  = false
   default_uri_disabled = false
-  tags                 = { (var.tag_key) = var.tag_value }
   scaling {
     min_instance_count = 0
     max_instance_count = 1
@@ -99,6 +78,7 @@ resource "google_cloud_run_v2_service" "preview" {
       client,
       client_version,
       invoker_iam_disabled,
+      tags,
     ]
   }
 }

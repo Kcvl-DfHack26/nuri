@@ -151,17 +151,7 @@ export async function runPreviewTofu(
     TF_DATA_DIR: join(scratch, 'tofu'),
     TF_WORKSPACE: 'default',
   };
-  const tagKey = Bun.env.PREVIEW_RUN_TAG_KEY;
-  const tagValue = Bun.env.PREVIEW_RUN_TAG_VALUE;
-  if (!tagKey || !tagValue) {
-    throw new Error('The preview Cloud Run tag is required');
-  }
-  const variables = [
-    `-var=project_id=${project}`,
-    `-var=pr_number=${pr}`,
-    `-var=tag_key=${tagKey}`,
-    `-var=tag_value=${tagValue}`,
-  ];
+  const variables = [`-var=project_id=${project}`, `-var=pr_number=${pr}`];
   try {
     // 同じ作業ツリーで複数PRを処理しても、状態やロックを混ぜない。
     await $`tofu -chdir=${directory} init -reconfigure -input=false -no-color -lockfile=readonly \

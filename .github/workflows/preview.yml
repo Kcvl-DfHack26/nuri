@@ -98,6 +98,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_RUN_TAG_VALUE: ${{ vars.PREVIEW_RUN_TAG_VALUE }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
         run: bun .github/scripts/preview/cloud.ts inspect "$PREVIEW_PR" "$PREVIEW_SHA"
@@ -140,8 +141,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
-          PREVIEW_RUN_TAG_KEY: ${{ vars.PREVIEW_RUN_TAG_KEY }}
           PREVIEW_RUN_TAG_VALUE: ${{ vars.PREVIEW_RUN_TAG_VALUE }}
+          PREVIEW_CLOUD_ENVIRONMENT: ${{ needs.inspect.outputs.environment }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
         run: bun .github/scripts/preview/cloud.ts apply "$PREVIEW_PR" "$PREVIEW_SHA"
@@ -227,8 +228,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
-          PREVIEW_RUN_TAG_KEY: ${{ vars.PREVIEW_RUN_TAG_KEY }}
-          PREVIEW_RUN_TAG_VALUE: ${{ vars.PREVIEW_RUN_TAG_VALUE }}
           PREVIEW_PR: ${{ github.event.pull_request.number }}
           PREVIEW_CLEANUP_REPORTS: ${{ runner.temp }}/preview-cleanup.ndjson
         run: bun .github/scripts/preview/cloud.ts cleanup "$PREVIEW_PR"
