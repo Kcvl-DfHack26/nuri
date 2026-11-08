@@ -3,6 +3,7 @@ import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { diagnoseFace } from '@/lib/face-diagnosis';
+import { deleteFile } from '@/lib/files';
 import { TestQueryProvider } from '@/lib/test/query-client';
 
 import { Diagnosis } from './diagnosis';
@@ -30,6 +31,7 @@ jest.mock('@/theme/colors', () => ({
   colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
 }));
 jest.mock('expo-image', () => ({ Image: () => null }));
+jest.mock('@/lib/files', () => ({ deleteFile: jest.fn() }));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
@@ -184,6 +186,23 @@ test('diagnoses the saved camera frame with its own landmarks and shows it on th
     });
   });
   expect(mockDetect).not.toHaveBeenCalled();
+  expect(deleteFile).not.toHaveBeenCalled();
+});
+
+test('deletes a camera frame that is not shown and keeps the adopted one', async () => {
+  mockRequestCamera.mockResolvedValue(true);
+  await render(<Suggest />);
+  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+  await act(async () => {
+    mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
+    await Promise.resolve();
+  });
+  mockSnapshot.mockResolvedValueOnce({ ...landmarks, uri: 'file:///turned.jpg' });
+  diagnose.mockReturnValueOnce({ kind: 'notFrontal' });
+  await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
+  expect(await screen.findByText('正面を向いた写真で試してください')).toBeOnTheScreen();
+  expect(deleteFile).toHaveBeenCalledWith('file:///turned.jpg');
+  expect(router.push).not.toHaveBeenCalled();
 });
 
 test('explains when the camera is not allowed or the face is lost, and closes the camera', async () => {

@@ -38,7 +38,8 @@ export type FaceSnapshot = FacePhotoLandmarks & {
 export type FaceTrackerViewRef = {
   /**
    * Saves the last frame with a face as a JPEG in the app's cache and returns it with that frame's
-   * landmarks (upright and unmirrored, like onLandmarks); null when no face was found yet.
+   * landmarks (upright and unmirrored, like onLandmarks); null when no face was found yet. The
+   * caller deletes the file when it no longer shows it.
    */
   takeSnapshotAsync(): Promise<FaceSnapshot | null>;
 };

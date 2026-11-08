@@ -32,9 +32,10 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   private var captures: [
     Int: (at: CFTimeInterval, generation: Int, size: CGSize, orientation: AVCaptureVideoOrientation)
   ] = [:]
-  // Frames sent to MediaPipe by timestamp, and the last frame with a face together with its
-  // landmarks, kept only so a snapshot and the landmarks it is diagnosed with come from one frame.
-  // Few are kept: held buffers stop the camera.
+  // At most one frame sent to MediaPipe and still waiting for its result, and the last such frame
+  // with a face together with its landmarks, kept only so a snapshot and the landmarks it is
+  // diagnosed with come from one frame. Holding one at a time never drops it before its result
+  // and keeps the camera's buffers free.
   private var pendingBuffers: [Int: CVPixelBuffer] = [:]
   private var landmarked: (buffer: CVPixelBuffer, points: [Double])?
   private var lastTimestamp = -1
@@ -207,8 +208,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   /// Saves the last frame with a face as a JPEG in the app's caches and returns its file URL with
   /// that frame's landmarks, or nil when no face was found yet. The photo is mirrored like the
   /// preview, so it looks as the person saw it; the landmarks stay upright and unmirrored, like
-  /// onLandmarks. Older snapshots are deleted once it is written, so at most one stays on the
-  /// device. Nothing is sent anywhere.
+  /// onLandmarks. JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
   func snapshot() throws -> [String: Any]? {
     lock.lock()
     let frame = landmarked
@@ -229,10 +229,6 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     try manager.createDirectory(at: folder, withIntermediateDirectories: true)
     let file = folder.appendingPathComponent("\(UUID().uuidString).jpg")
     try data.write(to: file)
-    for old in (try? manager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-    where old.lastPathComponent != file.lastPathComponent {
-      try? manager.removeItem(at: old)
-    }
     return [
       "uri": file.absoluteString,
       "points": frame.points,
@@ -273,9 +269,8 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     if captures.count > 30 {
       captures = captures.filter { $0.key > timestamp - 2000 }
     }
-    pendingBuffers[timestamp] = pixelBuffer
-    if pendingBuffers.count > 4, let oldest = pendingBuffers.keys.min() {
-      pendingBuffers.removeValue(forKey: oldest)
+    if pendingBuffers.isEmpty {
+      pendingBuffers[timestamp] = pixelBuffer
     }
     lock.unlock()
     do {

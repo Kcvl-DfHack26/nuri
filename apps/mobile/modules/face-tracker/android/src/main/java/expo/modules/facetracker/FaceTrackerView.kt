@@ -77,8 +77,9 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private var lastStatus: String? = null
   private var lastMessage: String? = null
 
-  // Frames sent to MediaPipe by timestamp, and the last frame with a face together with its
-  // landmarks, kept only so a snapshot and the landmarks it is diagnosed with come from one frame.
+  // At most one frame sent to MediaPipe and still waiting for its result, and the last such frame
+  // with a face together with its landmarks, kept only so a snapshot and the landmarks it is
+  // diagnosed with come from one frame. Holding one at a time never drops it before its result.
   private val pendingFrames = ConcurrentSkipListMap<Long, Bitmap>()
   private class LandmarkedFrame(val bitmap: Bitmap, val points: List<Double>)
   @Volatile private var landmarkedFrame: LandmarkedFrame? = null
@@ -192,8 +193,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
    * Saves the last frame with a face as a JPEG in the app's cache and returns its file URI with
    * that frame's landmarks, or null when no face was found yet. The photo is mirrored like the
    * preview, so it looks as the person saw it; the landmarks stay upright and unmirrored, like
-   * onLandmarks. Older snapshots are deleted once it is written, so at most one stays on the
-   * device. Nothing is sent anywhere.
+   * onLandmarks. JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
    */
   fun snapshot(): Map<String, Any>? {
     val landmarked = landmarkedFrame ?: return null
@@ -203,7 +203,6 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val folder = File(context.cacheDir, "face-tracker").apply { mkdirs() }
     val file = File(folder, "${UUID.randomUUID()}.jpg")
     file.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-    folder.listFiles()?.filter { it != file }?.forEach { it.delete() }
     return mapOf(
       "uri" to Uri.fromFile(file).toString(),
       "points" to landmarked.points,
@@ -321,9 +320,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     frameWidth = upright.width
     frameHeight = upright.height
-    pendingFrames[timestamp] = upright
-    // LIVE_STREAM drops frames it cannot keep up with, so only the newest few can still get a result.
-    while (pendingFrames.size > MAX_PENDING_FRAMES) pendingFrames.pollFirstEntry()
+    if (pendingFrames.isEmpty()) pendingFrames[timestamp] = upright
     if (!active || generation != sessionGeneration) return
     try {
       current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
@@ -380,7 +377,5 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     // About 5 s at 30 fps: long enough for a GPU to prepare its first result, while a slow but
     // working GPU (the emulator's, about 0.5 s per result) answers within a dozen frames.
     const val GPU_SILENT_FRAME_LIMIT = 150
-    // Enough for the frames sent while a slow CPU result (about 0.5 s on the emulator) is pending.
-    const val MAX_PENDING_FRAMES = 8
   }
 }

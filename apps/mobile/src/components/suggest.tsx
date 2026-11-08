@@ -17,6 +17,7 @@ import { arPhotos } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { diagnoseFace } from '@/lib/face-diagnosis';
+import { deleteFile } from '@/lib/files';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -111,6 +112,8 @@ export function Suggest() {
   const [capturing, setCapturing] = useState(false);
   const [faceFound, setFaceFound] = useState(false);
   const latest = useRef<FacePhotoLandmarks | null>(null);
+  // The camera frame saved for the adopted result, deleted once another result replaces it.
+  const savedFrame = useRef<string | null>(null);
   // Counts camera sessions, so a shot that finishes after the camera closed opens nothing.
   const cameraSession = useRef(0);
   const closeCamera = useCallback(() => {
@@ -182,14 +185,21 @@ export function Suggest() {
       // The saved frame is diagnosed with the landmarks found in it, so the result and its photo
       // match. Without a saved frame the latest landmarks are diagnosed, only without a photo.
       const snapshot = await tracker.current?.takeSnapshotAsync().catch(() => null);
-      if (session !== cameraSession.current) {
-        return;
-      }
       const outcome = outcomeOf(snapshot ?? latest.current, snapshot?.uri);
-      if ('message' in outcome) {
-        setMessage(outcome.message);
+      // A frame that is not shown is deleted right away, so it never stays on the device.
+      if (session !== cameraSession.current || 'message' in outcome) {
+        if (snapshot) {
+          deleteFile(snapshot.uri);
+        }
+        if (session === cameraSession.current && 'message' in outcome) {
+          setMessage(outcome.message);
+        }
         return;
       }
+      if (savedFrame.current && savedFrame.current !== snapshot?.uri) {
+        deleteFile(savedFrame.current);
+      }
+      savedFrame.current = snapshot?.uri ?? null;
       closeCamera();
       setPhoto(outcome.photo);
       setLast(outcome);
