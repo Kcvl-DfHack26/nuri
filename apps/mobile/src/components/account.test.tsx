@@ -55,6 +55,14 @@ const mockGetSession = jest.fn(async (): Promise<{ data: { user: { id: string } 
 }));
 const mockMagicLink = jest.fn(async () => ({ error: null }));
 
+beforeEach(() => {
+  // Let Testing Library flush React Query's scheduled notifications inside act.
+  jest.useFakeTimers();
+});
+afterEach(() => {
+  jest.useRealTimers();
+});
+
 function renderAccount() {
   return render(<Account />, { wrapper: TestQueryProvider });
 }
@@ -64,6 +72,7 @@ test('returns to the previous screen after a social login', async () => {
   await fireEvent.press(await screen.findByRole('button', { name: 'Googleで続ける' }));
   await waitFor(() => {
     expect(router.back).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Googleで続ける' })).toBeEnabled();
   });
   expect(mockSocial).toHaveBeenCalled();
 });
