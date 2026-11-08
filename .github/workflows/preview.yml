@@ -90,14 +90,10 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
-      - uses: opentofu/setup-opentofu@v2.0.2
-        with:
-          tofu_version: 1.13.8
-          tofu_wrapper: false
-      - name: Prepare Locked OpenTofu Provider
+      - name: Install Verified OpenTofu and Provider
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/ci/prepare-tofu-provider.ts infra/preview-pr/.terraform.lock.hcl
+        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview-pr/.terraform.lock.hcl
       - name: Apply Preview Infrastructure
         id: apply
         env:
@@ -178,14 +174,10 @@ jobs:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - uses: opentofu/setup-opentofu@v2.0.2
-        with:
-          tofu_version: 1.13.8
-          tofu_wrapper: false
-      - name: Prepare Locked OpenTofu Provider
+      - name: Install Verified OpenTofu and Provider
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/ci/prepare-tofu-provider.ts infra/preview-pr/.terraform.lock.hcl
+        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview-pr/.terraform.lock.hcl
       - name: Delete Closed Preview Resources
         id: cleanup
         env:

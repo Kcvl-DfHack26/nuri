@@ -38,14 +38,10 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.PREVIEW_INFRA_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_INFRA_SERVICE_ACCOUNT }}
-      - uses: opentofu/setup-opentofu@v2.0.2
-        with:
-          tofu_version: 1.13.8
-          tofu_wrapper: false
-      - name: Prepare Locked OpenTofu Provider
+      - name: Install Verified OpenTofu and Provider
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/ci/prepare-tofu-provider.ts infra/preview/.terraform.lock.hcl
+        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview/.terraform.lock.hcl
       - name: Plan or Apply Preview Infrastructure
         env:
           OPERATION: ${{ inputs.operation }}

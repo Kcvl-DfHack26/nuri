@@ -162,16 +162,13 @@ jobs:
     steps:
       - *checkout
       - *setup-bun
-      - uses: opentofu/setup-opentofu@v2.0.2
-        with:
-          tofu_version: 1.13.8
       - uses: terraform-linters/setup-tflint@v6.3.2
         with:
           tflint_version: v0.65.0
-      - name: Prepare Locked OpenTofu Provider
+      - name: Install Verified OpenTofu and Provider
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/ci/prepare-tofu-provider.ts
+        run: bun .github/scripts/ci/prepare-opentofu.ts
       - run: tofu fmt -check -recursive infra
       - run: tofu -chdir=infra init -backend=false -lockfile=readonly
       - run: tofu -chdir=infra validate
