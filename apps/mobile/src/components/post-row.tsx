@@ -1,6 +1,5 @@
 import { Icon } from '@expo/ui';
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { memo } from 'react';
 import { Alert, Pressable, Share, View } from 'react-native';
@@ -13,7 +12,6 @@ import { SocialIcon } from '@/components/social-icon';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { formatPostDate } from '@/lib/date';
-import { usePreferences } from '@/lib/preferences';
 import { changeLike, deletePost, updateFeedPost } from '@/lib/social';
 import { colors } from '@/theme/colors';
 import { avatarSize } from '@/theme/metrics';
@@ -29,7 +27,6 @@ export const PostRow = memo(function PostRow({
 }) {
   const date = formatPostDate(item.createdAt, now);
   const client = useQueryClient();
-  const { preferences } = usePreferences();
   const mutationKey = ['like', viewerId, item.id];
   const pending = useIsMutating({ mutationKey }) > 0;
   const like = useMutation({
@@ -64,11 +61,6 @@ export const PostRow = memo(function PostRow({
             })),
           );
         }
-      }
-    },
-    onSuccess: () => {
-      if (preferences.haptics) {
-        void Haptics.selectionAsync().catch(() => {});
       }
     },
   });

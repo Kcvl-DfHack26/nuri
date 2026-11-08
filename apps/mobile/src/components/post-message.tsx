@@ -395,7 +395,7 @@ function PublishOption({
         <Text className="font-maru text-meta text-ink-secondary">{detail}</Text>
       </View>
       {/* React Native's OS switch: @expo/ui's Switch always draws its label beside the toggle,
-          which would repeat the Plan A title, and follows the device's dark appearance. */}
+          which would repeat the Plan A title. */}
       <Switch
         accessibilityLabel={title}
         accessibilityHint={detail}

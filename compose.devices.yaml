@@ -7,7 +7,6 @@ services:
       PASSKEY_ORIGINS: ${DEVICE_METRO_ORIGIN:?Run bun run dev:devices first}
       DEV_METRO_ORIGIN: ${DEVICE_METRO_ORIGIN:?Run bun run dev:devices first}
       GOOGLE_EMULATOR_PUBLIC_URL: ${DEVICE_GOOGLE_ORIGIN:?Run bun run dev:devices first}
-      APPLE_EMULATOR_PUBLIC_URL: ${DEVICE_APPLE_ORIGIN:?Run bun run dev:devices first}
   metro:
     environment:
       EXPO_PUBLIC_API_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
@@ -17,10 +16,6 @@ services:
     environment:
       BETTER_AUTH_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
       EMULATE_PUBLIC_URL: ${DEVICE_GOOGLE_ORIGIN:?Run bun run dev:devices first}
-  apple:
-    environment:
-      BETTER_AUTH_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}
-      EMULATE_PUBLIC_URL: ${DEVICE_APPLE_ORIGIN:?Run bun run dev:devices first}
   mail:
     environment:
       BETTER_AUTH_URL: ${DEVICE_API_ORIGIN:?Run bun run dev:devices first}

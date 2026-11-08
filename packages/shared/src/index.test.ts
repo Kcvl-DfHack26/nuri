@@ -3,7 +3,6 @@ import { expect, test } from 'bun:test';
 import {
   feedQuerySchema,
   postInputSchema,
-  preferencesSchema,
   profileInputSchema,
   profilePatchSchema,
   purchaseUrlSchema,
@@ -33,13 +32,6 @@ test('bounds pagination and profile input', () => {
   expect(profileInputSchema.safeParse({ ...valid, bio: 'あ'.repeat(43) }).success).toBe(false);
   expect(profilePatchSchema.safeParse({}).success).toBe(false);
   expect(profilePatchSchema.safeParse({ name: '更新' }).success).toBe(true);
-});
-test('preserves appearance preferences while removing obsolete ritual data', () => {
-  expect(preferencesSchema.parse({ appearance: 'dark', favorites: ['old'] })).toEqual({
-    appearance: 'dark',
-    haptics: true,
-  });
-  expect(preferencesSchema.safeParse({ appearance: 'unknown' }).success).toBe(false);
 });
 test('accepts only slug recipe IDs and bounded recipe searches', () => {
   expect(recipeParamsSchema.parse({ id: 'fox' }).id).toBe('fox');

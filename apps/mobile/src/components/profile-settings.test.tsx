@@ -77,7 +77,17 @@ jest.mock('@/lib/api', () => ({
       },
     },
     signOut: () => mockSignOut(),
+    listAccounts: () => mockAccounts(),
+    passkey: {
+      listUserPasskeys: () => mockPasskeys(),
+      deletePasskey: (input: { id: string }) => mockDeletePasskey(input),
+    },
   },
+}));
+jest.mock('@/lib/passkeys', () => ({
+  ...jest.requireActual<typeof import('@/lib/passkeys')>('@/lib/passkeys'),
+  addPasskey: () => mockAddPasskey(),
+  passkeysAvailable: true,
 }));
 type Session = { data: { user: { id: string; name: string; email: string } } | null };
 const viewer: Session = {
@@ -103,6 +113,16 @@ const mockGetProfile = jest.fn(async () => ({
   json: async () => ({ profile: { name: 'はなこ', handle: null, bio: '', isPublic: true } }),
 }));
 const mockPutProfile = jest.fn(async (_input: { json: unknown }) => ({ status: 200 }));
+const mockAccounts = jest.fn(async () => ({
+  data: [{ providerId: 'google' }],
+  error: null,
+}));
+const mockPasskeys = jest.fn(async () => ({
+  data: [{ id: 'key', name: 'この端末' }],
+  error: null,
+}));
+const mockAddPasskey = jest.fn(async () => {});
+const mockDeletePasskey = jest.fn(async (_input: { id: string }) => ({ error: null }));
 const mockNotify = jest.fn();
 const mockSignOut = jest.fn(async (): Promise<{ error: { message: string } | null }> => ({
   error: null,
@@ -141,12 +161,38 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
   expect(mockNotify).toHaveBeenCalled();
 });
 
-test('opens the app settings and logs out from the profile settings', async () => {
+test('adds and removes passkeys inline in the account section', async () => {
+  await renderWithClient(<ProfileSettings />);
+  expect(await screen.findByText('連携済み')).toBeOnTheScreen();
+  expect(screen.queryByText('アプリの設定')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'この端末にパスキーを追加' })).toBeNull();
+  await fireEvent.press(await screen.findByRole('button', { name: 'パスキー 1 件登録済み' }));
+
+  const add = screen.getByRole('button', { name: 'この端末にパスキーを追加' });
+  await fireEvent.press(add);
+  await waitFor(() => {
+    expect(mockAddPasskey).toHaveBeenCalled();
+    expect(add).toBeEnabled();
+  });
+
+  mockPasskeys.mockResolvedValueOnce({ data: [], error: null });
+  await fireEvent.press(screen.getByRole('button', { name: 'この端末を削除' }));
+  expect(await screen.findByRole('button', { name: 'パスキー 未登録' })).toBeOnTheScreen();
+  expect(mockDeletePasskey).toHaveBeenCalledWith({ id: 'key' });
+  expect(router.push).not.toHaveBeenCalled();
+});
+
+test('ignores legacy Apple accounts and shows an empty passkey list', async () => {
+  mockAccounts.mockResolvedValueOnce({ data: [{ providerId: 'apple' }], error: null });
+  mockPasskeys.mockResolvedValueOnce({ data: [], error: null });
+  await renderWithClient(<ProfileSettings />);
+  expect(await screen.findByText('未連携')).toBeOnTheScreen();
+  expect(await screen.findByRole('button', { name: 'パスキー 未登録' })).toBeOnTheScreen();
+});
+
+test('logs out from the profile settings', async () => {
   await renderWithClient(<ProfileSettings />);
   await screen.findByLabelText('表示名');
-  await fireEvent.press(screen.getByRole('button', { name: 'アプリの設定 外観・触覚・パスキー' }));
-  expect(router.push).toHaveBeenCalledWith('/settings');
-
   await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
   await waitFor(() => {
     expect(router.dismissTo).toHaveBeenCalledWith('/');
@@ -220,13 +266,14 @@ test('blocks saving a draft until a failed refresh is retried', async () => {
   expect(screen.getByLabelText('表示名')).toHaveProp('value', '編集中');
 });
 
-test('lets a guest log in or open the app settings from the profile settings', async () => {
+test('lets a guest log in from the profile settings', async () => {
   signOutForTest();
   await renderWithClient(<ProfileSettings />);
   expect(screen.queryByLabelText('表示名')).not.toBeOnTheScreen();
+  expect(screen.queryByText('Google 連携')).toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: 'ログイン' }));
   expect(router.push).toHaveBeenCalledWith('/account');
-  expect(screen.getByRole('button', { name: 'アプリの設定 外観・触覚・パスキー' })).toBeEnabled();
+  expect(screen.queryByText('アプリの設定')).toBeNull();
 });
 
 test('keeps the edited name and shows why saving or logging out failed', async () => {

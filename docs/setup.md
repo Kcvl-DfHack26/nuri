@@ -4,7 +4,7 @@ nuriのGitHubは [Kcvl-DfHack26/nuri](https://github.com/Kcvl-DfHack26/nuri)、E
 
 この文書は[スターター](https://github.com/ReoHakase/expo-hono-opentofu-starter)の手順を引き継いでいる。nuriの共有APIはGoogle Cloudプロジェクト `kcvlb4` の `nuri-staging`。公開サービスとDBを共有しているため、この文書では本番として扱う。
 
-Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel EmulateでGoogle／Apple OAuthとメールを試せる。[認証とseed](auth.md)を参照。本番を変更する GitHub Actions は Workload Identity Federation（WIF）を使う。
+Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel EmulateでGoogle OAuthとメールを試せる。[認証とseed](auth.md)を参照。本番を変更する GitHub Actions は Workload Identity Federation（WIF）を使う。
 
 ## 1. cloneとworktreeの準備
 
@@ -33,7 +33,7 @@ portless trust
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-Composeが依存導入・未作成のアプリenv生成・PostgreSQLのhealthcheck・migrationを行う。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432。Google／Apple／メールのEmulateもAPIの依存として起動する。PostgreSQLはホストへ公開せず、PortlessがHTTPサービスにloopback上の空きポートを割り当てる。
+Composeが依存導入・未作成のアプリenv生成・PostgreSQLのhealthcheck・migrationを行う。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432。Google／メールのEmulateもAPIの依存として起動する。PostgreSQLはホストへ公開せず、PortlessがHTTPサービスにloopback上の空きポートを割り当てる。
 
 | サービス    | ホストからのURL                                |
 | ----------- | ---------------------------------------------- |
@@ -65,7 +65,7 @@ foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存�
 | `apps/api/.env`    | worktree固有の `BETTER_AUTH_SECRET` を生成する。`DATABASE_URL` と `BETTER_AUTH_URL` は空欄にし、ComposeのPostgreSQLとAPI originを使う |
 | `apps/mobile/.env` | `EXPO_PUBLIC_API_URL` は空欄にし、ComposeのAPIへ接続する。実機から自分のAPIを使う場合は到達可能なHTTPS URLを設定する                  |
 
-3ファイルはGit管理外。Google・Apple・メールはローカルの認証エミュレーターを使う。公開APIへの接続が必要な確認では、Expoのdevelopment環境に登録した公開URLを使う。[Expo GitHub連携・環境変数](#expo-github連携環境変数)
+3ファイルはGit管理外。Google・メールはローカルの認証エミュレーターを使う。公開APIへの接続が必要な確認では、Expoのdevelopment環境に登録した公開URLを使う。[Expo GitHub連携・環境変数](#expo-github連携環境変数)
 
 ### Dev Containerで編集・検査する
 
@@ -166,7 +166,7 @@ portless compose logs api-tunnel
 
 `portless compose restart api metro` で環境ファイルを読み直す。APIの `.env.example` には開発専用の `exp://**` originが含まれている。共有の本番APIにこのワイルドカードを入れない。実機の `localhost` は端末自身を指すため、localhost URLをモバイルへ設定しない。
 
-Cloudflareトンネルは外向きTCP 7844が必要。`curl https://....trycloudflare.com/ready` が `{"status":"ready"}` になれば、タイムラインの閲覧・投稿を確認できる。Google／AppleのローカルEmulateは `.localhost` のため、APIトンネルだけでは実機OAuthを完了できない。実機認証には到達可能な検証APIと実プロバイダ設定を用意する。トンネルを作り直すとURLが変わる。普段は安定したstaging Cloud Run URLも使える。実機・公開トンネルの確認範囲は [docs/testing.md](testing.md) に記録する。
+Cloudflareトンネルは外向きTCP 7844が必要。`curl https://....trycloudflare.com/ready` が `{"status":"ready"}` になれば、タイムラインの閲覧・投稿を確認できる。GoogleのローカルEmulateは `.localhost` のため、APIトンネルだけでは実機OAuthを完了できない。実機認証には到達可能な検証APIと実プロバイダ設定を用意する。トンネルを作り直すとURLが変わる。普段は安定したstaging Cloud Run URLも使える。実機・公開トンネルの確認範囲は [docs/testing.md](testing.md) に記録する。
 
 ### Development BuildとPRプレビュー
 

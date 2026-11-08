@@ -4,8 +4,8 @@ if (process.env.NODE_ENV === 'production') {
   throw new Error('Emulate cannot run in production');
 }
 const service = process.env.EMULATE_SERVICE;
-if (service !== 'google' && service !== 'apple' && service !== 'resend') {
-  throw new Error('Set EMULATE_SERVICE to google, apple or resend');
+if (service !== 'google' && service !== 'resend') {
+  throw new Error('Set EMULATE_SERVICE to google or resend');
 }
 const configuredApi = process.env.BETTER_AUTH_URL?.trim();
 const apiOrigin =
@@ -35,7 +35,6 @@ const emulator = await createEmulator({
         {
           client_id: 'starter-local',
           client_secret: 'starter-local-secret',
-          team_id: 'LOCALTEAM',
           name: 'SNSサンプル',
           redirect_uris: [`${apiOrigin}/api/auth/callback/emulate-${service}`],
         },

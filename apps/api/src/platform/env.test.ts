@@ -84,7 +84,6 @@ test('emulation cannot be enabled in production or point to public services', ()
     ...base,
     AUTH_EMULATE: 'true',
     GOOGLE_EMULATOR_URL: 'http://localhost:4002',
-    APPLE_EMULATOR_URL: 'http://localhost:4004',
     RESEND_API_URL: 'http://localhost:4005',
   };
   expect(readEnv(emulated).AUTH_EMULATE).toBe(true);

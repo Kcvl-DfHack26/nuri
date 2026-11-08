@@ -62,10 +62,6 @@ jest.mock('@/theme/colors', () => ({
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
-jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn().mockResolvedValue(undefined) }));
-jest.mock('@/lib/preferences', () => ({
-  usePreferences: () => ({ preferences: { haptics: false } }),
-}));
 jest.mock('@/lib/api', () => ({
   apiUrl: 'http://localhost:8080',
   authClient: {

@@ -1,12 +1,5 @@
 import { z } from 'zod';
 
-export const preferencesSchema = z.object({
-  appearance: z.enum(['system', 'light', 'dark']).default('system'),
-  haptics: z.boolean().default(true),
-});
-
-export type Preferences = z.infer<typeof preferencesSchema>;
-
 export const postInputSchema = z.object({
   body: z
     .string()

@@ -2,7 +2,7 @@
 
 ## ローカルで試す
 
-[セットアップ](setup.md)のHTTPS Composeを起動すると、API・PostgreSQLとVercel EmulateのGoogle、Apple、Resendが起動する。実プロバイダのキーやGoogle Cloudは不要。
+[セットアップ](setup.md)のHTTPS Composeを起動すると、API・PostgreSQLとVercel EmulateのGoogle、Resendが起動する。実プロバイダのキーやGoogle Cloudは不要。
 
 ```sh
 bun run dev
@@ -15,14 +15,13 @@ seedはSNSサンプルの画像付き4ユーザー・8投稿・20件のいいね
 | サービス       | PortlessのURL                                   |
 | -------------- | ----------------------------------------------- |
 | Google         | `https://google.nuri-<issue>-<topic>.localhost` |
-| Apple          | `https://apple.nuri-<issue>-<topic>.localhost`  |
 | メールの受信箱 | `https://mail.nuri-<issue>-<topic>.localhost`   |
 
-ログイン画面のGoogle／AppleボタンでEmulateの同意画面を開き、`hanako@example.com` または `taro@example.com` を選ぶ。実際のBetter Authセッションが発行される。実アカウントのパスワードは入力しない。email magic linkは任意のテスト用メールアドレスへ送信し、ローカル受信箱で開く。
+ログイン画面のGoogleボタンでEmulateの同意画面を開き、`hanako@example.com` または `taro@example.com` を選ぶ。実際のBetter Authセッションが発行される。実アカウントのパスワードは入力しない。email magic linkは任意のテスト用メールアドレスへ送信し、ローカル受信箱で開く。
 
 マジックリンクは10分で失効する単回利用トークン。モバイルは同じ端末で開く。メール内のHTTPSリンクから「nuriアプリで開く」を押してアプリへ戻り、SecureStoreに保存したリクエストstateを照合する。案内ページはURL断片からリンクを作り、トークンをCloud Runへのリクエストやアクセスログへ送らない。Better Authの検証とSet-CookieをExpo pluginへ引き渡す。リンクやcookieはログ・Issueへ貼らない。
 
-`.localhost` はホスト／iOS Simulator向け。SimulatorではPortless CAもそのSimulatorの信頼ストアへ登録する。APIやMetroだけを公開トンネルへ通してもGoogle／AppleのローカルURLに実機は到達できない。エミュレータを一般公開せず、実機は到達できる検証APIと実プロバイダ設定を使う。
+`.localhost` はホスト／iOS Simulator向け。SimulatorではPortless CAもそのSimulatorの信頼ストアへ登録する。APIやMetroだけを公開トンネルへ通してもGoogleのローカルURLに実機は到達できない。エミュレータを一般公開せず、実機は到達できる検証APIと実プロバイダ設定を使う。
 
 ## 設定の正本
 
@@ -33,13 +32,23 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 | `BETTER_AUTH_URL` / `TRUSTED_ORIGINS`       | APIのHTTPS URLと許可するアプリ・Web origin                   |
 | `AUTH_EMULATE`                              | ローカル限定。本番でtrueなら起動を拒否                       |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 実Google OAuthクライアント                                   |
-| `APPLE_CLIENT_ID` / `APPLE_CLIENT_SECRET`   | 実Apple Services IDと署名済みclient-secret JWT。期限前に更新 |
 | `RESEND_API_KEY` / `EMAIL_FROM`             | 実メール送信キーと送信元。一般配信には検証済みドメインが必要 |
 | `PASSKEY_RP_ID` / `PASSKEY_ORIGINS`         | パスキーのRPドメインと許可origin（カンマ区切り）             |
 | `APPLE_APP_ID`                              | `TEAM_ID.com.kcvl.nuri`                                      |
 | `ANDROID_SHA256_CERT_FINGERPRINTS`          | Android署名証明書のSHA-256（カンマ区切り）                   |
 
-実OAuthのcallbackは `<BETTER_AUTH_URL>/api/auth/callback/google` と `/apple`。ローカルは別provider IDの `/emulate-google` と `/emulate-apple` で、実プロバイダのidentityと混在させない。キー未設定のログイン方法はcapabilitiesに従って利用不可にする。認証バイパス・organization・パスワードログインは設けない。
+実OAuthのcallbackは `<BETTER_AUTH_URL>/api/auth/callback/google`。ローカルは別provider IDの `/emulate-google` で、実プロバイダのidentityと混在させない。キー未設定のログイン方法はcapabilitiesに従って利用不可にする。認証バイパス・organization・パスワードログインは設けない。
+
+Googleとマジックリンクは、大文字・小文字を区別しない同じ確認済みメールアドレスで同一アカウントに入る。Better Authがメールを正規化し、PostgreSQLの既存の `user.email` 一意制約で重複を防ぐ。マイページから「プロフィール設定」を開き、設定項目の末尾にある「アカウント」でGoogle連携状態を確認できる。既存のApple連携とユーザーデータは保持する。Appleでのみログインしていた利用者は、登録メールにマジックリンクを受け取れる場合、同じアカウントを利用できる。非公開メールの転送が止まっている場合はこの経路を使えない。
+
+## ネイティブのGoogle One Tap
+
+AndroidのCredential ManagerとiOSのGoogle Sign-In SDKを、Expoが案内する [react-native-nitro-google-signin](https://docs.expo.dev/guides/google-authentication/) から呼ぶ。Better AuthがGoogleのIDトークンを検証し、既存のGoogle OAuthと同じprovider IDでセッションを作る。
+
+- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` はAPIの `GOOGLE_CLIENT_ID` と同じWeb OAuthクライアントIDを設定する。
+- Androidは `com.kcvl.nuri` と使用する署名証明書のSHA-1を [Google Auth Platform](https://console.cloud.google.com/auth/clients) のAndroid OAuthクライアントに登録する。
+- iOSは `com.kcvl.nuri` のiOS OAuthクライアントを作り、`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` に設定する。Expo config pluginが戻り先のURL schemeを組み込む。
+- これらの公開IDを設定して新しいネイティブビルドを作る。Expo Go、Web、Emulate、プラットフォーム用のID未設定時はブラウザのOAuthを使う。
 
 ## Android仮想端末でGoogleとメールを試す（#51）
 
@@ -58,11 +67,11 @@ GoogleとResendの設定がない間は、公開APIのログイン方法とし�
 
 現行のExpo clientはGoogle OAuthからアプリへ戻るカスタムスキームのURLへセッションcookieを載せる。メールはメールアプリが開けるHTTPSの案内ページを経由し、そこから同じスキームに単回利用tokenを載せる。同じスキームを登録した別アプリがこれらを受け取る可能性がある。メールの端末内state照合は誤操作を防ぐが、リンクを横取りした別アプリがtokenを直接交換することまでは防げない。このため今回の採用は管理下のAndroid仮想端末とテストアカウントによる検証に限る。一般向けビルドを配る前に、所有を検証したHTTPSドメインのAndroid App Links／iOS Universal Links、またはtokenをURLへ載せない方式へ移す必要がある。これは#51の仮想端末での動作確認と区別して扱う。
 
-本番では `AUTH_EMULATE=false`、HTTPS、限定したoriginを使う。Google・Resendのsecret値はSecret Managerに置き、Cloud Runへsecret参照として渡す。OpenTofuはGoogle・Resendのsecretの器と有効化フラグを管理する。Appleの実サービス接続は今回扱わない。`EXPO_PUBLIC_*` へsecretを入れない。
+本番では `AUTH_EMULATE=false`、HTTPS、限定したoriginを使う。Google・Resendのsecret値はSecret Managerに置き、Cloud Runへsecret参照として渡す。OpenTofuはGoogle・Resendのsecretの器と有効化フラグを管理する。`EXPO_PUBLIC_*` へsecretを入れない。
 
 ## パスキーの端末設定
 
-WebはBetter Auth公式passkey client、ネイティブは `react-native-passkey` から同じ登録／認証検証エンドポイントを使う。Expo Goにはこのモジュールがないため、ログイン画面（⑱）にはパスキーの操作を出さず、設定の登録は無効化して理由を表示する。登録済みキーの表示・削除はログイン後に利用できる。
+WebはBetter Auth公式passkey client、ネイティブは `react-native-passkey` から同じ登録／認証検証エンドポイントを使う。Expo Goにはこのモジュールがないため、ログイン画面（⑱）にはパスキーの操作を出さず、プロフィール設定の登録ボタンは無効化して理由を表示する。「プロフィール設定」末尾の「アカウント」で登録件数を確認できる。「パスキー」を展開すると、その場で登録済みキーの一覧・追加・削除を操作できる。
 
 Development Buildには `EXPO_PUBLIC_PASSKEY_RP_ID` を設定する。iOSのAssociated Domainsはapp.config.tsが `webcredentials:<RP ID>` を生成する。APIの `/.well-known/apple-app-site-association` と `/.well-known/assetlinks.json` に正しいアプリID・署名を設定する。RPドメインから認証エンドポイントと関連付けファイルを公開し、HTTPSと端末の関連付けを確認する。Androidのnative originも `PASSKEY_ORIGINS` へ明示する。
 

@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { parseEnv } from 'node:util';
 
-const services = ['api', 'metro', 'google', 'apple', 'mail'] as const;
+const services = ['api', 'metro', 'google', 'mail'] as const;
 const root = fileURLToPath(new URL('../', import.meta.url));
 
 export function deviceOrigin(output: string): string {

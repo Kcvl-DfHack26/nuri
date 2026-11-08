@@ -16,7 +16,6 @@ import { sendLoginEmail } from './mail';
 export function authCapabilities(env: Environment) {
   return {
     google: env.AUTH_EMULATE || Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
-    apple: env.AUTH_EMULATE || Boolean(env.APPLE_CLIENT_ID && env.APPLE_CLIENT_SECRET),
     email: env.AUTH_EMULATE || Boolean(env.RESEND_API_KEY),
     emulated: env.AUTH_EMULATE,
   };
@@ -31,14 +30,6 @@ export function createAuth(db: Database, env: Environment) {
     trustedOrigins: env.TRUSTED_ORIGINS.split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
-    account: {
-      accountLinking: {
-        enabled: true,
-        trustedProviders: env.AUTH_EMULATE
-          ? ['emulate-google', 'emulate-apple']
-          : ['google', 'apple'],
-      },
-    },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === '/update-user') {
@@ -53,20 +44,10 @@ export function createAuth(db: Database, env: Environment) {
       }),
     },
     rateLimit: { enabled: true, storage: 'database', window: 60, max: 60 },
-    socialProviders: env.AUTH_EMULATE
-      ? {}
-      : {
-          ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
-            ? {
-                google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET },
-              }
-            : {}),
-          ...(env.APPLE_CLIENT_ID && env.APPLE_CLIENT_SECRET
-            ? {
-                apple: { clientId: env.APPLE_CLIENT_ID, clientSecret: env.APPLE_CLIENT_SECRET },
-              }
-            : {}),
-        },
+    socialProviders:
+      !env.AUTH_EMULATE && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? { google: { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET } }
+        : {},
     plugins: [
       expo(),
       passkey({
