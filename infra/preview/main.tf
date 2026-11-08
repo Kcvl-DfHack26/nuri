@@ -13,12 +13,12 @@ terraform {
 }
 
 variable "project_id" {
-  description = "ID of the dedicated preview GCP project."
+  description = "ID of the GCP project hosting nuri preview resources."
   type        = string
   nullable    = false
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{4,28}[a-z0-9]$", var.project_id)) && var.project_id != "kcvlb4"
-    error_message = "Set a valid preview project ID distinct from the kcvlb4 staging project."
+    condition     = var.project_id == "kcvlb4"
+    error_message = "nuri PR previews use the existing kcvlb4 project."
   }
 }
 
@@ -28,6 +28,10 @@ locals {
   name       = "nuri-preview"
   repository = "Kcvl-DfHack26/nuri"
   repo_id    = "1447386190"
+  identities = {
+    "preview"        = { suffix = "publisher", purpose = "publisher" }
+    "preview-create" = { suffix = "creator", purpose = "service creator" }
+  }
 }
 
 provider "google" {
@@ -38,6 +42,7 @@ provider "google" {
 resource "google_project_service" "preview" {
   for_each = toset([
     "artifactregistry.googleapis.com",
+    "cloudresourcemanager.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "run.googleapis.com",
@@ -54,9 +59,10 @@ resource "google_service_account" "runtime" {
   depends_on   = [google_project_service.preview]
 }
 
-resource "google_service_account" "publisher" {
-  account_id   = "${local.name}-publisher"
-  display_name = "GitHub Actions PR preview publisher"
+resource "google_service_account" "automation" {
+  for_each     = local.identities
+  account_id   = "${local.name}-${each.value.suffix}"
+  display_name = "GitHub Actions PR preview ${each.value.purpose}"
   depends_on   = [google_project_service.preview]
 }
 
@@ -69,23 +75,25 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   workload_identity_pool_id          = google_iam_workload_identity_pool.preview.workload_identity_pool_id
   workload_identity_pool_provider_id = "github"
   attribute_mapping = {
-    "google.subject"          = "assertion.sub"
-    "attribute.repository_id" = "assertion.repository_id"
+    "google.subject"               = "assertion.sub"
+    "attribute.github_environment" = "assertion.environment"
   }
-  attribute_condition = "assertion.repository_id == '${local.repo_id}' && assertion.repository == '${local.repository}' && assertion.ref == 'refs/heads/main' && assertion.environment == 'preview' && assertion.workflow_ref == '${local.repository}/.github/workflows/preview.yml@refs/heads/main'"
+  attribute_condition = "assertion.repository_id == '${local.repo_id}' && assertion.repository == '${local.repository}' && assertion.ref == 'refs/heads/main' && assertion.environment in ['preview', 'preview-create'] && assertion.workflow_ref == '${local.repository}/.github/workflows/preview.yml@refs/heads/main'"
   oidc { issuer_uri = "https://token.actions.githubusercontent.com" }
 }
 
 resource "google_service_account_iam_member" "federation" {
-  service_account_id = google_service_account.publisher.name
+  for_each           = google_service_account.automation
+  service_account_id = each.value.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.preview.name}/attribute.repository_id/${local.repo_id}"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.preview.name}/attribute.github_environment/${each.key}"
 }
 
 resource "google_service_account_iam_member" "act_as_runtime" {
+  for_each           = google_service_account.automation
   service_account_id = google_service_account.runtime.name
   role               = "roles/iam.serviceAccountUser"
-  member             = "serviceAccount:${google_service_account.publisher.email}"
+  member             = "serviceAccount:${each.value.email}"
 }
 
 resource "google_artifact_registry_repository" "preview" {
@@ -108,7 +116,7 @@ resource "google_artifact_registry_repository_iam_member" "publisher" {
   location   = local.region
   repository = google_artifact_registry_repository.preview.name
   role       = "roles/artifactregistry.repoAdmin"
-  member     = "serviceAccount:${google_service_account.publisher.email}"
+  member     = "serviceAccount:${google_service_account.automation["preview"].email}"
 }
 
 resource "google_storage_bucket" "state" {
@@ -131,25 +139,98 @@ resource "google_storage_bucket" "state" {
   lifecycle { prevent_destroy = true }
 }
 
-resource "google_storage_bucket_iam_member" "publisher" {
-  bucket = google_storage_bucket.state.name
-  role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.publisher.email}"
+resource "google_storage_bucket_iam_member" "automation" {
+  for_each = google_service_account.automation
+  bucket   = google_storage_bucket.state.name
+  role     = "roles/storage.objectAdmin"
+  member   = "serviceAccount:${each.value.email}"
 }
 
-# Cloud Run の管理権限は、ステージングを含まないプレビュー専用プロジェクトに付与する。
+data "google_project" "preview" {
+  project_id = local.project
+}
+
+resource "google_tags_tag_key" "preview" {
+  parent      = "projects/${data.google_project.preview.number}"
+  short_name  = local.name
+  description = "Identifies the disposable nuri PR preview Cloud Run services."
+  depends_on  = [google_project_service.preview]
+}
+
+resource "google_tags_tag_value" "preview" {
+  parent     = google_tags_tag_key.preview.name
+  short_name = "service"
+}
+
+# 作成ジョブは新規サービスにタグを付ける。既存サービスの更新・削除権限は持たない。
+resource "google_tags_tag_value_iam_member" "creator" {
+  tag_value = google_tags_tag_value.preview.name
+  role      = "roles/resourcemanager.tagUser"
+  member    = "serviceAccount:${google_service_account.automation["preview-create"].email}"
+}
+
+resource "google_project_iam_custom_role" "creator" {
+  project = local.project
+  role_id = "nuriPreviewCloudRunCreator"
+  title   = "nuri PR preview Cloud Run creator"
+  permissions = [
+    "run.operations.get",
+    "run.services.create",
+    "run.services.createTagBinding",
+  ]
+  depends_on = [google_project_service.preview]
+}
+
+resource "google_project_iam_member" "creator" {
+  project = local.project
+  role    = google_project_iam_custom_role.creator.name
+  member  = "serviceAccount:${google_service_account.automation["preview-create"].email}"
+}
+
+# 非同期操作と配信リビジョンの参照には、サービスのタグを評価できない。
+resource "google_project_iam_custom_role" "observe" {
+  project = local.project
+  role_id = "nuriPreviewCloudRunObserver"
+  title   = "nuri PR preview Cloud Run observer"
+  permissions = [
+    "run.operations.get",
+    "run.revisions.get",
+  ]
+  depends_on = [google_project_service.preview]
+}
+
+resource "google_project_iam_member" "observe" {
+  project = local.project
+  role    = google_project_iam_custom_role.observe.name
+  member  = "serviceAccount:${google_service_account.automation["preview"].email}"
+}
+
+resource "google_project_iam_custom_role" "read_service" {
+  project     = local.project
+  role_id     = "nuriPreviewCloudRunReader"
+  title       = "nuri PR preview Cloud Run reader"
+  permissions = ["run.services.get", "run.services.listTagBindings"]
+  depends_on  = [google_project_service.preview]
+}
+
+resource "google_project_iam_member" "read_service" {
+  for_each = google_service_account.automation
+  project  = local.project
+  role     = google_project_iam_custom_role.read_service.name
+  member   = "serviceAccount:${each.value.email}"
+  condition {
+    title      = "nuri-preview-services"
+    expression = "resource.matchTagId('${google_tags_tag_key.preview.name}', '${google_tags_tag_value.preview.name}')"
+  }
+}
+
+# 配信・回収ジョブの更新はタグ付きサービスに限る。配信アカウントにはタグの付与権限を与えない。
 resource "google_project_iam_custom_role" "publisher" {
   project = local.project
   role_id = "nuriPreviewCloudRunManager"
   title   = "nuri PR preview Cloud Run manager"
   permissions = [
-    "run.operations.get",
-    "run.revisions.delete",
-    "run.revisions.get",
-    "run.revisions.list",
-    "run.services.create",
     "run.services.delete",
-    "run.services.get",
     "run.services.getIamPolicy",
     "run.services.setIamPolicy",
     "run.services.update",
@@ -160,7 +241,11 @@ resource "google_project_iam_custom_role" "publisher" {
 resource "google_project_iam_member" "publisher" {
   project = local.project
   role    = google_project_iam_custom_role.publisher.name
-  member  = "serviceAccount:${google_service_account.publisher.email}"
+  member  = "serviceAccount:${google_service_account.automation["preview"].email}"
+  condition {
+    title      = "nuri-preview-services"
+    expression = "resource.matchTagId('${google_tags_tag_key.preview.name}', '${google_tags_tag_value.preview.name}')"
+  }
 }
 
 output "preview_wif_provider" {
@@ -170,10 +255,25 @@ output "preview_wif_provider" {
 
 output "preview_service_account" {
   description = "GitHub preview Environment variable PREVIEW_SERVICE_ACCOUNT."
-  value       = google_service_account.publisher.email
+  value       = google_service_account.automation["preview"].email
 }
 
 output "preview_state_bucket" {
   description = "GCS bucket with per-PR OpenTofu state."
   value       = google_storage_bucket.state.name
+}
+
+output "preview_creator_service_account" {
+  description = "GitHub preview-create Environment variable PREVIEW_SERVICE_ACCOUNT."
+  value       = google_service_account.automation["preview-create"].email
+}
+
+output "preview_run_tag_key" {
+  description = "GitHub repository variable PREVIEW_RUN_TAG_KEY."
+  value       = google_tags_tag_key.preview.name
+}
+
+output "preview_run_tag_value" {
+  description = "GitHub repository variable PREVIEW_RUN_TAG_VALUE."
+  value       = google_tags_tag_value.preview.name
 }

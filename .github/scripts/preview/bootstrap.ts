@@ -30,8 +30,8 @@ async function manage() {
   if (operation !== 'plan' && operation !== 'apply') {
     throw new Error('Expected OpenTofu plan or apply');
   }
-  if (!project || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project) || project === 'kcvlb4') {
-    throw new Error('Set PREVIEW_GCP_PROJECT_ID to a dedicated preview project');
+  if (project !== 'kcvlb4') {
+    throw new Error('Set PREVIEW_GCP_PROJECT_ID to kcvlb4');
   }
   if (!runnerTemp) {
     throw new Error('RUNNER_TEMP is required');

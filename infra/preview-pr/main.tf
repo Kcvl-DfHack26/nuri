@@ -20,12 +20,32 @@ variable "pr_number" {
 }
 
 variable "project_id" {
-  description = "ID of the dedicated preview GCP project."
+  description = "ID of the GCP project hosting nuri preview resources."
   type        = string
   nullable    = false
   validation {
-    condition     = can(regex("^[a-z][a-z0-9-]{4,28}[a-z0-9]$", var.project_id)) && var.project_id != "kcvlb4"
-    error_message = "Set a valid preview project ID distinct from the kcvlb4 staging project."
+    condition     = var.project_id == "kcvlb4"
+    error_message = "nuri PR previews use the existing kcvlb4 project."
+  }
+}
+
+variable "tag_key" {
+  description = "Permanent ID of the Resource Manager key marking preview services."
+  type        = string
+  nullable    = false
+  validation {
+    condition     = can(regex("^tagKeys/[0-9]+$", var.tag_key))
+    error_message = "Use the permanent preview tag key ID."
+  }
+}
+
+variable "tag_value" {
+  description = "Permanent ID of the Resource Manager value marking preview services."
+  type        = string
+  nullable    = false
+  validation {
+    condition     = can(regex("^tagValues/[0-9]+$", var.tag_value))
+    error_message = "Use the permanent preview tag value ID."
   }
 }
 
@@ -41,12 +61,13 @@ provider "google" {
 }
 
 resource "google_cloud_run_v2_service" "preview" {
+  project              = local.project
   name                 = local.name
   location             = local.region
   ingress              = "INGRESS_TRAFFIC_ALL"
   deletion_protection  = false
   default_uri_disabled = false
-  invoker_iam_disabled = true
+  tags                 = { (var.tag_key) = var.tag_value }
   scaling {
     min_instance_count = 0
     max_instance_count = 1
@@ -77,6 +98,7 @@ resource "google_cloud_run_v2_service" "preview" {
       traffic,
       client,
       client_version,
+      invoker_iam_disabled,
     ]
   }
 }

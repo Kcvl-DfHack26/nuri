@@ -108,7 +108,11 @@ export function renderPreviewComment(input: {
     `| 📱 **Expo Go**<br>${go} | ${status} | ${time} | ${expoCost} |`,
     '',
     ...(canRequest
-      ? [requestLine, '', 'main宛てのPRは自動配信します。write権限を持つ人はチェックして配信を再実行できます。']
+      ? [
+          requestLine,
+          '',
+          'main宛てのPRは自動配信します。write権限を持つ人はチェックして配信を再実行できます。',
+        ]
       : [previewSetupPendingMarker, 'プレビューの初期設定後に配信できます。']),
     ...(deployment
       ? ['Expo Goはプロジェクトと同じSDKを使ってください。初回起動時はバンドルを生成します。']
@@ -116,7 +120,7 @@ export function renderPreviewComment(input: {
     '',
     '#### 🧹 Cleanup',
     '',
-    '- **更新成功後** 旧リビジョン・イメージを削除',
+    '- **更新成功後** 旧イメージを削除',
     '- **マージ・クローズ後** OpenTofuでPR専用サービスを削除し、イメージとstateを回収',
     '- **実行ログ** Apply・Destroyのたびに、このPRへコードブロック付きの新規コメントを投稿',
     '- **定期処理** 取りこぼしを日次で回収し、14日を超えるイメージを削除',

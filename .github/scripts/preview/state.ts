@@ -30,11 +30,16 @@ function recordStateNames(items: unknown, pullRequests: Set<string>) {
   }
 }
 
-export async function listPreviewStates(project: string, pr?: string) {
+async function storageToken() {
   const token = (await $`gcloud auth print-access-token`.text()).trim();
   if (!token) {
     throw new Error('Could not read the preview access token');
   }
+  return token;
+}
+
+export async function listPreviewStates(project: string, pr?: string) {
+  const token = await storageToken();
   const url = new URL(`https://storage.googleapis.com/storage/v1/b/${bucketName(project)}/o`);
   url.searchParams.set('prefix', pr ? `pr-${pr}/default.tfstate` : 'pr-');
   url.searchParams.set('fields', 'items(name),nextPageToken');
@@ -59,6 +64,66 @@ export async function listPreviewStates(project: string, pr?: string) {
     }
     url.searchParams.set('pageToken', page);
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export async function hasPreviewService(project: string, pr: string) {
+  const object = encodeURIComponent(`pr-${pr}/default.tfstate`);
+  const url = `https://storage.googleapis.com/storage/v1/b/${bucketName(project)}/o/${object}?alt=media`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${await storageToken()}` },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (response.status === 404) {
+    return false;
+  }
+  if (!response.ok) {
+    throw new Error(`Could not read preview state: HTTP ${response.status}`);
+  }
+
+  // 共有プロジェクトでは、state が指すサービスを操作前に照合する。
+  const state: unknown = await response.json();
+  const resources: unknown = isRecord(state) ? state.resources : null;
+  if (!Array.isArray(resources)) {
+    throw new Error('Invalid OpenTofu preview state');
+  }
+  if (resources.length === 0) {
+    return false;
+  }
+
+  const entries: unknown[] = resources;
+  const [resource] = entries;
+  const service = `nuri-preview-pr-${pr}`;
+  const region = 'asia-northeast1';
+  if (
+    resources.length !== 1 ||
+    !isRecord(resource) ||
+    resource.module !== undefined ||
+    resource.mode !== 'managed' ||
+    resource.type !== 'google_cloud_run_v2_service' ||
+    resource.name !== 'preview' ||
+    !Array.isArray(resource.instances) ||
+    resource.instances.length !== 1
+  ) {
+    throw new Error('OpenTofu preview state contains an unexpected resource');
+  }
+
+  const instances: unknown[] = resource.instances;
+  const [instance] = instances;
+  const attributes = isRecord(instance) ? instance.attributes : null;
+  if (
+    !isRecord(attributes) ||
+    attributes.id !== `projects/${project}/locations/${region}/services/${service}` ||
+    attributes.project !== project ||
+    attributes.location !== region ||
+    attributes.name !== service
+  ) {
+    throw new Error('OpenTofu preview state points to an unexpected Cloud Run service');
+  }
+  return true;
 }
 
 export async function removePreviewState(project: string, pr: string) {
@@ -86,11 +151,22 @@ export async function runPreviewTofu(
     TF_DATA_DIR: join(scratch, 'tofu'),
     TF_WORKSPACE: 'default',
   };
-  const variables = [`-var=project_id=${project}`, `-var=pr_number=${pr}`];
+  const tagKey = Bun.env.PREVIEW_RUN_TAG_KEY;
+  const tagValue = Bun.env.PREVIEW_RUN_TAG_VALUE;
+  if (!tagKey || !tagValue) {
+    throw new Error('The preview Cloud Run tag is required');
+  }
+  const variables = [
+    `-var=project_id=${project}`,
+    `-var=pr_number=${pr}`,
+    `-var=tag_key=${tagKey}`,
+    `-var=tag_value=${tagValue}`,
+  ];
   try {
     // 同じ作業ツリーで複数PRを処理しても、状態やロックを混ぜない。
     await $`tofu -chdir=${directory} init -reconfigure -input=false -no-color -lockfile=readonly \
       -backend-config=bucket=${bucketName(project)} -backend-config=prefix=pr-${pr}`.env(env);
+    await hasPreviewService(project, pr);
     let operationOptions = [...options, ...variables, '-auto-approve'];
     if (operation === 'apply') {
       const plan = join(scratch, 'preview.tfplan');

@@ -3,7 +3,7 @@ import { appendFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { checkCloudPreview } from './check';
-import { listPreviewStates, removePreviewState, runPreviewTofu } from './state';
+import { hasPreviewService, listPreviewStates, removePreviewState, runPreviewTofu } from './state';
 
 const region = 'asia-northeast1';
 const registryHost = `${region}-docker.pkg.dev`;
@@ -37,11 +37,11 @@ function reportError(error: unknown) {
 const repository = required(Bun.env.GITHUB_REPOSITORY, 'GITHUB_REPOSITORY');
 required(Bun.env.GH_TOKEN, 'GH_TOKEN');
 const project = required(Bun.env.PREVIEW_GCP_PROJECT_ID, 'PREVIEW_GCP_PROJECT_ID');
-if (project === 'kcvlb4' || !/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/.test(project)) {
-  throw new Error('Expected a dedicated preview Google Cloud project');
+if (project !== 'kcvlb4') {
+  throw new Error('Expected the kcvlb4 Google Cloud project');
 }
 const registry = `${registryHost}/${project}/nuri-preview`;
-// プレビュー専用プロジェクトのサービスとレジストリを対象にする。
+// kcvlb4 内で、プレビュー用のサービスとレジストリを対象にする。
 const shell = $.env({
   ...Bun.env,
   CLOUDSDK_CORE_PROJECT: project,
@@ -82,18 +82,6 @@ async function cloudText(command: $.ShellPromise, onFailure: string, progress?: 
   } catch (error) {
     progress?.(onFailure);
     throw error;
-  }
-}
-
-async function deleteOldRevisions(service: string, keepRevision: string) {
-  const revisionPattern = new RegExp(`^${service}-[a-z0-9-]+$`);
-  const listedRevisions =
-    await shell`gcloud run revisions list --service=${service} --format='value(metadata.name)'`.text();
-  for (const revision of listedRevisions.split('\n')) {
-    if (!revisionPattern.test(revision) || revision === keepRevision) {
-      continue;
-    }
-    await shell`gcloud run revisions delete ${revision} --quiet`;
   }
 }
 
@@ -217,6 +205,12 @@ async function validateOpenPullRequest(pr: string, sha: string) {
   }
 }
 
+async function inspect(pr: string, sha: string, outputPath: string) {
+  await validateOpenPullRequest(pr, sha);
+  const environment = (await hasPreviewService(project, pr)) ? 'preview' : 'preview-create';
+  await appendFile(outputPath, `environment=${environment}\n`);
+}
+
 async function apply(pr: string, sha: string, outputPath: string) {
   await validateOpenPullRequest(pr, sha);
   const applyExit = await runPreviewTofu(project, pr, 'apply', {
@@ -241,6 +235,13 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
   const origin = serviceUrl;
   const revisionSuffix = `rev-${sha.slice(0, 12)}`;
   const revision = `${service}-${revisionSuffix}`;
+  const publicAnnotation = 'value(metadata.annotations."run.googleapis.com/invoker-iam-disabled")';
+  const publicAccess = (
+    await shell`gcloud run services describe ${service} --format=${publicAnnotation}`.text()
+  ).trim();
+  if (publicAccess !== 'true' && publicAccess !== 'True') {
+    await shell`gcloud run services update ${service} --no-invoker-iam-check --quiet`;
+  }
   const image = `${registry}/${tag}:${sha}`;
   const current = servingRevision(await serviceStatus(service));
 
@@ -296,14 +297,7 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
     throw new Error('Public preview traffic does not match the deployed revision');
   }
 
-  // 失敗した候補が最新の場合、そのリビジョンを Cloud Run から削除できない。
-  if (
-    status.latestCreatedRevisionName === revision &&
-    status.latestReadyRevisionName === revision
-  ) {
-    await deleteOldRevisions(service, revision);
-    await deleteImages(pr, digest);
-  }
+  await deleteImages(pr, digest);
   const createdAt = (
     await shell`gcloud run revisions describe ${revision} --format='value(metadata.creationTimestamp)'`.text()
   ).trim();
@@ -315,7 +309,9 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
 
 const [operation, pr, sha, source] = Bun.argv.slice(2);
 const outputPath = required(Bun.env.GITHUB_OUTPUT, 'GITHUB_OUTPUT');
-if (operation === 'apply') {
+if (operation === 'inspect') {
+  await inspect(pullRequestNumber(pr), required(sha, 'SHA'), outputPath);
+} else if (operation === 'apply') {
   process.exitCode = await apply(pullRequestNumber(pr), required(sha, 'SHA'), outputPath);
 } else if (operation === 'publish') {
   await publish(
@@ -337,5 +333,5 @@ if (operation === 'apply') {
     }
   }
 } else {
-  throw new Error('Expected apply, publish or cleanup');
+  throw new Error('Expected inspect, apply, publish or cleanup');
 }

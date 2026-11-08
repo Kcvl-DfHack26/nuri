@@ -65,15 +65,52 @@ jobs:
           COMMENT_BEFORE: ${{ github.event.changes.body.from }}
         run: bun .github/scripts/preview/request.ts
 
-  apply:
-    name: Apply Preview Infrastructure
+  inspect:
+    name: Inspect Preview State
     needs: request
     if: >-
-      github.ref == 'refs/heads/main' && inputs.operation != 'comment' &&
-      needs.request.outputs.pr != '' && vars.PREVIEW_GCP_ENABLED == 'true'
+      github.ref == 'refs/heads/main' && needs.request.outputs.pr != '' &&
+      vars.PREVIEW_GCP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    outputs:
+      environment: ${{ steps.inspect.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Select Preview Credentials
+        id: inspect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_PR: ${{ needs.request.outputs.pr }}
+          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+        run: bun .github/scripts/preview/cloud.ts inspect "$PREVIEW_PR" "$PREVIEW_SHA"
+
+  apply:
+    name: Apply Preview Infrastructure
+    needs: [request, inspect]
+    if: >-
+      needs.inspect.outputs.environment == 'preview' ||
+      needs.inspect.outputs.environment == 'preview-create'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: preview
+    environment: ${{ needs.inspect.outputs.environment }}
     permissions:
       contents: read
       pull-requests: read
@@ -93,6 +130,7 @@ jobs:
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
       - name: Install Verified OpenTofu and Provider
         env:
           GH_TOKEN: ${{ github.token }}
@@ -102,6 +140,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_RUN_TAG_KEY: ${{ vars.PREVIEW_RUN_TAG_KEY }}
+          PREVIEW_RUN_TAG_VALUE: ${{ vars.PREVIEW_RUN_TAG_VALUE }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
         run: bun .github/scripts/preview/cloud.ts apply "$PREVIEW_PR" "$PREVIEW_SHA"
@@ -187,6 +227,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_RUN_TAG_KEY: ${{ vars.PREVIEW_RUN_TAG_KEY }}
+          PREVIEW_RUN_TAG_VALUE: ${{ vars.PREVIEW_RUN_TAG_VALUE }}
           PREVIEW_PR: ${{ github.event.pull_request.number }}
           PREVIEW_CLEANUP_REPORTS: ${{ runner.temp }}/preview-cleanup.ndjson
         run: bun .github/scripts/preview/cloud.ts cleanup "$PREVIEW_PR"
@@ -251,7 +293,7 @@ jobs:
 
   report:
     name: Report Preview Deployment
-    needs: [request, apply, publish]
+    needs: [request, inspect, apply, publish]
     if: always() && needs.request.outputs.comment != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -273,7 +315,7 @@ jobs:
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
           PREVIEW_COMMENT: ${{ needs.request.outputs.comment }}
-          PREVIEW_RESULT: ${{ needs.apply.result == 'failure' && 'failure' || needs.publish.result }}
+          PREVIEW_RESULT: ${{ (needs.inspect.result == 'failure' || needs.apply.result == 'failure') && 'failure' || needs.publish.result }}
           PREVIEW_ORIGIN: ${{ needs.publish.outputs.origin }}
           PREVIEW_DEPLOYED_AT: ${{ needs.publish.outputs.deployed_at }}
         run: bun .github/scripts/preview/report.ts
