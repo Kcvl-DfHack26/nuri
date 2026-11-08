@@ -20,7 +20,7 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
-import { analyzePostVideo } from '@/lib/post-analysis';
+import { analyzePostVideo, shrinkVideo } from '@/lib/post-analysis';
 import { planSteps } from '@/lib/post-steps';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +32,12 @@ const CHECK = Icon.select({
 
 const markStages = ['動画を読み込む', '手順の区切りを確認する', '手順の場面を切り出す'];
 const analysisStages = ['動画を読み込む', '動画から手順を読み取る', '手順の場面を切り出す'];
+const shrinkStages = [
+  '動画を読み込む',
+  '動画を縮める',
+  '動画から手順を読み取る',
+  '手順の場面を切り出す',
+];
 
 /** A step ⑫-3 is about to make, with what the analysis found when there was one. */
 type Planned = PlannedStep & { description: string; cosmetics: Cosmetic[] };
@@ -91,6 +97,9 @@ export function PostCreating() {
   const { draft, setDraft, trackFile } = usePostDraft();
   const video = draft.video;
   const [sending, setSending] = useState(false);
+  // How far a video over the API's limit has been shrunk (0–1); null when it is not being shrunk.
+  const [shrinking, setShrinking] = useState<number | null>(null);
+  const [shrunk, setShrunk] = useState(false);
   const [analyzedPlan, setPlan] = useState<Plan | null>(null);
   // Without an API nothing is sent or asked; the steps come from the marks right away.
   const markPlan = useMemo(() => (video && !apiUrl ? planFromMarks(video) : null), [video]);
@@ -113,34 +122,45 @@ export function PostCreating() {
       const controller = new AbortController();
       request.current = controller;
       setSending(true);
-      analyzePostVideo(video, controller.signal).then(
-        (analysis) => {
-          const analyzed = planFromAnalysis(analysis, video.durationMs);
-          if (!analyzed) {
-            // Gemini saw no makeup, e.g. in a test clip; say so instead of quietly falling back.
-            Alert.alert(
-              '動画からメイクの手順を見つけられませんでした',
-              '区切りから手順を作ります。',
-            );
+      shrinkVideo(video.uri, controller.signal, setShrinking)
+        .then((uri) => {
+          if (uri !== video.uri) {
+            // The shrunk copy is deleted with the draft's other files when the flow closes.
+            trackFile(uri);
+            setShrunk(true);
+          }
+          setShrinking(null);
+          return analyzePostVideo({ uri, marks: video.marks }, controller.signal);
+        })
+        .then(
+          (analysis) => {
+            const analyzed = planFromAnalysis(analysis, video.durationMs);
+            if (!analyzed) {
+              // Gemini saw no makeup, e.g. in a test clip; say so instead of quietly falling back.
+              Alert.alert(
+                '動画からメイクの手順を見つけられませんでした',
+                '区切りから手順を作ります。',
+              );
+              setSending(false);
+              setPlan(planFromMarks(video));
+              return;
+            }
+            if (analysis.title) {
+              setDraft((current) => ({ ...current, title: current.title || analysis.title }));
+            }
+            setPlan(analyzed);
+          },
+          (error: unknown) => {
+            if (controller.signal.aborted) {
+              return;
+            }
+            const message = error instanceof Error ? error.message : '';
+            Alert.alert('動画から手順書を作れませんでした', `${message}区切りから手順を作ります。`);
             setSending(false);
+            setShrinking(null);
             setPlan(planFromMarks(video));
-            return;
-          }
-          if (analysis.title) {
-            setDraft((current) => ({ ...current, title: current.title || analysis.title }));
-          }
-          setPlan(analyzed);
-        },
-        (error: unknown) => {
-          if (controller.signal.aborted) {
-            return;
-          }
-          const message = error instanceof Error ? error.message : '';
-          Alert.alert('動画から手順書を作れませんでした', `${message}区切りから手順を作ります。`);
-          setSending(false);
-          setPlan(planFromMarks(video));
-        },
-      );
+          },
+        );
     };
     Alert.alert(
       '動画を送って手順書を作りますか',
@@ -151,7 +171,7 @@ export function PostCreating() {
       ],
       { cancelable: true, onDismiss: backOrHome },
     );
-  }, [video, setDraft]);
+  }, [video, setDraft, trackFile]);
   useEffect(() => {
     if (!video || !plan) {
       return;
@@ -214,15 +234,23 @@ export function PostCreating() {
       </View>
     );
   }
-  const stages = sending || plan?.analyzed ? analysisStages : markStages;
+  let stages = markStages;
+  if (shrunk || shrinking !== null) {
+    stages = shrinkStages;
+  } else if (sending || plan?.analyzed) {
+    stages = analysisStages;
+  }
   const total = plan?.steps.length ?? 0;
   // Reading the video takes the first half of the bar; cutting the frames, the rest.
   let progress = sending ? 25 : 0;
+  if (shrinking !== null) {
+    progress = Math.round(5 + shrinking * 20);
+  }
   if (plan) {
     progress = Math.round((sending ? 50 : 0) + (cut / Math.max(total, 1)) * (sending ? 50 : 100));
   }
   // Loading the video and finding the steps are done once the frames are being cut.
-  let done = 1;
+  let done = shrunk ? 2 : 1;
   if (plan) {
     done = cut === total ? stages.length : stages.length - 1;
   }
