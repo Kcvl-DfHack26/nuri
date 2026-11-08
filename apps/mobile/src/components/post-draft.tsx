@@ -1,3 +1,4 @@
+import type { MakeupShape } from '@starter/shared';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import * as Crypto from 'expo-crypto';
@@ -35,6 +36,8 @@ export type PostStep = {
   segment: { startMs: number; endMs: number | null };
   /** Frame cut from the video at the step's start; null when it could not be cut. */
   image: string | null;
+  /** The painted area read from the video (#156); null when none was read or the part changed. */
+  shape: MakeupShape | null;
 };
 
 type PostVideo = {

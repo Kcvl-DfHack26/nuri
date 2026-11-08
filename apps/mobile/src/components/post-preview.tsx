@@ -38,6 +38,7 @@ function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
         // ⑦ shows this as what the step uses; the part's name stands in when nothing is named.
         uses: names.join('、') || parts[step.part].label,
         color: cosmetics[0]?.color ?? partColors[step.part],
+        ...(step.shape ? { shape: step.shape } : {}),
       };
     }),
   };

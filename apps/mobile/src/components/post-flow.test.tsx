@@ -139,6 +139,7 @@ const brow: PostDraft['steps'][number] = {
   cosmetics: [],
   segment: { startMs: 0, endMs: 65_000 },
   image: 'file:///step-0.jpg',
+  shape: { strokes: [{ mirror: true, points: [{ at: 46 }, { at: 52 }] }] },
 };
 const readyDraft: Partial<PostDraft> = {
   video: { uri: 'file:///video.mov', marks: [65_000], durationMs: 125_000 },
@@ -149,6 +150,7 @@ const readyDraft: Partial<PostDraft> = {
       part: 'cheek',
       title: '頬に高めに',
       description: '',
+      shape: null,
       cosmetics: [
         {
           id: 'c',
@@ -398,7 +400,25 @@ const analysis: PostAnalysis = {
       regions: [],
       cosmetics: [1],
     },
-    { start: 0, end: 26, part: 'brow', description: '眉尻を描き足す', regions: [], cosmetics: [0] },
+    {
+      start: 0,
+      end: 26,
+      part: 'brow',
+      description: '眉尻を描き足す',
+      regions: [
+        {
+          detail: '眉尻を外へ描き足す',
+          side: 'both',
+          start: 'browTail',
+          end: 'none',
+          shape: 'line',
+          length: 'short',
+          direction: 'outward',
+          clip: 'none',
+        },
+      ],
+      cosmetics: [0],
+    },
   ],
   cosmetics: [
     {
@@ -461,6 +481,9 @@ test('asks before sending the video and fills the steps with what Gemini found',
     'peripera スピーディー スキニー ブロウ',
   ]);
   expect(steps[1]?.cosmetics.map((cosmetic) => cosmetic.name)).toEqual(['アイライナー']);
+  // The area Gemini read becomes the step's shape; a step without one keeps none.
+  expect(steps[0]?.shape?.strokes[0]?.mirror).toBe(true);
+  expect(steps[1]?.shape).toBeNull();
   expect(draft()?.title).toBe('ナチュラルメイク');
   expect(jest.mocked(getThumbnailAsync).mock.calls.map(([, options]) => options?.time)).toEqual([
     0, 26_000,
@@ -542,12 +565,25 @@ test('lists the steps made from the video with their segment lengths', async () 
   expect(router.push).toHaveBeenCalledWith('/post/step/1');
 });
 
-test('picks the part of a step on ⑫-5', async () => {
-  await renderSeeded(<PostStepEdit index="0" />);
+test('picks the part of a step on ⑫-5 and drops the area read for the old part', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="0" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  const shape = () => latest?.steps[0]?.shape;
   expect(screen.getByText('0:00 〜 1:05')).toBeOnTheScreen();
   expect(screen.getByLabelText('タイトル')).toHaveProp('placeholder', '眉');
+  expect(shape()).not.toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: '部位' }));
   expect(screen.getByLabelText('タイトル')).toHaveProp('placeholder', 'リップ');
+  expect(shape()).toBeNull();
 });
 
 test('asks before posting and sends the steps and thumbnail, never the video', async () => {
@@ -584,6 +620,7 @@ test('asks before posting and sends the steps and thumbnail, never the video', a
           description: '眉尻を足す',
           uses: '眉',
           color: '#79513A',
+          shape: brow.shape,
         },
         {
           part: 'cheek',

@@ -482,17 +482,18 @@ test('posting a recipe validates and stores the latest draft and serves its thum
   const created = await request('/api/recipes', valid, cookie);
   expect(created.status).toBe(201);
   const { id } = z.object({ id: z.string().regex(/^p-[a-z0-9-]+$/) }).parse(await created.json());
-  // A post resent after a lost response is saved once, with the latest contents; someone else's
-  // key is refused.
+  // A post resent after a lost response is saved once, with the latest contents and the painted
+  // area read from the video; someone else's key is refused.
+  const shape = { strokes: [{ fill: true, points: [{ at: 50 }, { at: 117 }, { at: 123 }] }] };
   const resent = await request(
     '/api/recipes',
-    { ...valid, title: '二度目', steps: [step] },
+    { ...valid, title: '二度目', steps: [{ ...step, shape }] },
     cookie,
   );
   expect(resent.status).toBe(201);
   expect(await resent.json()).toEqual({ id });
   expect(await (await appRequest(`/api/recipes/${id}`)).json()).toMatchObject({
-    recipe: { title: '二度目', steps: [{ part: 'cheek' }] },
+    recipe: { title: '二度目', steps: [{ part: 'cheek', shape }] },
   });
   expect((await request('/api/recipes', valid, cookie)).status).toBe(201);
   const otherKey = crypto.randomUUID();

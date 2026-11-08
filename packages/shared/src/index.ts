@@ -98,6 +98,8 @@ export const recipeListQuerySchema = feedQuerySchema.pick({ offset: true, author
   q: z.string().trim().min(1).max(recipeSearchMaxLength).optional(),
 });
 
+/** IDs of recipes posted from ⑫ start with this; the seeded ones never do. */
+export const postedRecipeIdPrefix = 'p-';
 /** Most steps a posted recipe may have; ⑫-2 stops adding marks at this. */
 export const recipeStepsMax = 20;
 /** Most tags a posted recipe may have; ⑫-7 stops adding tags at this. */
@@ -116,6 +118,8 @@ export const recipeStepInputSchema = z.object({
   description: z.string().trim().max(200),
   uses: z.string().trim().min(1).max(200),
   color: hexColor,
+  /** The painted area read from the video (#156); none uses no texture in ⑦⑩. */
+  shape: makeupShapeSchema.optional(),
 });
 
 /**

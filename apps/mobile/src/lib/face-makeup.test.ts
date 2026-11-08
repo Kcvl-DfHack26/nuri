@@ -1,4 +1,4 @@
-import { finishLayers, paintColor } from './face-makeup';
+import { finishLayers, paintColor, recipeLayers } from './face-makeup';
 
 test('uses the middle recommended color and falls back to black when none is given', () => {
   expect(paintColor(['#FFFFFF', '#CC6633', '#000000'])).toBe('#CC6633');
@@ -32,4 +32,14 @@ test('keeps the shape of the last step for each part', () => {
       { part: 'brow', colors: ['#402010'], shape: arch },
     ]),
   ).toEqual([{ part: 'brow', color: '#402010', shape: arch }]);
+});
+
+test('paints only the read areas of a posted recipe, and standard textures elsewhere', () => {
+  const lip = { strokes: [{ fill: true, points: [{ at: 61 }, { at: 0 }, { at: 291 }] }] };
+  const layers = [
+    { part: 'brow' as const, color: '#503020', shape: null },
+    { part: 'lip' as const, color: '#C04050', shape: lip },
+  ];
+  expect(recipeLayers('p-3f2b8c1e', layers)).toEqual([layers[1]]);
+  expect(recipeLayers('fox-eye', layers)).toEqual(layers);
 });

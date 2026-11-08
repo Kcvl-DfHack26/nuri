@@ -18,7 +18,7 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { useStepCamera } from '@/components/use-step-camera';
 import { apiUrl } from '@/lib/api';
-import { paintColor } from '@/lib/face-makeup';
+import { paintColor, recipeLayers } from '@/lib/face-makeup';
 import { backOrHome } from '@/lib/navigation';
 import { recipeOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
@@ -127,7 +127,9 @@ function StepsContent({
               <FaceMakeupCamera
                 layers={
                   overlayVisible
-                    ? [{ part: step.part, color: paintColor(step.colors), shape: step.shape }]
+                    ? recipeLayers(recipeId, [
+                        { part: step.part, color: paintColor(step.colors), shape: step.shape },
+                      ])
                     : []
                 }
                 annotation={overlayVisible ? { part: step.part, label: step.label } : undefined}

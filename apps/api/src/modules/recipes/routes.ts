@@ -1,6 +1,7 @@
 import { zValidator } from '@hono/zod-validator';
 import {
   feedQuerySchema,
+  postedRecipeIdPrefix,
   recipeInputSchema,
   recipeListQuerySchema,
   recipeParamsSchema,
@@ -72,7 +73,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
         // The draft's key makes the ID, so a post resent after its response was lost is saved
         // once, with the contents of the latest send (the user may have changed the photo). The
         // same key from someone else is refused.
-        const id = `p-${input.key.toLowerCase()}`;
+        const id = `${postedRecipeIdPrefix}${input.key.toLowerCase()}`;
         const authorId = c.get('currentUser').id;
         const fields = {
           title: input.title,
@@ -108,6 +109,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
               hint: step.description,
               product: step.uses,
               colors: [step.color],
+              shape: step.shape ?? null,
             })),
           );
           await tx
