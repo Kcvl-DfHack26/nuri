@@ -12,7 +12,7 @@ bun run export:mobile
 
 APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。
 
-GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
+GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、AndroidのMaestro、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
 
 | 検査                | 確認すること                                                  |
 | ------------------- | ------------------------------------------------------------- |
@@ -74,6 +74,8 @@ bun run test:e2e
 テストはDBへmigrationとseedを実行し、Honoがエクスポート済みのExpo WebとAPIを49116で同一オリジン配信する。別の使い捨てローカルDBを使う場合は `NURI_E2E_DATABASE_URL` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
 
 ## Maestro
+
+GitHub Actionsの `Native E2E (Maestro Android)` は公式Expo Go APKをAndroidエミュレーターにインストールし、同じコミットのMetroからアプリを起動する。ゲストのプロフィールと設定への遷移を確認する。GitHub標準ランナーで実行し、EAS Build枠の消費は0。失敗時の診断は `maestro-android-debug` に保存する。
 
 `apps/mobile/.maestro/showcase.yaml` が未ログイン時のホーム・プロフィール・設定フローを検証する。開発サーバーを必要としないpreview/simulatorビルドで実行する。
 
