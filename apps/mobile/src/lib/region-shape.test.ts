@@ -4,7 +4,7 @@ import { makeupShapeSchema } from '@starter/shared';
 
 import { canonicalFaceMesh } from './face-mesh';
 import { shapeStrokes } from './makeup-shape';
-import { regionShape } from './region-shape';
+import { defaultShape, regionShape } from './region-shape';
 
 type Region = PostAnalysis['steps'][number]['regions'][number];
 
@@ -140,4 +140,14 @@ test('keeps at most 8 strokes with the cut-outs last, and returns null for nothi
   expect(shape?.strokes).toHaveLength(8);
   expect(shape?.strokes.at(-1)?.erase).toBe(true);
   expect(regionShape([])).toBeNull();
+});
+
+test('offers a plain area for every part but the base', () => {
+  for (const part of ['brow', 'eye', 'lash', 'cheek', 'shading', 'highlight', 'lip'] as const) {
+    expect(makeupShapeSchema.safeParse(defaultShape(part)).success).toBe(true);
+  }
+  expect(defaultShape('base')).toBeNull();
+  // Paired parts are drawn on both sides; the nose's highlight stays on the midline.
+  expect(defaultShape('brow')?.strokes[0]?.mirror).toBe(true);
+  expect(defaultShape('highlight')?.strokes[0]?.mirror).toBeUndefined();
 });

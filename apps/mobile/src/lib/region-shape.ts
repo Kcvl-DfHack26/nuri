@@ -1,10 +1,11 @@
-import type { MakeupShape, PostAnalysis } from '@starter/shared';
+import type { MakeupShape, makeupParts, PostAnalysis } from '@starter/shared';
 
 import type { Point } from './face-landmarks';
 
 import { canonicalFaceMesh } from './face-mesh';
 
 type Region = PostAnalysis['steps'][number]['regions'][number];
+type PartId = (typeof makeupParts)[number];
 type Stroke = MakeupShape['strokes'][number];
 type ShapePoint = Stroke['points'][number];
 /** A landmark, or the midpoint of two. */
@@ -377,4 +378,44 @@ export function regionShape(regions: readonly Region[]): MakeupShape | null {
   }
   const strokes = [...paint.slice(0, 8 - cut.length), ...cut];
   return paint.length > 0 ? { strokes } : null;
+}
+
+const region = (fields: Pick<Region, 'start' | 'shape'> & Partial<Region>): Region => ({
+  detail: '',
+  side: 'both',
+  end: 'none',
+  length: 'none',
+  direction: 'none',
+  clip: 'none',
+  ...fields,
+});
+
+// ⑫-5's 範囲を追加 (#196): a plain area for each part, in the words Gemini answers with. The base
+// covers the whole face, so it gets none.
+const partRegions: Record<PartId, Region[] | null> = {
+  base: null,
+  brow: [region({ start: 'browHead', end: 'browTail', shape: 'line' })],
+  eye: [region({ start: 'eyeInner', end: 'eyeOuter', shape: 'band', detail: '上まぶた' })],
+  lash: [
+    region({
+      start: 'eyeInner',
+      end: 'eyeOuter',
+      shape: 'line',
+      length: 'short',
+      direction: 'upOutward',
+      detail: '上まぶたのきわ',
+    }),
+  ],
+  cheek: [
+    region({ start: 'cheekCenter', shape: 'ellipse', length: 'medium', direction: 'upOutward' }),
+  ],
+  shading: [region({ start: 'browHead', end: 'noseWing', shape: 'line' })],
+  highlight: [region({ side: 'center', start: 'noseRoot', end: 'noseTip', shape: 'line' })],
+  lip: [region({ side: 'center', start: 'lips', shape: 'area' })],
+};
+
+/** A plain area for the part that the user then shapes on ⑫-5; null for the base. */
+export function defaultShape(part: PartId): MakeupShape | null {
+  const regions = partRegions[part];
+  return regions ? regionShape(regions) : null;
 }

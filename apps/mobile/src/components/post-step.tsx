@@ -9,15 +9,14 @@ import { useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { Cosmetic, PostStep } from '@/components/post-draft';
-import type { PhotoCrop } from '@/components/recipes';
+import type { Cosmetic } from '@/components/post-draft';
 
-import { CroppedPhoto } from '@/components/cropped-photo';
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { AreaEditor } from '@/components/post-area';
 import { BottomCta, DashedButton, PostHeader, PrimaryButton } from '@/components/post-chrome';
 import { cosmeticCandidates, usePostDraft } from '@/components/post-draft';
 import { StepSegment } from '@/components/post-segment';
-import { arPhotos, parts } from '@/components/recipes';
+import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { backOrHome } from '@/lib/navigation';
@@ -25,8 +24,6 @@ import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
 import sparkleRoseSmall from '../../assets/plan-a/post/sparkle-rose-small.svg';
-import zoneBrowPoints from '../../assets/plan-a/post/zone-brow-points.svg';
-import zoneBrow from '../../assets/plan-a/post/zone-brow.svg';
 
 const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
 const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/add.xml') });
@@ -42,14 +39,6 @@ const BACK = Icon.select({
   ios: 'chevron.left',
   android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
 });
-
-// Crop of Plan A's sample face photo under the area preview.
-const faceCrop: PhotoCrop = {
-  width: '161.29%',
-  height: '512.99%',
-  left: '-33.06%',
-  top: '-131.84%',
-};
 
 function useStep(index: string) {
   const { draft, updateStep } = usePostDraft();
@@ -142,7 +131,7 @@ export function PostStepEdit({ index }: { index: string }) {
             className="rounded-2xl border border-ink-primary bg-bg-surface px-3.5 py-3.25 font-maru text-ui text-ink-primary"
           />
         </Field>
-        <AreaPreview step={step} />
+        <AreaEditor step={step} position={position} />
         <View className="gap-2">
           <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
             使ったコスメ
@@ -195,63 +184,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
     <View className="gap-1.5">
       <Text className="font-maru-bold text-label text-ink-primary">{label}</Text>
       {children}
-    </View>
-  );
-}
-
-function AreaPreview({ step }: { step: PostStep }) {
-  // Plan A draws the editable area for the brow step only.
-  const zone = step.part === 'brow';
-  return (
-    <View className="gap-2">
-      <View className="gap-0.5">
-        <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
-          塗る範囲
-        </Text>
-        <Text className="font-maru text-meta text-ink-secondary">
-          見る人の顔に合わせて重ねて表示されます
-        </Text>
-      </View>
-      <View
-        accessible
-        accessibilityLabel={zone ? '両眉の塗る範囲' : '塗る範囲はまだありません'}
-        className="aspect-358/200 w-full overflow-hidden rounded-panel"
-      >
-        <CroppedPhoto source={arPhotos.camera} crop={faceCrop} />
-        {zone ? (
-          <>
-            <Image
-              accessible={false}
-              source={zoneBrow}
-              contentFit="fill"
-              style={{
-                position: 'absolute',
-                left: '8.68%',
-                top: '30.27%',
-                width: '81.85%',
-                height: '12.99%',
-              }}
-            />
-            <Image
-              accessible={false}
-              source={zoneBrowPoints}
-              contentFit="fill"
-              style={{
-                position: 'absolute',
-                left: '7.26%',
-                top: '32.5%',
-                width: '84.64%',
-                height: '10%',
-              }}
-            />
-          </>
-        ) : null}
-      </View>
-      {zone ? (
-        <Text className="font-maru text-meta text-ink-secondary">
-          塗る範囲は見本です。形の調整は準備中です
-        </Text>
-      ) : null}
     </View>
   );
 }
