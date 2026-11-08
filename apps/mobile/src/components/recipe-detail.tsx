@@ -170,6 +170,7 @@ export function RecipeContent({
   onPost,
   posting = false,
   appLink,
+  areas,
 }: {
   recipe: RecipeData;
   /** Empty for a recipe without steps yet; it cannot start ⑦. */
@@ -178,6 +179,8 @@ export function RecipeContent({
   /** ⑫-8 is sending the post; 投稿 waits until it finishes. */
   posting?: boolean;
   appLink?: ReactNode;
+  /** ⑫-8's picture of every step's area on a sample face (#202). */
+  areas?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
   const { width, height, onLayout } = useLayoutSize();
@@ -332,6 +335,7 @@ export function RecipeContent({
               </View>
             </>
           ) : null}
+          {areas}
           {recipe.products.length > 0 ? (
             <>
               <View className="flex-row items-center justify-between">

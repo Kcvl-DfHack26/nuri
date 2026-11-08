@@ -881,6 +881,17 @@ test('keeps the last step of a recipe', async () => {
   expect(screen.getByRole('button', { name: 'この手順を削除' })).toBeDisabled();
 });
 
+test('shows every step’s area on the sample face on ⑫-8, and nothing without one', async () => {
+  await renderSeeded(<PostPreview />);
+  // Only the brow has an area in this draft.
+  expect(screen.getByLabelText('見本の顔に1つの手順の塗る範囲を重ねた図')).toBeOnTheScreen();
+  await renderSeeded(<PostPreview />, {
+    ...readyDraft,
+    steps: (readyDraft.steps ?? []).map((step) => ({ ...step, shape: null })),
+  });
+  expect(screen.queryByLabelText(/塗る範囲を重ねた図/)).toBeNull();
+});
+
 test('asks before posting and sends the steps and thumbnail, never the video', async () => {
   const { invalidate } = await renderSeeded(<PostPreview />);
   expect(screen.getByText('狐メイク')).toBeOnTheScreen();

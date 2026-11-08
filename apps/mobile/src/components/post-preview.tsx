@@ -9,6 +9,7 @@ import { Alert } from 'react-native';
 import type { PostDraft } from '@/components/post-draft';
 import type { RecipeDetail, RecipeInput } from '@/lib/recipes';
 
+import { AreaSummary } from '@/components/post-area-summary';
 import { usePostConfirm } from '@/components/post-confirm';
 import { stepTitle, usePostDraft } from '@/components/post-draft';
 import { RecipeContent } from '@/components/recipe-detail';
@@ -156,6 +157,14 @@ export function PostPreview() {
     }
     confirm.ask();
   };
+  const areaSummary = (
+    <AreaSummary
+      areas={draft.steps.flatMap((step, index) => {
+        const color = fields.steps[index]?.color;
+        return step.shape && color ? [{ shape: step.shape, color }] : [];
+      })}
+    />
+  );
   return (
     <>
       <RecipeContent
@@ -163,6 +172,7 @@ export function PostPreview() {
         steps={fields.steps}
         onPost={onPost}
         posting={post.isPending}
+        areas={areaSummary}
       />
       {confirm.dialog}
     </>
