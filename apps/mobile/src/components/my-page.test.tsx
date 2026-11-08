@@ -51,6 +51,7 @@ jest.mock('@/lib/api', () => ({
     api: {
       recipes: { $get: () => mockPosted() },
       me: { favorites: { $get: () => mockFavorites() } },
+      users: { ':id': { $get: () => mockProfile() } },
     },
   },
 }));
@@ -67,6 +68,12 @@ const page = (items: unknown[], nextOffset: number | null = null) => ({
 });
 const mockPosted = jest.fn(async () => page([recipe('own', '自分のメイク')]));
 const mockFavorites = jest.fn(async () => page([recipe('fox', '狐メイク')]));
+const mockProfile = jest.fn(async () => ({
+  status: 200,
+  json: async () => ({
+    user: { id: 'viewer', followerCount: 328, followingCount: 96, likeCount: 2400 },
+  }),
+}));
 
 type Session = { data: { user: { id: string; name: string; email: string } } | null };
 const viewer: Session = {
@@ -90,9 +97,9 @@ test('shows the signed-in profile with posted and favorite recipes and opens the
   });
   const favorite = await screen.findByRole('button', { name: '狐メイク、はなこ、お気に入り1.2k' });
   expect(screen.getByRole('header', { name: 'はなこ' })).toBeOnTheScreen();
-  // Following and likes are not built, so Plan A's sample counts are not shown.
-  for (const label of ['フォロワー', 'フォロー中', 'いいね', '328', '96', '2.4k']) {
-    expect(screen.queryByText(label)).toBeNull();
+  // The counts come from the user's profile.
+  for (const label of ['フォロワー 328', 'フォロー中 96', 'いいね 2.4k']) {
+    expect(await screen.findByLabelText(label)).toBeOnTheScreen();
   }
   expect(screen.queryByText(/見本です/)).toBeNull();
 

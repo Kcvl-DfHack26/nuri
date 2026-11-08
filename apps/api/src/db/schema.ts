@@ -6,6 +6,7 @@ import {
   bigint,
   boolean,
   bytea,
+  check,
   index,
   integer,
   jsonb,
@@ -134,6 +135,25 @@ export const like = pgTable(
       .references(() => user.id, { onDelete: 'cascade' }),
   },
   (table) => [primaryKey({ columns: [table.postId, table.userId] })],
+);
+
+/** Who follows whom (#195). A user cannot follow themselves. */
+export const follow = pgTable(
+  'follow',
+  {
+    followerId: text('follower_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    followeeId: text('followee_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.followerId, table.followeeId] }),
+    index('follow_followee_id_idx').on(table.followeeId),
+    check('follow_not_self', sql`${table.followerId} <> ${table.followeeId}`),
+  ],
 );
 
 export const recipe = pgTable(
