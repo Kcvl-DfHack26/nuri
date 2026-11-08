@@ -87,6 +87,19 @@ export async function changeFavorite(id: string, favorited: boolean) {
   }
 }
 
+/** Whether a cached recipe list or ⑤ holds the recipe with this ID. */
+export function holdsRecipe(data: unknown, id: string) {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  if ('pages' in data && Array.isArray(data.pages)) {
+    return data.pages.some(
+      (page: Partial<RecipePage>) => page.items?.some((item) => item.id === id) ?? false,
+    );
+  }
+  return 'id' in data && data.id === id;
+}
+
 /**
  * Shows one recipe as favorited or not in every cached list and its ⑤, with the heart's count
  * moved by one, and returns the keys of the caches it changed. Given `only`, it changes just

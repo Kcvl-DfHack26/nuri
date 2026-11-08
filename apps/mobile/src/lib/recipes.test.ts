@@ -3,6 +3,7 @@ import { createTestQueryClient } from '@/lib/test/query-client';
 import {
   favoriteListOptions,
   formatCount,
+  holdsRecipe,
   recipeKeys,
   recipeListOptions,
   recipeOptions,
@@ -102,4 +103,13 @@ test('rolls back only the caches a change touched', () => {
   expect(
     client.getQueryData<{ pages: { items: unknown[] }[] }>(listKey)?.pages[0]?.items[0],
   ).toEqual({ id: 'fox', favorited: false, likeCount: 3 });
+});
+
+test('finds a recipe in a cached list or ⑤', () => {
+  const list = { pages: [{ items: [{ id: 'cat' }] }, { items: [{ id: 'fox' }] }] };
+  expect(holdsRecipe(list, 'fox')).toBe(true);
+  expect(holdsRecipe(list, 'dog')).toBe(false);
+  expect(holdsRecipe({ id: 'fox', title: '狐メイク' }, 'fox')).toBe(true);
+  expect(holdsRecipe([{ part: 'brow', count: 6 }], 'fox')).toBe(false);
+  expect(holdsRecipe(undefined, 'fox')).toBe(false);
 });
