@@ -3,7 +3,7 @@
     "name": "nuri",
     "slug": "nuri",
     "version": "0.1.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "com.kcvl.nuri",
     "userInterfaceStyle": "automatic",
@@ -26,7 +26,7 @@
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [

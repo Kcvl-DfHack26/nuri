@@ -185,7 +185,10 @@ export function FaceMakeupCamera({
       className="absolute inset-0 bg-black"
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
-        setView({ width, height });
+        if (width !== view.width || height !== view.height) {
+          setView({ width, height });
+          setPoints([]);
+        }
       }}
     >
       <FaceTrackerView

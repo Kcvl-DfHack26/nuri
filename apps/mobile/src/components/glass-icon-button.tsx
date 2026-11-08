@@ -1,8 +1,9 @@
 import type { ComponentProps } from 'react';
 
-import { Pressable } from 'react-native';
+import { Platform, Pressable } from 'react-native';
 
 import { SocialIcon } from '@/components/social-icon';
+import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -23,6 +24,7 @@ export function GlassIconButton({
   className?: string;
 }) {
   const disabled = !onPress;
+  const isWeb = Platform.OS === 'web';
   const ink = useTokenColor('--color-ink-primary');
   return (
     <Pressable
@@ -33,12 +35,17 @@ export function GlassIconButton({
       hitSlop={4}
       onPress={onPress}
       className={cn(
-        'size-10 items-center justify-center rounded-full border border-white/90 bg-white/60 active:opacity-70',
+        'items-center justify-center rounded-full border border-white/90 bg-white/60 active:opacity-70',
+        isWeb ? 'min-h-10 min-w-10 px-2' : 'size-10',
         className,
       )}
       style={{ boxShadow: '0px 4px 8px rgba(196, 61, 112, 0.1)' }}
     >
-      <SocialIcon name={icon} size={22} color={ink} />
+      {isWeb ? (
+        <Text className="text-center font-maru-bold text-meta text-ink-primary">{label}</Text>
+      ) : (
+        <SocialIcon name={icon} size={22} color={ink} />
+      )}
     </Pressable>
   );
 }

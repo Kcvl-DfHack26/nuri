@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { AccessibilityActionEvent } from 'react-native';
 
 import { Icon } from '@expo/ui';
@@ -8,14 +9,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { openBrowserAsync } from 'expo-web-browser';
 import { Fragment } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId, PhotoCrop } from '@/components/recipes';
@@ -25,11 +19,13 @@ import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
+import { OpenNativeAppLink } from '@/components/open-native-app-link';
 import { arPhotos, findProduct, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
+import { hasRoomForSidePanel, useLayoutSize } from '@/lib/layout';
 import { backOrHome } from '@/lib/navigation';
 import {
   changeFavorite,
@@ -105,7 +101,14 @@ type StepSummary = Pick<RecipeStep, 'part' | 'label'>;
 export function RecipeDetail({ id, onPost }: { id: string; onPost?: () => void }) {
   const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
   if (query.data) {
-    return <RecipeContent recipe={query.data} steps={query.data.steps} onPost={onPost} />;
+    return (
+      <RecipeContent
+        recipe={query.data}
+        steps={query.data.steps}
+        onPost={onPost}
+        appLink={onPost ? null : <OpenNativeAppLink recipeId={query.data.id} />}
+      />
+    );
   }
   return (
     <RecipeStatus
@@ -166,6 +169,7 @@ export function RecipeContent({
   steps,
   onPost,
   posting = false,
+  appLink,
 }: {
   recipe: RecipeData;
   /** Empty for a recipe without steps yet; it cannot start ⑦. */
@@ -173,9 +177,11 @@ export function RecipeContent({
   onPost: (() => void) | undefined;
   /** ⑫-8 is sending the post; 投稿 waits until it finishes. */
   posting?: boolean;
+  appLink?: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
-  const window = useWindowDimensions();
+  const { width, height, onLayout } = useLayoutSize();
+  const wide = hasRoomForSidePanel(width, height);
   const likes = formatCount(recipe.likeCount);
   const tags = [
     ...recipe.tags.map((tag) => `＃${tag}`),
@@ -183,24 +189,45 @@ export function RecipeContent({
     ...(steps.length > 0 ? [`${steps.length}ステップ`] : []),
   ];
   // Plan A keeps the face and the sheet in place; only the sheet's content scrolls.
-  const heroHeight = (window.width * 540) / 390;
-  // Wide or short windows (iPad, landscape) keep Plan A's share of the screen for the sheet.
-  const sheetTop = Math.min(heroHeight - 50, window.height * (490 / 844));
+  const heroWidth = height > 0 ? Math.min(width, height * 0.8) : undefined;
+  const sheetTop =
+    heroWidth === undefined
+      ? ('58%' as const)
+      : Math.min((heroWidth * 540) / 390 - 50, height * (490 / 844));
   return (
-    <View className="flex-1 bg-white">
+    <View className="flex-1 bg-white" onLayout={onLayout}>
       <StatusBar style="dark" />
-      <View className="absolute inset-x-0 top-0">
-        <Hero recipe={recipe} steps={steps} />
+      <View
+        className={cn(
+          'absolute top-0 items-center overflow-hidden bg-bg-surface',
+          wide ? 'inset-y-0 left-0' : 'inset-x-0',
+        )}
+        style={wide ? { width: '48%' } : undefined}
+      >
+        <View className="w-full" style={{ maxWidth: heroWidth }}>
+          <Hero recipe={recipe} steps={steps} />
+        </View>
       </View>
       <View
-        className="absolute inset-x-0 bottom-0 rounded-t-sheet bg-white"
-        style={{ top: sheetTop, boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)' }}
+        className={cn(
+          'absolute bottom-0 bg-white',
+          wide ? 'inset-y-0 right-0' : 'inset-x-0 rounded-t-sheet',
+        )}
+        style={{
+          top: wide ? 0 : sheetTop,
+          width: wide ? '52%' : undefined,
+          boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)',
+        }}
       >
         <ScrollView
           className="rounded-t-sheet"
           contentInsetAdjustmentBehavior="never"
-          contentContainerClassName="gap-3 px-5 pt-5"
-          contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
+          contentContainerClassName="gap-3 px-5"
+          contentContainerStyle={{
+            paddingTop: wide ? insets.top + 20 : 20,
+            paddingRight: wide ? insets.right + 20 : 20,
+            paddingBottom: insets.bottom + 96,
+          }}
         >
           <View className="gap-2">
             <Text
@@ -209,6 +236,7 @@ export function RecipeContent({
             >
               {recipe.title}
             </Text>
+            {appLink}
             <View className="flex-row flex-wrap gap-1.5">
               {tags.map((tag, index) => (
                 <View
@@ -317,18 +345,29 @@ export function RecipeContent({
             </>
           ) : null}
         </ScrollView>
+        {onPost ? (
+          <PostBar onPost={onPost} posting={posting} bottom={insets.bottom} />
+        ) : (
+          <RecipeStartBar recipe={recipe} canStart={steps.length > 0} bottom={insets.bottom} />
+        )}
       </View>
       <View
         pointerEvents="none"
-        className="absolute inset-x-0 top-0 h-27.5"
+        className="absolute left-0 top-0 h-27.5"
         style={{
+          width: wide ? '48%' : '100%',
           backgroundImage:
             'linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0))',
         }}
       />
       <View
-        className="absolute inset-x-4 flex-row items-center gap-2"
-        style={{ top: insets.top + 6 }}
+        className="absolute left-0 flex-row items-center gap-2"
+        style={{
+          width: wide ? '48%' : '100%',
+          top: insets.top + 6,
+          paddingLeft: insets.left + 16,
+          paddingRight: (wide ? 0 : insets.right) + 16,
+        }}
       >
         <GlassIconButton
           icon={BACK}
@@ -360,11 +399,6 @@ export function RecipeContent({
           </>
         )}
       </View>
-      {onPost ? (
-        <PostBar onPost={onPost} posting={posting} bottom={insets.bottom} />
-      ) : (
-        <RecipeStartBar recipe={recipe} canStart={steps.length > 0} bottom={insets.bottom} />
-      )}
     </View>
   );
 }
@@ -469,11 +503,11 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
           onPress={openShop}
           className="min-h-6 flex-row items-center gap-1 rounded-xl bg-base-peach px-2.5 active:opacity-70"
         >
-          <SocialIcon name={CART} size={12} color={ink} />
+          <SocialIcon name={CART} webGlyph="↗" size={12} color={ink} />
           <Text className="font-maru-bold text-micro text-ink-primary">買う</Text>
         </Pressable>
       ) : null}
-      <SocialIcon name={NEXT} size={18} color={secondary} />
+      <SocialIcon name={NEXT} webGlyph="›" size={18} color={secondary} />
     </>
   );
   const className =

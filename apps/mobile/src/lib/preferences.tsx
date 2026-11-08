@@ -2,13 +2,13 @@ import type { Preferences } from '@starter/shared';
 import type { ReactNode } from 'react';
 
 import { preferencesSchema } from '@starter/shared';
-import Storage from 'expo-sqlite/kv-store';
+import 'expo-sqlite/localStorage/install';
 import { createContext, use, useEffect, useState } from 'react';
 import { Uniwind } from 'uniwind';
 
 function readPreferences(): Preferences {
   try {
-    const raw = Storage.getItemSync('nuri.preferences');
+    const raw = globalThis.localStorage.getItem('nuri.preferences');
     return preferencesSchema.parse(raw ? JSON.parse(raw) : {});
   } catch {
     return preferencesSchema.parse({});
@@ -33,7 +33,7 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   function update(patch: Partial<Preferences>) {
     const next = preferencesSchema.parse({ ...preferences, ...patch });
     try {
-      Storage.setItemSync('nuri.preferences', JSON.stringify(next));
+      globalThis.localStorage.setItem('nuri.preferences', JSON.stringify(next));
       setPreferences(next);
       setStorageError(null);
     } catch {

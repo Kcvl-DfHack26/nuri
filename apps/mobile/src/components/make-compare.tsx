@@ -3,9 +3,8 @@ import type { ReactNode } from 'react';
 import { Icon } from '@expo/ui';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
-import { PanResponder, useWindowDimensions, View } from 'react-native';
+import { useState } from 'react';
+import { View, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PartId } from '@/components/recipes';
@@ -14,10 +13,12 @@ import type { RecipeStep } from '@/lib/recipes';
 import { FaceScene } from '@/components/face-scene';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { MediaLayout } from '@/components/media-layout';
 import { arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
+import { useLayoutSize } from '@/lib/layout';
 import { backOrHome } from '@/lib/navigation';
 import { recipeOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
@@ -57,27 +58,16 @@ const SAMPLE_HIDDEN_PARTS: PartId[] = ['shading'];
 // Plan A ⑪ 完成プレビュー（比較）: drag the divider to compare the bare face with the finished look.
 export function MakeCompare({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, onLayout } = useLayoutSize();
   const rose = useTokenColor('--color-accent-rose');
   // Divider position as a share of the width, so it survives rotation and window resizing.
   const [position, setPosition] = useState(0.5);
-  const edge = HANDLE_SIZE / 2 / width;
+  const edge = width > 0 ? Math.min(0.5, HANDLE_SIZE / 2 / width) : 0;
   const clamp = (value: number) => Math.min(Math.max(value, edge), 1 - edge);
   // A tap or drag anywhere on the photo moves the divider under the finger.
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (event) => {
-          setPosition(event.nativeEvent.pageX / width);
-        },
-        onPanResponderMove: (_event, gesture) => {
-          setPosition(gesture.moveX / width);
-        },
-      }),
-    [width],
-  );
+  function moveDivider(event: GestureResponderEvent) {
+    setPosition(event.nativeEvent.locationX / Math.max(width, 1));
+  }
   const shown = clamp(position);
   const x = shown * width;
   const percent = Math.round(shown * 100);
@@ -85,100 +75,124 @@ export function MakeCompare({ id }: { id: string }) {
   const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
 
   return (
-    <View className="flex-1 bg-white">
-      <StatusBar style="dark" />
-      <View className="absolute inset-0" {...pan.panHandlers}>
-        <FaceScene photo={arPhotos.camera} />
-        <Slice from={x} to={width} className="inset-y-0">
-          <FaceScene photo={arPhotos.finished} />
-        </Slice>
-        <View
-          pointerEvents="none"
-          className="absolute inset-y-0 w-0.75 bg-white"
-          style={{ left: x - 1.5, boxShadow: '0px 0px 6px rgba(0, 0, 0, 0.18)' }}
-        />
-        <View
-          accessible
-          accessibilityRole="adjustable"
-          accessibilityLabel="メイク前とメイク後の境目"
-          accessibilityValue={{ text: `メイク前${percent}% メイク後${100 - percent}%` }}
-          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
-          onAccessibilityAction={(event) => {
-            const delta = event.nativeEvent.actionName === 'increment' ? STEP : -STEP;
-            setPosition(clamp(shown + delta));
-          }}
-          // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- The compare handle aligns with the eyes in the Plan A crop.
-          className="absolute top-[39.1%] size-12 items-center justify-center rounded-full bg-white"
-          style={{ left: x - HANDLE_SIZE / 2, boxShadow: '0px 4px 7px rgba(196, 61, 112, 0.2)' }}
-        >
-          <SocialIcon name={COMPARE} size={24} color={rose} />
-        </View>
-      </View>
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 top-0 h-42.5"
-        style={{
-          backgroundImage:
-            'linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0))',
-        }}
-      />
-      <View
-        className="absolute inset-x-4 flex-row items-center justify-between gap-2"
-        style={{ top: insets.top + 8 }}
-      >
-        <GlassIconButton
-          icon={BACK}
-          label="戻る"
-          onPress={() => {
-            backOrHome();
-          }}
-        />
-        {/* Shrinks so large text wraps the title instead of pushing the share button away. */}
-        <View className="min-h-9 shrink flex-row items-center rounded-card border border-white bg-white/70 px-4">
-          <Text
-            accessibilityRole="header"
-            className="shrink text-center font-maru-bold text-label text-ink-primary"
+    <MediaLayout
+      media={
+        <>
+          <View
+            className="absolute inset-0"
+            onLayout={onLayout}
+            onStartShouldSetResponder={() => true}
+            onResponderGrant={moveDivider}
+            onResponderMove={moveDivider}
           >
-            完成プレビュー
-          </Text>
+            <FaceScene photo={arPhotos.camera} />
+            <Slice from={x} to={width} width={width} className="inset-y-0">
+              <FaceScene photo={arPhotos.finished} />
+            </Slice>
+            <View
+              pointerEvents="none"
+              className="absolute inset-y-0 w-0.75 bg-white"
+              style={{ left: x - 1.5, boxShadow: '0px 0px 6px rgba(0, 0, 0, 0.18)' }}
+            />
+            <View
+              pointerEvents="none"
+              accessible
+              accessibilityRole="adjustable"
+              accessibilityLabel="メイク前とメイク後の境目"
+              accessibilityValue={{ text: `メイク前${percent}% メイク後${100 - percent}%` }}
+              accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+              onAccessibilityAction={(event) => {
+                const delta = event.nativeEvent.actionName === 'increment' ? STEP : -STEP;
+                setPosition(clamp(shown + delta));
+              }}
+              // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- The compare handle aligns with the eyes in the Plan A crop.
+              className="absolute top-[39.1%] size-12 items-center justify-center rounded-full bg-white"
+              style={{
+                left: x - HANDLE_SIZE / 2,
+                boxShadow: '0px 4px 7px rgba(196, 61, 112, 0.2)',
+              }}
+            >
+              <SocialIcon name={COMPARE} webGlyph="↔" size={24} color={rose} />
+            </View>
+          </View>
+          <View
+            pointerEvents="none"
+            className="absolute inset-x-0 top-0 h-42.5"
+            style={{
+              backgroundImage:
+                'linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0))',
+            }}
+          />
+          {/* Each tag is clipped with its side of the photo, like the photos themselves. */}
+          <Slice from={0} to={x} width={width} style={{ top: insets.top + 64 }}>
+            <Tag
+              label="Before"
+              className="ml-4 self-start bg-white/78"
+              textClassName="text-ink-primary"
+            />
+          </Slice>
+          <Slice from={x} to={width} width={width} style={{ top: insets.top + 64 }}>
+            <Tag
+              label="After"
+              className="mr-4 self-end bg-accent-rose"
+              textClassName="text-white"
+            />
+          </Slice>
+        </>
+      }
+      header={
+        <View
+          className="flex-row items-center justify-between gap-2 px-4"
+          style={{ paddingTop: insets.top + 8 }}
+        >
+          <GlassIconButton
+            icon={BACK}
+            label="戻る"
+            onPress={() => {
+              backOrHome();
+            }}
+          />
+          {/* Shrinks so large text wraps the title instead of pushing the share button away. */}
+          <View className="min-h-9 shrink flex-row items-center rounded-card border border-white bg-white/70 px-4">
+            <Text
+              accessibilityRole="header"
+              className="shrink text-center font-maru-bold text-label text-ink-primary"
+            >
+              完成プレビュー
+            </Text>
+          </View>
+          <GlassIconButton icon={SHARE} label="共有（準備中）" />
         </View>
-        <GlassIconButton icon={SHARE} label="共有（準備中）" />
-      </View>
-      {/* Each tag is clipped with its side of the photo, like the photos themselves. */}
-      <Slice from={0} to={x} style={{ top: insets.top + 64 }}>
-        <Tag
-          label="Before"
-          className="ml-4 self-start bg-white/78"
-          textClassName="text-ink-primary"
-        />
-      </Slice>
-      <Slice from={x} to={width} style={{ top: insets.top + 64 }}>
-        <Tag label="After" className="mr-4 self-end bg-accent-rose" textClassName="text-white" />
-      </Slice>
-      <View
-        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-sheet bg-white/86 px-4 pt-4.5"
-        style={{
-          paddingBottom: insets.bottom + 12,
-          boxShadow: '0px -6px 12px rgba(196, 61, 112, 0.12)',
-        }}
-      >
-        <View className="flex-row flex-wrap items-center justify-between gap-x-3">
-          <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
-            手順を重ねて確認
-          </Text>
-          <Text className="font-maru text-meta text-ink-secondary">タップでオン・オフ</Text>
-        </View>
-        <StepLayers
-          steps={query.data?.steps ?? []}
-          isLoading={query.isPending && Boolean(apiUrl)}
-          isError={query.isError}
-          onRetry={() => {
-            void query.refetch();
+      }
+      footer={
+        <View
+          className="gap-3.5 rounded-t-sheet bg-white/86 px-4 pt-4.5"
+          style={{
+            paddingBottom: insets.bottom + 12,
+            boxShadow: '0px -6px 12px rgba(196, 61, 112, 0.12)',
           }}
-        />
-        <Controls />
-      </View>
-    </View>
+        >
+          <View className="flex-row flex-wrap items-center justify-between gap-x-3">
+            <Text
+              accessibilityRole="header"
+              className="font-maru-bold text-heading text-ink-primary"
+            >
+              手順を重ねて確認
+            </Text>
+            <Text className="font-maru text-meta text-ink-secondary">タップでオン・オフ</Text>
+          </View>
+          <StepLayers
+            steps={query.data?.steps ?? []}
+            isLoading={query.isPending && Boolean(apiUrl)}
+            isError={query.isError}
+            onRetry={() => {
+              void query.refetch();
+            }}
+          />
+          <Controls />
+        </View>
+      }
+    />
   );
 }
 
@@ -226,17 +240,18 @@ function StepLayers({
 function Slice({
   from,
   to,
+  width,
   className,
   style,
   children,
 }: {
   from: number;
   to: number;
+  width: number;
   className?: string;
   style?: { top: number };
   children: ReactNode;
 }) {
-  const { width } = useWindowDimensions();
   return (
     <View
       pointerEvents="none"
@@ -283,7 +298,7 @@ function LayerChip({ part, label, visible }: { part: PartId; label: string; visi
       )}
     >
       {visible ? (
-        <SocialIcon name={CHECK} size={16} color={rose} />
+        <SocialIcon name={CHECK} webGlyph="✓" size={16} color={rose} />
       ) : (
         <Image
           accessible={false}
@@ -325,7 +340,7 @@ function Controls() {
         className="min-h-13 flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5"
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
       >
-        <SocialIcon name={PLUS} size={20} color="white" />
+        <SocialIcon name={PLUS} webGlyph="+" size={20} color="white" />
         <Text className="font-maru-bold text-action text-white">レシピを投稿する</Text>
       </View>
     </View>

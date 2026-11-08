@@ -1,3 +1,5 @@
+import type { DimensionValue } from 'react-native';
+
 import { Icon } from '@expo/ui';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -14,7 +16,7 @@ import { useTokenColor } from '@/theme/tokens';
 const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 
 // Plan A ①'s recipe card in a two-column grid; search results reuse it. Opens the recipe's ⑤.
-export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
+export function RecipeCard({ recipe, width }: { recipe: RecipeSummary; width: DimensionValue }) {
   const secondary = useTokenColor('--color-ink-secondary');
   const ink = useTokenColor('--color-ink-primary');
   const likes = formatCount(recipe.likeCount);
@@ -22,8 +24,8 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${recipe.title}、${recipe.author.name}、いいね${likes}`}
-      // Half of the row, so a lone last card keeps the grid's width.
-      className="max-w-1/2 flex-1 gap-1.25 active:opacity-80"
+      className="gap-1.25 active:opacity-80"
+      style={{ width }}
       onPress={() => {
         router.push(`/recipes/${recipe.id}`);
       }}
@@ -36,7 +38,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
           style={{ width: '100%', height: '100%' }}
         />
         <View className="absolute right-2 top-2 size-8 items-center justify-center rounded-full bg-white">
-          <SocialIcon name={HEART} size={18} color={ink} />
+          <SocialIcon name={HEART} webGlyph="♡" size={18} color={ink} />
         </View>
       </View>
       <View className="w-full gap-1.25 px-2">
@@ -45,7 +47,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
           <Text className="flex-1 font-maru text-meta text-ink-secondary">
             {recipe.author.name}
           </Text>
-          <SocialIcon name={HEART} size={14} color={secondary} />
+          <SocialIcon name={HEART} webGlyph="♡" size={14} color={secondary} />
           <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
         </View>
       </View>

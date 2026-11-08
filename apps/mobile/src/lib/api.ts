@@ -8,8 +8,12 @@ import * as SecureStore from 'expo-secure-store';
 import { hc } from 'hono/client';
 import { Platform } from 'react-native';
 
-const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim().replace(/\/$/, '');
-export const apiUrl = configuredUrl === '' ? null : (configuredUrl ?? null);
+const configuredUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+const apiOrigin =
+  Platform.OS === 'web' && configuredUrl === '/'
+    ? globalThis.location?.origin
+    : configuredUrl?.replace(/\/$/, '');
+export const apiUrl = apiOrigin === '' ? null : (apiOrigin ?? null);
 /** Resolves an image path served by the API (e.g. /sample-avatars/haru.jpg) to a full URL. */
 export function apiAssetUrl(path: string) {
   return path.startsWith('/') && apiUrl ? `${apiUrl}${path}` : path;

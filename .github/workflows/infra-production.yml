@@ -1,0 +1,59 @@
+name: Production Infrastructure
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan only, or apply to kcvlb4 / nuri-staging
+        type: choice
+        options: [plan, apply]
+        default: plan
+permissions:
+  contents: read
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+jobs:
+  opentofu:
+    name: Run OpenTofu
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE: ${{ vars.CLOUD_RUN_SERVICE }}
+      TOFU_PROVIDER: ${{ vars.TOFU_WORKLOAD_IDENTITY_PROVIDER }}
+      TOFU_ACCOUNT: ${{ vars.TOFU_SERVICE_ACCOUNT }}
+      TOFU_VARIABLES: ${{ vars.TOFU_VARIABLES_JSON }}
+      TF_IN_AUTOMATION: 'true'
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      # 最新の main と CI の成功を確認してからクラウドへ認証する。
+      - name: Verify Current Main and CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          DEPLOY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        run: bun .github/scripts/opentofu/verify.ts
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.TOFU_PROVIDER }}
+          service_account: ${{ env.TOFU_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - uses: opentofu/setup-opentofu@v2.0.2
+        with:
+          tofu_version: 1.13.8
+          tofu_wrapper: false
+      - name: Plan or Apply Production Infrastructure
+        env:
+          OPERATION: ${{ inputs.operation }}
+        run: bun .github/scripts/opentofu/manage.ts

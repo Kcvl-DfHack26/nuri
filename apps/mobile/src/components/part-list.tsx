@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, View, type DimensionValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { RecipeSummary } from '@/lib/recipes';
@@ -16,6 +16,7 @@ import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl } from '@/lib/api';
+import { cardGrid, cardGridGap, cardGridInset, useLayoutSize } from '@/lib/layout';
 import { backOrHome } from '@/lib/navigation';
 import { recipeListOptions } from '@/lib/recipes';
 import { cn } from '@/lib/utils';
@@ -53,7 +54,8 @@ const roundTag = '丸顔向け';
 // Plan A ③ 部位別一覧: the part's recipes from the API. Choosing one and starting opens its ⑤.
 export function PartList({ part }: { part: string }) {
   const insets = useSafeAreaInsets();
-  const window = useWindowDimensions();
+  const { width, onLayout } = useLayoutSize();
+  const { cardWidth } = cardGrid(width);
   const partId = isPartId(part) ? part : undefined;
   const list = useInfiniteQuery({
     ...recipeListOptions(partId ? { part: partId } : {}),
@@ -123,16 +125,21 @@ export function PartList({ part }: { part: string }) {
       <FilterChips value={filter} onChange={setFilter} />
       <ScrollView
         contentInsetAdjustmentBehavior="never"
-        contentContainerClassName="flex-row flex-wrap gap-x-2 gap-y-5.25 px-4"
-        contentContainerStyle={{ paddingTop: 42, paddingBottom: insets.bottom + 96 }}
+        onLayout={onLayout}
+        contentContainerClassName="flex-row flex-wrap gap-y-5.25"
+        contentContainerStyle={{
+          columnGap: cardGridGap,
+          paddingHorizontal: cardGridInset,
+          paddingTop: 42,
+          paddingBottom: insets.bottom + 96,
+        }}
       >
         {status ? <View className="w-full">{status}</View> : null}
         {visible.map((recipe) => (
           <StyleCard
             key={recipe.id}
             recipe={recipe}
-            // Two columns with an 8pt gutter; a lone filtered card keeps its column width.
-            width={Math.floor((window.width - 40) / 2)}
+            width={cardWidth}
             selected={recipe.id === selectedId}
             onSelect={() => {
               setChosenId(recipe.id);
@@ -228,7 +235,7 @@ function StyleCard({
   onSelect,
 }: {
   recipe: RecipeSummary;
-  width: number;
+  width: DimensionValue;
   selected: boolean;
   onSelect: () => void;
 }) {

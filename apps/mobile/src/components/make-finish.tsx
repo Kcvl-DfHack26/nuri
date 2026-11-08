@@ -2,13 +2,13 @@ import { Icon } from '@expo/ui';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { canTrackFace, FaceMakeupCamera } from '@/components/face-makeup-camera';
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { MediaLayout } from '@/components/media-layout';
 import { RecipeStatus } from '@/components/recipe-detail';
 import { arPhotos } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
@@ -78,69 +78,73 @@ export function MakeFinish({ id }: { id: string }) {
     />
   );
   return (
-    <View className="flex-1 bg-white">
-      <StatusBar style="dark" />
-      {canTrackFace ? (
-        <FaceMakeupCamera layers={layers}>
-          {fade}
-          {sparkles}
-        </FaceMakeupCamera>
-      ) : (
-        <FaceScene photo={arPhotos.finished}>
-          {fade}
-          {sparkles}
-        </FaceScene>
-      )}
-      <View className="absolute inset-x-4 flex-row justify-between" style={{ top: insets.top + 8 }}>
-        <GlassIconButton
-          icon={CLOSE}
-          label="閉じる"
-          onPress={() => {
-            backOrHome();
-          }}
-        />
-        {/* Plan A ⑩ has only 保存 here and no way to ⑪, which Plan A hides. 共有 is added
-            beside it (#95) and shares text only, never the camera image. */}
-        <View className="flex-row gap-2">
+    <MediaLayout
+      media={
+        <>
+          {canTrackFace ? (
+            <FaceMakeupCamera layers={layers}>
+              {fade}
+              {sparkles}
+            </FaceMakeupCamera>
+          ) : (
+            <FaceScene photo={arPhotos.finished}>
+              {fade}
+              {sparkles}
+            </FaceScene>
+          )}
+        </>
+      }
+      header={
+        <View className="flex-row justify-between px-4" style={{ paddingTop: insets.top + 8 }}>
           <GlassIconButton
-            icon={SHARE}
-            label="共有"
-            {...(recipe
-              ? {
-                  onPress: () => {
-                    shareRecipe(recipe, '試しました');
-                  },
-                }
-              : {})}
+            icon={CLOSE}
+            label="閉じる"
+            onPress={() => {
+              backOrHome();
+            }}
           />
-          <GlassIconButton icon={DOWNLOAD} label="写真を保存（準備中）" />
+          {/* Plan A ⑩ has only 保存 here and no way to ⑪, which Plan A hides. 共有 is added
+            beside it (#95) and shares text only, never the camera image. */}
+          <View className="flex-row gap-2">
+            <GlassIconButton
+              icon={SHARE}
+              label="共有"
+              {...(recipe
+                ? {
+                    onPress: () => {
+                      shareRecipe(recipe, '試しました');
+                    },
+                  }
+                : {})}
+            />
+            <GlassIconButton icon={DOWNLOAD} label="写真を保存（準備中）" />
+          </View>
         </View>
-      </View>
-      <View
-        className="absolute inset-x-0 bottom-0 items-center gap-3.5 px-5"
-        style={{ paddingBottom: insets.bottom + 12 }}
-      >
-        <Text
-          accessibilityRole="header"
-          className="font-maru-black text-match-score text-accent-rose"
-        >
-          Finish!
-        </Text>
-        <Text className="font-maru-bold text-heading text-ink-primary">
-          {recipe ? `${recipe.title}のできあがり` : 'メイクのできあがり'}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => {
-            router.dismissTo('/');
-          }}
-          className="min-h-13 w-full flex-row items-center justify-center gap-1.5 rounded-full border border-line-soft bg-white px-4.5 active:opacity-70"
-        >
-          <Image accessible={false} source={sparkleInk} style={{ width: 20, height: 20 }} />
-          <Text className="font-maru-bold text-action text-ink-primary">次のメイクを試す？</Text>
-        </Pressable>
-      </View>
-    </View>
+      }
+      footer={
+        <View className="items-center gap-3.5 px-5" style={{ paddingBottom: insets.bottom + 12 }}>
+          <Text
+            accessibilityRole="header"
+            className="font-maru-black text-match-score text-accent-rose"
+          >
+            Finish!
+          </Text>
+          <Text className="font-maru-bold text-heading text-ink-primary">
+            {recipe ? `${recipe.title}のできあがり` : 'メイクのできあがり'}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              router.dismissTo('/');
+            }}
+            className="min-h-13 w-full flex-row items-center justify-center gap-1.5 rounded-full border border-line-soft bg-white px-4.5 active:opacity-70"
+          >
+            <Image accessible={false} source={sparkleInk} style={{ width: 20, height: 20 }} />
+            <Text className="font-maru-bold text-action text-ink-primary">次のメイクを試す？</Text>
+          </Pressable>
+        </View>
+      }
+    />
   );
 }
 

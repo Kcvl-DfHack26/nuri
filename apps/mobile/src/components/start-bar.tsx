@@ -47,6 +47,7 @@ export function StartBar({
           {/* Android ships only outlined symbols, so the rose color also marks a favorite. */}
           <SocialIcon
             name={favorite.favorited ? HEART_FILLED : HEART}
+            webGlyph={favorite.favorited ? '♥' : '♡'}
             size={22}
             color={favorite.favorited ? rose : ink}
           />
@@ -59,7 +60,7 @@ export function StartBar({
           accessibilityState={{ disabled: true }}
           className="size-13 items-center justify-center rounded-full bg-white"
         >
-          <SocialIcon name={HEART} size={22} color={ink} />
+          <SocialIcon name={HEART} webGlyph="♡" size={22} color={ink} />
         </View>
       )}
       <Pressable

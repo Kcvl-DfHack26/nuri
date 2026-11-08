@@ -52,6 +52,19 @@ jobs:
         env:
           DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
         run: bun run --cwd apps/api db:migrate && bun run --cwd apps/api test:integration
+      - name: Install browsers for Web E2E
+        run: bunx playwright install --with-deps --no-shell chromium webkit
+      - name: Test Expo Web with the API
+        env:
+          NURI_E2E_DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
+        run: bun run test:e2e
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: web-e2e-traces
+          path: .artifacts/playwright
+          if-no-files-found: ignore
+          retention-days: 7
   mobile-bundle:
     runs-on: ubuntu-latest
     env:
@@ -115,15 +128,14 @@ jobs:
           docker compose -f compose.yaml -f compose.go.yaml config --quiet
           docker compose -f compose.yaml -f compose.devices.yaml config --quiet
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
-      - name: Run Node.js container smoke test
+      - name: Run Hono and Expo Web container smoke test
         run: |
           docker run -d --name api -p 8080:8080 \
             -e DATABASE_URL=postgresql://unused:unused@localhost:5432/unused \
             -e BETTER_AUTH_SECRET=ci-only-secret-not-for-real-deployments \
             -e BETTER_AUTH_URL=https://example.com expo-hono-opentofu-starter-api
-          for _ in $(seq 1 20); do
-            if curl --fail --silent http://localhost:8080/health; then exit 0; fi
-            sleep 1
-          done
-          docker logs api
-          exit 1
+          if ! curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 1 --max-time 5 http://localhost:8080/health ||
+             ! bash scripts/check-expo-web.sh http://localhost:8080; then
+            docker logs api
+            exit 1
+          fi

@@ -13,6 +13,7 @@ import { Alert, AppState, Linking, Pressable, StyleSheet, View } from 'react-nat
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { MediaLayout } from '@/components/media-layout';
 import { usePostDraft } from '@/components/post-draft';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
@@ -237,7 +238,7 @@ function CameraAction({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      className="w-24 items-center gap-1.5 active:opacity-70"
+      className="w-24 shrink items-center gap-1.5 active:opacity-70"
     >
       {children}
       <Text className="text-center font-maru-bold text-label text-ink-primary">{label}</Text>
@@ -338,111 +339,127 @@ export function PostRecording() {
   };
 
   return (
-    <View className="flex-1 bg-white">
-      <StatusBar style="dark" />
-      {released ? null : (
-        <CameraView
-          ref={camera}
-          facing="front"
-          mode="video"
-          style={StyleSheet.absoluteFill}
-          onCameraReady={start}
-          onMountError={() => {
-            stopUnexpectedly('カメラを開けませんでした');
-          }}
-        />
-      )}
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 top-0"
-        style={{
-          height: insets.top + 86,
-          backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.8), rgba(255,255,255,0))',
-        }}
-      />
-      <View className="absolute left-4" style={{ top: insets.top + 8 }}>
-        <GlassIconButton
-          icon={CLOSE}
-          label="閉じる"
-          onPress={() => {
-            ending.current = { kind: 'discard' };
-            camera.current?.stopRecording();
-            backOrHome();
-          }}
-        />
-      </View>
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-20 items-center gap-2"
-        style={{ top: insets.top + 12 }}
-      >
-        <View className="flex-row items-center gap-2 rounded-panel bg-bg-surface py-2 pl-3 pr-3.5">
-          <View className="size-2.5 rounded-full bg-accent-rose" />
-          <Text
-            accessibilityLabel={`録画時間 ${spokenElapsed(elapsed)}`}
-            className="font-maru-bold text-action text-ink-primary"
-          >
-            {formatElapsed(elapsed)}
-          </Text>
-        </View>
-        <View className="rounded-2xl bg-bg-surface px-3 py-1.5">
-          <Text className="font-maru text-meta text-ink-primary">手順{steps.length} を撮影中</Text>
-        </View>
-      </View>
-      <View
-        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-sheet bg-post-panel px-5 pt-4"
-        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-      >
-        <View className="h-2 flex-row gap-0.75" accessible={false}>
-          {steps.map((length, index) => (
-            <View
-              key={index}
-              className={
-                index === steps.length - 1 ? 'rounded bg-accent-rose/45' : 'rounded bg-accent-rose'
-              }
-              style={{ flex: Math.max(length, 1) }}
+    <MediaLayout
+      media={
+        <>
+          {released ? null : (
+            <CameraView
+              ref={camera}
+              facing="front"
+              mode="video"
+              style={StyleSheet.absoluteFill}
+              onCameraReady={start}
+              onMountError={() => {
+                stopUnexpectedly('カメラを開けませんでした');
+              }}
             />
-          ))}
+          )}
+          <View
+            pointerEvents="none"
+            className="absolute inset-x-0 top-0"
+            style={{
+              height: insets.top + 86,
+              backgroundImage:
+                'linear-gradient(to bottom, rgba(255,255,255,0.8), rgba(255,255,255,0))',
+            }}
+          />
+        </>
+      }
+      header={
+        <View style={{ paddingTop: insets.top + 8 }}>
+          <View className="relative">
+            <View className="absolute left-4 top-0">
+              <GlassIconButton
+                icon={CLOSE}
+                label="閉じる"
+                onPress={() => {
+                  ending.current = { kind: 'discard' };
+                  camera.current?.stopRecording();
+                  backOrHome();
+                }}
+              />
+            </View>
+            <View pointerEvents="none" className="items-center gap-2 px-14">
+              <View className="flex-row items-center gap-2 rounded-panel bg-bg-surface py-2 pl-3 pr-3.5">
+                <View className="size-2.5 rounded-full bg-accent-rose" />
+                <Text
+                  accessibilityLabel={`録画時間 ${spokenElapsed(elapsed)}`}
+                  className="font-maru-bold text-action text-ink-primary"
+                >
+                  {formatElapsed(elapsed)}
+                </Text>
+              </View>
+              <View className="rounded-2xl bg-bg-surface px-3 py-1.5">
+                <Text className="font-maru text-meta text-ink-primary">
+                  手順{steps.length} を撮影中
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
-        <View className="flex-row items-center justify-between">
-          <CameraAction label="一時停止">
-            <View className="size-13 flex-row items-center justify-center gap-1.25 rounded-full border border-ink-primary">
-              <View className="h-4.5 w-1.25 rounded-sm bg-ink-primary" />
-              <View className="h-4.5 w-1.25 rounded-sm bg-ink-primary" />
-            </View>
-          </CameraAction>
-          <CameraAction
-            label="撮影を終える"
-            onPress={
-              startedAt === null
-                ? undefined
-                : () => {
-                    ending.current = { kind: 'finish', marks, durationMs: Date.now() - startedAt };
-                    camera.current?.stopRecording();
-                  }
-            }
-          >
-            <View className="size-18 items-center justify-center rounded-full bg-bg-surface">
-              <View className="size-6.5 rounded-md bg-accent-rose" />
-            </View>
-          </CameraAction>
-          <CameraAction
-            label="手順を区切る"
-            // A post has at most recipeStepsMax steps, so marks stop one short of it.
-            onPress={
-              startedAt === null || marks.length >= recipeStepsMax - 1
-                ? undefined
-                : () => {
-                    setMarks((current) => [...current, Date.now() - startedAt]);
-                  }
-            }
-          >
-            <View className="size-13 items-center justify-center rounded-full bg-accent-rose">
-              <SocialIcon name={ADD} size={26} color="white" />
-            </View>
-          </CameraAction>
+      }
+      footer={
+        <View
+          className="gap-3.5 rounded-t-sheet bg-post-panel px-5 pt-4"
+          style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+        >
+          <View className="h-2 flex-row gap-0.75" accessible={false}>
+            {steps.map((length, index) => (
+              <View
+                key={index}
+                className={
+                  index === steps.length - 1
+                    ? 'rounded bg-accent-rose/45'
+                    : 'rounded bg-accent-rose'
+                }
+                style={{ flex: Math.max(length, 1) }}
+              />
+            ))}
+          </View>
+          <View className="flex-row items-center justify-between">
+            <CameraAction label="一時停止">
+              <View className="size-13 flex-row items-center justify-center gap-1.25 rounded-full border border-ink-primary">
+                <View className="h-4.5 w-1.25 rounded-sm bg-ink-primary" />
+                <View className="h-4.5 w-1.25 rounded-sm bg-ink-primary" />
+              </View>
+            </CameraAction>
+            <CameraAction
+              label="撮影を終える"
+              onPress={
+                startedAt === null
+                  ? undefined
+                  : () => {
+                      ending.current = {
+                        kind: 'finish',
+                        marks,
+                        durationMs: Date.now() - startedAt,
+                      };
+                      camera.current?.stopRecording();
+                    }
+              }
+            >
+              <View className="size-18 items-center justify-center rounded-full bg-bg-surface">
+                <View className="size-6.5 rounded-md bg-accent-rose" />
+              </View>
+            </CameraAction>
+            <CameraAction
+              label="手順を区切る"
+              // A post has at most recipeStepsMax steps, so marks stop one short of it.
+              onPress={
+                startedAt === null || marks.length >= recipeStepsMax - 1
+                  ? undefined
+                  : () => {
+                      setMarks((current) => [...current, Date.now() - startedAt]);
+                    }
+              }
+            >
+              <View className="size-13 items-center justify-center rounded-full bg-accent-rose">
+                <SocialIcon name={ADD} size={26} color="white" />
+              </View>
+            </CameraAction>
+          </View>
         </View>
-      </View>
-    </View>
+      }
+    />
   );
 }

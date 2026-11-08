@@ -34,6 +34,7 @@
     }
   },
   "cacheDir": ".turbo/cache",
+  "globalPassThroughEnv": ["NURI_E2E_DATABASE_URL"],
   "globalEnv": [
     "AUTH_EMULATE",
     "GOOGLE_EMULATOR_URL",

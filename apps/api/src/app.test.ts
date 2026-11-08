@@ -1,4 +1,7 @@
 import { afterAll, describe, expect, test } from 'bun:test';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
@@ -86,4 +89,51 @@ describe('HTTP contract', () => {
     expect(page).toContain('id="open"');
     expect(page).not.toContain('href="com.kcvl.nuri:');
   });
+});
+
+test('serves the Expo SPA without rewriting API, missing assets, or the future LP', async () => {
+  const webRoot = await mkdtemp(join(tmpdir(), 'nuri-expo-web-'));
+  try {
+    const html = '<!doctype html><title>nuri</title>';
+    const assets = join(webRoot, '_expo/static/js');
+    await mkdir(assets, { recursive: true });
+    await writeFile(join(webRoot, 'index.html'), html);
+    await writeFile(join(assets, 'entry-hash.js'), 'console.log("nuri");');
+    const hosted = createApp(db, auth, { ...env, EXPO_WEB_ROOT: webRoot }, () => Promise.resolve());
+
+    expect((await app.request('/')).status).toBe(404);
+    for (const path of ['/', '/recipes/fox/steps', '/auth-callback?next=/profile']) {
+      const response = await hosted.request(path);
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/html');
+      expect(response.headers.get('cache-control')).toBe('no-cache');
+      expect(await response.text()).toBe(html);
+    }
+
+    const head = await hosted.request('/recipes/fox', { method: 'HEAD' });
+    expect(head.status).toBe(200);
+    expect(await head.text()).toBe('');
+
+    const entry = await hosted.request('/_expo/static/js/entry-hash.js');
+    expect(entry.status).toBe(200);
+    expect(entry.headers.get('content-type')).toContain('javascript');
+    expect(entry.headers.get('cache-control')).toContain('immutable');
+    expect(await entry.text()).toContain('console.log');
+    const capabilities = await hosted.request('/api/auth-capabilities');
+    expect(capabilities.headers.get('content-type')).toContain('application/json');
+    expect((await hosted.request('/.well-known/assetlinks.json')).status).toBe(200);
+    for (const path of [
+      '/api/unknown',
+      '/_expo/static/js/missing.js',
+      '/assets/missing.png',
+      '/recipes/fox/unknown',
+      '/about/',
+      '/unknown',
+    ]) {
+      expect((await hosted.request(path)).status).toBe(404);
+    }
+    expect((await hosted.request('/', { method: 'POST' })).status).toBe(404);
+  } finally {
+    await rm(webRoot, { recursive: true, force: true });
+  }
 });

@@ -1,19 +1,21 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import Storage from 'expo-sqlite/kv-store';
 import { Pressable, Text, View } from 'react-native';
 import { Uniwind } from 'uniwind';
 
 import { PreferencesProvider, usePreferences } from './preferences';
 
-jest.mock('expo-sqlite/kv-store', () => ({
-  __esModule: true,
-  default: { getItemSync: jest.fn(), setItemSync: jest.fn() },
-}));
+jest.mock('expo-sqlite/localStorage/install', () => {
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: { getItem: jest.fn(), setItem: jest.fn() },
+  });
+  return {};
+});
 jest.mock('expo-haptics', () => ({ selectionAsync: jest.fn() }));
 jest.mock('uniwind', () => ({ Uniwind: { setTheme: jest.fn() } }));
 
-const readStoredPreferences = jest.spyOn(Storage, 'getItemSync');
-const writeStoredPreferences = jest.spyOn(Storage, 'setItemSync');
+const readStoredPreferences = jest.spyOn(globalThis.localStorage, 'getItem');
+const writeStoredPreferences = jest.spyOn(globalThis.localStorage, 'setItem');
 const setTheme = jest.spyOn(Uniwind, 'setTheme');
 
 let stored: string | null;
@@ -22,7 +24,7 @@ beforeEach(() => {
   stored = null;
   readStoredPreferences.mockImplementation(() => stored);
   writeStoredPreferences.mockImplementation((_key, value) => {
-    stored = typeof value === 'function' ? value(stored) : value;
+    stored = value;
   });
 });
 

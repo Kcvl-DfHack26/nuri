@@ -2,7 +2,19 @@
 
 **自分の顔で、手順どおりに。**
 
-nuriは、メイクの手順をレシピとして選び、インカメラに映る自分の顔へ塗る範囲と色を重ねながら、1ステップずつ再現するモバイルアプリです。SNSの投稿からレシピを取り込み、完成形をメイク前と比較する体験を目指します。
+nuriは、メイクの手順をレシピとして選び、インカメラに映る自分の顔へ塗る範囲と色を重ねながら、1ステップずつ再現するiOS・Android・Web向けのアプリです。SNSの投稿からレシピを取り込み、完成形をメイク前と比較する体験を目指します。
+
+## ブラウザで試す
+
+Web版の配備後は、審査員にCloud Runの既定HTTPS URLを共有するだけで、スマートフォンやタブレットのブラウザから開けます。アプリのインストールは不要です。ホームからレシピを選び、カメラを許可せずに見本で手順を確認することもできます。
+
+公開先は `asia-northeast1` の `nuri-staging` です。OpenTofuを適用し、Web版を含むイメージを配備した環境で、共有用URLを確認できます。
+
+```sh
+tofu -chdir=infra output -raw expo_web_url
+```
+
+同じURLの `/` でExpo Web、`/api/` 以下でHono APIを配信します。レシピのURLはブラウザで直接開けます。[配備と公開確認の手順](docs/setup.md#webを開く)・[ルーティングの詳細](docs/architecture.md#審査向けwebの配信設計)
 
 ## 最初に確かめること
 
@@ -46,7 +58,7 @@ Dev Containers対応エディタでは **Reopen in Container** で編集・検�
 | 場所                             | 責務                                                                        |
 | -------------------------------- | --------------------------------------------------------------------------- |
 | `apps/mobile`                    | Expo SDK 58 / React Native 0.88 / Expo Router / Expo UI                     |
-| `apps/api`                       | Node.js / Hono RPC / Better Auth / Drizzle / PostgreSQL                     |
+| `apps/api`                       | Hono API・Expo Webの配信 / Better Auth / Drizzle / PostgreSQL               |
 | `apps/emulate`                   | Vercel EmulateのGoogle・Apple・Resend                                       |
 | `packages/shared`                | Zodスキーマと純粋な処理                                                     |
 | `infra`                          | OpenTofu: Cloud Run、Cloud SQL、IAM、WIF、Secret Manager、Artifact Registry |
@@ -65,6 +77,7 @@ Dev Containers対応エディタでは **Reopen in Container** で編集・検�
 | `bun run dev:go`                                | Expo Go用のMetroトンネル付きで起動                 |
 | `bun run check`                                 | 整形、型付きlint、型検査、Bun/Jestテスト、Fallow   |
 | `bun run test:integration`                      | PostgreSQLを使った認証・認可テスト                 |
+| `bun run test:e2e`                              | Chromium・WebKitのWeb E2E（要ローカルDB）          |
 | `bun run db:generate` / `bun run db:migrate`    | migration生成 / 適用                               |
 | `bun run db:seed`                               | ローカルの4ユーザー・アバター・8投稿・いいねを用意 |
 | `bun run doctor`                                | Expoの互換性確認                                   |

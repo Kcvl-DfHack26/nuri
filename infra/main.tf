@@ -154,11 +154,12 @@ resource "google_secret_manager_secret_iam_member" "migration" {
 }
 
 resource "google_cloud_run_v2_service" "api" {
-  count               = var.deploy_application ? 1 : 0
-  name                = var.name
-  location            = var.region
-  deletion_protection = var.deletion_protection
-  ingress             = "INGRESS_TRAFFIC_ALL"
+  count                = var.deploy_application ? 1 : 0
+  name                 = var.name
+  location             = var.region
+  deletion_protection  = var.deletion_protection
+  ingress              = "INGRESS_TRAFFIC_ALL"
+  default_uri_disabled = false
   template {
     service_account = google_service_account.runtime.email
     scaling {
