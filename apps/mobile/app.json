@@ -6,7 +6,7 @@
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "com.kcvl.nuri",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.kcvl.nuri",
       "supportsTablet": true,
@@ -40,7 +40,6 @@
         }
       ],
       "expo-secure-store",
-      "expo-sqlite",
       "expo-font",
       "expo-image",
       "expo-camera"

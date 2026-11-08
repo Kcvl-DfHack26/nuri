@@ -1,7 +1,22 @@
+import { queryOptions } from '@tanstack/react-query';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 
 import { authClient } from '@/lib/api';
+
+export function passkeyListOptions(userId: string | undefined) {
+  return queryOptions({
+    queryKey: ['passkeys', userId],
+    enabled: Boolean(userId),
+    queryFn: async ({ signal }) => {
+      const result = await authClient.passkey.listUserPasskeys({ fetchOptions: { signal } });
+      if (result.error) {
+        throw new Error('パスキーを読み込めませんでした。');
+      }
+      return result.data;
+    },
+  });
+}
 
 export const passkeysAvailable =
   Platform.OS === 'web'

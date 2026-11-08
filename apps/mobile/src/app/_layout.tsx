@@ -5,25 +5,24 @@ import { ZenMaruGothic_700Bold } from '@expo-google-fonts/zen-maru-gothic/700Bol
 import { ZenMaruGothic_900Black } from '@expo-google-fonts/zen-maru-gothic/900Black';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
+import { DefaultTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { Stack } from 'expo-router/stack';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { Uniwind } from 'uniwind';
 
 import { Launch } from '@/components/launch';
-import { PreferencesProvider } from '@/lib/preferences';
 import { stackOptions } from '@/theme/navigation';
 
+Uniwind.setTheme('light');
+
 function Navigation() {
-  const scheme = useColorScheme();
   return (
-    <ThemeProvider value={scheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
       <Stack screenOptions={stackOptions}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="account" options={{ title: 'ログイン', headerShown: false }} />
         <Stack.Screen name="users/[id]" options={{ title: 'プロフィール' }} />
-        <Stack.Screen name="settings" options={{ title: '設定' }} />
         <Stack.Screen name="post" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/index" options={{ headerShown: false }} />
         <Stack.Screen name="recipes/[id]/steps" options={{ headerShown: false }} />
@@ -70,7 +69,7 @@ function Navigation() {
         <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
         <Stack.Screen name="auth-callback" options={{ title: 'ログイン' }} />
       </Stack>
-      <StatusBar style="auto" />
+      <StatusBar style="dark" />
     </ThemeProvider>
   );
 }
@@ -90,9 +89,7 @@ export default function RootLayout() {
   }
   return (
     <QueryClientProvider client={client}>
-      <PreferencesProvider>
-        <Navigation />
-      </PreferencesProvider>
+      <Navigation />
     </QueryClientProvider>
   );
 }

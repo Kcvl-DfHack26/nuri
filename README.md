@@ -59,7 +59,7 @@ Dev Containers対応エディタでは **Reopen in Container** で編集・検�
 | -------------------------------- | --------------------------------------------------------------------------- |
 | `apps/mobile`                    | Expo SDK 58 / React Native 0.88 / Expo Router / Expo UI                     |
 | `apps/api`                       | Hono API・Expo Webの配信 / Better Auth / Drizzle / PostgreSQL               |
-| `apps/emulate`                   | Vercel EmulateのGoogle・Apple・Resend                                       |
+| `apps/emulate`                   | Vercel EmulateのGoogle・Resend                                              |
 | `packages/shared`                | Zodスキーマと純粋な処理                                                     |
 | `infra`                          | OpenTofu: Cloud Run、Cloud SQL、IAM、WIF、Secret Manager、Artifact Registry |
 | `.devcontainer` / `compose.yaml` | Linux上のNode・Bun・gcloud・OpenTofu・TFLint・CodexとPostgreSQL             |

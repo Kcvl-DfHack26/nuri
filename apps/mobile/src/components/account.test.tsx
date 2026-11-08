@@ -16,16 +16,6 @@ jest.mock('uniwind', () => ({ useCSSVariable: () => '#43304b' }));
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
-jest.mock('@/components/apple-button', () => {
-  const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
-  return {
-    AppleButton: ({ onPress }: { onPress: () => void }) => (
-      <reactNative.Pressable accessibilityRole="button" onPress={onPress}>
-        <reactNative.Text>Appleで続ける</reactNative.Text>
-      </reactNative.Pressable>
-    ),
-  };
-});
 jest.mock('@/lib/passkeys', () => ({
   passkeysAvailable: true,
   signInWithPasskey: jest.fn(async () => {}),
@@ -42,7 +32,7 @@ jest.mock('@/lib/api', () => ({
       'auth-capabilities': {
         $get: async () => ({
           ok: true,
-          json: async () => ({ apple: true, google: true, email: true, emulated: false }),
+          json: async () => ({ google: true, email: true, emulated: false }),
         }),
       },
     },
@@ -67,9 +57,12 @@ function renderAccount() {
   return render(<Account />, { wrapper: TestQueryProvider });
 }
 
-test('returns to the previous screen after a social login', async () => {
+test('shows the supported methods and returns after Google login', async () => {
   await renderAccount();
-  await fireEvent.press(await screen.findByRole('button', { name: 'Googleで続ける' }));
+  const google = await screen.findByRole('button', { name: 'Googleで続ける' });
+  expect(screen.queryByRole('button', { name: 'Appleで続ける' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'パスキーでログイン' })).toBeOnTheScreen();
+  await fireEvent.press(google);
   await waitFor(() => {
     expect(router.back).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Googleで続ける' })).toBeEnabled();

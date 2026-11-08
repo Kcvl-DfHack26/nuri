@@ -52,9 +52,7 @@ services:
       PORT: '8080'
       AUTH_EMULATE: 'true'
       GOOGLE_EMULATOR_URL: http://google:4002
-      APPLE_EMULATOR_URL: http://apple:4004
       GOOGLE_EMULATOR_PUBLIC_URL: https://google.${COMPOSE_PROJECT_NAME}.localhost
-      APPLE_EMULATOR_PUBLIC_URL: https://apple.${COMPOSE_PROJECT_NAME}.localhost
       RESEND_API_URL: http://mail:4005
       PASSKEY_RP_ID: ${COMPOSE_PROJECT_NAME}.localhost
       PASSKEY_ORIGINS: https://metro.${COMPOSE_PROJECT_NAME}.localhost
@@ -73,8 +71,6 @@ services:
         condition: service_completed_successfully
       google:
         condition: service_started
-      apple:
-        condition: service_started
       mail:
         condition: service_started
   google:
@@ -88,20 +84,6 @@ services:
     command: bun run --cwd apps/emulate dev
     ports: ['127.0.0.1:4002:4002']
     labels: { portless.ports: '4002' }
-    depends_on:
-      setup:
-        condition: service_completed_successfully
-  apple:
-    <<: *runtime
-    environment:
-      <<: *environment
-      EMULATE_SERVICE: apple
-      EMULATE_HOST: 0.0.0.0
-      EMULATE_PUBLIC_URL: https://apple.${COMPOSE_PROJECT_NAME}.localhost
-      PORT: '4004'
-    command: bun run --cwd apps/emulate dev
-    ports: ['127.0.0.1:4004:4004']
-    labels: { portless.ports: '4004' }
     depends_on:
       setup:
         condition: service_completed_successfully

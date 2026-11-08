@@ -217,7 +217,6 @@ jobs:
           DEVICE_METRO_ORIGIN: https://metro.nuri.localhost
           DEVICE_EXPO_ORIGIN: exps://metro.nuri.localhost
           DEVICE_GOOGLE_ORIGIN: https://google.nuri.localhost
-          DEVICE_APPLE_ORIGIN: https://apple.nuri.localhost
           DEVICE_MAIL_ORIGIN: https://mail.nuri.localhost
         run: bun .github/scripts/ci/check-compose.ts
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
