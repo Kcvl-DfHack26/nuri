@@ -75,7 +75,6 @@ describe('HTTP contract', () => {
     expect(allowed.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
     expect(await allowed.json()).toEqual({
       google: false,
-      apple: false,
       email: false,
       emulated: false,
     });

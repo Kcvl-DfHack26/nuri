@@ -18,5 +18,5 @@ appId: com.kcvl.nuri
 - assertVisible: 'Googleで続ける'
 - back
 - tapOn: 'プロフィール設定'
-- tapOn: 'アプリの設定 外観・触覚・パスキー'
-- assertVisible: '外観'
+- assertVisible: 'ログインするとプロフィールを変更できます'
+- assertNotVisible: 'アプリの設定'

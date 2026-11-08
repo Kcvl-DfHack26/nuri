@@ -13,16 +13,12 @@ const schema = z.object({
     .default('false')
     .transform((value) => value === 'true'),
   GOOGLE_EMULATOR_URL: z.url().optional(),
-  APPLE_EMULATOR_URL: z.url().optional(),
   GOOGLE_EMULATOR_PUBLIC_URL: z.url().optional(),
-  APPLE_EMULATOR_PUBLIC_URL: z.url().optional(),
   RESEND_API_URL: z.url().default('https://api.resend.com'),
   RESEND_API_KEY: z.string().trim().min(1).optional(),
   EMAIL_FROM: z.string().trim().min(1).default('nuri <login@example.com>'),
   GOOGLE_CLIENT_ID: z.string().trim().min(1).optional(),
   GOOGLE_CLIENT_SECRET: z.string().trim().min(1).optional(),
-  APPLE_CLIENT_ID: z.string().optional(),
-  APPLE_CLIENT_SECRET: z.string().optional(),
   PASSKEY_RP_ID: z.string().optional(),
   PASSKEY_ORIGINS: z.string().optional(),
   APPLE_APP_ID: z.string().optional(),
@@ -76,15 +72,13 @@ function validateEmulation(env: Environment) {
     }
     for (const key of [
       'GOOGLE_EMULATOR_URL',
-      'APPLE_EMULATOR_URL',
       'RESEND_API_URL',
       ...(env.GOOGLE_EMULATOR_PUBLIC_URL ? ['GOOGLE_EMULATOR_PUBLIC_URL' as const] : []),
-      ...(env.APPLE_EMULATOR_PUBLIC_URL ? ['APPLE_EMULATOR_PUBLIC_URL' as const] : []),
     ] as const) {
       const value = env[key];
       const host = value ? new URL(value).hostname : '';
       if (
-        !['localhost', '127.0.0.1', 'google', 'apple', 'mail'].includes(host) &&
+        !['localhost', '127.0.0.1', 'google', 'mail'].includes(host) &&
         !host.endsWith('.localhost')
       ) {
         throw new Error(`${key} must point to a local emulator`);

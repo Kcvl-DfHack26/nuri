@@ -48,7 +48,6 @@ export default defineConfig({
       EXPO_NO_TELEMETRY: '1',
       AUTH_EMULATE: 'true',
       GOOGLE_EMULATOR_URL: 'http://127.0.0.1:4002',
-      APPLE_EMULATOR_URL: 'http://127.0.0.1:4004',
       RESEND_API_URL: 'http://127.0.0.1:4005',
     },
   },

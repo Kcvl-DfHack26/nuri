@@ -32,7 +32,6 @@ import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
 import java.io.File
 import java.util.UUID
-import java.util.concurrent.ConcurrentSkipListMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -72,17 +71,16 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   // Frames sent since the last result: counted on the analysis thread, reset on MediaPipe's thread.
   private val framesWithoutResult = AtomicInteger(0)
   @Volatile private var active = false
+  @Volatile private var trackLandmarks = true
   @Volatile private var sessionGeneration = 0
   @Volatile private var discardResultsBeforeMs = 0L
   private var lastStatus: String? = null
   private var lastMessage: String? = null
 
-  // At most one frame sent to MediaPipe and still waiting for its result, and the last such frame
-  // with a face together with its landmarks, kept only so a snapshot and the landmarks it is
-  // diagnosed with come from one frame. Holding one at a time never drops it before its result.
-  private val pendingFrames = ConcurrentSkipListMap<Long, Bitmap>()
-  private class LandmarkedFrame(val bitmap: Bitmap, val points: List<Double>)
-  @Volatile private var landmarkedFrame: LandmarkedFrame? = null
+  // The camera frame is independent of live tracking: a still-photo diagnosis can use it even
+  // when MediaPipe misses a frame. Replacing it keeps only one bitmap in memory.
+  private class CameraFrame(val bitmap: Bitmap, val atMs: Long, val generation: Int)
+  @Volatile private var latestFrame: CameraFrame? = null
   @Volatile private var frameWidth = 0
   @Volatile private var frameHeight = 0
 
@@ -93,6 +91,10 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   fun setActive(value: Boolean) {
     active = value
     if (value) start() else stop()
+  }
+
+  fun setTrackLandmarks(value: Boolean) {
+    trackLandmarks = value
   }
 
   override fun onAttachedToWindow() {
@@ -106,6 +108,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val rotation = display?.rotation ?: return
     if (analysis.targetRotation != rotation) {
       discardResultsBeforeMs = SystemClock.uptimeMillis()
+      latestFrame = null
       analysis.targetRotation = rotation
       setStatus("noFace")
     }
@@ -182,33 +185,30 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     discardResultsBeforeMs = SystemClock.uptimeMillis()
     cameraProvider?.unbind(*useCases)
     useCases = emptyArray()
-    pendingFrames.clear()
-    landmarkedFrame = null
+    latestFrame = null
     // A resumed camera must report its first state even when it matches the previous session.
     lastStatus = null
     lastMessage = null
   }
 
   /**
-   * Saves the last frame with a face as a JPEG in the app's cache and returns its file URI with
-   * that frame's landmarks, or null when no face was found yet. The photo is mirrored like the
-   * preview, so it looks as the person saw it; the landmarks stay upright and unmirrored, like
-   * onLandmarks. JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
+   * Saves the current frame as a mirrored JPEG in the app's cache, or null before a frame arrives.
+   * JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
    */
-  fun snapshot(): Map<String, Any>? {
-    val landmarked = landmarkedFrame ?: return null
-    val upright = landmarked.bitmap
+  fun snapshot(): String? {
+    val latest = latestFrame
+      ?.takeIf {
+        active && it.generation == sessionGeneration &&
+          SystemClock.uptimeMillis() - it.atMs <= SNAPSHOT_MAX_AGE_MS
+      }
+      ?: return null
+    val upright = latest.bitmap
     val mirror = Matrix().apply { preScale(-1f, 1f) }
     val frame = Bitmap.createBitmap(upright, 0, 0, upright.width, upright.height, mirror, true)
     val folder = File(context.cacheDir, "face-tracker").apply { mkdirs() }
     val file = File(folder, "${UUID.randomUUID()}.jpg")
     file.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-    return mapOf(
-      "uri" to Uri.fromFile(file).toString(),
-      "points" to landmarked.points,
-      "width" to upright.width.toDouble(),
-      "height" to upright.height.toDouble()
-    )
+    return Uri.fromFile(file).toString()
   }
 
   // Analysis thread.
@@ -294,19 +294,6 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       image.close()
       return
     }
-    val current = landmarker ?: openLandmarker()
-    if (current == null) {
-      image.close()
-      return
-    }
-    // MediaPipe only logs GPU graph errors that happen while frames are sent, so a GPU landmarker
-    // that returns nothing for many frames is treated as failed.
-    val gpuSilent = !gpuFailed && framesWithoutResult.incrementAndGet() > GPU_SILENT_FRAME_LIMIT
-    if (gpuSilent) {
-      image.close()
-      onLandmarkerError(current, IllegalStateException("GPU returned no results"))
-      return
-    }
     // Monotonic, so it is both the LIVE_STREAM timestamp and the capture time for the delay.
     val timestamp = SystemClock.uptimeMillis()
     val rotation = image.imageInfo.rotationDegrees
@@ -320,8 +307,17 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     frameWidth = upright.width
     frameHeight = upright.height
-    if (pendingFrames.isEmpty()) pendingFrames[timestamp] = upright
     if (!active || generation != sessionGeneration) return
+    latestFrame = CameraFrame(upright, timestamp, generation)
+    if (!trackLandmarks) return
+    val current = landmarker ?: openLandmarker() ?: return
+    // MediaPipe only logs GPU graph errors that happen while frames are sent, so a GPU landmarker
+    // that returns nothing for many frames is treated as failed.
+    val gpuSilent = !gpuFailed && framesWithoutResult.incrementAndGet() > GPU_SILENT_FRAME_LIMIT
+    if (gpuSilent) {
+      onLandmarkerError(current, IllegalStateException("GPU returned no results"))
+      return
+    }
     try {
       current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
     } catch (error: MediaPipeException) {
@@ -333,11 +329,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private fun onResult(result: FaceLandmarkerResult) {
     if (result.timestampMs() <= discardResultsBeforeMs) return
     framesWithoutResult.set(0)
-    val frame = pendingFrames.remove(result.timestampMs())
-    pendingFrames.headMap(result.timestampMs()).clear()
     val face = result.faceLandmarks().firstOrNull()
     if (face.isNullOrEmpty()) {
-      landmarkedFrame = null
       post {
         if (result.timestampMs() > discardResultsBeforeMs) setStatus("noFace")
       }
@@ -348,7 +341,6 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       points.add(landmark.x().toDouble())
       points.add(landmark.y().toDouble())
     }
-    if (frame != null) landmarkedFrame = LandmarkedFrame(frame, points)
     val latencyMs = (SystemClock.uptimeMillis() - result.timestampMs()).toDouble()
     val width = frameWidth.toDouble()
     val height = frameHeight.toDouble()
@@ -377,5 +369,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     // About 5 s at 30 fps: long enough for a GPU to prepare its first result, while a slow but
     // working GPU (the emulator's, about 0.5 s per result) answers within a dozen frames.
     const val GPU_SILENT_FRAME_LIMIT = 150
+    // Do not save a frozen preview after the camera stops delivering frames.
+    const val SNAPSHOT_MAX_AGE_MS = 1500L
   }
 }

@@ -136,6 +136,26 @@ jobs:
           path: apps/mobile/dist
           retention-days: 7
 
+  native-e2e:
+    name: Native E2E (Maestro Android)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - *checkout
+      - *setup-bun
+      - name: Run Android Smoke Test
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+        run: bun .github/scripts/ci/android-maestro.ts
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: maestro-android-debug
+          path: .artifacts/maestro
+          if-no-files-found: ignore
+          retention-days: 7
+
   all-checks:
     name: All CI Checks
     needs:
@@ -146,6 +166,7 @@ jobs:
         api-integration,
         web-e2e,
         mobile-export,
+        native-e2e,
         infrastructure,
         container,
       ]
@@ -196,7 +217,6 @@ jobs:
           DEVICE_METRO_ORIGIN: https://metro.nuri.localhost
           DEVICE_EXPO_ORIGIN: exps://metro.nuri.localhost
           DEVICE_GOOGLE_ORIGIN: https://google.nuri.localhost
-          DEVICE_APPLE_ORIGIN: https://apple.nuri.localhost
           DEVICE_MAIL_ORIGIN: https://mail.nuri.localhost
         run: bun .github/scripts/ci/check-compose.ts
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .

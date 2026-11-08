@@ -12,7 +12,7 @@ bun run export:mobile
 
 APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。
 
-GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
+GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、AndroidのMaestro、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
 
 | 検査                | 確認すること                                                  |
 | ------------------- | ------------------------------------------------------------- |
@@ -45,11 +45,11 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 
 1. `bun run db:seed` 後、メイクタブの①にレシピ6件が並び、狐メイクから⑤（タグ・取り込み元・使うメイク品）を開けることを確認する。タイムラインでは複数ユーザーの画像と投稿を確認する。再実行して件数が増えず、利用者の投稿が残ることも確認する。
 2. 投稿者のアイコン→プロフィール→戻る。ユーザー情報・編集と、そのユーザーの投稿一覧が明確に分かれていることを確認する。
-3. 未ログインのいいね／投稿はログインへ進む。Google／AppleのEmulate同意から復帰し、セッションが保持されることを確認する。
+3. 未ログインのいいね／投稿はログインへ進む。GoogleのEmulate同意から復帰し、セッションが保持されることを確認する。
 4. 投稿シートで入力、失敗時の本文保持、再試行、閉じる・スワイプ・Android Backを確認する。キーボード表示中も操作に届くことを確認する。
 5. いいねを切り替えてもスクロール位置・行高が変わらないこと、他の投稿がpendingにならないことを確認する。共有シートと自分の投稿だけの削除も確認する。
 6. プロフィール編集とログアウト。表示情報と操作行が区別され、再起動後のセッション・設定が維持されることを確認する。
-7. 外観をsystem／light／darkへ切り替え、文字を最大へ拡大する。全タブ、loading／error／empty、ログイン、シートで見切れ・操作不能がないことを確認する。
+7. 端末の外観をダークにしてもアプリの配色はライトのままか確認し、文字を最大へ拡大する。全タブ、loading／error／empty、ログイン、シートで見切れ・操作不能がないことを確認する。
 8. メールの単回リンク、失効・他端末の拒否、パスキー登録・ログイン・削除を確認する。Expo Goではnative passkeyが利用不可であることを表示する。
 9. API停止時のエラーと再試行。OS関連付け・実プロバイダでの認証はローカルEmulate／仮想WebAuthnの検証と別に記録する。
 
@@ -74,6 +74,8 @@ bun run test:e2e
 テストはDBへmigrationとseedを実行し、Honoがエクスポート済みのExpo WebとAPIを49116で同一オリジン配信する。別の使い捨てローカルDBを使う場合は `NURI_E2E_DATABASE_URL` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
 
 ## Maestro
+
+GitHub Actionsの `Native E2E (Maestro Android)` は公式Expo Go APKをAndroidエミュレーターにインストールし、同じコミットのMetroからアプリを起動する。ゲストのプロフィールと設定への遷移を確認する。GitHub標準ランナーで実行し、EAS Build枠の消費は0。失敗時の診断は `maestro-android-debug` に保存する。
 
 `apps/mobile/.maestro/showcase.yaml` が未ログイン時のホーム・プロフィール・設定フローを検証する。開発サーバーを必要としないpreview/simulatorビルドで実行する。
 

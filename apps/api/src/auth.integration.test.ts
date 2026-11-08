@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from 'bun:test';
-import { inArray, like } from 'drizzle-orm';
+import { inArray, like, or } from 'drizzle-orm';
 import { createEmulator } from 'emulate';
 import { z } from 'zod';
 
@@ -18,6 +18,7 @@ const { db, pool } = connectDatabase(databaseUrl);
 const unique = crypto.randomUUID();
 // Better Auth limits requests by client IP. Give each suite run its own private IPv6 subnet.
 const testClientIp = `fd00:${unique.slice(0, 4)}:${unique.slice(4, 8)}:${unique.slice(9, 13)}:0000:0000:0000:0000`;
+const providerTestClientIp = testClientIp.replace('fd00:', 'fd01:');
 const email = `auth-${unique}@example.com`;
 const secondEmail = `other-${unique}@example.com`;
 const favoriteEmail = `favorite-${unique}@example.com`;
@@ -40,21 +41,6 @@ const google = await createEmulator({
     },
   },
 });
-const apple = await createEmulator({
-  service: 'apple',
-  port: 0,
-  seed: {
-    apple: {
-      users: [{ email, name: 'はなこ' }],
-      oauth_clients: [
-        {
-          client_id: 'starter-local',
-          redirect_uris: [`${baseURL}/api/auth/callback/emulate-apple`],
-        },
-      ],
-    },
-  },
-});
 const mail = await createEmulator({
   service: 'resend',
   port: 0,
@@ -68,7 +54,6 @@ const env = readEnv({
   TRUSTED_ORIGINS: `${origin},com.kcvl.nuri://`,
   AUTH_EMULATE: 'true',
   GOOGLE_EMULATOR_URL: google.url,
-  APPLE_EMULATOR_URL: apple.url,
   RESEND_API_URL: mail.url,
   PASSKEY_ORIGINS: origin,
   PASSKEY_RP_ID: 'localhost',
@@ -98,13 +83,20 @@ afterAll(async () => {
   await db
     .delete(user)
     .where(inArray(user.email, [email, secondEmail, favoriteEmail, posterEmail]));
-  await db.delete(rateLimit).where(like(rateLimit.key, `${testClientIp}|%`));
-  await Promise.all([pool.end(), google.close(), apple.close(), mail.close()]);
+  await db
+    .delete(rateLimit)
+    .where(
+      or(
+        like(rateLimit.key, `${testClientIp}|%`),
+        like(rateLimit.key, `${providerTestClientIp}|%`),
+      ),
+    );
+  await Promise.all([pool.end(), google.close(), mail.close()]);
 });
 
-async function oauth(provider: 'google' | 'apple') {
+async function googleLogin() {
   const start = await request('/api/auth/sign-in/social', {
-    provider: `emulate-${provider}`,
+    provider: 'emulate-google',
     callbackURL: origin,
   });
   expect(start.status).toBe(200);
@@ -116,10 +108,11 @@ async function oauth(provider: 'google' | 'apple') {
   expect(consent.status).toBe(200);
   const body = new URLSearchParams(authorize.searchParams);
   body.set('email', email);
-  const chosen = await fetch(
-    `${provider === 'google' ? google.url : apple.url}${provider === 'google' ? '/o/oauth2/v2/auth/callback' : '/auth/authorize/callback'}`,
-    { method: 'POST', body, redirect: 'manual' },
-  );
+  const chosen = await fetch(`${google.url}/o/oauth2/v2/auth/callback`, {
+    method: 'POST',
+    body,
+    redirect: 'manual',
+  });
   const location = chosen.headers.get('location');
   expect(location).toBeTruthy();
   if (!location) {
@@ -182,26 +175,62 @@ async function emailLink(recipient: string, native = false) {
   return new URL(callback);
 }
 
-test('Google/Apple OAuth use verified sessions and link the same verified email', async () => {
-  const googleCookie = await oauth('google');
-  const appleCookie = await oauth('apple');
-  const first = z
-    .object({ user: z.object({ id: z.string(), email: z.email() }) })
-    .parse(await (await appRequest('/api/me', { headers: { cookie: googleCookie } })).json());
-  const second = z
-    .object({ user: z.object({ id: z.string() }) })
-    .parse(await (await appRequest('/api/me', { headers: { cookie: appleCookie } })).json());
-  expect(first.user.email).toBe(email);
-  expect(second.user.id).toBe(first.user.id);
-}, 20000);
+test('Apple OAuth is unavailable and Google rejects a forged native ID token', async () => {
+  const productionAuth = createAuth(db, {
+    ...env,
+    AUTH_EMULATE: false,
+    GOOGLE_CLIENT_ID: 'test.apps.googleusercontent.com',
+    GOOGLE_CLIENT_SECRET: 'test-secret',
+  });
+  const providerRequest = (body: unknown) =>
+    productionAuth.handler(
+      new Request(`${baseURL}/api/auth/sign-in/social`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin,
+          'x-forwarded-for': providerTestClientIp,
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+  for (const attempt of [
+    { provider: 'apple' },
+    { provider: 'google', idToken: { token: 'forged' } },
+  ]) {
+    const response = await providerRequest(attempt);
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(response.status).toBeLessThan(500);
+    expect(cookies(response)).not.toContain('session_token');
+  }
+});
 
 test('magic links are single-use and sessions protect posts, likes and deletion', async () => {
   const handle = `h_${unique.replaceAll('-', '').slice(0, 18)}`;
-  const link = await emailLink(email);
+  const link = await emailLink(email.toUpperCase());
   const signedIn = await appRequest(link.href);
   const cookie = cookies(signedIn);
   expect(cookie).toContain('session_token');
   expect(cookies(await appRequest(link.href))).not.toContain('session_token');
+  const googleCookie = await googleLogin();
+  const sessionUser = z.object({ user: z.object({ id: z.string(), email: z.email() }) });
+  const first = sessionUser.parse(
+    await (await appRequest('/api/me', { headers: { cookie } })).json(),
+  );
+  const second = sessionUser.parse(
+    await (await appRequest('/api/me', { headers: { cookie: googleCookie } })).json(),
+  );
+  expect(first.user.email).toBe(email);
+  expect(second.user).toEqual(first.user);
+  expect((await appRequest('/api/auth/list-accounts')).status).toBe(401);
+  const accounts = await appRequest('/api/auth/list-accounts', {
+    headers: { cookie },
+  });
+  expect(accounts.status).toBe(200);
+  expect(await accounts.json()).toEqual([
+    expect.objectContaining({ providerId: 'emulate-google', userId: first.user.id }),
+  ]);
+
   const nativeLink = await emailLink(secondEmail, true);
   expect(nativeLink.searchParams.get('state')).toBe('bound-device-state');
   const native = await request('/api/auth/mobile-magic-link', {
@@ -315,7 +344,7 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
 test('passkeys require a session to register, verify signatures/origin, and can be removed', async () => {
   const authenticator = softwareAuthenticator();
   expect((await appRequest('/api/auth/passkey/generate-register-options')).status).toBe(401);
-  const cookie = await oauth('google');
+  const cookie = await googleLogin();
   const registration = await appRequest('/api/auth/passkey/generate-register-options', {
     headers: { cookie, origin },
   });

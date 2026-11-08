@@ -10,10 +10,10 @@ import { useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppleButton } from '@/components/apple-button';
 import { GoogleButton } from '@/components/google-button';
 import { Text } from '@/components/ui/text';
 import { api, apiUrl, authClient } from '@/lib/api';
+import { signInWithGoogle } from '@/lib/google-sign-in';
 import { backOrHome } from '@/lib/navigation';
 import { passkeysAvailable, signInWithPasskey } from '@/lib/passkeys';
 import { cn } from '@/lib/utils';
@@ -143,7 +143,7 @@ function SignInOptions({
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const login = useMutation({
-    mutationFn: async (method: 'google' | 'apple' | 'passkey' | 'email') => {
+    mutationFn: async (method: 'google' | 'passkey' | 'email') => {
       if (method === 'passkey') {
         await signInWithPasskey();
         return;
@@ -168,13 +168,7 @@ function SignInOptions({
         setSent(true);
         return;
       }
-      const result = await authClient.signIn.social({
-        provider: capabilities.emulated ? `emulate-${method}` : method,
-        callbackURL: Linking.createURL('/'),
-      });
-      if (result.error) {
-        throw new Error('ログインを完了できませんでした。もう一度お試しください。');
-      }
+      await signInWithGoogle(capabilities.emulated);
     },
     onSuccess: async (_data, method) => {
       if (method === 'email') {
@@ -197,14 +191,6 @@ function SignInOptions({
   };
   return (
     <>
-      {capabilities.apple ? (
-        <AppleButton
-          disabled={login.isPending}
-          onPress={() => {
-            login.mutate('apple');
-          }}
-        />
-      ) : null}
       {capabilities.google ? (
         <GoogleButton
           disabled={login.isPending}

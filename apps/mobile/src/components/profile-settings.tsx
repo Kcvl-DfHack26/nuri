@@ -17,6 +17,7 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { api, apiUrl, authClient } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
+import { addPasskey, passkeyListOptions, passkeysAvailable } from '@/lib/passkeys';
 import { useTokenColor } from '@/theme/tokens';
 
 const BACK = Icon.select({
@@ -73,6 +74,7 @@ export function ProfileSettings() {
         <Editor
           key={user.id}
           profile={profile.data}
+          userId={user.id}
           email={user.email}
           image={user.image}
           top={insets.top + headerHeight + 16}
@@ -99,7 +101,6 @@ export function ProfileSettings() {
               router.push('/account');
             }}
           />
-          <AppSection />
         </ScrollView>
       )}
       <View
@@ -146,6 +147,7 @@ function ProfileStatusBar() {
 
 function Editor({
   profile,
+  userId,
   email,
   image,
   top,
@@ -153,6 +155,7 @@ function Editor({
   onRetry,
 }: {
   profile: { name: string; handle: string | null; bio: string; isPublic: boolean };
+  userId: string;
   email: string;
   image: string | null | undefined;
   top: number;
@@ -320,12 +323,7 @@ function Editor({
           <Divider />
           <SwitchRow title="新着の通知" detail="フォロー中の人の投稿をお知らせします" />
         </Section>
-        <Section title="アカウント">
-          <Row label="メールアドレス" value={email} />
-          <Divider />
-          <Row label="連携アカウント" />
-        </Section>
-        <AppSection />
+        <AccountSection userId={userId} email={email} />
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ disabled: logout.isPending }}
@@ -423,26 +421,176 @@ function Divider() {
   return <View className="h-px bg-line-soft" />;
 }
 
-// A Plan A list row. Without onPress it shows as not built yet.
-function Row({ label, value, onPress }: { label: string; value?: string; onPress?: () => void }) {
+const rowClassName = 'min-h-13 flex-row items-center gap-2 py-2 pl-3.5 pr-3';
+
+// A Plan A list row. A read-only value has no disclosure control.
+function Row({
+  label,
+  value,
+  readOnly = false,
+  expanded,
+  onPress,
+}: {
+  label: string;
+  value?: string;
+  readOnly?: boolean;
+  expanded?: boolean;
+  onPress?: () => void;
+}) {
   const ink = useTokenColor('--color-ink-primary');
+  const content = (
+    <>
+      <Text className="flex-1 font-maru-bold text-label text-ink-primary">{label}</Text>
+      {value ? (
+        <Text className="shrink font-maru text-meta text-ink-secondary">{value}</Text>
+      ) : null}
+    </>
+  );
+  if (readOnly) {
+    return <View className={rowClassName}>{content}</View>;
+  }
+
   const disabled = !onPress;
   const description = value ? `${label} ${value}` : label;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={disabled ? `${description}（準備中）` : description}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, expanded }}
       disabled={disabled}
       onPress={onPress}
-      className="min-h-13 flex-row items-center gap-2 py-2 pl-3.5 pr-3 active:opacity-70"
+      className={`${rowClassName} active:opacity-70`}
     >
-      <Text className="flex-1 font-maru-bold text-label text-ink-primary">{label}</Text>
-      {value ? (
-        <Text className="shrink font-maru text-meta text-ink-secondary">{value}</Text>
-      ) : null}
-      <SocialIcon name={NEXT} size={18} color={ink} />
+      {content}
+      <View className={expanded === undefined ? '' : expanded ? '-rotate-90' : 'rotate-90'}>
+        <SocialIcon name={NEXT} size={18} color={ink} />
+      </View>
     </Pressable>
+  );
+}
+
+function AccountSection({ userId, email }: { userId: string; email: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const client = useQueryClient();
+  const google = useQuery({
+    queryKey: ['google-connection', userId],
+    queryFn: async ({ signal }) => {
+      const result = await authClient.listAccounts({ fetchOptions: { signal } });
+      if (result.error) {
+        throw new Error('Google の連携状況を読み込めませんでした。');
+      }
+      return result.data.some(
+        ({ providerId }) => providerId === 'google' || providerId === 'emulate-google',
+      );
+    },
+  });
+  const passkeyOptions = passkeyListOptions(userId);
+  const keys = useQuery(passkeyOptions);
+  const passkeyAction = useMutation({
+    mutationFn: async (action: { kind: 'add' } | { kind: 'delete'; id: string }) => {
+      if (action.kind === 'add') {
+        await addPasskey();
+        return;
+      }
+      const result = await authClient.passkey.deletePasskey({ id: action.id });
+      if (result.error) {
+        throw new Error('パスキーを削除できませんでした。もう一度お試しください。');
+      }
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: passkeyOptions.queryKey, exact: true }),
+  });
+  const googleStatus = google.isError
+    ? '確認できませんでした'
+    : google.isPending
+      ? '確認中'
+      : google.data
+        ? '連携済み'
+        : '未連携';
+  const passkeyStatus = keys.isError
+    ? '確認できませんでした'
+    : keys.isPending
+      ? '確認中'
+      : keys.data.length
+        ? `${keys.data.length} 件登録済み`
+        : '未登録';
+
+  return (
+    <Section title="アカウント">
+      <Row label="メールアドレス" value={email} />
+      <Divider />
+      <Row label="Google 連携" value={googleStatus} readOnly />
+      <Divider />
+      <Row
+        label="パスキー"
+        value={passkeyStatus}
+        expanded={expanded}
+        onPress={() => {
+          setExpanded((value) => !value);
+        }}
+      />
+      {expanded ? (
+        <>
+          <Divider />
+          <View className="gap-2 px-3.5 py-3">
+            <Text className="font-maru text-meta text-ink-secondary">
+              顔認証や指紋認証など、端末のロック解除方法でログインできます
+            </Text>
+            {keys.data?.map((key) => {
+              const name = key.name ?? 'パスキー';
+              return (
+                <View key={key.id} className="flex-row items-center gap-2">
+                  <Text className="flex-1 font-maru-bold text-label text-ink-primary">{name}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${name}を削除`}
+                    disabled={passkeyAction.isPending}
+                    onPress={() => {
+                      passkeyAction.mutate({ kind: 'delete', id: key.id });
+                    }}
+                    className="min-h-12 min-w-12 items-center justify-center px-2 active:opacity-70 disabled:opacity-50"
+                  >
+                    <Text className="font-maru-bold text-label text-accent-rose">削除</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+            <PrimaryButton
+              label="この端末にパスキーを追加"
+              disabled={passkeyAction.isPending || !passkeysAvailable}
+              onPress={() => {
+                passkeyAction.mutate({ kind: 'add' });
+              }}
+            />
+            {!passkeysAvailable ? (
+              <Text className="font-maru text-meta text-ink-secondary">
+                この環境ではパスキーを追加できません
+              </Text>
+            ) : null}
+            {passkeyAction.error ? (
+              <Text accessibilityRole="alert" className="font-maru text-meta text-accent-rose">
+                {passkeyAction.error.message}
+              </Text>
+            ) : null}
+          </View>
+        </>
+      ) : null}
+      {google.isError || keys.isError ? (
+        <>
+          <Divider />
+          <Row
+            label="ログイン方法を再確認"
+            onPress={() => {
+              if (google.isError) {
+                void google.refetch();
+              }
+              if (keys.isError) {
+                void keys.refetch();
+              }
+            }}
+          />
+        </>
+      ) : null}
+    </Section>
   );
 }
 
@@ -471,20 +619,5 @@ function SwitchRow({
       </Host>
       <Text className="font-maru text-meta text-ink-secondary">{detail}</Text>
     </View>
-  );
-}
-
-// Not in Plan A: the starter's app settings (appearance, haptics, passkeys) need an entry.
-function AppSection() {
-  return (
-    <Section title="アプリ">
-      <Row
-        label="アプリの設定"
-        value="外観・触覚・パスキー"
-        onPress={() => {
-          router.push('/settings');
-        }}
-      />
-    </Section>
   );
 }

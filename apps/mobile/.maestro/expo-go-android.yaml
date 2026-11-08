@@ -1,0 +1,11 @@
+appId: host.exp.exponent
+---
+- openLink: exp://127.0.0.1:8081?__expo_disable_onboarding=1&__expo_disable_fab=1&__expo_disable_auto_launch=1
+- extendedWaitUntil:
+    visible: 'マイ'
+    timeout: 45000
+- tapOn: 'マイ'
+- assertVisible: 'ゲスト'
+- tapOn: 'プロフィール設定'
+- tapOn: 'アプリの設定 外観・触覚・パスキー'
+- assertVisible: '外観'

@@ -29,25 +29,20 @@ export type FaceTrackerStatusEvent = {
 };
 
 /** Methods of a mounted FaceTrackerView. */
-/** A frame saved on the device with the landmarks found in it. */
-export type FaceSnapshot = FacePhotoLandmarks & {
-  /** The JPEG's file URI, mirrored like the preview. */
-  uri: string;
-};
-
 export type FaceTrackerViewRef = {
   /**
-   * Saves the last frame with a face as a JPEG in the app's cache and returns it with that frame's
-   * landmarks (upright and unmirrored, like onLandmarks); null when no face was found yet. The
-   * caller deletes the file when it no longer shows it.
+   * Saves the current frame as a JPEG in the app's cache, mirrored like the preview. Returns null
+   * before the camera supplies a frame. The caller deletes the file when it no longer shows it.
    */
-  takeSnapshotAsync(): Promise<FaceSnapshot | null>;
+  takeSnapshotAsync(): Promise<string | null>;
 };
 
 export type FaceTrackerViewProps = {
   ref?: Ref<FaceTrackerViewRef> | undefined;
-  /** Runs the camera and face tracking while true. */
+  /** Runs the camera while true. Live tracking is enabled by default. */
   active: boolean;
+  /** Skip live landmarks when the screen only needs a still camera frame. */
+  trackLandmarks?: boolean;
   onLandmarks?: (event: { nativeEvent: FaceLandmarksEvent }) => void;
   onStatus?: (event: { nativeEvent: FaceTrackerStatusEvent }) => void;
   style?: StyleProp<ViewStyle>;

@@ -8,10 +8,19 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
     process.env.EXPO_PUBLIC_API_URL = process.env.DEV_API_ORIGIN;
   }
   const rpId = process.env.EXPO_PUBLIC_PASSKEY_RP_ID;
+  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
+  const plugins = [...(config.plugins ?? [])];
+  if (googleIosClientId) {
+    plugins.push([
+      'react-native-nitro-google-signin',
+      { iosUrlScheme: googleIosClientId.split('.').reverse().join('.') },
+    ]);
+  }
   return withLocalhostCA({
     ...config,
     name: config.name ?? 'nuri',
     slug: config.slug ?? 'nuri',
+    plugins,
     ios: { ...config.ios, ...(rpId ? { associatedDomains: [`webcredentials:${rpId}`] } : {}) },
   });
 }

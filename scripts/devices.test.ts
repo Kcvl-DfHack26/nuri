@@ -81,7 +81,7 @@ else if (!readFileSync('.env.devices', 'utf8').includes('DEVICE_API_ORIGIN=')) p
       .split('\n')
       .map((line): unknown => JSON.parse(line));
     const project = 'nuri-123-add-something';
-    const services = ['api', 'metro', 'google', 'apple', 'mail'];
+    const services = ['api', 'metro', 'google', 'mail'];
     expect(commands).toEqual([
       ['docker', 'compose', '-f', 'compose.yaml', 'config', '--environment'],
       ...services.map((service) => ['portless', 'get', `${service}.${project}`, '--no-worktree']),
