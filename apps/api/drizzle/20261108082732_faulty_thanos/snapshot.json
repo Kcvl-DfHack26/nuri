@@ -1,0 +1,47 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "0ad5252d-a7c2-4233-976a-a236278b3012",
+  "prevIds": [
+    "685aa338-ed84-4ace-ab3a-70c33df40a07"
+  ],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "recipe_step",
+        "shape"
+      ],
+      "writes": [
+        "s|col|public.recipe_step.shape",
+        "n|col|public.recipe_step.shape",
+        "e|col|public.recipe_step.shape"
+      ],
+      "reads": [
+        "n|tbl|public.recipe_step",
+        "n|sch|public"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "recipe_step",
+        "name": "shape",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

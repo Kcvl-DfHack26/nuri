@@ -1,8 +1,8 @@
-name: Preview request
+name: PR Preview Comment
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
-    branches: [main]
+    branches-ignore: [main]
 permissions:
   contents: read
   pull-requests: write
@@ -11,28 +11,25 @@ concurrency:
   cancel-in-progress: false
 jobs:
   comment:
+    name: Initialize Preview Comment
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      # Metadata only: never check out or execute the PR in pull_request_target.
+      # PRのコードを実行せず、mainのスクリプトでコメントを作る。
       - uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ github.workflow_sha }}
+          ref: refs/heads/main
           persist-credentials: false
-      - uses: actions/github-script@v9.0.0
+      # mainへの取り込み前は、PRブランチのコメント専用実行を使う。
+      - uses: oven-sh/setup-bun@v2
+        if: hashFiles('.github/scripts/preview/initialize.ts') != ''
         with:
-          script: |
-            const { previewMarker, previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
-            const number = context.payload.pull_request.number;
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
-            if (pr.state !== 'open' || pr.head.repo?.full_name !== `${context.repo.owner}/${context.repo.repo}`) return;
-            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: number });
-            const comment = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(`${previewMarker}\n`));
-            if (comment && previewSha(comment.body) === pr.head.sha) return;
-            const body = renderPreviewComment({ sha: pr.head.sha });
-            if (comment) {
-              await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });
-            } else {
-              await github.rest.issues.createComment({ ...context.repo, issue_number: number, body });
-            }
+          bun-version-file: .bun-version
+      - name: Update Preview Comment
+        if: hashFiles('.github/scripts/preview/initialize.ts') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PREVIEW_CAN_PUBLISH: ${{ vars.PREVIEW_GCP_ENABLED == 'true' }}
+        run: bun .github/scripts/preview/initialize.ts

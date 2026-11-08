@@ -170,7 +170,7 @@ Cloudflareトンネルは外向きTCP 7844が必要。`curl https://....trycloud
 
 ### Development BuildとPRプレビュー
 
-Expo Goは初期確認に使う。PRのExpo Updateをインストールして試すにはDevelopment Buildを使う。
+Expo Goは初期確認に使う。PRの確認には [Cloud Runのプレビュー](preview.md) も使える。ネイティブモジュールを使う変更にはDevelopment Buildが必要。
 
 ```sh
 cd apps/mobile
@@ -244,30 +244,9 @@ Google CloudのAPIキーやサービスアカウントJSONをGitHub Secretに登
 
 登録したtokenの名称は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter production`。対象を `reohakase` アカウントに限定し、権限は `VIEW` / `RUN` / `PUBLISH`。アカウント管理権限は含めない。更新時は同じ制限のtokenを発行してEnvironment Secretを差し替え、旧tokenを失効させる。
 
-### 手動preview配信（GitHub Actions）
+### PRプレビュー
 
-PRを作成・更新すると、`expo-hono-opentofu-starter preview` コメントだけを作成・更新する。**pushではExpoへ配信しない**。コメントの **🚀 previewを配信** チェックボックスを押すと、そのコメントに記載したSHAを両OSへ配信する。実行中・成功・失敗、配信SHA、OS別リンクとQRは同じコメントへ戻る。
-
-Actionsの **Publish preview → Run workflow** から、branchを `main`、`pr` を公開中PRの番号として指定してもよい。
-
-```sh
-gh workflow run preview.yml --ref main -f pr=PR_NUMBER
-```
-
-- リポジトリのwrite権限を持つ利用者だけ実行できる。同一リポジトリからmainへ向けた公開中PRに限り、fork・bot操作・古いSHAのコメントは拒否する。
-- `pull_request_target` はコメント更新だけに使い、信頼済みworkflowのコードのみ実行する。配信側も認可後に固定SHAをcheckoutし、依存インストール時にはExpo tokenを渡さない。
-- GitHub Environment **preview** はmainからのworkflowだけを許可し、専用 `EXPO_TOKEN` を登録済み。token名は `GitHub Actions: ReoHakase/expo-hono-opentofu-starter preview`、対象は `reohakase`、権限は `VIEW` / `RUN` / `PUBLISH`。productionのtokenとは分ける。
-- Expo公式 `expo/expo-github-action/preview` がGitHub runner上でbundle生成と `eas update` を実行する。**Expo Workflowsの60分枠は使わない**。GitHub Actionsの実行時間と、EAS UpdateのMAU・転送量・保存容量の枠は使う。
-- 配信先はEAS environment `preview`、branch `pr-<番号>`。共通preview channelやproductionは上書きしない。対応するfingerprintのDevelopment Buildからリンク・QRを開く。Expo Goは従来どおりローカル開発サーバーを使う。
-
-フォーク先ではGitHub Environment `preview` を同様に作り、Expo tokenを登録する。
-
-```sh
-# tokenは対話入力する。引数・リポジトリへ書かない。
-gh secret set EXPO_TOKEN --env preview
-```
-
-この仕組みは `issue_comment` / `pull_request_target` を使うため、workflowをdefault branchへ取り込んだ後に有効になる。既に公開中のPRには、次のpushまたは手動実行でコメントを作成する。
+初期設定、PRからの手動配信、Apply・Destroyのログとcleanupは [PRプレビュー](preview.md) を参照する。
 
 ### Expo GitHub連携・環境変数
 
@@ -277,7 +256,6 @@ gh secret set EXPO_TOKEN --env preview
 
 1. Expo dashboardでGitHub Appを対象リポジトリへ接続し、Base directoryを `apps/mobile` にする。
 2. ExpoのEnvironment Variablesで `EXPO_PUBLIC_API_URL` をdevelopment/preview/productionそれぞれに設定する。公開URLなのでvisibilityはplain text。previewは共有staging API、productionは本番API。ローカル `.env` はクラウドへアップロードしない。未設定なら接続案内が表示され、SNS機能は利用できない。
-3. GitHubのpreview Environmentへtokenを登録し、PRコメントまたはActionsから配信する。
 
 `apps/mobile/.eas/workflows/native-builds.yml` は手動でiOS SimulatorとAndroid preview APKを作る。Development Buildが必要なら `ios_profile=development-simulator`（Simulator）または `development`（実機）、Androidは `android_profile=development` を選ぶ。iOS実機用にはApple署名が必要。本番は従来どおり、APIデプロイ成功後だけ `production-update.yml` を呼び出す。両方ともExpo Workflows側の実行となる。
 
