@@ -177,6 +177,7 @@ resource "google_project_iam_custom_role" "creator" {
     "run.operations.get",
     "run.services.create",
     "run.services.createTagBinding",
+    "run.services.get",
   ]
   depends_on = [google_project_service.preview]
 }

@@ -205,9 +205,68 @@ async function validateOpenPullRequest(pr: string, sha: string) {
   }
 }
 
+function tagBindingParent(pr: string) {
+  return `//run.googleapis.com/projects/${project}/locations/${region}/services/nuri-preview-pr-${pr}`;
+}
+
+function previewTagValue() {
+  const value = required(Bun.env.PREVIEW_RUN_TAG_VALUE, 'PREVIEW_RUN_TAG_VALUE');
+  if (!/^tagValues\/[0-9]+$/.test(value)) {
+    throw new Error('Invalid preview tag value ID');
+  }
+  return value;
+}
+
+async function hasPreviewTag(parent: string, tagValue: string) {
+  const token = (await shell`gcloud auth print-access-token`.text()).trim();
+  const url = new URL(`https://${region}-cloudresourcemanager.googleapis.com/v3/tagBindings`);
+  url.searchParams.set('parent', parent);
+  url.searchParams.set('pageSize', '100');
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(20_000),
+  });
+  // タグ付きサービスだけを参照できる権限では、未設定のサービスは 403 になる。
+  if (response.status === 403 || response.status === 404) {
+    return false;
+  }
+  if (!response.ok) {
+    throw new Error(`Could not list preview tag bindings: HTTP ${response.status}`);
+  }
+  const result: unknown = await response.json();
+  return (
+    isRecord(result) &&
+    Array.isArray(result.tagBindings) &&
+    result.tagBindings.some(
+      (binding: unknown) => isRecord(binding) && binding.tagValue === tagValue,
+    )
+  );
+}
+
+async function attachPreviewTag(pr: string) {
+  const parent = tagBindingParent(pr);
+  const tagValue = previewTagValue();
+  const created = await shell`gcloud resource-manager tags bindings create \
+    --parent=${parent} --tag-value=${tagValue} --location=${region} --quiet`.nothrow();
+  if (created.exitCode !== 0 && !created.stderr.toString().includes('ALREADY_EXISTS')) {
+    throw new Error('Could not attach the preview tag');
+  }
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    if (await hasPreviewTag(parent, tagValue)) {
+      console.log(`Confirmed the Resource Manager tag for PR #${pr}`);
+      return;
+    }
+    await Bun.sleep(5_000);
+  }
+  throw new Error('The preview tag binding is not visible yet');
+}
+
 async function inspect(pr: string, sha: string, outputPath: string) {
   await validateOpenPullRequest(pr, sha);
-  const environment = (await hasPreviewService(project, pr)) ? 'preview' : 'preview-create';
+  const tagged =
+    (await hasPreviewService(project, pr)) &&
+    (await hasPreviewTag(tagBindingParent(pr), previewTagValue()));
+  const environment = tagged ? 'preview' : 'preview-create';
   await appendFile(outputPath, `environment=${environment}\n`);
 }
 
@@ -218,6 +277,9 @@ async function apply(pr: string, sha: string, outputPath: string) {
       await appendFile(outputPath, `tofu_exit=${exitCode}\ntofu_log<<TOFU_LOG\n${log}\nTOFU_LOG\n`);
     },
   });
+  if (applyExit === 0 && Bun.env.PREVIEW_CLOUD_ENVIRONMENT === 'preview-create') {
+    await attachPreviewTag(pr);
+  }
   return applyExit ?? 1;
 }
 
