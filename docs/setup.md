@@ -186,7 +186,7 @@ EASの `development` のAndroidビルドは、ビルド用マシンでGradleが�
 
 2026年11月7日時点で、試したApple IDはApple Developer Programに入っておらず、`bunx eas device:create` がAppleに拒否されたため、iPhoneのDevelopment Buildはまだ作れていない。Developer ProgramのチームにいるApple IDで、試す人のiPhoneを先に `bunx eas device:create` で登録してからビルドする（登録していない端末には入らない）。AndroidのAPKは端末の登録なしで入れられる。
 
-顔追跡（`apps/mobile/modules/face-tracker`、MediaPipe Face Landmarker）はネイティブモジュールのため、Expo Goでは動かずDevelopment Buildが必要。Development Buildでは⑦（レシピの「メイクをはじめる」）と⑩で、カメラの映像に今の手順の塗る範囲を重ねる。ネイティブモジュールや依存を変えたら、新しいDevelopment Buildを作る（OTAでは届かない）。
+顔追跡（`apps/mobile/modules/face-tracker`、MediaPipe Face Landmarker）はネイティブモジュールのため、Expo Goでは動かずDevelopment Buildが必要。Development Buildでは⑦（レシピの「メイクをはじめる」）で、カメラの映像に今の手順の塗る範囲を重ねる。⑩はカメラの映像だけを出す（#190）。ネイティブモジュールや依存を変えたら、新しいDevelopment Buildを作る（OTAでは届かない）。
 
 Androidのネイティブコードは手元でもコンパイルを確かめられる。JDK 17とAndroid SDK（Platform 37.0、Build-Tools 37.0.0、NDK 27.1.12297006、CMake 3.22.1）を入れ、`JAVA_HOME` と `ANDROID_HOME` を設定する。生成される `android/` はコミットしない。
 
