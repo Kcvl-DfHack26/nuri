@@ -1,27 +1,21 @@
 import { $ } from 'bun';
 
-import { mergedMainPr, readOperation, readTarget, requireEnv } from './context';
+import { requireEnv } from './context';
 
 const repo = requireEnv('GITHUB_REPOSITORY');
 const sha = requireEnv('GITHUB_SHA');
 
-if (readOperation() === 'apply') {
-  await mergedMainPr(repo);
+const project = requireEnv('PROJECT_ID');
+const region = requireEnv('REGION');
+const service = requireEnv('SERVICE');
+if (`${project}/${region}/${service}` !== 'kcvlb4/asia-northeast1/nuri-staging') {
+  throw new Error('Invalid production infrastructure target');
 }
-
-if (readTarget() === 'production') {
-  const project = requireEnv('PROJECT_ID');
-  const region = requireEnv('REGION');
-  const service = requireEnv('SERVICE');
-  if (`${project}/${region}/${service}` !== 'kcvlb4/asia-northeast1/nuri-staging') {
-    throw new Error('Invalid production infrastructure target');
-  }
-  if (
-    requireEnv('TOFU_PROVIDER') === Bun.env.DEPLOY_PROVIDER ||
-    requireEnv('TOFU_ACCOUNT') === Bun.env.DEPLOY_ACCOUNT
-  ) {
-    throw new Error('Use the dedicated OpenTofu identity');
-  }
+if (
+  requireEnv('TOFU_PROVIDER') === Bun.env.DEPLOY_PROVIDER ||
+  requireEnv('TOFU_ACCOUNT') === Bun.env.DEPLOY_ACCOUNT
+) {
+  throw new Error('Use the dedicated OpenTofu identity');
 }
 
 const head = await $`gh api repos/${repo}/git/ref/heads/main --jq .object.sha`.text();

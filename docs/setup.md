@@ -327,14 +327,14 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 
 `kcvlb4` の `nuri-staging`、Cloud SQL、Secret Manager、GCS stateは本番扱い。ローカルでの `tofu apply`／`destroy`、`gcloud` による公開設定・トラフィック・secretの変更は禁止する。インフラ変更は **Production Infrastructure**、アプリ配信は **Deploy API, Expo Web and mobile update** を使う。2つのワークフローは同じconcurrency groupを使う。
 
-**Production Infrastructure** は、push時のCIに成功した最新の `main` から手動実行する。既定の `plan` で差分を確認し、承認を得て `apply` を実行する。`pr` にはmainへマージ済みの関連PR番号を指定する。そのPRに **🧱 OpenTofu Apply** のコメントを実行ごとに追加する。コードブロックにはリソースの操作と件数を載せる。診断の詳細はActionsの実行ログで確認できる。
+**Production Infrastructure** は、push時のCIに成功した最新の `main` から手動実行する。既定の `plan` で差分を確認し、承認を得て `apply` を実行する。差分、適用結果、診断は各Actionsの実行ログで確認する。
 
-`apply` はその実行内でplanを取り直し、削除・置換を含む場合は停止する。既存の `gs://kcvlb4-tofu-state/nuri/staging` を使うため、初回構築・state移行・廃止は管理者が別の手順をレビューし、承認済みのGitHub Actionsで行う。廃止のワークフローでも共通の通知を使うと、同じ形式で **🧱 OpenTofu Destroy** を投稿できる。
+`apply` はその実行内でplanを取り直し、削除・置換を含む場合は停止する。既存の `gs://kcvlb4-tofu-state/nuri/staging` を使うため、初回構築・state移行・廃止は管理者が別の手順をレビューし、承認済みのGitHub Actionsで行う。
 
 ```sh
 gh workflow run infra-production.yml --ref main -f operation=plan
 # planをレビューしてから実行する
-gh workflow run infra-production.yml --ref main -f operation=apply -f pr=PR_NUMBER
+gh workflow run infra-production.yml --ref main -f operation=apply
 ```
 
 稼働開始前に、管理者が承認済みの管理用GitHub Actionsから以下を用意する。既存のアプリ配信用サービスアカウントには、OpenTofuの適用権限を付けない。

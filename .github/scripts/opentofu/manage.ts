@@ -2,12 +2,10 @@ import { $ } from 'bun';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { readOperation, readTarget, requireEnv } from './context';
-import { runOperation } from './run-operation';
+import { readOperation, requireEnv } from './context';
 
-const target = readTarget();
 const operation = readOperation();
-const directory = target === 'preview' ? 'infra/preview' : 'infra';
+const directory = 'infra';
 const shellEnv = { ...Bun.env, TF_IN_AUTOMATION: 'true' };
 const options = ['-input=false', '-no-color', '-lock-timeout=5m'];
 
@@ -107,15 +105,9 @@ process.umask(0o077);
 const scratch = await mkdtemp(join(requireEnv('RUNNER_TEMP'), 'nuri-opentofu-'));
 try {
   const plan = join(scratch, 'operation.tfplan');
-  const planOptions = [...options, `-out=${plan}`];
-  let operationEnv: Record<string, string | undefined> = shellEnv;
-  if (target === 'preview') {
-    await $`tofu -chdir=${directory} init -input=false -lockfile=readonly`.env(shellEnv);
-  } else {
-    const { file, password } = await productionVars(scratch);
-    planOptions.push(`-var-file=${file}`);
-    operationEnv = { ...shellEnv, TF_VAR_database_password: password };
-  }
+  const { file, password } = await productionVars(scratch);
+  const planOptions = [...options, `-out=${plan}`, `-var-file=${file}`];
+  const operationEnv = { ...shellEnv, TF_VAR_database_password: password };
 
   await $`tofu -chdir=${directory} plan ${planOptions}`.env(operationEnv);
   if (operation === 'apply') {
@@ -138,18 +130,10 @@ try {
       );
     }
 
-    const exitCode = await runOperation({
-      directory,
-      operation,
-      options: [...options, plan],
-      env: operationEnv,
-      events: join(scratch, 'events.jsonl'),
-    });
-    if (exitCode !== 0) {
-      process.exitCode = exitCode;
-    } else if (target === 'preview') {
-      await $`tofu -chdir=${directory} output -no-color`.env(operationEnv);
-    }
+    const result = await $`tofu -chdir=${directory} apply ${options} ${plan}`
+      .env(operationEnv)
+      .nothrow();
+    process.exitCode = result.exitCode;
   }
 } finally {
   await rm(scratch, { force: true, recursive: true });

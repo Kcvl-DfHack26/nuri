@@ -7,9 +7,6 @@ on:
         type: choice
         options: [plan, apply]
         default: plan
-      pr:
-        description: Merged PR number to receive the apply result
-        type: string
 permissions:
   contents: read
 concurrency:
@@ -21,12 +18,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
-    outputs:
-      log: ${{ steps.operation.outputs.log }}
     permissions:
       contents: read
       actions: read
-      pull-requests: read
       id-token: write
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -43,15 +37,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      # 現在のmainと対象PRを確認してからクラウドへ認証する。
+      # 最新の main と CI の成功を確認してからクラウドへ認証する。
       - name: Verify Current Main and CI
         env:
-          OPERATION: ${{ inputs.operation }}
-          PR_NUMBER: ${{ inputs.pr }}
           GH_TOKEN: ${{ github.token }}
           DEPLOY_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
           DEPLOY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-        run: bun .github/scripts/opentofu/verify.ts production
+        run: bun .github/scripts/opentofu/verify.ts
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ env.TOFU_PROVIDER }}
@@ -62,20 +54,6 @@ jobs:
           tofu_version: 1.13.8
           tofu_wrapper: false
       - name: Plan or Apply Production Infrastructure
-        id: operation
         env:
           OPERATION: ${{ inputs.operation }}
-        run: bun .github/scripts/opentofu/manage.ts production
-  report:
-    needs: opentofu
-    if: always() && github.ref == 'refs/heads/main' && inputs.operation == 'apply' && inputs.pr != ''
-    permissions:
-      contents: read
-      pull-requests: write
-    uses: ./.github/workflows/report-opentofu.yml
-    with:
-      pr: ${{ inputs.pr }}
-      target: nuri-staging
-      operation: ${{ inputs.operation }}
-      result: ${{ needs.opentofu.result }}
-      log: ${{ needs.opentofu.outputs.log }}
+        run: bun .github/scripts/opentofu/manage.ts
