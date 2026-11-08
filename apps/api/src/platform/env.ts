@@ -27,6 +27,9 @@ const schema = z.object({
   PASSKEY_ORIGINS: z.string().optional(),
   APPLE_APP_ID: z.string().optional(),
   ANDROID_SHA256_CERT_FINGERPRINTS: z.string().optional(),
+  // Vertex AI for ⑫-3's video analysis (#142). Without a project the analysis answers 503.
+  VERTEX_PROJECT: z.string().trim().min(1).optional(),
+  VERTEX_LOCATION: z.string().trim().min(1).default('global'),
 });
 
 export function readEnv(env: NodeJS.ProcessEnv = process.env) {
