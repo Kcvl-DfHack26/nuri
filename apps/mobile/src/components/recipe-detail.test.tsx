@@ -48,14 +48,19 @@ jest.mock('@/lib/api', () => ({
       recipes: {
         ':id': {
           $get: () => mockGetRecipe(),
-          favorite: { $put: () => mockFavorite(), $delete: () => mockFavorite() },
+          favorite: { $put: () => mockFavorite(true), $delete: () => mockFavorite(false) },
         },
       },
     },
   },
 }));
 let mockSignedIn = false;
-const mockFavorite = jest.fn(async () => ({ ok: true, status: 200 }));
+// The server's favorite, which ⑤ reads back once a change settles.
+let mockServerFavorited = false;
+const mockFavorite = jest.fn(async (favorited: boolean) => {
+  mockServerFavorited = favorited;
+  return { ok: true, status: 200 };
+});
 const fox = {
   id: 'fox',
   title: '狐メイク',
@@ -94,11 +99,12 @@ type Response = { ok: boolean; status: number; json: () => Promise<unknown> };
 const mockGetRecipe = jest.fn(async (): Promise<Response> => ({
   ok: true,
   status: 200,
-  json: async () => ({ recipe: fox }),
+  json: async () => ({ recipe: { ...fox, favorited: mockServerFavorited } }),
 }));
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockServerFavorited = false;
 });
 
 test('shows the recipe from the API and opens the product sheet from a product row', async () => {
@@ -108,7 +114,7 @@ test('shows the recipe from the API and opens the product sheet from a product r
   expect(screen.getByText('＃15分')).toBeOnTheScreen();
   expect(screen.getByText('5ステップ')).toBeOnTheScreen();
   expect(screen.getAllByText('シェード').length).toBeGreaterThan(0);
-  expect(screen.getByText('Instagramから取り込み・保存 1.2k')).toBeOnTheScreen();
+  expect(screen.getByText('Instagramから取り込み・お気に入り 1.2k')).toBeOnTheScreen();
   expect(screen.getByText('2点')).toBeOnTheScreen();
   await fireEvent.press(
     screen.getByRole('button', { name: 'CELANE 極細アイブロウペンシル、眉・モカブラウン' }),
@@ -173,7 +179,6 @@ test('keeps a favorite at once and rolls it back when the server refuses', async
   const favorite = await screen.findByRole('button', { name: 'お気に入り' });
   expect(favorite).not.toBeSelected();
   await fireEvent.press(favorite);
-  // The optimistic update lands once the detail query is cancelled.
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
   });
@@ -181,13 +186,16 @@ test('keeps a favorite at once and rolls it back when the server refuses', async
 
   const alert = jest.spyOn(Alert, 'alert');
   mockFavorite.mockResolvedValueOnce({ ok: false, status: 500 });
+  // The refused change leaves the server, and so ⑤ after its refetch, as it was.
   await fireEvent.press(screen.getByRole('button', { name: 'お気に入り' }));
+  await waitFor(() => {
+    expect(alert).toHaveBeenCalledWith(
+      'お気に入りを変更できませんでした',
+      'お気に入りを変更できませんでした。',
+    );
+  });
   await waitFor(() => {
     expect(screen.getByRole('button', { name: 'お気に入り' })).toBeSelected();
   });
-  expect(alert).toHaveBeenCalledWith(
-    'お気に入りを変更できませんでした',
-    'お気に入りを変更できませんでした。',
-  );
   mockSignedIn = false;
 });

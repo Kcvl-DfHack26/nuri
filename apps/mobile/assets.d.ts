@@ -13,3 +13,8 @@ declare module '*.svg' {
   const source: number;
   export default source;
 }
+
+declare module '*.xml' {
+  const source: number;
+  export default source;
+}

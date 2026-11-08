@@ -85,8 +85,10 @@ afterEach(() => {
 
 test('shows the signed-in profile with posted and favorite recipes and opens them', async () => {
   await render(<MyPage />, { wrapper: TestQueryProvider });
-  const posted = await screen.findByRole('button', { name: '自分のメイク、はなこ、いいね1.2k' });
-  const favorite = await screen.findByRole('button', { name: '狐メイク、はなこ、いいね1.2k' });
+  const posted = await screen.findByRole('button', {
+    name: '自分のメイク、はなこ、お気に入り1.2k',
+  });
+  const favorite = await screen.findByRole('button', { name: '狐メイク、はなこ、お気に入り1.2k' });
   expect(screen.getByRole('header', { name: 'はなこ' })).toBeOnTheScreen();
   // Following and likes are not built, so Plan A's sample counts are not shown.
   for (const label of ['フォロワー', 'フォロー中', 'いいね', '328', '96', '2.4k']) {
@@ -110,7 +112,7 @@ test('loads more favorites past the first page', async () => {
   await render(<MyPage />, { wrapper: TestQueryProvider });
   await fireEvent.press(await screen.findByRole('button', { name: 'もっと見る' }));
   expect(
-    await screen.findByRole('button', { name: '猫メイク、はなこ、いいね1.2k' }),
+    await screen.findByRole('button', { name: '猫メイク、はなこ、お気に入り1.2k' }),
   ).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'もっと見る' })).toBeNull();
 });
@@ -125,7 +127,7 @@ test('shows empty sections and retries a failed list', async () => {
   ).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
   expect(
-    await screen.findByRole('button', { name: '狐メイク、はなこ、いいね1.2k' }),
+    await screen.findByRole('button', { name: '狐メイク、はなこ、お気に入り1.2k' }),
   ).toBeOnTheScreen();
 });
 

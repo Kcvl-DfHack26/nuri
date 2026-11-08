@@ -1,12 +1,17 @@
+import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 import type { InferRequestType, InferResponseType } from 'hono/client';
 
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
+import { hashKey, infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { Share } from 'react-native';
 
 import { api } from '@/lib/api';
 
 const allRecipes = ['recipes'] as const;
-export const recipeKeys = { all: allRecipes, favorites: [...allRecipes, 'favorites'] as const };
+export const recipeKeys = {
+  all: allRecipes,
+  lists: [...allRecipes, 'list'] as const,
+  favorites: [...allRecipes, 'favorites'] as const,
+};
 
 type RecipeListFilters = Omit<InferRequestType<typeof api.api.recipes.$get>['query'], 'offset'>;
 
@@ -16,7 +21,7 @@ type RecipeListFilters = Omit<InferRequestType<typeof api.api.recipes.$get>['que
  */
 export function recipeListOptions({ part, author, q }: RecipeListFilters = {}) {
   return infiniteQueryOptions({
-    queryKey: [...recipeKeys.all, 'list', part ?? 'whole', author, q],
+    queryKey: [...recipeKeys.lists, part ?? 'whole', author, q],
     initialPageParam: 0,
     queryFn: async ({ pageParam, signal }) => {
       const response = await api.api.recipes.$get(
@@ -80,6 +85,61 @@ export async function changeFavorite(id: string, favorited: boolean) {
       response.status === 401 ? 'ログインし直してください。' : 'お気に入りを変更できませんでした。',
     );
   }
+}
+
+/** Whether a cached recipe list or ⑤ holds the recipe with this ID. */
+export function holdsRecipe(data: unknown, id: string) {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  if ('pages' in data && Array.isArray(data.pages)) {
+    return data.pages.some(
+      (page: Partial<RecipePage>) => page.items?.some((item) => item.id === id) ?? false,
+    );
+  }
+  return 'id' in data && data.id === id;
+}
+
+/**
+ * Shows one recipe as favorited or not in every cached list and its ⑤, with the heart's count
+ * moved by one, and returns the keys of the caches it changed. Given `only`, it changes just
+ * those, so a rollback restores exactly what the change touched. Copies already in that state,
+ * other recipes and untouched pages keep their references.
+ */
+export function setCachedFavorite(
+  client: QueryClient,
+  id: string,
+  favorited: boolean,
+  only?: readonly QueryKey[],
+): QueryKey[] {
+  const changed: QueryKey[] = [];
+  const allowed = (key: QueryKey) => !only || only.some((other) => hashKey(other) === hashKey(key));
+  const stale = (item: { id: string; favorited: boolean }) =>
+    item.id === id && item.favorited !== favorited;
+  const flip = <T extends { id: string; favorited: boolean; likeCount: number }>(item: T): T =>
+    stale(item)
+      ? { ...item, favorited, likeCount: Math.max(0, item.likeCount + (favorited ? 1 : -1)) }
+      : item;
+  for (const queryKey of [recipeKeys.lists, recipeKeys.favorites]) {
+    for (const [key, data] of client.getQueriesData<InfiniteData<RecipePage>>({ queryKey })) {
+      if (data?.pages.some((page) => page.items.some(stale)) && allowed(key)) {
+        changed.push(key);
+        client.setQueryData<InfiniteData<RecipePage>>(key, {
+          ...data,
+          pages: data.pages.map((page) =>
+            page.items.some(stale) ? { ...page, items: page.items.map(flip) } : page,
+          ),
+        });
+      }
+    }
+  }
+  const detailKey = recipeOptions(id).queryKey;
+  const detail = client.getQueryData(detailKey);
+  if (detail && stale(detail) && allowed(detailKey)) {
+    changed.push(detailKey);
+    client.setQueryData(detailKey, flip(detail));
+  }
+  return changed;
 }
 
 export type RecipeInput = InferRequestType<typeof api.api.recipes.$post>['json'];

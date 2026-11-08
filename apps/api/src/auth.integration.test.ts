@@ -432,27 +432,38 @@ test('favorites are idempotent and only visible to the user who added them', asy
     request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'PUT'),
   ]);
   expect(added.map((response) => response.status)).toEqual([200, 200]);
+  // The heart's count adds this one favorite to the recipe's carried-over popularity.
+  const heart = z.object({ id: z.string(), favorited: z.boolean(), likeCount: z.number() });
   const detail = z
-    .object({ recipe: z.object({ favorited: z.boolean() }) })
+    .object({ recipe: heart })
     .parse(await (await appRequest(`/api/recipes/${recipeId}`, { headers: { cookie } })).json());
-  expect(detail.recipe.favorited).toBe(true);
+  expect(detail.recipe).toMatchObject({ favorited: true, likeCount: 1 });
   const guestDetail = z
-    .object({ recipe: z.object({ favorited: z.boolean() }) })
+    .object({ recipe: heart })
     .parse(await (await appRequest(`/api/recipes/${recipeId}`)).json());
-  expect(guestDetail.recipe.favorited).toBe(false);
-  const list = z.object({ items: z.array(z.object({ id: z.string() })) });
+  expect(guestDetail.recipe).toMatchObject({ favorited: false, likeCount: 1 });
+  const list = z.object({ items: z.array(heart) });
   const favorites = list.parse(
     await (await appRequest('/api/me/favorites', { headers: { cookie } })).json(),
   );
-  expect(favorites.items.map((item) => item.id)).toEqual([recipeId]);
-  const authored = list.parse(await (await appRequest(`/api/recipes?author=${me.id}`)).json());
-  expect(authored.items.map((item) => item.id)).toEqual([recipeId]);
+  expect(favorites.items).toEqual([{ id: recipeId, favorited: true, likeCount: 1 }]);
+  const authored = (author: string, headers?: { cookie: string }) =>
+    appRequest(`/api/recipes?author=${author}`, headers ? { headers } : {});
+  expect(list.parse(await (await authored(me.id, { cookie })).json()).items).toEqual([
+    { id: recipeId, favorited: true, likeCount: 1 },
+  ]);
+  expect(list.parse(await (await authored(me.id)).json()).items).toEqual([
+    { id: recipeId, favorited: false, likeCount: 1 },
+  ]);
   expect((await request(`/api/recipes/${recipeId}/favorite`, {}, cookie, 'DELETE')).status).toBe(
     200,
   );
   expect(
     list.parse(await (await appRequest('/api/me/favorites', { headers: { cookie } })).json()).items,
   ).toEqual([]);
+  expect(list.parse(await (await authored(me.id, { cookie })).json()).items).toEqual([
+    { id: recipeId, favorited: false, likeCount: 0 },
+  ]);
 }, 20000);
 
 test('posting a recipe validates and stores the latest draft and serves its thumbnail', async () => {

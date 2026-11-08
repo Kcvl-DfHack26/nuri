@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BrowShape, DiagnosisResult, FaceType } from '@/lib/face-diagnosis';
 import type { RecipeSummary } from '@/lib/recipes';
 
+import { CardFavorite } from '@/components/card-favorite';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
@@ -362,48 +363,53 @@ function RecommendationCard({
   recipe: RecipeSummary;
   matched: string | undefined;
 }) {
-  const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
   const likes = formatCount(recipe.likeCount);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={[recipe.title, recipe.author.name, matched].filter(Boolean).join('、')}
-      className="w-43 gap-1.25 active:opacity-80"
-      onPress={() => {
-        router.push(`/recipes/${recipe.id}`);
-      }}
-    >
-      <View className="h-45 w-full overflow-hidden rounded-card bg-neutral-soft">
-        <Image
-          accessible={false}
-          source={{ uri: apiAssetUrl(recipe.image) }}
-          contentFit="cover"
-          style={{ width: '100%', height: '100%' }}
-        />
-        {matched ? (
-          <View
-            className="absolute left-2 top-2 flex-row items-center gap-1.25 rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
-            style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
-          >
-            <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
-            <Text className="font-maru-bold text-micro text-accent-rose">{matched}</Text>
+    <View className="w-43">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={[recipe.title, recipe.author.name, matched].filter(Boolean).join('、')}
+        className="gap-1.25 active:opacity-80"
+        onPress={() => {
+          router.push(`/recipes/${recipe.id}`);
+        }}
+      >
+        <View className="h-45 w-full overflow-hidden rounded-card bg-neutral-soft">
+          <Image
+            accessible={false}
+            source={{ uri: apiAssetUrl(recipe.image) }}
+            contentFit="cover"
+            style={{ width: '100%', height: '100%' }}
+          />
+          {matched ? (
+            <View
+              className="absolute left-2 top-2 flex-row items-center gap-1.25 rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
+              style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
+            >
+              <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
+              <Text className="font-maru-bold text-micro text-accent-rose">{matched}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View className="w-full gap-px px-1 pt-0.5">
+          <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
+          <View className="flex-row items-center gap-0.75">
+            <Text className="flex-1 font-maru text-meta text-ink-secondary">
+              {recipe.author.name}
+            </Text>
+            <SocialIcon name={HEART} size={13} color={secondary} />
+            <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
           </View>
-        ) : null}
-        <View className="absolute bottom-2 right-2 size-7.5 items-center justify-center rounded-full bg-white/85">
-          <SocialIcon name={HEART} size={16} color={ink} />
         </View>
-      </View>
-      <View className="w-full gap-px px-1 pt-0.5">
-        <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-        <View className="flex-row items-center gap-0.75">
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">
-            {recipe.author.name}
-          </Text>
-          <SocialIcon name={HEART} size={13} color={secondary} />
-          <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
-        </View>
-      </View>
-    </Pressable>
+      </Pressable>
+      {/* Plan A puts the heart at the photo's bottom right: 180 - 8 - 30 from the top. */}
+      <CardFavorite
+        recipe={recipe}
+        title={recipe.title}
+        iconSize={16}
+        className="right-2 top-35.5 size-7.5 bg-white/85"
+      />
+    </View>
   );
 }
