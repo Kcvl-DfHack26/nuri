@@ -114,7 +114,7 @@ export function stepTitle(step: PostStep) {
 }
 
 /** A step's 区間 length, e.g. 1:12, or — when the video's length is unknown. */
-export function segmentLength(step: PostStep) {
+export function segmentLength(step: Pick<PostStep, 'segment'>) {
   const { startMs, endMs } = step.segment;
   return endMs === null ? '—' : formatClock(endMs - startMs);
 }

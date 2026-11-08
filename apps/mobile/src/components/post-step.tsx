@@ -14,19 +14,13 @@ import type { PhotoCrop } from '@/components/recipes';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import {
-  BottomCta,
-  DashedButton,
-  PostHeader,
-  PrimaryButton,
-  StepFrame,
-} from '@/components/post-chrome';
-import { cosmeticCandidates, segmentLength, usePostDraft } from '@/components/post-draft';
+import { BottomCta, DashedButton, PostHeader, PrimaryButton } from '@/components/post-chrome';
+import { cosmeticCandidates, usePostDraft } from '@/components/post-draft';
+import { StepSegment } from '@/components/post-segment';
 import { arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { backOrHome } from '@/lib/navigation';
-import { formatClock } from '@/lib/post-edit';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -34,10 +28,6 @@ import sparkleRoseSmall from '../../assets/plan-a/post/sparkle-rose-small.svg';
 import zoneBrowPoints from '../../assets/plan-a/post/zone-brow-points.svg';
 import zoneBrow from '../../assets/plan-a/post/zone-brow.svg';
 
-const PLAY = Icon.select({
-  ios: 'play.fill',
-  android: import('@expo/material-symbols/play_arrow.xml'),
-});
 const CLOSE = Icon.select({ ios: 'xmark', android: import('@expo/material-symbols/close.xml') });
 const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/add.xml') });
 const SEARCH = Icon.select({
@@ -87,12 +77,10 @@ function MissingStep() {
   );
 }
 
-// Plan A ⑫-5 手順を編集. Edits apply to the draft as they are made; playing and trimming the
-// segment and dragging the area handles are not built.
+// Plan A ⑫-5 手順を編集. Edits apply to the draft as they are made; the segment is played and moved
+// on the device (#181); dragging the area handles is not built.
 export function PostStepEdit({ index }: { index: string }) {
   const { step, position, updateStep } = useStep(index);
-  const { draft } = usePostDraft();
-  const durationMs = draft.video?.durationMs ?? null;
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
   const addIcon = <SocialIcon name={ADD} size={20} color={ink} />;
@@ -110,21 +98,7 @@ export function PostStepEdit({ index }: { index: string }) {
         automaticallyAdjustKeyboardInsets
         contentContainerClassName="gap-4 px-4 pb-6 pt-2"
       >
-        <View className="aspect-358/190 w-full items-center justify-center overflow-hidden rounded-panel">
-          <View className="absolute inset-0">
-            <StepFrame step={step} />
-          </View>
-          <View
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="区間を再生（準備中）"
-            accessibilityState={{ disabled: true }}
-            className="size-13 items-center justify-center rounded-full bg-bg-surface"
-          >
-            <SocialIcon name={PLAY} size={28} color={ink} />
-          </View>
-        </View>
-        <SegmentBar step={step} durationMs={durationMs} />
+        <StepSegment step={step} position={position} />
         <Field label="部位">
           {/* Plan A ⑫-5 has no part field; the steps are split by time, so the user names the part. */}
           <Host colorScheme="light" matchContents style={{ alignSelf: 'flex-start' }}>
@@ -212,39 +186,6 @@ export function PostStepEdit({ index }: { index: string }) {
           }}
         />
       </BottomCta>
-    </View>
-  );
-}
-
-/** Where the step is in the whole video, with its start, end and length. */
-function SegmentBar({ step, durationMs }: { step: PostStep; durationMs: number | null }) {
-  const { startMs, endMs } = step.segment;
-  const range = endMs === null ? '' : `${formatClock(startMs)} 〜 ${formatClock(endMs)}`;
-  return (
-    <View className="gap-1.5">
-      {durationMs && endMs !== null ? (
-        <View
-          accessible
-          accessibilityLabel={`動画${formatClock(durationMs)}のうち${range}`}
-          className="h-3 w-full overflow-hidden rounded-md bg-ink-primary/15"
-        >
-          <View
-            className="absolute inset-y-0 rounded-md bg-accent-rose"
-            style={{
-              left: `${(startMs / durationMs) * 100}%`,
-              width: `${((endMs - startMs) / durationMs) * 100}%`,
-            }}
-          />
-        </View>
-      ) : null}
-      <View className="flex-row items-start justify-between gap-2">
-        <Text className="font-maru text-meta text-ink-secondary">
-          {range || `${formatClock(startMs)} 〜`}
-        </Text>
-        <Text className="font-maru-bold text-label text-accent-rose">
-          区間 {segmentLength(step)}
-        </Text>
-      </View>
     </View>
   );
 }

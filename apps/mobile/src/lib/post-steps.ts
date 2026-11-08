@@ -33,3 +33,65 @@ export function planSteps(marks: readonly number[], durationMs: number | null): 
     endMs: starts[index + 1] ?? durationMs,
   }));
 }
+
+/** A step's place in the video, in ms; `endMs` is null when the video's length is unknown. */
+export type Segment = { startMs: number; endMs: number | null };
+
+/** The shortest step ⑫-5 lets a segment become. */
+export const minSegmentMs = 1000;
+
+/**
+ * ⑫-5: how far a step's start and end may move. The start may go back until the previous step
+ * keeps `minSegmentMs`, or to the video's start; the end may go on until the next step keeps it,
+ * or to the video's end. Null when the video's length is unknown, so the end cannot be bounded.
+ */
+export function segmentBounds(
+  segments: readonly Segment[],
+  index: number,
+  durationMs: number | null,
+): { minStartMs: number; maxEndMs: number } | null {
+  const previous = segments[index - 1];
+  const next = segments[index + 1];
+  const nextEnd = next ? (next.endMs ?? durationMs) : durationMs;
+  if (nextEnd === null || !segments[index]) {
+    return null;
+  }
+  return {
+    minStartMs: previous ? previous.startMs + minSegmentMs : 0,
+    maxEndMs: next ? nextEnd - minSegmentMs : nextEnd,
+  };
+}
+
+/**
+ * ⑫-5: the segments after a step is moved to `startMs`–`endMs`, kept inside `segmentBounds` and at
+ * least `minSegmentMs` long. A neighbor that would overlap is cut back to meet it; a gap the
+ * analysis left between steps stays.
+ */
+export function moveSegment(
+  segments: readonly Segment[],
+  index: number,
+  change: { startMs: number; endMs: number },
+  durationMs: number | null,
+): Segment[] {
+  const bounds = segmentBounds(segments, index, durationMs);
+  if (!bounds) {
+    return [...segments];
+  }
+  const startMs = Math.min(
+    Math.max(change.startMs, bounds.minStartMs),
+    bounds.maxEndMs - minSegmentMs,
+  );
+  const endMs = Math.max(Math.min(change.endMs, bounds.maxEndMs), startMs + minSegmentMs);
+  return segments.map((segment, position) => {
+    if (position === index) {
+      return { startMs, endMs };
+    }
+    if (position === index - 1 && (segment.endMs === null || segment.endMs > startMs)) {
+      return { ...segment, endMs: startMs };
+    }
+    if (position === index + 1 && segment.startMs < endMs) {
+      return { ...segment, startMs: endMs };
+    }
+    return segment;
+  });
+}
