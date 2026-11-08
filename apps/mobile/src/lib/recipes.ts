@@ -1,7 +1,7 @@
-import type { InfiniteData, QueryClient } from '@tanstack/react-query';
+import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 import type { InferRequestType, InferResponseType } from 'hono/client';
 
-import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
+import { hashKey, infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { Share } from 'react-native';
 
 import { api } from '@/lib/api';
@@ -89,26 +89,44 @@ export async function changeFavorite(id: string, favorited: boolean) {
 
 /**
  * Shows one recipe as favorited or not in every cached list and its ⑤, with the heart's count
- * moved by one. Copies already in that state, other recipes and untouched pages keep their
- * references, so a retry or a second tap never counts twice and other rows do not re-render.
+ * moved by one, and returns the keys of the caches it changed. Given `only`, it changes just
+ * those, so a rollback restores exactly what the change touched. Copies already in that state,
+ * other recipes and untouched pages keep their references.
  */
-export function setCachedFavorite(client: QueryClient, id: string, favorited: boolean) {
+export function setCachedFavorite(
+  client: QueryClient,
+  id: string,
+  favorited: boolean,
+  only?: readonly QueryKey[],
+): QueryKey[] {
+  const changed: QueryKey[] = [];
+  const allowed = (key: QueryKey) => !only || only.some((other) => hashKey(other) === hashKey(key));
+  const stale = (item: { id: string; favorited: boolean }) =>
+    item.id === id && item.favorited !== favorited;
   const flip = <T extends { id: string; favorited: boolean; likeCount: number }>(item: T): T =>
-    item.id !== id || item.favorited === favorited
-      ? item
-      : { ...item, favorited, likeCount: Math.max(0, item.likeCount + (favorited ? 1 : -1)) };
-  const flipPages = (data: InfiniteData<RecipePage> | undefined) =>
-    data && {
-      ...data,
-      pages: data.pages.map((page) =>
-        page.items.some((item) => item.id === id && item.favorited !== favorited)
-          ? { ...page, items: page.items.map(flip) }
-          : page,
-      ),
-    };
-  client.setQueriesData({ queryKey: recipeKeys.lists }, flipPages);
-  client.setQueriesData({ queryKey: recipeKeys.favorites }, flipPages);
-  client.setQueryData(recipeOptions(id).queryKey, (recipe) => recipe && flip(recipe));
+    stale(item)
+      ? { ...item, favorited, likeCount: Math.max(0, item.likeCount + (favorited ? 1 : -1)) }
+      : item;
+  for (const queryKey of [recipeKeys.lists, recipeKeys.favorites]) {
+    for (const [key, data] of client.getQueriesData<InfiniteData<RecipePage>>({ queryKey })) {
+      if (data?.pages.some((page) => page.items.some(stale)) && allowed(key)) {
+        changed.push(key);
+        client.setQueryData<InfiniteData<RecipePage>>(key, {
+          ...data,
+          pages: data.pages.map((page) =>
+            page.items.some(stale) ? { ...page, items: page.items.map(flip) } : page,
+          ),
+        });
+      }
+    }
+  }
+  const detailKey = recipeOptions(id).queryKey;
+  const detail = client.getQueryData(detailKey);
+  if (detail && stale(detail) && allowed(detailKey)) {
+    changed.push(detailKey);
+    client.setQueryData(detailKey, flip(detail));
+  }
+  return changed;
 }
 
 export type RecipeInput = InferRequestType<typeof api.api.recipes.$post>['json'];

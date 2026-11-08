@@ -77,3 +77,29 @@ test('flips one recipe in every cached copy once and keeps other rows', () => {
   setCachedFavorite(client, 'fox', false);
   expect(client.getQueryData<typeof after>(listKey)?.pages[0]?.items[0]).toEqual(fox);
 });
+
+test('rolls back only the caches a change touched', () => {
+  const client = createTestQueryClient();
+  const listKey = [...recipeKeys.lists, 'whole'];
+  client.setQueryData(listKey, {
+    pages: [{ items: [{ id: 'fox', favorited: false, likeCount: 3 }], nextOffset: null }],
+    pageParams: [0],
+  });
+  // ⑤ already shows the favorite, e.g. from a newer fetch.
+  client.setQueryData([...recipeKeys.all, 'detail', 'fox'], {
+    id: 'fox',
+    favorited: true,
+    likeCount: 4,
+  });
+  const changed = setCachedFavorite(client, 'fox', true);
+  expect(changed).toEqual([listKey]);
+
+  setCachedFavorite(client, 'fox', false, changed);
+  expect(client.getQueryData(recipeOptions('fox').queryKey)).toMatchObject({
+    favorited: true,
+    likeCount: 4,
+  });
+  expect(
+    client.getQueryData<{ pages: { items: unknown[] }[] }>(listKey)?.pages[0]?.items[0],
+  ).toEqual({ id: 'fox', favorited: false, likeCount: 3 });
+});
