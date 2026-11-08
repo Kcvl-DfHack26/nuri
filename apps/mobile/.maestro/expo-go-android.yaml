@@ -7,5 +7,10 @@ appId: host.exp.exponent
 - tapOn: 'マイ'
 - assertVisible: 'ゲスト'
 - tapOn: 'プロフィール設定'
-- tapOn: 'アプリの設定 外観・触覚・パスキー'
-- assertVisible: '外観'
+- assertVisible: 'ログインするとプロフィールを変更できます'
+- assertNotVisible: 'アプリの設定'
+- tapOn: 'ログイン'
+# CI has no API configured, so the account screen explains how to enable sign-in.
+- assertVisible: '接続先が未設定です。セットアップ後にログインできます。'
+- tapOn: 'ゲストで参加'
+- assertVisible: 'ログインするとプロフィールを変更できます'
