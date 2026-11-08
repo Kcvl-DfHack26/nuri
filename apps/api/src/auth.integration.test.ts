@@ -222,25 +222,31 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     request(`/api/posts/${id}/like`, {}, other, 'PUT'),
     request(`/api/posts/${id}/like`, {}, other, 'PUT'),
   ]);
-  const feed = z
-    .object({
-      items: z.array(
-        z.object({
-          id: z.string(),
-          body: z.string(),
-          likeCount: z.number(),
-          liked: z.boolean(),
-          author: z
-            .object({ id: z.string(), name: z.string(), image: z.string().nullable() })
-            .strict(),
-        }),
-      ),
-    })
-    .parse(await (await appRequest('/api/posts', { headers: { cookie: other } })).json());
+  const feedSchema = z.object({
+    items: z.array(
+      z.object({
+        id: z.string(),
+        body: z.string(),
+        likeCount: z.number(),
+        liked: z.boolean(),
+        author: z
+          .object({ id: z.string(), name: z.string(), image: z.string().nullable() })
+          .strict(),
+      }),
+    ),
+  });
+  const feed = feedSchema.parse(
+    await (await appRequest('/api/posts', { headers: { cookie: other } })).json(),
+  );
   expect(feed.items.find((item) => item.id === id)).toMatchObject({
     body: '今日もいい日でした。',
     likeCount: 1,
     liked: true,
+  });
+  const guestFeed = feedSchema.parse(await (await appRequest('/api/posts')).json());
+  expect(guestFeed.items.find((item) => item.id === id)).toMatchObject({
+    likeCount: 1,
+    liked: false,
   });
   const author = feed.items.find((item) => item.id === id)?.author;
   expect(author).toBeDefined();

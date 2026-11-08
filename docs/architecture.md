@@ -67,7 +67,7 @@ PoC-1・PoC-2（#24）の⑦⑩への引き継ぎには、このExpo ModuleとSk
 
 `tablecast-poc/apps/api` のcomposition rootとモジュール公開入口を参考に、`app.ts`、`platform/env.ts`、`db`、`modules/auth`、`modules/social` へ分離した。organization／店舗・Cloudflare固有処理は持ち込まない。公開RPCは `contract.ts` の型だけ。
 
-レシピ詳細はDrizzleのrelational queryで著者、コスメ、手順、お気に入り状態を1回のSQLで取得する。コスメと手順の順序はそれぞれの `position` で決まる。
+レシピ詳細はDrizzleのrelational queryで著者、コスメ、手順、お気に入り状態を1回のSQLで取得する。コスメと手順の順序はそれぞれの `position` で決まる。お気に入りや投稿のいいね判定・集計にはDrizzleの `exists`・`$count` を使う。レシピ検索で配列内の各タグを部分一致させる式はPostgreSQLの `unnest` を使う。
 
 Better Authが認証し、Honoの `requireSession` と所有者条件が投稿・削除・いいねを認可する。入力はZod、いいねは複合主キーで冪等。公開フィードは著者ID・表示名・画像だけを返し、メールを公開しない。マジックリンクは10分・単回利用・ハッシュ保存、WebAuthnは署名／challenge／originを検証する。共通rate limitはDB保存。
 

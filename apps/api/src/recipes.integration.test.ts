@@ -105,6 +105,7 @@ test('shows the public recipe with ordered products and steps', async () => {
       tags: ['丸顔向け'],
       durationMinutes: 15,
       source: 'instagram',
+      favorited: false,
       author: { name: 'mio', image: '/sample-avatars/mio.png' },
       products: [
         { id: 'celane-brow-pencil', usage: '眉・モカブラウン', purchaseUrl: null },

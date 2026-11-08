@@ -6,7 +6,7 @@ import {
   profilePatchSchema,
   userParamsSchema,
 } from '@starter/shared';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, exists, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
@@ -79,10 +79,15 @@ export function socialRoutes(db: Database, auth: Auth) {
           body: post.body,
           createdAt: post.createdAt,
           author: { id: user.id, name: user.name, image: user.image },
-          likeCount: sql<number>`(select count(*)::int from ${like} where ${like.postId} = ${post.id})`,
-          liked: session
-            ? sql<boolean>`exists(select 1 from ${like} where ${like.postId} = ${post.id} and ${like.userId} = ${session.user.id})`
-            : sql<boolean>`false`,
+          likeCount: db.$count(like, eq(like.postId, post.id)),
+          liked: exists(
+            db
+              .select({ postId: like.postId })
+              .from(like)
+              .where(
+                and(eq(like.postId, post.id), eq(like.userId, sql.param(session?.user.id ?? null))),
+              ),
+          ).mapWith(Boolean),
         })
         .from(post)
         .innerJoin(user, eq(post.userId, user.id))
@@ -143,7 +148,10 @@ export function socialRoutes(db: Database, auth: Auth) {
             db
               .select({
                 postId: post.id,
-                userId: sql<string>`${c.get('currentUser').id}`.as('user_id'),
+                userId: sql
+                  .param(c.get('currentUser').id, like.userId)
+                  .getSQL()
+                  .as(like.userId.name),
               })
               .from(post)
               .where(eq(post.id, c.req.valid('param').id)),

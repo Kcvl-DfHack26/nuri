@@ -5,7 +5,7 @@ import {
   recipeListQuerySchema,
   recipeParamsSchema,
 } from '@starter/shared';
-import { and, count, desc, eq, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, exists, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
@@ -176,9 +176,11 @@ export function recipeRoutes(db: Database, auth: Auth) {
             .select(
               db
                 .select({
-                  userId: sql<string>`${c.get('currentUser').id}`.as('user_id'),
+                  userId: sql
+                    .param(c.get('currentUser').id, recipeFavorite.userId)
+                    .getSQL()
+                    .as(recipeFavorite.userId.name),
                   recipeId: recipe.id,
-                  createdAt: sql<Date>`now()`.as('created_at'),
                 })
                 .from(recipe)
                 .where(eq(recipe.id, id)),
@@ -231,9 +233,17 @@ export function recipeRoutes(db: Database, auth: Auth) {
           },
           extras: {
             favorited: (row) =>
-              session
-                ? sql<boolean>`exists(select 1 from ${recipeFavorite} where ${recipeFavorite.recipeId} = ${row.id} and ${recipeFavorite.userId} = ${session.user.id})`
-                : sql<boolean>`false`,
+              exists(
+                db
+                  .select({ recipeId: recipeFavorite.recipeId })
+                  .from(recipeFavorite)
+                  .where(
+                    and(
+                      eq(recipeFavorite.recipeId, row.id),
+                      eq(recipeFavorite.userId, sql.param(session?.user.id ?? null)),
+                    ),
+                  ),
+              ).mapWith(Boolean),
           },
           with: {
             author: { columns: { id: true, name: true, image: true } },
