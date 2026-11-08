@@ -1,13 +1,9 @@
 import type { ReactNode } from 'react';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as Crypto from 'expo-crypto';
 import { Image } from 'expo-image';
-import * as Linking from 'expo-linking';
-import * as SecureStore from 'expo-secure-store';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GoogleButton } from '@/components/google-button';
@@ -139,41 +135,15 @@ function SignInOptions({
   capabilities: NonNullable<ReturnType<typeof useCapabilities>['data']>;
 }) {
   const client = useQueryClient();
-  const [emailOpen, setEmailOpen] = useState(false);
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
   const login = useMutation({
-    mutationFn: async (method: 'google' | 'passkey' | 'email') => {
+    mutationFn: async (method: 'google' | 'passkey') => {
       if (method === 'passkey') {
         await signInWithPasskey();
         return;
       }
-      if (method === 'email') {
-        const state = Crypto.randomUUID();
-        if (Platform.OS !== 'web') {
-          await SecureStore.setItemAsync('magic-link-state', state);
-        }
-        const callbackURL =
-          Platform.OS === 'web'
-            ? Linking.createURL('/auth-callback')
-            : Linking.createURL('/auth-callback', { queryParams: { state } });
-        const result = await authClient.signIn.magicLink({
-          email: email.trim(),
-          name: '新しいユーザー',
-          callbackURL,
-        });
-        if (result.error) {
-          throw new Error('メールを送信できませんでした。入力内容を確認してお試しください。');
-        }
-        setSent(true);
-        return;
-      }
       await signInWithGoogle(capabilities.emulated);
     },
-    onSuccess: async (_data, method) => {
-      if (method === 'email') {
-        return;
-      }
+    onSuccess: async () => {
       const current = await authClient.getSession();
       // Dismissing the OS login browser is cancellation, not a successful login.
       if (current.data) {
@@ -183,12 +153,6 @@ function SignInOptions({
       }
     },
   });
-  const canSend = !login.isPending && email.trim().includes('@');
-  const sendLink = () => {
-    if (canSend) {
-      login.mutate('email');
-    }
-  };
   return (
     <>
       {capabilities.google ? (
@@ -198,38 +162,6 @@ function SignInOptions({
             login.mutate('google');
           }}
         />
-      ) : null}
-      {capabilities.email && emailOpen ? (
-        <>
-          <EmailInput
-            value={email}
-            editable={!login.isPending}
-            onChange={(value) => {
-              setEmail(value);
-              setSent(false);
-            }}
-            onSubmit={sendLink}
-          />
-          <PillButton
-            tone="rose"
-            label={login.isPending ? '処理中' : 'ログインリンクを送信'}
-            disabled={!canSend}
-            onPress={sendLink}
-          />
-        </>
-      ) : null}
-      {capabilities.email && !emailOpen ? (
-        <PillButton
-          tone="rose"
-          label="メールアドレスで続ける"
-          disabled={login.isPending}
-          onPress={() => {
-            setEmailOpen(true);
-          }}
-        />
-      ) : null}
-      {sent ? (
-        <Notice live>メールを送信しました。10分以内に、この端末でリンクを開いてください。</Notice>
       ) : null}
       {login.error ? <Notice alert>{login.error.message}</Notice> : null}
       {passkeysAvailable ? (
@@ -243,7 +175,7 @@ function SignInOptions({
         />
       ) : null}
       {capabilities.emulated ? (
-        <Notice>サンプル環境ではテスト用アカウントとメール受信箱を使用します</Notice>
+        <Notice>サンプル環境ではGoogleのテスト用アカウントを使用します</Notice>
       ) : null}
     </>
   );
@@ -398,50 +330,11 @@ function LinkButton({
   );
 }
 
-function EmailInput({
-  value,
-  editable,
-  onChange,
-  onSubmit,
-}: {
-  value: string;
-  editable: boolean;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  const placeholder = useTokenColor('--color-ink-secondary');
-  return (
-    <TextInput
-      accessibilityLabel="メールアドレス"
-      placeholder="メールアドレス"
-      placeholderTextColor={placeholder}
-      keyboardType="email-address"
-      autoComplete="email"
-      autoCapitalize="none"
-      autoCorrect={false}
-      returnKeyType="send"
-      value={value}
-      editable={editable}
-      onChangeText={onChange}
-      onSubmitEditing={onSubmit}
-      className="min-h-13 rounded-full border-fine border-line-soft bg-white px-4.5 py-3 font-maru text-action text-ink-primary"
-    />
-  );
-}
-
-function Notice({
-  children,
-  alert = false,
-  live = false,
-}: {
-  children: ReactNode;
-  alert?: boolean;
-  live?: boolean;
-}) {
+function Notice({ children, alert = false }: { children: ReactNode; alert?: boolean }) {
   return (
     <Text
       accessibilityRole={alert ? 'alert' : undefined}
-      accessibilityLiveRegion={live || alert ? 'polite' : undefined}
+      accessibilityLiveRegion={alert ? 'polite' : undefined}
       className={cn(
         'text-center font-maru text-label',
         alert ? 'text-accent-rose' : 'text-ink-secondary',
