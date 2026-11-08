@@ -85,13 +85,13 @@ test('shares the recipe as text from the finish screen, as Plan A has no way to 
   expect(share).toHaveBeenCalledWith({ message: '狐メイク（mio）をnuriで試しました' });
 });
 
-test('shows the live finish without step guides and before the recipe loads', async () => {
+test('shows the live finish at once and without step guides once the recipe loads', async () => {
   mockCanTrackFace = true;
-  mockGetRecipe.mockImplementationOnce(() => new Promise(() => {}));
   try {
     await render(<MakeFinish id="fox" />, { wrapper: TestQueryProvider });
-    expect(screen.getByText('Finish!')).toBeOnTheScreen();
     expect(screen.getByText('メイクのできあがり')).toBeOnTheScreen();
+    expect(await screen.findByText('狐メイクのできあがり')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: '共有', disabled: false })).toBeOnTheScreen();
     expect(mockFaceMakeupCamera.mock.lastCall?.[0].layers).toEqual([]);
   } finally {
     mockCanTrackFace = false;
