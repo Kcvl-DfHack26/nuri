@@ -100,7 +100,7 @@ function CloseButton() {
       }}
       className="size-9 items-center justify-center rounded-full bg-neutral-soft active:opacity-70"
     >
-      <SocialIcon name={CLOSE} size={18} color={ink} />
+      <SocialIcon name={CLOSE} webGlyph="×" size={18} color={ink} />
     </Pressable>
   );
 }
@@ -178,7 +178,7 @@ function ProductDetails({ info }: { info: ProductInfo }) {
             key={label}
             className="min-h-6.5 flex-row items-center gap-1 rounded-chip bg-pastel-mint px-2.5"
           >
-            <SocialIcon name={CHECK} size={12} color={ink} />
+            <SocialIcon name={CHECK} webGlyph="✓" size={12} color={ink} />
             <Text className="font-maru-bold text-micro text-ink-primary">{label}</Text>
           </View>
         ))}

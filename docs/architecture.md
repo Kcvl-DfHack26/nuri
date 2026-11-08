@@ -130,3 +130,32 @@ PRのExpo Updateは、tablecast-pocの手動カタログ配備と同じコメン
 - [Expo Workflows](https://docs.expo.dev/eas/workflows/syntax/)
 - [Expo MCP](https://docs.expo.dev/mcp/)
 - [OpenTofu ephemerality](https://opentofu.org/docs/language/ephemerality/)
+
+## スマートフォンとタブレットの表示
+
+ルート・画面・取得処理は iOS、Android、Webで共有する。ホーム、検索、部位別のカードはリストの幅から、最小156pt相当のカードが収まる列数を決める。ホームと検索は仮想化とページ送りを維持する。列数が変わる場合は FlatList の行構造を作り直す。部位別で最後の行に1枚だけあっても列幅を保つ。
+
+横長で680pt相当以上の領域があれば、レシピ詳細とカメラを使う手順・完成・比較・録画で、映像と操作を左右に並べる。縦長では Plan A の重ね表示を使う。カメラと比較の座標、見本画像の切り抜きは、それぞれの表示領域を計測して決める。端末の種類でレイアウトを選ばず、画面全体の幅に上限は設けない。画面の向きに合わせて iOS はプレビューと解析フレーム、Android は CameraX の解析フレームを更新する。
+
+Webの出力は Expo Router の SPA とし、既存の画面ルートを共有する。端末設定は Expo SQLite の `localStorage` 互換APIで同じキーに保存する。ネイティブでは既存のSQLiteストア、Webではブラウザ標準の保存領域を使う。公開URLで動的ルートを開くには、配信側がページのパスを `index.html` に解決する必要がある。
+
+WebのAR手順では「カメラを使う」を押したときにブラウザのカメラ許可を求め、前面カメラの映像をページ内に表示する。音声は要求しない。許可が得られないときは見本で続けられる。見本に戻るか手順画面を離れたときに映像トラックを停止する。見本にガイドを表示し、カメラ映像は端末内でプレビューする。ブラウザ上でのライブ顔追跡と録画は [#105](https://github.com/Kcvl-DfHack26/nuri/issues/105) で扱う。
+
+## 審査向けWebの配信設計
+
+審査員向けの入口は既存の Cloud Run `nuri-staging`（`asia-northeast1`）の [サービスURL](https://nuri-staging-v3kjfarita-an.a.run.app/) を使う設計とする。Hono の Node.js コンテナに Expo Web のエクスポートを同梱する。将来 `apps/website` に Astro でLPを作る場合も、静的出力を同じコンテナの `/about/` に置ける。現在このサービスが公開しているのは Hono API とサンプル素材で、Webの配信設定は #105 で扱う。
+
+| パス                                                                                                        | 処理                                                                                                                |
+| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `/api/**`                                                                                                   | Hono。Better Auth は `/api/auth/**`、Google OAuth の登録先は `/api/auth/callback/google`                            |
+| `/health`、`/ready`、`/.well-known/**`、`/sample-avatars/**`、`/sample-recipes/**`                          | 既存の Hono エンドポイントとサンプル素材                                                                            |
+| `/about`、`/about/**`                                                                                       | 将来のLP。Astro の `base: '/about'` で出力し、`/about` は `/about/` に正規化。`/about/_astro/**` も同じ配信先で解決 |
+| `/_expo/**`、`/assets/**`、`/favicon.ico`                                                                   | Expo Web の静的出力。公開用OG画像を追加する場合も静的配信で先に解決                                                 |
+| `/`、`/recipes/**`、`/parts/*`、`/products/*`、`/users/*`、`/post/**`、`/import/**`、その他のExpo画面ルート | Expo Router。ページへの `GET` と `HEAD` を `index.html` に解決。`/auth-callback` はアプリ画面                       |
+
+API、LP、静的ファイルの順に解決してからExpoの画面ルートを判定する。APIや静的ファイルの欠損はその領域で404を返す。ブラウザ版の `EXPO_PUBLIC_API_URL` と `BETTER_AUTH_URL` は同じ `https://nuri-staging-v3kjfarita-an.a.run.app` に合わせる。ブラウザは同一オリジンで認証Cookieを扱える。独自ドメインの購入やCookieの `Domain` 共有を省ける。ExpoのSPA共通OGは `index.html` に、LPのページ別OGはAstroの静的HTMLに出力できる。
+
+- [Cloud RunのHTTPSサービスURL](https://docs.cloud.google.com/run/docs/triggering/https-request)
+- [Expo RouterのWeb出力](https://docs.expo.dev/router/web/hosting/)
+- [Better Authの公開URLとCookie設定](https://better-auth.com/docs/reference/options)
+- [Astroのbase設定](https://docs.astro.build/en/reference/configuration-reference/#base)

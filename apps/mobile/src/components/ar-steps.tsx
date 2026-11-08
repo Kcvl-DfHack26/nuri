@@ -2,9 +2,8 @@ import { Icon } from '@expo/ui';
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { RecipeStep } from '@/lib/recipes';
@@ -12,10 +11,12 @@ import type { RecipeStep } from '@/lib/recipes';
 import { canTrackFace, FaceMakeupCamera } from '@/components/face-makeup-camera';
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
+import { MediaLayout } from '@/components/media-layout';
 import { RecipeStatus } from '@/components/recipe-detail';
 import { arOverlays, arPhotos, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { useStepCamera } from '@/components/use-step-camera';
 import { apiUrl } from '@/lib/api';
 import { paintColor } from '@/lib/face-makeup';
 import { backOrHome } from '@/lib/navigation';
@@ -101,6 +102,7 @@ function StepsContent({
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const camera = useStepCamera();
   // A refetch may return fewer steps than the one on screen.
   const current = Math.min(index, steps.length - 1);
   const step = steps[current];
@@ -117,88 +119,102 @@ function StepsContent({
     setIndex(current + 1);
   };
   return (
-    <View className="flex-1 bg-white">
-      <StatusBar style="dark" />
-      {canTrackFace ? (
-        <FaceMakeupCamera
-          layers={overlayVisible ? [{ part: step.part, color: paintColor(step.colors) }] : []}
-          annotation={overlayVisible ? { part: step.part, label: step.label } : undefined}
-        />
-      ) : (
-        // Expo Go has no face tracker; Plan A's frame and overlays stand in.
-        <FaceScene photo={arPhotos.camera}>
-          {overlayVisible && overlay !== undefined ? (
-            <Image
-              accessible={false}
-              source={overlay}
-              contentFit="fill"
-              style={{ position: 'absolute', width: '100%', height: '100%' }}
-            />
-          ) : null}
-        </FaceScene>
-      )}
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 top-0 h-50"
-        style={{
-          backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.7), rgba(255,255,255,0))',
-        }}
-      />
-      <View className="absolute inset-x-4 gap-2.5" style={{ top: insets.top + 8 }}>
-        <View className="flex-row items-center justify-between">
-          <GlassIconButton
-            icon={CLOSE}
-            label="閉じる"
-            onPress={() => {
-              backOrHome();
+    <MediaLayout
+      media={
+        <>
+          {camera.preview ??
+            (canTrackFace ? (
+              <FaceMakeupCamera
+                layers={overlayVisible ? [{ part: step.part, color: paintColor(step.colors) }] : []}
+                annotation={overlayVisible ? { part: step.part, label: step.label } : undefined}
+              />
+            ) : (
+              // Expo Go has no face tracker; Plan A's frame and overlays stand in.
+              <FaceScene photo={arPhotos.camera}>
+                {overlayVisible && overlay !== undefined ? (
+                  <Image
+                    accessible={false}
+                    source={overlay}
+                    contentFit="fill"
+                    style={{ position: 'absolute', width: '100%', height: '100%' }}
+                  />
+                ) : null}
+              </FaceScene>
+            ))}
+          <View
+            pointerEvents="none"
+            className="absolute inset-x-0 top-0 h-50"
+            style={{
+              backgroundImage:
+                'linear-gradient(to bottom, rgba(255,255,255,0.7), rgba(255,255,255,0))',
             }}
           />
-          <View className="min-h-9 flex-row items-center gap-1.5 rounded-card border border-white bg-white/70 px-3.5">
-            <Text className="font-maru-bold text-label text-ink-primary">{title}</Text>
-            <Text className="font-maru text-meta text-ink-secondary">
-              {current + 1}/{steps.length}
-            </Text>
+        </>
+      }
+      header={
+        <View className="gap-2.5 px-4" style={{ paddingTop: insets.top + 8 }}>
+          <View className="flex-row items-center justify-between">
+            <GlassIconButton
+              icon={CLOSE}
+              label="閉じる"
+              onPress={() => {
+                backOrHome();
+              }}
+            />
+            <View className="min-h-9 shrink flex-row items-center gap-1.5 rounded-card border border-white bg-white/70 px-3.5">
+              <Text className="shrink font-maru-bold text-label text-ink-primary">{title}</Text>
+              <Text className="font-maru text-meta text-ink-secondary">
+                {current + 1}/{steps.length}
+              </Text>
+            </View>
+            {camera.preview ? (
+              <View className="w-10" />
+            ) : (
+              <GlassIconButton
+                icon={overlayVisible ? EYE : EYE_OFF}
+                label={overlayVisible ? 'ガイドを隠す' : 'ガイドを表示'}
+                onPress={() => {
+                  setOverlayVisible(!overlayVisible);
+                }}
+              />
+            )}
           </View>
-          <GlassIconButton
-            icon={overlayVisible ? EYE : EYE_OFF}
-            label={overlayVisible ? 'ガイドを隠す' : 'ガイドを表示'}
-            onPress={() => {
-              setOverlayVisible(!overlayVisible);
+          <View className="flex-row gap-1">
+            {steps.map((_, position) => (
+              <View
+                // Steps are identified by their position; a part may appear twice.
+                key={position}
+                className={cn(
+                  'h-1 flex-1 rounded-sm',
+                  position <= current ? 'bg-accent-pink' : 'bg-white/70',
+                )}
+              />
+            ))}
+          </View>
+          <Instruction step={step} number={current + 1} />
+          {camera.control}
+        </View>
+      }
+      footer={
+        <View
+          className="gap-3.5 rounded-t-sheet bg-white/80 px-4 pt-4"
+          style={{
+            paddingBottom: insets.bottom + 12,
+            boxShadow: '0px -6px 12px rgba(196, 61, 112, 0.12)',
+          }}
+        >
+          <ProductRow step={step} />
+          <StepList steps={steps} current={current} onSelect={setIndex} />
+          <Controls
+            isFirst={current === 0}
+            onPrevious={() => {
+              setIndex(current - 1);
             }}
+            onNext={goNext}
           />
         </View>
-        <View className="flex-row gap-1">
-          {steps.map((_, position) => (
-            <View
-              // Steps are identified by their position; a part may appear twice.
-              key={position}
-              className={cn(
-                'h-1 flex-1 rounded-sm',
-                position <= current ? 'bg-accent-pink' : 'bg-white/70',
-              )}
-            />
-          ))}
-        </View>
-        <Instruction step={step} number={current + 1} />
-      </View>
-      <View
-        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-sheet bg-white/80 px-4 pt-4"
-        style={{
-          paddingBottom: insets.bottom + 12,
-          boxShadow: '0px -6px 12px rgba(196, 61, 112, 0.12)',
-        }}
-      >
-        <ProductRow step={step} />
-        <StepList steps={steps} current={current} onSelect={setIndex} />
-        <Controls
-          isFirst={current === 0}
-          onPrevious={() => {
-            setIndex(current - 1);
-          }}
-          onNext={goNext}
-        />
-      </View>
-    </View>
+      }
+    />
   );
 }
 
@@ -254,7 +270,7 @@ function ProductRow({ step }: { step: RecipeStep }) {
         className="size-12 items-center justify-center"
       >
         <View className="size-9 items-center justify-center rounded-full bg-neutral-soft">
-          <SocialIcon name={PLAY} size={16} color={ink} />
+          <SocialIcon name={PLAY} webGlyph="▷" size={16} color={ink} />
         </View>
       </View>
     </View>
@@ -271,7 +287,11 @@ function StepList({
   onSelect: (index: number) => void;
 }) {
   return (
-    <View className="flex-row justify-between">
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between' }}
+    >
       {steps.map((step, position) => {
         const active = position === current;
         return (
@@ -308,7 +328,7 @@ function StepList({
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -335,7 +355,7 @@ function Controls({
           isFirst && 'opacity-50',
         )}
       >
-        <SocialIcon name={BACK} size={22} color={ink} />
+        <SocialIcon name={BACK} webGlyph="‹" size={22} color={ink} />
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -343,7 +363,7 @@ function Controls({
         className="min-h-13 flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5 active:opacity-80"
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
       >
-        <SocialIcon name={NEXT} size={20} color="white" />
+        <SocialIcon name={NEXT} webGlyph="›" size={20} color="white" />
         <Text className="font-maru-bold text-action text-white">次へ</Text>
       </Pressable>
       <View

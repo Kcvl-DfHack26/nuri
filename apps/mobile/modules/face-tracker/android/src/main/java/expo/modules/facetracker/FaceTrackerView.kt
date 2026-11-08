@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.SystemClock
 import android.util.Range
+import android.view.Surface
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -89,6 +90,17 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     if (active) start()
   }
 
+  override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+    super.onSizeChanged(width, height, oldWidth, oldHeight)
+    val analysis = useCases.filterIsInstance<ImageAnalysis>().firstOrNull() ?: return
+    val rotation = display?.rotation ?: return
+    if (analysis.targetRotation != rotation) {
+      discardResultsBeforeMs = SystemClock.uptimeMillis()
+      analysis.targetRotation = rotation
+      setStatus("noFace")
+    }
+  }
+
   override fun onDetachedFromWindow() {
     stop()
     runOnAnalysisThread { closeLandmarker() }
@@ -132,6 +144,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
         .build()
       preview.setSurfaceProvider(previewView.surfaceProvider)
       val analysis = ImageAnalysis.Builder()
+        .setTargetRotation(display?.rotation ?: Surface.ROTATION_0)
         .setResolutionSelector(resolutionSelector)
         // MediaPipe's LIVE_STREAM mode drops frames it cannot keep up with; keep only the latest here too.
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)

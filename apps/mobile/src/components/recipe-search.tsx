@@ -3,12 +3,12 @@ import { recipeSearchMaxLength } from '@starter/shared';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { FlatList, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { RecipeCard } from '@/components/recipe-card';
+import { RecipeList } from '@/components/recipe-list';
 import { SocialIcon } from '@/components/social-icon';
 import { apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
@@ -75,7 +75,7 @@ export function RecipeSearch() {
           }}
         />
         <View className="min-h-12 flex-1 flex-row items-center gap-2 rounded-full border border-black bg-white pl-3.5 pr-4">
-          <SocialIcon name={SEARCH} size={22} color={ink} />
+          <SocialIcon name={SEARCH} webGlyph="⌕" size={22} color={ink} />
           <TextInput
             accessibilityLabel="メイクを検索"
             placeholder="メイクを検索"
@@ -96,12 +96,9 @@ export function RecipeSearch() {
           />
         </View>
       </View>
-      <FlatList
+      <RecipeList
         automaticallyAdjustKeyboardInsets
         data={items}
-        keyExtractor={(recipe) => recipe.id}
-        numColumns={2}
-        columnWrapperStyle={{ gap: 6 }}
         contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 24, gap: 14 }}
         contentInsetAdjustmentBehavior="never"
         keyboardDismissMode="on-drag"
@@ -119,7 +116,6 @@ export function RecipeSearch() {
             void list.fetchNextPage();
           }
         }}
-        renderItem={({ item }) => <RecipeCard recipe={item} />}
       />
     </View>
   );

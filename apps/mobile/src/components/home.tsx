@@ -4,12 +4,12 @@ import { Image } from 'expo-image';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
-import { RecipeCard } from '@/components/recipe-card';
+import { RecipeList } from '@/components/recipe-list';
 import { partCards, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
@@ -93,7 +93,7 @@ function Header({ top, onHeight }: { top: number; onHeight: (height: number) => 
           }}
           className="min-h-9 flex-1 flex-row items-center gap-2 active:opacity-70"
         >
-          <SocialIcon name={SEARCH} size={22} color={ink} />
+          <SocialIcon name={SEARCH} webGlyph="⌕" size={22} color={ink} />
           <Text className="flex-1 font-maru text-ui text-ink-secondary" numberOfLines={1}>
             メイクを検索
           </Text>
@@ -108,7 +108,7 @@ function Header({ top, onHeight }: { top: number; onHeight: (height: number) => 
           }}
           className="min-h-9 flex-row items-center gap-1 rounded-full bg-neutral-soft pl-2.5 pr-3 active:opacity-70"
         >
-          <SocialIcon name={LINK} size={16} color={secondary} />
+          <SocialIcon name={LINK} webGlyph="↗" size={16} color={secondary} />
           <Text className="font-maru-bold text-label text-ink-primary">動画URL</Text>
         </Pressable>
       </View>
@@ -176,11 +176,8 @@ function RecipeGrid({ top, bottom }: { top: number; bottom: number }) {
     />
   ) : null;
   return (
-    <FlatList
+    <RecipeList
       data={items}
-      keyExtractor={(recipe) => recipe.id}
-      numColumns={2}
-      columnWrapperStyle={{ gap: 6 }}
       contentContainerStyle={{ paddingTop: top, paddingBottom: bottom, gap: 14 }}
       contentInsetAdjustmentBehavior="never"
       // A failed next page keeps the loaded cards and shows the retry above them.
@@ -197,7 +194,6 @@ function RecipeGrid({ top, bottom }: { top: number; bottom: number }) {
           void list.fetchNextPage();
         }
       }}
-      renderItem={({ item }) => <RecipeCard recipe={item} />}
     />
   );
 }

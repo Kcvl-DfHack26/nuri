@@ -13,7 +13,7 @@
     "typecheck": "expo customize tsconfig.json && test -s .expo/types/router.d.ts && tsc --noEmit",
     "styles:generate": "uniwind generate-artifacts --css ./global.css --dts ./uniwind-types.d.ts",
     "test": "jest --ci --runInBand",
-    "export": "expo export --platform ios --platform android",
+    "export": "expo export --platform ios --platform android --platform web",
     "doctor": "expo-doctor",
     "go": "expo start --port 8081 --go --tunnel ngrok"
   },

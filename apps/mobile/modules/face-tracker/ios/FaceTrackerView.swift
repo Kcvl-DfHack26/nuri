@@ -17,6 +17,8 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   private let videoQueue = DispatchQueue(label: "com.kcvl.nuri.facetracker.video")
   private var landmarker: FaceLandmarker?
   private var configured = false
+  private var videoOutput: AVCaptureVideoDataOutput?
+  private var orientation: AVCaptureVideoOrientation = .portrait
   private var active = false
   private var lastStatus: String?
   private var lastMessage: String?
@@ -25,8 +27,9 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   private let lock = NSLock()
   private var sessionGeneration = 0
   private var acceptingFrames = false
-  private var captureTimes: [Int: (at: CFTimeInterval, generation: Int)] = [:]
-  private var frameSize = CGSize.zero
+  private var captures: [
+    Int: (at: CFTimeInterval, generation: Int, size: CGSize, orientation: AVCaptureVideoOrientation)
+  ] = [:]
   private var lastTimestamp = -1
 
   required init(appContext: AppContext? = nil) {
@@ -45,6 +48,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   override func layoutSubviews() {
     super.layoutSubviews()
     previewLayer.frame = bounds
+    updateOrientation()
   }
 
   override func didMoveToWindow() {
@@ -70,11 +74,13 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       emitStatus("permissionDenied")
       return
     }
+    updateOrientation()
+    let targetOrientation = orientation
     lock.lock()
     let generation = sessionGeneration
     lock.unlock()
     sessionQueue.async {
-      if !self.configured && !self.configure() {
+      if !self.configured && !self.configure(targetOrientation) {
         return
       }
       if !self.session.isRunning {
@@ -92,7 +98,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     lock.lock()
     acceptingFrames = false
     sessionGeneration += 1
-    captureTimes.removeAll()
+    captures.removeAll()
     lock.unlock()
     // A resumed camera must report its first state even when it matches the previous session.
     lastStatus = nil
@@ -104,8 +110,35 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     }
   }
 
+  private func updateOrientation() {
+    guard let interfaceOrientation = window?.windowScene?.interfaceOrientation else { return }
+    let next: AVCaptureVideoOrientation
+    switch interfaceOrientation {
+    case .portrait: next = .portrait
+    case .portraitUpsideDown: next = .portraitUpsideDown
+    case .landscapeLeft: next = .landscapeLeft
+    case .landscapeRight: next = .landscapeRight
+    default: return
+    }
+    guard next != orientation else { return }
+    orientation = next
+    orient(previewLayer.connection, to: next)
+    sessionQueue.async {
+      self.orient(self.videoOutput?.connection(with: .video), to: next)
+      self.lock.lock()
+      self.captures.removeAll()
+      self.lock.unlock()
+    }
+  }
+
+  // Use the same interface orientation for the preview and the buffers fed to MediaPipe.
+  private func orient(_ connection: AVCaptureConnection?, to orientation: AVCaptureVideoOrientation) {
+    guard let connection, connection.isVideoOrientationSupported else { return }
+    connection.videoOrientation = orientation
+  }
+
   // Runs on the session queue.
-  private func configure() -> Bool {
+  private func configure(_ orientation: AVCaptureVideoOrientation) -> Bool {
     do {
       landmarker = try makeLandmarker()
     } catch {
@@ -136,19 +169,16 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       return false
     }
     session.addOutput(output)
+    videoOutput = output
     if let connection = output.connection(with: .video) {
-      // Upright portrait frames, not mirrored.
-      if #available(iOS 17.0, *) {
-        if connection.isVideoRotationAngleSupported(90) {
-          connection.videoRotationAngle = 90
-        }
-      } else if connection.isVideoOrientationSupported {
-        connection.videoOrientation = .portrait
-      }
+      orient(connection, to: orientation)
       if connection.isVideoMirroringSupported {
         connection.automaticallyAdjustsVideoMirroring = false
         connection.isVideoMirrored = false
       }
+    }
+    DispatchQueue.main.async {
+      self.orient(self.previewLayer.connection, to: self.orientation)
     }
     configured = true
     return true
@@ -189,11 +219,11 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     }
     lastTimestamp = timestamp
     let generation = sessionGeneration
-    frameSize = CGSize(
+    let size = CGSize(
       width: CVPixelBufferGetWidth(pixelBuffer), height: CVPixelBufferGetHeight(pixelBuffer))
-    captureTimes[timestamp] = (CACurrentMediaTime(), generation)
-    if captureTimes.count > 30 {
-      captureTimes = captureTimes.filter { $0.key > timestamp - 2000 }
+    captures[timestamp] = (CACurrentMediaTime(), generation, size, connection.videoOrientation)
+    if captures.count > 30 {
+      captures = captures.filter { $0.key > timestamp - 2000 }
     }
     lock.unlock()
     do {
@@ -210,8 +240,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     timestampInMilliseconds: Int, error: Error?
   ) {
     lock.lock()
-    let capture = captureTimes.removeValue(forKey: timestampInMilliseconds)
-    let size = frameSize
+    let capture = captures.removeValue(forKey: timestampInMilliseconds)
     lock.unlock()
     guard let capture else {
       return
@@ -232,14 +261,16 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     }
     let latencyMs = (CACurrentMediaTime() - capture.at) * 1000
     DispatchQueue.main.async {
-      guard self.active, self.window != nil, self.isCurrentSession(capture.generation) else {
+      guard self.active, self.window != nil, self.isCurrentSession(capture.generation),
+        self.orientation == capture.orientation
+      else {
         return
       }
       self.setStatus("tracking", message: nil)
       self.onLandmarks([
         "points": points,
-        "width": Double(size.width),
-        "height": Double(size.height),
+        "width": Double(capture.size.width),
+        "height": Double(capture.size.height),
         "latencyMs": latencyMs,
       ])
     }
