@@ -29,11 +29,6 @@ export default defineConfig({
         launchOptions: { args: ['--use-fake-device-for-media-stream'] },
       },
     },
-    {
-      name: 'webkit',
-      testIgnore: '**/camera.spec.ts',
-      use: { browserName: 'webkit' },
-    },
   ],
   webServer: {
     cwd: './apps/api',

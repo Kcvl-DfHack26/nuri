@@ -204,7 +204,7 @@ adb reverse tcp:8081 tcp:8081
 
 ### GitHub Actions
 
-通常のCIはsecretなしで動く。GitHub Actionsは有効で、mainはPR経由の変更と `quality`、`infrastructure`、`container` の成功を必須に設定済み。最新mainへの追従、会話の解決も必要で、管理者にも適用する。承認人数は0、force pushとブランチ削除は禁止。フォーク時は初回CI成功後に同じ保護を設定する。
+通常のCIはsecretなしで動く。PRでは `All CI Checks` から、静的検査、各テスト、バンドル、コンテナ、OpenTofuの結果を確認できる。
 
 **Settings → Environments → production** は作成済みで、利用できるブランチをmainだけに制限している。フォーク時は作成し、必要に応じてrequired reviewerを指定する。デプロイ先の変数を設定する。
 

@@ -1,4 +1,4 @@
-name: Preview request
+name: PR Preview Comment
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
@@ -10,6 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   comment:
+    name: Initialize Preview Comment
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -24,7 +25,7 @@ jobs:
         if: hashFiles('.github/scripts/preview/initialize.ts') != ''
         with:
           bun-version-file: .bun-version
-      - name: プレビューコメントを更新する
+      - name: Update Preview Comment
         if: hashFiles('.github/scripts/preview/initialize.ts') != ''
         env:
           GH_TOKEN: ${{ github.token }}

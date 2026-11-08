@@ -1,4 +1,4 @@
-name: Deploy API, Expo Web and mobile update
+name: Staging Deployment
 on:
   workflow_run:
     workflows: [CI]
@@ -12,6 +12,7 @@ concurrency:
   queue: max
 jobs:
   deploy:
+    name: Deploy Staging
     if: >-
       vars.GCP_DEPLOY_ENABLED == 'true' && github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||
@@ -39,7 +40,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      - name: Check deployment configuration and current main
+      - name: Verify Deployment Configuration
         env:
           GH_TOKEN: ${{ github.token }}
         run: bun .github/scripts/deploy/staging.ts check
@@ -48,21 +49,21 @@ jobs:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Resolve the staging API and Web image
+      - name: Resolve Staging Image
         id: image
         run: bun .github/scripts/deploy/staging.ts image
-      - name: Migrate before deploying
+      - name: Run Database Migrations
         if: steps.image.outputs.skip != 'true'
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
         run: bun .github/scripts/deploy/staging.ts migrate
-      - name: Deploy candidate without traffic and check API and Web
+      - name: Deploy and Verify Candidate
         if: steps.image.outputs.skip != 'true'
         id: candidate
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
         run: bun .github/scripts/deploy/staging.ts candidate
-      - name: Promote tested revision
+      - name: Promote Verified Revision
         if: steps.image.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,7 +71,7 @@ jobs:
         run: bun .github/scripts/deploy/staging.ts promote
       - if: vars.EXPO_UPDATE_ENABLED == 'true' && steps.image.outputs.skip != 'true'
         run: bun install --frozen-lockfile
-      - name: Publish matching production update through Expo Workflows
+      - name: Publish Expo Update
         if: vars.EXPO_UPDATE_ENABLED == 'true' && steps.image.outputs.skip != 'true'
         working-directory: apps/mobile
         env:

@@ -1,4 +1,4 @@
-name: Manage PR preview infrastructure
+name: Preview Infrastructure
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +17,7 @@ concurrency:
   queue: max
 jobs:
   opentofu:
+    name: Run OpenTofu
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
@@ -35,7 +36,7 @@ jobs:
         with:
           bun-version-file: .bun-version
       # 現在のmainと対象PRを確認してからクラウドへ認証する。
-      - name: Verify the current main passed CI
+      - name: Verify Current Main and CI
         env:
           OPERATION: ${{ inputs.operation }}
           PR_NUMBER: ${{ inputs.pr }}
@@ -49,7 +50,7 @@ jobs:
         with:
           tofu_version: 1.13.8
           tofu_wrapper: false
-      - name: Plan and optionally apply the preview stack
+      - name: Plan or Apply Preview Infrastructure
         id: operation
         env:
           OPERATION: ${{ inputs.operation }}

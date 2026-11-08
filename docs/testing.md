@@ -12,7 +12,7 @@ bun run export:mobile
 
 APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。
 
-GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ブラウザ別のWeb E2E、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。必須チェックの `quality` はすべての結果を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
+GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
 
 | 検査                | 確認すること                                                  |
 | ------------------- | ------------------------------------------------------------- |
@@ -22,7 +22,7 @@ GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard�
 | 実Compose・Portless | 各構成の解決、起動、HTTPS、worktree間の分離と永続化           |
 | 開発ビルド          | 仮想端末でのTLS、Metro、Fast Refresh、認証の戻り先            |
 
-GitHub Actionsの `quality` は生成型・静的検査・Bun/Jest・PostgreSQL統合テストを実行する。`quality` と並行して動く `mobile-bundle` はExpo DoctorとiOS／Androidのexportを行い、`mobile-bundles` を保存する。
+`Native Bundle Build` はExpo DoctorとiOS／Androidのexportを実行し、`mobile-bundles` を保存する。
 
 モバイルの `src` は `bun run lint` でReact DoctorのOxlintプラグインも実行する。Effectの解除漏れや不安定な依存、TanStack Queryのクライアント再生成や購読範囲、React Nativeのリストと条件付き描画を検査する。ルールは `oxlint.config.ts` で指定し、違反はローカルとCIの両方でエラーになる。
 
@@ -55,7 +55,7 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 
 ## Expo WebのE2E
 
-Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgreSQLを経由してサンプルレシピを読む。ChromiumとWebKitでスマートフォン・横向きタブレットの一覧、URL直アクセス、手順と完成、比較のドラッグを検査する。Chromiumではカメラ拒否後の見本と、仮想カメラの開始・停止も検査する。CIではブラウザごとの使い捨てPostgreSQLサービスを使い、失敗時にブラウザ別のトレースを保存する。
+Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgreSQLを経由してサンプルレシピを読む。Chromiumでスマートフォン・横向きタブレットの一覧、URL直アクセス、手順と完成、比較のドラッグを検査する。カメラ拒否後の見本と、仮想カメラの開始・停止も検査する。CIでは専用の使い捨てPostgreSQLを使い、失敗時にトレースを保存する。
 
 ローカルでは次のように専用DBを起動する。停止するとこのコンテナのデータは消える。
 
@@ -67,7 +67,7 @@ docker run --rm --publish 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data 
 DBが起動したら別のターミナルで実行する。
 
 ```sh
-bunx playwright install --no-shell chromium webkit
+bunx --bun playwright install --no-shell chromium
 bun run test:e2e
 ```
 

@@ -1,6 +1,6 @@
 # PRプレビューとstaging配信
 
-同じリポジトリのPRにある **previewを配信** を、write権限を持つメンバーがチェックする。Actionsから起動する場合は、mainの **Publish or clean up PR preview** に公開中のPR番号を渡す。
+同じリポジトリのPRにある **previewを配信** を、write権限を持つメンバーがチェックする。Actionsから起動する場合は、mainの **PR Preview** に公開中のPR番号を渡す。
 
 ```sh
 gh workflow run preview.yml --ref main -f pr=PR_NUMBER
@@ -38,7 +38,7 @@ Cloud Runの月間無料枠は 180,000 vCPU秒、360,000 GiB秒、200万リク�
 ## 初期設定
 
 1. 管理者が `production` Environmentに `PREVIEW_INFRA_WIF_PROVIDER` と `PREVIEW_INFRA_SERVICE_ACCOUNT` を用意する。専用の管理用WIFは、このリポジトリのmain、`production` Environment、`.github/workflows/infra-preview.yml` に絞る。GCSの `nuri/preview` stateの更新と、`infra/preview` が管理する資源の作成・権限設定を許可する。
-2. mainのCIが成功した状態で **Manage PR preview infrastructure** の `plan` を実行して差分を確認し、同じActionsの `apply` で専用サービス、レジストリ、配信用WIFを作成する。`pr` にmainへマージ済みの関連PR番号を指定する。実行ごとに **🧱 OpenTofu Apply** の新規コメントを残す。コードブロックには公開用のリソース操作と件数を載せ、実行ログの詳細はActionsから確認できる。
+2. mainのCIが成功した状態で **Preview Infrastructure** の `plan` を実行して差分を確認し、同じActionsの `apply` で専用サービス、レジストリ、配信用WIFを作成する。`pr` にmainへマージ済みの関連PR番号を指定する。実行ごとに **🧱 OpenTofu Apply** の新規コメントを残す。コードブロックには公開用のリソース操作と件数を載せ、実行ログの詳細はActionsから確認できる。
 3. GitHubの `preview` EnvironmentにOpenTofuの `preview_wif_provider` を `PREVIEW_WIF_PROVIDER`、`preview_service_account` を `PREVIEW_SERVICE_ACCOUNT` として登録する。プレビューの実行用サービスアカウントに本番のSecret ManagerやDB権限は付けない。
 4. Repository Variable `PREVIEW_GCP_ENABLED=true` を設定し、テスト用PRをリクエストする。実際のWeb、API、Expo Goを確認したらPRを閉じ、タグとイメージの削除を確認する。
 
@@ -46,6 +46,6 @@ Cloud Runの月間無料枠は 180,000 vCPU秒、360,000 GiB秒、200万リク�
 
 ## staging配信
 
-共有の `nuri-staging` は、mainのCIが成功したあとに **Deploy API, Expo Web and mobile update** から配信する。API・Webイメージの入力が同じならdigestを再利用する。自動実行で同じdigestが既に全トラフィックを受け、公開URLの検査も通る場合はmigrationと配信を省く。設定変更後など、同じイメージでも新しいrevisionが必要なら `gh workflow run deploy.yml --ref main` で実行する。
+共有の `nuri-staging` は、mainのCIが成功したあとに **Staging Deployment** から配信する。API・Webイメージの入力が同じならdigestを再利用する。自動実行で同じdigestが既に全トラフィックを受け、公開URLの検査も通る場合はmigrationと配信を省く。設定変更後など、同じイメージでも新しいrevisionが必要なら `gh workflow run deploy.yml --ref main` で実行する。
 
 新しい配信はmigration、トラフィックなしの候補revisionでの `/ready` とWeb配信の検査、mainのSHA再確認、昇格の順。昇格時に候補タグを外し、公開URLを検査する。Expoの本番Updateは既存の有効化設定に従う。

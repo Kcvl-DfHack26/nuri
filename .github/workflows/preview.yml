@@ -1,4 +1,4 @@
-name: Publish or clean up PR preview
+name: PR Preview
 on:
   issue_comment:
     types: [edited]
@@ -25,6 +25,7 @@ concurrency:
   queue: max
 jobs:
   request:
+    name: Prepare Preview Comment
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.operation == 'comment') ||
       (github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' ||
@@ -47,7 +48,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      - name: プレビューコメントを準備する
+      - name: Prepare Preview Comment
         id: request
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,6 +63,7 @@ jobs:
         run: bun .github/scripts/preview/request.ts
 
   publish:
+    name: Publish Preview
     needs: request
     if: >-
       github.ref == 'refs/heads/main' && inputs.operation != 'comment' &&
@@ -96,7 +98,7 @@ jobs:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Publish and check the Cloud Run preview
+      - name: Publish and Verify Preview
         id: preview
         working-directory: controller
         env:
@@ -106,6 +108,7 @@ jobs:
         run: bun .github/scripts/preview/cloud.ts publish "$PREVIEW_PR" "$PREVIEW_SHA" "$GITHUB_WORKSPACE/source"
 
   cleanup:
+    name: Clean Up Closed Previews
     if: >-
       github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' &&
       (github.event_name == 'schedule' ||
@@ -132,7 +135,7 @@ jobs:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Delete closed PR tags, revisions and images
+      - name: Delete Closed Preview Resources
         id: cleanup
         env:
           GH_TOKEN: ${{ github.token }}
@@ -148,7 +151,7 @@ jobs:
           retention-days: 1
 
   report-cleanup:
-    name: Report preview cleanup on PRs
+    name: Report Preview Cleanup
     needs: cleanup
     if: always() && needs.cleanup.outputs.logs != ''
     runs-on: ubuntu-latest
@@ -168,12 +171,13 @@ jobs:
         with:
           artifact-ids: ${{ needs.cleanup.outputs.logs }}
           path: ${{ runner.temp }}/preview-cleanup
-      - name: Post the cleanup log to each closed PR
+      - name: Post Cleanup Logs
         env:
           GH_TOKEN: ${{ github.token }}
         run: bun .github/scripts/preview/report-cleanup.ts "$RUNNER_TEMP/preview-cleanup/preview-cleanup.ndjson"
 
   report:
+    name: Report Preview Deployment
     needs: [request, publish]
     if: always() && needs.request.outputs.comment != ''
     runs-on: ubuntu-latest
@@ -190,7 +194,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      - name: 配信結果をコメントに反映する
+      - name: Update Preview Comment
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
