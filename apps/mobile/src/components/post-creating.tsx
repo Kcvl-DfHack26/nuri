@@ -50,7 +50,9 @@ function planFromMarks(video: NonNullable<PostDraft['video']>): Plan {
 
 /** The steps Gemini found, in order, cut to the video and to the API's step limit. */
 function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Plan | null {
-  const steps = [...analysis.steps]
+  const steps = analysis.steps
+    // A step that ends before it starts is a misreading; it would make a negative segment.
+    .filter((step) => step.end > step.start)
     .sort((a, b) => a.start - b.start)
     .slice(0, recipeStepsMax)
     .map((step) => {
@@ -114,10 +116,20 @@ export function PostCreating() {
       analyzePostVideo(video, controller.signal).then(
         (analysis) => {
           const analyzed = planFromAnalysis(analysis, video.durationMs);
-          if (analyzed && analysis.title) {
+          if (!analyzed) {
+            // Gemini saw no makeup, e.g. in a test clip; say so instead of quietly falling back.
+            Alert.alert(
+              '動画からメイクの手順を見つけられませんでした',
+              '区切りから手順を作ります。',
+            );
+            setSending(false);
+            setPlan(planFromMarks(video));
+            return;
+          }
+          if (analysis.title) {
             setDraft((current) => ({ ...current, title: current.title || analysis.title }));
           }
-          setPlan(analyzed ?? planFromMarks(video));
+          setPlan(analyzed);
         },
         (error: unknown) => {
           if (controller.signal.aborted) {

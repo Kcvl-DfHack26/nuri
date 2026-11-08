@@ -470,6 +470,28 @@ test('returns to ⑫-1 without sending when the user chooses やめる', async (
   expect(getThumbnailAsync).not.toHaveBeenCalled();
 });
 
+test('says so and makes the steps from the marks when Gemini finds no makeup', async () => {
+  mockAnalyze.mockResolvedValue({
+    ...analysis,
+    // A step that ends before it starts is dropped like no step at all.
+    steps: [{ start: 30, end: 10, part: 'brow', description: '', regions: [], cosmetics: [] }],
+  });
+  const draft = await renderCreating();
+  await pressAlertButton('送る');
+  await waitFor(() => {
+    expect(router.replace).toHaveBeenCalledWith('/post/review');
+  });
+  expect(alert).toHaveBeenCalledWith(
+    '動画からメイクの手順を見つけられませんでした',
+    '区切りから手順を作ります。',
+  );
+  expect(draft()?.title).toBe('');
+  expect(draft()?.steps.map((step) => step.segment)).toEqual([
+    { startMs: 0, endMs: 26_000 },
+    { startMs: 26_000, endMs: 60_000 },
+  ]);
+});
+
 test('makes the steps from the marks when the analysis fails', async () => {
   mockAnalyze.mockRejectedValue(new Error('今は動画から手順書を作れません。'));
   const draft = await renderCreating();
