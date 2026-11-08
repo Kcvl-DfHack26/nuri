@@ -30,8 +30,9 @@ export async function mergedMainPr(repo: string) {
     throw new Error('Invalid PR number');
   }
 
-  const merged =
-    await $`gh api repos/${repo}/pulls/${pr} --jq '.merged and (.base.ref == "main")'`.text();
+  // スタック経由のマージでは、直接のbaseに下段のブランチ名が残る。
+  const mergedToMain = '.merged and (.base.ref == "main" or .stack.base.ref == "main")';
+  const merged = await $`gh api repos/${repo}/pulls/${pr} --jq ${mergedToMain}`.text();
   if (merged.trim() !== 'true') {
     throw new Error('Expected a PR merged into main');
   }
