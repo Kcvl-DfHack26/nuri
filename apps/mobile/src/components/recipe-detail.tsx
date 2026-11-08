@@ -8,20 +8,17 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { openBrowserAsync } from 'expo-web-browser';
-import { Fragment } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { PartId, PhotoCrop } from '@/components/recipes';
 import type { RecipeDetail as RecipeData, RecipeStep } from '@/lib/recipes';
 
-import { CroppedPhoto } from '@/components/cropped-photo';
 import { Feedback } from '@/components/feedback';
 import { FollowButton } from '@/components/follow-button';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
 import { OpenNativeAppLink } from '@/components/open-native-app-link';
-import { arPhotos, findProduct, parts } from '@/components/recipes';
+import { findProduct, parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { StartBar } from '@/components/start-bar';
 import { Text } from '@/components/ui/text';
@@ -33,11 +30,6 @@ import { formatCount, recipeOptions, shareRecipe, sourceLabels } from '@/lib/rec
 import { userOptions } from '@/lib/social';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
-
-import guideBrow from '../../assets/plan-a/detail/guide-brow.svg';
-import guideCheek from '../../assets/plan-a/detail/guide-cheek.svg';
-import guideFace from '../../assets/plan-a/detail/guide-face.svg';
-import guideShading from '../../assets/plan-a/detail/guide-shading.svg';
 
 const BACK = Icon.select({
   ios: 'chevron.left',
@@ -60,27 +52,6 @@ const UPLOAD = Icon.select({
   android: import('@expo/material-symbols/upload.xml'),
 });
 
-// Hero layout from Plan A ⑤ (390×540 frame). The guides and pins were drawn on its top 480pt.
-const heroCrop: PhotoCrop = {
-  width: '120.64%',
-  height: '154.82%',
-  left: '-12.18%',
-  top: '-13.89%',
-};
-// Where Plan A puts each part's pin and label on its annotated photo (390×540 frame).
-const planAPins: Partial<Record<PartId, { pin: FramePoint; label: FramePoint }>> = {
-  brow: { pin: { x: 251, y: 177 }, label: { x: 272, y: 160 } },
-  eye: { pin: { x: 101, y: 211 }, label: { x: 14, y: 186 } },
-  lash: { pin: { x: 281, y: 227 }, label: { x: 302, y: 228 } },
-  shading: { pin: { x: 75, y: 341 }, label: { x: 10, y: 370 } },
-  cheek: { pin: { x: 271, y: 281 }, label: { x: 290, y: 306 } },
-  lip: { pin: { x: 203, y: 381 }, label: { x: 236, y: 404 } },
-};
-// Plan A's annotated photo shows the fox recipe; other recipes show their own photo.
-const planARecipe = 'fox';
-type FramePoint = { x: number; y: number };
-const atFrame = (x: number, y: number) =>
-  ({ left: `${(x / 390) * 100}%`, top: `${(y / 540) * 100}%` }) as const;
 // Plan A colors the tags in this order.
 const tagBackgrounds = ['bg-base-peach', 'bg-base-lilac', 'bg-base-mint'];
 
@@ -207,7 +178,7 @@ export function RecipeContent({
         style={wide ? { width: '48%' } : undefined}
       >
         <View className="w-full" style={{ maxWidth: heroWidth }}>
-          <Hero recipe={recipe} steps={steps} />
+          <Hero recipe={recipe} />
         </View>
       </View>
       <View
@@ -397,65 +368,16 @@ export function RecipeContent({
   );
 }
 
-function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
-  // Plan A's guides and pins are drawn on its own photo of the fox recipe.
-  if (recipe.id !== planARecipe) {
-    return (
-      <View className="aspect-390/540 w-full overflow-hidden bg-neutral-soft">
-        <Image
-          accessible={false}
-          source={{ uri: apiAssetUrl(recipe.image) }}
-          contentFit="cover"
-          style={{ width: '100%', height: '100%' }}
-        />
-      </View>
-    );
-  }
+// ⑤'s photo is the recipe's own picture, like its card in ① (#193).
+function Hero({ recipe }: { recipe: RecipeData }) {
   return (
-    <View className="aspect-390/540 w-full overflow-hidden">
-      <CroppedPhoto source={arPhotos.finished} crop={heroCrop} />
-      {[guideFace, guideCheek, guideShading, guideBrow].map((guide, index) => (
-        <Image
-          // Guides are a fixed set of static assets.
-          key={index}
-          accessible={false}
-          source={guide}
-          contentFit="fill"
-          style={{ position: 'absolute', width: '100%', height: `${(480 / 540) * 100}%` }}
-        />
-      ))}
-      {steps.map((step, index) => {
-        const place = planAPins[step.part];
-        if (!place) {
-          return null;
-        }
-        return (
-          // Steps are identified by their position; a part may appear twice.
-          <Fragment key={index}>
-            <View
-              className="absolute size-5.5 items-center justify-center rounded-full bg-white/95"
-              style={{
-                ...atFrame(place.pin.x, place.pin.y),
-                boxShadow: '0px 2px 6px rgba(196, 61, 112, 0.25)',
-              }}
-            >
-              <View className="size-2.5 rounded-full bg-accent-rose" />
-            </View>
-            <View
-              className="absolute flex-row items-center gap-1.25 rounded-thumbnail border border-white bg-white/80 py-0.75 pl-0.75 pr-2.5"
-              style={{
-                ...atFrame(place.label.x, place.label.y),
-                boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)',
-              }}
-            >
-              <View className="size-5 items-center justify-center rounded-full bg-accent-rose">
-                <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
-              </View>
-              <Text className="font-maru-bold text-micro text-ink-primary">{step.label}</Text>
-            </View>
-          </Fragment>
-        );
-      })}
+    <View className="aspect-390/540 w-full overflow-hidden bg-neutral-soft">
+      <Image
+        accessible={false}
+        source={{ uri: apiAssetUrl(recipe.image) }}
+        contentFit="cover"
+        style={{ width: '100%', height: '100%' }}
+      />
     </View>
   );
 }
