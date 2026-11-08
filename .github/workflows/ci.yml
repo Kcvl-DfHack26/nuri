@@ -162,24 +162,27 @@ jobs:
     steps:
       - *checkout
       - *setup-bun
-      - uses: opentofu/setup-opentofu@v2.0.2
-        with:
-          tofu_version: 1.13.8
       - uses: terraform-linters/setup-tflint@v6.3.2
         with:
           tflint_version: v0.65.0
-      - name: Prepare Locked OpenTofu Provider
+      - name: Install Verified OpenTofu and Provider
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/ci/prepare-tofu-provider.ts
+        run: bun .github/scripts/ci/prepare-opentofu.ts
       - run: tofu fmt -check -recursive infra
       - run: tofu -chdir=infra init -backend=false -lockfile=readonly
       - run: tofu -chdir=infra validate
       - run: tofu -chdir=infra/bootstrap init -backend=false -lockfile=readonly
       - run: tofu -chdir=infra/bootstrap validate
+      - run: tofu -chdir=infra/preview init -backend=false -lockfile=readonly
+      - run: tofu -chdir=infra/preview validate
+      - run: tofu -chdir=infra/preview-pr init -backend=false -lockfile=readonly
+      - run: tofu -chdir=infra/preview-pr validate
       - run: tflint --init
       - run: tflint --chdir=infra --config="$GITHUB_WORKSPACE/.tflint.hcl"
       - run: tflint --chdir=infra/bootstrap --config="$GITHUB_WORKSPACE/.tflint.hcl"
+      - run: tflint --chdir=infra/preview --config="$GITHUB_WORKSPACE/.tflint.hcl"
+      - run: tflint --chdir=infra/preview-pr --config="$GITHUB_WORKSPACE/.tflint.hcl"
   container:
     name: Container Smoke Test
     runs-on: ubuntu-latest

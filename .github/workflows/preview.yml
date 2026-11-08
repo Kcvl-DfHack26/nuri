@@ -1,25 +1,38 @@
-name: Publish preview
+name: PR Preview
 on:
   issue_comment:
     types: [edited]
+  pull_request_target:
+    types: [opened, reopened, synchronize, closed]
+    branches: [main]
+  schedule:
+    - cron: '41 17 * * *'
   workflow_dispatch:
     inputs:
       pr:
         description: Open pull request number
         type: string
         required: true
+      operation:
+        description: Publish the preview or create its status comment only
+        type: choice
+        options: [publish, comment]
+        default: publish
 permissions:
   contents: read
 concurrency:
-  group: publish-preview-${{ github.event.issue.number || inputs.pr }}
-  cancel-in-progress: false
+  group: nuri-preview-cloud
+  queue: max
 jobs:
   request:
+    name: Prepare Preview Comment
     if: >-
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.pull_request && github.event.sender.type == 'User' &&
-      contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->')))
+      (github.event_name == 'workflow_dispatch' && inputs.operation == 'comment') ||
+      (github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request_target' && github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository && github.event.sender.type == 'User') ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.sender.type == 'User' &&
+      contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->'))))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -34,82 +47,253 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - uses: actions/github-script@v9.0.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Prepare Preview Comment
         id: request
         env:
-          REQUEST_PR: ${{ inputs.pr }}
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          REQUEST_SHA: ${{ github.event.pull_request.head.sha }}
+          PREVIEW_OPERATION: ${{ inputs.operation }}
+          PREVIEW_CAN_PUBLISH: ${{ github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' }}
+          SENDER_TYPE: ${{ github.event.sender.type }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          COMMENT_BEFORE: ${{ github.event.changes.body.from }}
+        run: bun .github/scripts/preview/request.ts
+
+  inspect:
+    name: Inspect Preview State
+    needs: request
+    if: >-
+      github.ref == 'refs/heads/main' && needs.request.outputs.pr != '' &&
+      vars.PREVIEW_GCP_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    outputs:
+      environment: ${{ steps.inspect.outputs.environment }}
+    steps:
+      - uses: actions/checkout@v7.0.1
         with:
-          script: |
-            const { assertPreviewTarget, parsePreviewRequest, previewMarker, previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
-            const isComment = context.eventName === 'issue_comment';
-            const payload = context.payload;
-            const requestedSha = isComment ? parsePreviewRequest({ author: payload.comment.user.login, body: payload.comment.body, before: payload.changes?.body?.from }) : undefined;
-            if (isComment && !requestedSha) return;
-            const number = isComment ? String(payload.issue.number) : process.env.REQUEST_PR;
-            if (!/^[1-9]\d{0,8}$/.test(number ?? '')) throw new Error('PR番号が不正です');
-            const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: context.actor });
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
-            assertPreviewTarget({ actorType: payload.sender?.type, permission: permission.permission, repository: `${context.repo.owner}/${context.repo.repo}`, headRepository: pr.head.repo?.full_name, state: pr.state, base: pr.base.ref, sha: pr.head.sha, requestedSha });
-            const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number });
-            let comment = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(`${previewMarker}\n`));
-            if (isComment && (!comment || comment.id !== payload.comment.id || comment.body !== payload.comment.body || previewSha(comment.body) !== pr.head.sha)) throw new Error('最新のpreviewコメントから実行してください');
-            const body = renderPreviewComment({ sha: pr.head.sha, status: '⏳ previewを配信中です。', runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}` });
-            if (comment) {
-              await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });
-            } else {
-              ({ data: comment } = await github.rest.issues.createComment({ ...context.repo, issue_number: pr.number, body }));
-            }
-            core.setOutput('pr', String(pr.number));
-            core.setOutput('sha', pr.head.sha);
-            core.setOutput('comment', String(comment.id));
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Select Preview Credentials
+        id: inspect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_PR: ${{ needs.request.outputs.pr }}
+          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+        run: bun .github/scripts/preview/cloud.ts inspect "$PREVIEW_PR" "$PREVIEW_SHA"
+
+  apply:
+    name: Apply Preview Infrastructure
+    needs: [request, inspect]
+    if: >-
+      needs.inspect.outputs.environment == 'preview' ||
+      needs.inspect.outputs.environment == 'preview-create'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: ${{ needs.inspect.outputs.environment }}
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    outputs:
+      tofu_log: ${{ steps.apply.outputs.tofu_log }}
+      tofu_exit: ${{ steps.apply.outputs.tofu_exit }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Install Verified OpenTofu and Provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview-pr/.terraform.lock.hcl
+      - name: Apply Preview Infrastructure
+        id: apply
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_RUN_TAG_KEY: ${{ vars.PREVIEW_RUN_TAG_KEY }}
+          PREVIEW_RUN_TAG_VALUE: ${{ vars.PREVIEW_RUN_TAG_VALUE }}
+          PREVIEW_PR: ${{ needs.request.outputs.pr }}
+          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+        run: bun .github/scripts/preview/cloud.ts apply "$PREVIEW_PR" "$PREVIEW_SHA"
 
   publish:
-    needs: request
-    if: needs.request.outputs.pr != ''
+    name: Publish Preview
+    needs: [request, apply]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: preview
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
     outputs:
-      comment: ${{ steps.preview.outputs.comment }}
+      origin: ${{ steps.preview.outputs.origin }}
+      deployed_at: ${{ steps.preview.outputs.deployed_at }}
     steps:
-      # Only the authorized, same-repository commit reaches this job.
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+      # ビルド手順は main のものを使い、PR のコードは Docker に渡す。
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.request.outputs.sha }}
+          path: source
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version-file: .node-version
+          bun-version-file: controller/.bun-version
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Publish and Verify Preview
+        id: preview
+        working-directory: controller
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_PR: ${{ needs.request.outputs.pr }}
+          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+        run: bun .github/scripts/preview/cloud.ts publish "$PREVIEW_PR" "$PREVIEW_SHA" "$GITHUB_WORKSPACE/source"
+
+  cleanup:
+    name: Clean Up Closed Previews
+    if: >-
+      github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' &&
+      (github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    outputs:
+      logs: ${{ steps.logs.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
-      - run: bun install --frozen-lockfile
-      - name: Use the repository EAS CLI
-        run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Check the PR is still current
-        uses: actions/github-script@v9.0.0
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Install Verified OpenTofu and Provider
         env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview-pr/.terraform.lock.hcl
+      - name: Delete Closed Preview Resources
+        id: cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+          PREVIEW_RUN_TAG_KEY: ${{ vars.PREVIEW_RUN_TAG_KEY }}
+          PREVIEW_RUN_TAG_VALUE: ${{ vars.PREVIEW_RUN_TAG_VALUE }}
+          PREVIEW_PR: ${{ github.event.pull_request.number }}
+          PREVIEW_CLEANUP_REPORTS: ${{ runner.temp }}/preview-cleanup.ndjson
+        run: bun .github/scripts/preview/cloud.ts cleanup "$PREVIEW_PR"
+      - uses: actions/upload-artifact@v7.0.2
+        id: logs
+        if: always() && steps.cleanup.outputs.has_reports == 'true'
+        with:
+          name: preview-cleanup-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-cleanup.ndjson
+          retention-days: 1
+
+  report-destroy:
+    name: Report OpenTofu Destroy
+    needs: cleanup
+    if: always() && needs.cleanup.outputs.logs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.cleanup.outputs.logs }}
+          path: ${{ runner.temp }}/preview-cleanup
+      - name: Post Destroy Logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/preview/report-cleanup.ts "$RUNNER_TEMP/preview-cleanup/preview-cleanup.ndjson"
+
+  report-apply:
+    name: Report OpenTofu Apply
+    needs: [request, apply]
+    if: always() && needs.apply.outputs.tofu_exit != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Post Apply Log
+        env:
+          GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
-          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
-        with:
-          script: |
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PREVIEW_PR) });
-            if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA) throw new Error('PRが更新・終了されたため配信を中止します');
-      - name: Publish iOS and Android updates
-        id: preview
-        uses: expo/expo-github-action/preview@9.0.1
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        with:
-          working-directory: apps/mobile
-          command: eas update --branch pr-${{ needs.request.outputs.pr }} --environment preview --platform all --message "PR ${{ needs.request.outputs.pr }} @ ${{ needs.request.outputs.sha }}" --non-interactive
-          comment: false
+          TOFU_LOG: ${{ needs.apply.outputs.tofu_log }}
+          TOFU_EXIT: ${{ needs.apply.outputs.tofu_exit }}
+        run: bun .github/scripts/preview/report-operation.ts
 
   report:
-    needs: [request, publish]
+    name: Report Preview Deployment
+    needs: [request, inspect, apply, publish]
     if: always() && needs.request.outputs.comment != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -117,24 +301,21 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      # Render from the trusted workflow revision, not from the published PR.
+      # 配信対象のPRではなく、信頼済みのワークフローの版でコメントを作る。
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - uses: actions/github-script@v9.0.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Update Preview Comment
         env:
+          GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
           PREVIEW_COMMENT: ${{ needs.request.outputs.comment }}
-          PREVIEW_RESULT: ${{ needs.publish.result }}
-          PREVIEW_UPDATE_COMMENT: ${{ needs.publish.outputs.comment }}
-        with:
-          script: |
-            const { previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PREVIEW_PR) });
-            const { data: comment } = await github.rest.issues.getComment({ ...context.repo, comment_id: Number(process.env.PREVIEW_COMMENT) });
-            if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA || previewSha(comment.body) !== pr.head.sha) return;
-            const success = process.env.PREVIEW_RESULT === 'success';
-            const body = renderPreviewComment({ sha: pr.head.sha, status: success ? '✅ このコミットのpreviewを配信しました。' : '❌ previewを配信できませんでした。ログを確認して再実行できます。', runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`, updateComment: success ? process.env.PREVIEW_UPDATE_COMMENT : undefined });
-            await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });
+          PREVIEW_RESULT: ${{ (needs.inspect.result == 'failure' || needs.apply.result == 'failure') && 'failure' || needs.publish.result }}
+          PREVIEW_ORIGIN: ${{ needs.publish.outputs.origin }}
+          PREVIEW_DEPLOYED_AT: ${{ needs.publish.outputs.deployed_at }}
+        run: bun .github/scripts/preview/report.ts
