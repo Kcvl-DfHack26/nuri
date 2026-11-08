@@ -20,9 +20,11 @@ import {
 async function requestPreview() {
   const env = Bun.env;
   const isComment = env.GITHUB_EVENT_NAME === 'issue_comment';
+  const automatic = env.GITHUB_EVENT_NAME === 'pull_request_target';
   const commentOnly =
     env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.PREVIEW_OPERATION === 'comment';
-  const canRequest = !commentOnly || env.PREVIEW_CAN_PUBLISH === 'true';
+  const canRequest = env.PREVIEW_CAN_PUBLISH === 'true';
+  const publish = canRequest && !commentOnly;
   const requestedSha = isComment
     ? parsePreviewRequest({
         author: env.COMMENT_AUTHOR ?? '',
@@ -34,9 +36,14 @@ async function requestPreview() {
     return;
   }
 
+  const pr = await getPullRequest(env.REQUEST_PR ?? '');
+  // キューに残った古いイベントからはクラウドの操作を始めない。
+  if (automatic && (pr.baseRef !== 'main' || pr.state !== 'open' || pr.sha !== env.REQUEST_SHA)) {
+    return;
+  }
+
   const permissionUrl = `repos/${repository}/collaborators/${env.GITHUB_ACTOR}/permission`;
   const permission = (await $`gh api ${permissionUrl} --jq .permission`.text()).trim();
-  const pr = await getPullRequest(env.REQUEST_PR ?? '');
   assertPreviewTarget({
     actorType: env.SENDER_TYPE ?? '',
     permission,
@@ -61,7 +68,7 @@ async function requestPreview() {
   // 旧形式のコメントは同じSHAでも表へ更新する。
   const currentTable = comment?.body.split('\n', 2)[1] === `<!-- nuri-preview-sha: ${pr.sha} -->`;
   const activateRequest = canRequest && comment?.body.includes(previewSetupPendingMarker);
-  if (commentOnly && currentTable && !activateRequest) {
+  if ((commentOnly || (automatic && !publish)) && currentTable && !activateRequest) {
     return;
   }
 
@@ -69,14 +76,14 @@ async function requestPreview() {
     sha: pr.sha,
     pullRequest: pr,
     canRequest,
-    ...(commentOnly ? {} : { status: '⏳ 配信中' }),
+    ...(publish ? { status: '⏳ 配信中' } : {}),
     runUrl,
   });
   if (comment) {
     await updateComment(comment.id, body);
   }
   const commentId = comment?.id ?? (await createComment(pr.number, body));
-  if (commentOnly) {
+  if (!publish) {
     return;
   }
 

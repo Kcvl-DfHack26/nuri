@@ -48,7 +48,7 @@ COPY --from=build /app/apps/api/dist /app/apps/api/dist
 COPY --from=build /app/apps/api/drizzle /app/apps/api/drizzle
 COPY --from=build /app/apps/api/assets /app/apps/api/assets
 COPY --from=preview-build /app/apps/api/dist-preview/seed.js /app/apps/api/dist/seed.js
-COPY scripts/preview-start.sh scripts/preview-nginx.conf /app/scripts/
+COPY --from=preview-scripts preview-start.sh preview-nginx.conf /app/scripts/
 WORKDIR /app
 USER postgres
 ENTRYPOINT []

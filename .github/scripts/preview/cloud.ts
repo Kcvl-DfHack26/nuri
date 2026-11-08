@@ -1,5 +1,6 @@
 import { $ } from 'bun';
 import { appendFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 import { checkCloudPreview } from './check';
 import { listPreviewStates, removePreviewState, runPreviewTofu } from './state';
@@ -192,7 +193,10 @@ async function previewImageDigest(image: string, source: string) {
     return existingDigest;
   }
   await shell`gcloud auth configure-docker ${registryHost} --quiet`;
-  await shell`docker build --target preview -f ${`${source}/apps/api/Dockerfile`} -t ${image} ${source}`;
+  const dockerfile = resolve('apps/api/Dockerfile');
+  const previewScripts = resolve('scripts');
+  await shell`docker build --target preview --build-context ${`preview-scripts=${previewScripts}`} \
+    -f ${dockerfile} -t ${image} ${source}`;
   await shell`docker push ${image}`;
   const digest = (
     await shell`gcloud artifacts docker images describe ${image} --format='value(image_summary.digest)'`.text()

@@ -108,7 +108,7 @@ export function renderPreviewComment(input: {
     `| 📱 **Expo Go**<br>${go} | ${status} | ${time} | ${expoCost} |`,
     '',
     ...(canRequest
-      ? [requestLine, '', 'write権限を持つ人がチェックすると、3つのプレビューを一緒に配信します。']
+      ? [requestLine, '', 'main宛てのPRは自動配信します。write権限を持つ人はチェックして配信を再実行できます。']
       : [previewSetupPendingMarker, 'プレビューの初期設定後に配信できます。']),
     ...(deployment
       ? ['Expo Goはプロジェクトと同じSDKを使ってください。初回起動時はバンドルを生成します。']

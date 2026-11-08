@@ -3,7 +3,7 @@ on:
   issue_comment:
     types: [edited]
   pull_request_target:
-    types: [closed]
+    types: [opened, reopened, synchronize, closed]
     branches: [main]
   schedule:
     - cron: '41 17 * * *'
@@ -29,6 +29,8 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.operation == 'comment') ||
       (github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request_target' && github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository && github.event.sender.type == 'User') ||
       (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.sender.type == 'User' &&
       contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->'))))
     runs-on: ubuntu-latest
@@ -52,7 +54,8 @@ jobs:
         id: request
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUEST_PR: ${{ github.event.issue.number || inputs.pr }}
+          REQUEST_PR: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+          REQUEST_SHA: ${{ github.event.pull_request.head.sha }}
           PREVIEW_OPERATION: ${{ inputs.operation }}
           PREVIEW_CAN_PUBLISH: ${{ github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' }}
           SENDER_TYPE: ${{ github.event.sender.type }}
@@ -122,7 +125,7 @@ jobs:
           ref: ${{ github.workflow_sha }}
           path: controller
           persist-credentials: false
-      # PR のコードは Docker のビルドコンテキストに限定し、ランナー上では実行しない。
+      # ビルド手順は main のものを使い、PR のコードは Docker に渡す。
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.request.outputs.sha }}
@@ -151,7 +154,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' &&
       (github.event_name == 'schedule' ||
-      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository))
+      (github.event_name == 'pull_request_target' && github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: preview

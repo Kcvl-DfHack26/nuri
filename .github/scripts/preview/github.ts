@@ -19,13 +19,13 @@ export async function getPullRequest(number: string) {
     throw new Error('PR番号が不正です');
   }
   const endpoint = `repos/${repository}/pulls/${number}`;
-  const fields = '[.html_url, .state, (.head.repo.full_name // ""), .head.sha] | @tsv';
+  const fields = '[.html_url, .state, (.head.repo.full_name // ""), .head.sha, .base.ref] | @tsv';
   const response = await $`gh api ${endpoint} --jq ${fields}`.text();
-  const [url, state, headRepository, sha] = response.trimEnd().split('\t');
-  if (!url || !state || !sha) {
+  const [url, state, headRepository, sha, baseRef] = response.trimEnd().split('\t');
+  if (!url || !state || !sha || !baseRef) {
     throw new Error('PR情報を取得できませんでした');
   }
-  return { number: Number(number), url, state, headRepository, sha };
+  return { number: Number(number), url, state, headRepository, sha, baseRef };
 }
 
 export async function findComment(pr: number) {
