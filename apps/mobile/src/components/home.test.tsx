@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 
 import { TestQueryProvider } from '@/lib/test/query-client';
 
@@ -25,8 +25,15 @@ jest.mock('@/components/native-host', () => ({
 }));
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
+  router: {
+    back: jest.fn(),
+    push: jest.fn(),
+    replace: jest.fn(),
+    setParams: jest.fn(),
+    canGoBack: () => true,
+  },
   useIsFocused: () => true,
+  useLocalSearchParams: jest.fn(),
 }));
 jest.mock('@/theme/colors', () => ({
   colors: { background: '#f2f2f7', card: '#fff', secondary: '#777', separator: '#ccc' },
@@ -71,6 +78,7 @@ const mockGetRecipes = jest.fn(async () =>
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(useLocalSearchParams).mockReturnValue({});
 });
 
 test('retries a failed recipe list and opens a recipe from its card', async () => {
@@ -96,9 +104,20 @@ test('shows an empty recipe list', async () => {
   expect(await screen.findByText('レシピはまだありません')).toBeOnTheScreen();
 });
 
-test('opens the brow list from the part cards', async () => {
+test('keeps the chosen list in the route', async () => {
   await render(<Home />, { wrapper: TestQueryProvider });
+  expect(screen.getByRole('tab', { name: '全体 顔まるごと' })).toBeSelected();
+  expect(
+    await screen.findByRole('button', { name: '狐メイク、mio、いいね1.2k' }),
+  ).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('tab', { name: '部位 パーツ別' }));
+  expect(router.setParams).toHaveBeenCalledWith({ scope: 'parts' });
+});
+
+test('opens the brow list from the part cards', async () => {
+  jest.mocked(useLocalSearchParams).mockReturnValue({ scope: 'parts' });
+  await render(<Home />, { wrapper: TestQueryProvider });
+  expect(screen.getByRole('tab', { name: '部位 パーツ別' })).toBeSelected();
 
   await fireEvent.press(await screen.findByRole('button', { name: '眉、6レシピ' }));
   expect(router.push).toHaveBeenCalledWith('/parts/brow');
