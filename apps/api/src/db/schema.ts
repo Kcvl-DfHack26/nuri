@@ -1,6 +1,6 @@
 import type { MakeupShape } from '@starter/shared';
 
-import { makeupParts, recipeSources } from '@starter/shared';
+import { faceTypeIds, makeupParts, recipeSources } from '@starter/shared';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -25,6 +25,8 @@ export const user = pgTable('user', {
   handle: text('handle').unique(),
   bio: text('bio').default('').notNull(),
   isPublic: boolean('is_public').default(true).notNull(),
+  /** The face type chosen on ⑰-2 or saved from ⑭ (#194); only its owner reads it. */
+  faceType: text('face_type', { enum: faceTypeIds }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

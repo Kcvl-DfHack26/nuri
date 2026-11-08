@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { InferResponseType } from 'hono/client';
+import type { InferRequestType, InferResponseType } from 'hono/client';
 
 import { queryOptions } from '@tanstack/react-query';
 
@@ -19,6 +19,37 @@ export function userOptions(id: string) {
       return (await response.json()).user;
     },
   });
+}
+
+/** The signed-in user's own profile, with what only they see, such as the face type (⑰, ⑰-2, ⑭). */
+export const myProfileKeys = { all: ['my-profile'] as const };
+
+export function myProfileOptions(userId: string | undefined) {
+  return queryOptions({
+    queryKey: [...myProfileKeys.all, userId],
+    enabled: Boolean(userId),
+    queryFn: async ({ signal }) => {
+      const response = await api.api.me.profile.$get({}, { init: { signal } });
+      if (response.status !== 200) {
+        throw new Error('プロフィールを読み込めませんでした。');
+      }
+      return (await response.json()).profile;
+    },
+  });
+}
+
+export type MyProfile = InferResponseType<typeof api.api.me.profile.$get, 200>['profile'];
+export type ProfileChanges = InferRequestType<typeof api.api.me.profile.$patch>['json'];
+
+/** Saves changes to the signed-in user's profile (⑰-2, ⑭). */
+export async function changeProfile(json: ProfileChanges) {
+  const response = await api.api.me.profile.$patch({ json });
+  if (response.status === 409) {
+    throw new Error('このユーザーIDは既に使われています。');
+  }
+  if (response.status !== 200) {
+    throw new Error('変更を保存できませんでした。もう一度お試しください。');
+  }
 }
 
 export type UserProfile = InferResponseType<(typeof api.api.users)[':id']['$get'], 200>['user'];

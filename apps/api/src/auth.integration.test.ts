@@ -331,6 +331,25 @@ test('magic links are single-use and sessions protect posts, likes and deletion'
     },
   });
   expect((await request('/api/me/profile', { name: '更新後' }, cookie, 'PATCH')).status).toBe(200);
+  // The face type (#194) is the owner's own: saved, cleared, validated, and not on /users/:id.
+  const myFaceType = async () =>
+    z
+      .object({ profile: z.object({ faceType: z.string().nullable() }) })
+      .parse(await (await appRequest('/api/me/profile', { headers: { cookie } })).json()).profile
+      .faceType;
+  expect(await myFaceType()).toBeNull();
+  expect((await request('/api/me/profile', { faceType: 'round' }, cookie, 'PATCH')).status).toBe(
+    200,
+  );
+  expect(await myFaceType()).toBe('round');
+  expect(
+    (await request('/api/me/profile', { faceType: 'round_yellow' }, cookie, 'PATCH')).status,
+  ).toBe(400);
+  expect(await myFaceType()).toBe('round');
+  const afterFaceType = await appRequest(`/api/users/${author?.id}`, { headers: { cookie } });
+  expect(await afterFaceType.json()).not.toHaveProperty('user.faceType');
+  expect((await request('/api/me/profile', { faceType: null }, cookie, 'PATCH')).status).toBe(200);
+  expect(await myFaceType()).toBeNull();
   const afterPartialUpdate = await appRequest(`/api/users/${author?.id}`, { headers: { cookie } });
   expect(await afterPartialUpdate.json()).toEqual({
     user: {

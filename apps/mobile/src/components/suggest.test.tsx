@@ -80,11 +80,30 @@ jest.mock('@/lib/face-diagnosis', () => ({
   diagnoseFace: jest.fn(),
 }));
 jest.mock('@/lib/api', () => ({
-  authClient: { useSession: () => ({ data: null }) },
+  authClient: { useSession: () => ({ data: mockSignedIn ? { user: { id: 'viewer' } } : null }) },
   apiUrl: 'http://localhost:8080',
   apiAssetUrl: (path: string) => path,
-  api: { api: { recipes: { $get: () => mockGetRecipes() } } },
+  api: {
+    api: {
+      recipes: { $get: () => mockGetRecipes() },
+      me: {
+        profile: {
+          $get: async () => ({
+            status: 200,
+            json: async () => ({ profile: { faceType: mockSavedFaceType } }),
+          }),
+          $patch: (input: { json: { faceType?: string | null } }) => mockPatchProfile(input),
+        },
+      },
+    },
+  },
 }));
+let mockSignedIn = false;
+let mockSavedFaceType: string | null = null;
+const mockPatchProfile = jest.fn(async ({ json }: { json: { faceType?: string | null } }) => {
+  mockSavedFaceType = json.faceType ?? null;
+  return { status: 200 };
+});
 
 const landmarks = { points: [0.5, 0.5], width: 100, height: 100 };
 const mockDetect = jest.fn<Promise<typeof landmarks | null>, [string]>();
@@ -118,6 +137,8 @@ const params = jest.mocked(useLocalSearchParams);
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSignedIn = false;
+  mockSavedFaceType = null;
   mockTrackerProps = undefined;
   pick.mockResolvedValue({
     canceled: false,
@@ -347,6 +368,29 @@ test('shows the face type, the brows and recipes for that face type first', asyn
   expect(cards[0]).toHaveProp('accessibilityLabel', '丸顔メイク、mio、丸顔向け');
   await fireEvent.press(screen.getByRole('button', { name: '狐メイク、mio' }));
   expect(router.push).toHaveBeenCalledWith('/recipes/fox');
+});
+
+test('saves the diagnosed face type to the profile, sending a guest to log in first', async () => {
+  params.mockReturnValue({ face: 'round', eye: 'droopy', midface: 'short', brow: 'falling' });
+  await render(<Diagnosis />, { wrapper: TestQueryProvider });
+  await fireEvent.press(screen.getByRole('button', { name: '顔タイプをプロフィールに保存' }));
+  expect(router.push).toHaveBeenCalledWith('/account');
+  expect(mockPatchProfile).not.toHaveBeenCalled();
+});
+
+test('saves the diagnosed face type once for a signed-in user', async () => {
+  mockSignedIn = true;
+  params.mockReturnValue({ face: 'round', eye: 'droopy', midface: 'short', brow: 'falling' });
+  await render(<Diagnosis />, { wrapper: TestQueryProvider });
+  const save = await screen.findByRole('button', {
+    name: '顔タイプをプロフィールに保存',
+    disabled: false,
+  });
+  await fireEvent.press(save);
+  expect(mockPatchProfile).toHaveBeenCalledWith({ json: { faceType: 'round' } });
+  expect(
+    await screen.findByRole('button', { name: 'プロフィールに保存済み', disabled: true }),
+  ).toBeOnTheScreen();
 });
 
 test('fills the recommendations with up to ten recipes and opens the full list', async () => {

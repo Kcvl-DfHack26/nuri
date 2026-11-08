@@ -1,5 +1,5 @@
 import { Icon } from '@expo/ui';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -14,13 +14,15 @@ import { CardFavorite } from '@/components/card-favorite';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
+import { PrimaryButton } from '@/components/post-chrome';
 import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { apiAssetUrl, apiUrl } from '@/lib/api';
+import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
 import { browShapes, eyeShapes, faceTypes, midfaces, readResultParams } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
 import { formatCount, recipeListOptions } from '@/lib/recipes';
+import { changeProfile, myProfileKeys, myProfileOptions } from '@/lib/social';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -113,6 +115,7 @@ export function Diagnosis() {
                 </Text>
               </View>
             </View>
+            <SaveFaceType faceType={result.faceType} />
             <Basis result={result} />
             <View className="mx-4 gap-2.5">
               <View className="gap-0.5 pl-1">
@@ -172,6 +175,44 @@ export function Diagnosis() {
           className="border-black/8 bg-white"
         />
       </View>
+    </View>
+  );
+}
+
+/**
+ * Saves the diagnosed face type to the signed-in user's profile (#194), where ⑰ and ⑰-2 show it.
+ * Guests are sent to ⑱ first (#42). Only the type is sent, never the photo or its landmarks.
+ */
+function SaveFaceType({ faceType }: { faceType: FaceType }) {
+  const client = useQueryClient();
+  const { data: session } = authClient.useSession();
+  const profile = useQuery({
+    ...myProfileOptions(session?.user.id),
+    enabled: Boolean(session && apiUrl),
+  });
+  const save = useMutation({
+    mutationFn: () => changeProfile({ faceType }),
+    onSuccess: () => client.invalidateQueries({ queryKey: myProfileKeys.all }),
+  });
+  const saved = profile.data?.faceType === faceType;
+  return (
+    <View className="mx-4 gap-1.5">
+      <PrimaryButton
+        label={saved ? 'プロフィールに保存済み' : '顔タイプをプロフィールに保存'}
+        disabled={saved || save.isPending || (Boolean(session) && profile.isPending)}
+        onPress={() => {
+          if (!session) {
+            router.push('/account');
+            return;
+          }
+          save.mutate();
+        }}
+      />
+      {save.error ? (
+        <Text accessibilityRole="alert" className="font-maru text-meta text-accent-rose">
+          {save.error.message}
+        </Text>
+      ) : null}
     </View>
   );
 }

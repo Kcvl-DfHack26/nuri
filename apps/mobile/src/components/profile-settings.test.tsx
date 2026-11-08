@@ -110,7 +110,9 @@ afterEach(() => {
 });
 const mockGetProfile = jest.fn(async () => ({
   status: 200,
-  json: async () => ({ profile: { name: 'はなこ', handle: null, bio: '', isPublic: true } }),
+  json: async () => ({
+    profile: { name: 'はなこ', handle: null, bio: '', isPublic: true, faceType: null },
+  }),
 }));
 const mockPutProfile = jest.fn(async (_input: { json: unknown }) => ({ status: 200 }));
 const mockAccounts = jest.fn(async () => ({
@@ -159,6 +161,22 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
     json: { name: 'はな', handle: 'hana_1', bio: 'よろしく', isPublic: false },
   });
   expect(mockNotify).toHaveBeenCalled();
+});
+
+test('chooses a face type from the five and saves it, never showing a skin tone', async () => {
+  await renderWithClient(<ProfileSettings />);
+  const row = await screen.findByRole('button', { name: '顔タイプ 未設定' });
+  expect(screen.queryByText(/イエベ/)).toBeNull();
+  await fireEvent.press(row);
+  for (const label of ['面長', 'ベース型', '丸顔', '逆三角形', '卵型', '未設定']) {
+    expect(screen.getByRole('radio', { name: label })).toBeOnTheScreen();
+  }
+  expect(screen.getByRole('radio', { name: '未設定' })).toBeChecked();
+  await fireEvent.press(screen.getByRole('radio', { name: '丸顔' }));
+  expect(screen.getByRole('radio', { name: '丸顔' })).toBeChecked();
+  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeOnTheScreen();
+  await saveProfile();
+  expect(mockPutProfile).toHaveBeenCalledWith({ json: { faceType: 'round' } });
 });
 
 test('adds and removes passkeys inline in the account section', async () => {
@@ -235,7 +253,7 @@ test('saves a privacy change when the existing display name exceeds the edit lim
   mockGetProfile.mockResolvedValueOnce({
     status: 200,
     json: async () => ({
-      profile: { name: 'x'.repeat(41), handle: null, bio: '', isPublic: true },
+      profile: { name: 'x'.repeat(41), handle: null, bio: '', isPublic: true, faceType: null },
     }),
   });
   await renderWithClient(<ProfileSettings />);

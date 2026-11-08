@@ -62,7 +62,13 @@ export function socialRoutes(db: Database, auth: Auth) {
       })
       .get('/me/profile', requireSession(auth), async (c) => {
         const [profile] = await db
-          .select({ name: user.name, handle: user.handle, bio: user.bio, isPublic: user.isPublic })
+          .select({
+            name: user.name,
+            handle: user.handle,
+            bio: user.bio,
+            isPublic: user.isPublic,
+            faceType: user.faceType,
+          })
           .from(user)
           .where(eq(user.id, c.get('currentUser').id));
         if (!profile) {

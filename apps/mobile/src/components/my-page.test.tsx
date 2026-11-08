@@ -43,6 +43,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 jest.mock('@/lib/api', () => ({
+  apiUrl: 'http://localhost:8080',
   apiAssetUrl: (path: string) => path,
   authClient: {
     useSession: () => mockUseSession(),
@@ -50,7 +51,15 @@ jest.mock('@/lib/api', () => ({
   api: {
     api: {
       recipes: { $get: () => mockPosted() },
-      me: { favorites: { $get: () => mockFavorites() } },
+      me: {
+        favorites: { $get: () => mockFavorites() },
+        profile: {
+          $get: async () => ({
+            status: 200,
+            json: async () => ({ profile: { faceType: 'round' } }),
+          }),
+        },
+      },
       users: { ':id': { $get: () => mockProfile() } },
     },
   },
@@ -97,6 +106,8 @@ test('shows the signed-in profile with posted and favorite recipes and opens the
   });
   const favorite = await screen.findByRole('button', { name: '狐メイク、はなこ、お気に入り1.2k' });
   expect(screen.getByRole('header', { name: 'はなこ' })).toBeOnTheScreen();
+  // The face type saved on ⑰-2 or from ⑭ shows under the name.
+  expect(await screen.findByText('丸顔')).toBeOnTheScreen();
   // The counts come from the user's profile.
   for (const label of ['フォロワー 328', 'フォロー中 96', 'いいね 2.4k']) {
     expect(await screen.findByLabelText(label)).toBeOnTheScreen();
