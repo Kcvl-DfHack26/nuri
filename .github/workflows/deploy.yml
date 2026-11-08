@@ -75,4 +75,4 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: bun run --bun eas workflow:run .eas/workflows/production-update.yml --ref "$TARGET_SHA" --non-interactive --wait
+        run: bunx --bun eas workflow:run .eas/workflows/production-update.yml --ref "$TARGET_SHA" --non-interactive --wait

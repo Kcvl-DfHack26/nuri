@@ -182,6 +182,13 @@ export function RecipeContent({
   const insets = useSafeAreaInsets();
   const { width, height, onLayout } = useLayoutSize();
   const wide = hasRoomForSidePanel(width, height);
+  const headerWidth = wide ? '48%' : '100%';
+  const profileAccessibility = onPost
+    ? undefined
+    : {
+        accessibilityRole: 'button' as const,
+        accessibilityHint: 'プロフィールと投稿したレシピを開きます',
+      };
   const likes = formatCount(recipe.likeCount);
   const tags = [
     ...recipe.tags.map((tag) => `＃${tag}`),
@@ -256,8 +263,7 @@ export function RecipeContent({
             <Pressable
               // ⑫-8 previews the user's own draft; leaving for a profile would drop the post.
               disabled={Boolean(onPost)}
-              accessibilityRole={onPost ? undefined : 'button'}
-              accessibilityHint={onPost ? undefined : 'プロフィールと投稿したレシピを開きます'}
+              {...profileAccessibility}
               // The 36pt row keeps Plan A's look; hitSlop extends the target to 48pt.
               hitSlop={6}
               onPress={() => {
@@ -355,7 +361,7 @@ export function RecipeContent({
         pointerEvents="none"
         className="absolute left-0 top-0 h-27.5"
         style={{
-          width: wide ? '48%' : '100%',
+          width: headerWidth,
           backgroundImage:
             'linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0))',
         }}
@@ -363,7 +369,7 @@ export function RecipeContent({
       <View
         className="absolute left-0 flex-row items-center gap-2"
         style={{
-          width: wide ? '48%' : '100%',
+          width: headerWidth,
           top: insets.top + 6,
           paddingLeft: insets.left + 16,
           paddingRight: (wide ? 0 : insets.right) + 16,

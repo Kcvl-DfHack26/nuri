@@ -1,4 +1,4 @@
-export function fetchProbe(url: string, headers?: HeadersInit) {
+function fetchProbe(url: string, headers?: HeadersInit) {
   return fetch(url, {
     ...(headers ? { headers } : {}),
     redirect: 'manual',
