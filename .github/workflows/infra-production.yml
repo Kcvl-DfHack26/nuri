@@ -7,6 +7,9 @@ on:
         type: choice
         options: [plan, apply]
         default: plan
+      pr:
+        description: Merged PR number to receive the apply result
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -20,6 +23,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      pull-requests: read
       id-token: write
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -35,10 +39,16 @@ jobs:
           persist-credentials: false
       - name: Verify the production target and main CI
         env:
+          OPERATION: ${{ inputs.operation }}
+          PR_NUMBER: ${{ inputs.pr }}
           GH_TOKEN: ${{ github.token }}
           DEPLOY_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
           DEPLOY_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
         run: |
+          if [[ "$OPERATION" == apply ]]; then
+            [[ "$PR_NUMBER" =~ ^[1-9][0-9]{0,8}$ ]] || { echo 'Enter the merged PR number for apply'; exit 1; }
+            gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" --jq '.merged and (.base.ref == "main")' | grep -Fx true
+          fi
           test "$PROJECT_ID/$REGION/$SERVICE" = 'kcvlb4/asia-northeast1/nuri-staging'
           : "${TOFU_PROVIDER:?Set TOFU_WORKLOAD_IDENTITY_PROVIDER}" "${TOFU_ACCOUNT:?Set TOFU_SERVICE_ACCOUNT}"
           test "$TOFU_PROVIDER" != "$DEPLOY_PROVIDER"
@@ -87,3 +97,13 @@ jobs:
             }
             tofu apply -input=false -no-color -lock-timeout=5m "$plan_file"
           fi
+  report:
+    needs: opentofu
+    if: always() && github.ref == 'refs/heads/main' && inputs.operation == 'apply' && inputs.pr != ''
+    permissions:
+      pull-requests: write
+    uses: ./.github/workflows/report-opentofu.yml
+    with:
+      pr: ${{ inputs.pr }}
+      target: nuri-staging
+      result: ${{ needs.opentofu.result }}
