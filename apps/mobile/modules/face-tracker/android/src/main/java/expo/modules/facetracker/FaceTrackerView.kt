@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Range
 import android.view.Surface
@@ -29,6 +30,9 @@ import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
+import java.io.File
+import java.util.UUID
+import java.util.concurrent.ConcurrentSkipListMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -73,6 +77,10 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private var lastStatus: String? = null
   private var lastMessage: String? = null
 
+  // Frames sent to MediaPipe by timestamp, and the one whose landmarks were sent last, kept only so
+  // a snapshot shows the same frame that was diagnosed.
+  private val pendingFrames = ConcurrentSkipListMap<Long, Bitmap>()
+  @Volatile private var landmarkedFrame: Bitmap? = null
   @Volatile private var frameWidth = 0
   @Volatile private var frameHeight = 0
 
@@ -172,9 +180,28 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     discardResultsBeforeMs = SystemClock.uptimeMillis()
     cameraProvider?.unbind(*useCases)
     useCases = emptyArray()
+    pendingFrames.clear()
+    landmarkedFrame = null
     // A resumed camera must report its first state even when it matches the previous session.
     lastStatus = null
     lastMessage = null
+  }
+
+  /**
+   * Saves the frame of the landmarks sent last as a JPEG in the app's cache and returns its file
+   * URI, or null when no face was found yet. It is mirrored like the preview, so it looks as the
+   * person saw it. Older snapshots are deleted once it is written, so at most one stays on the
+   * device. Nothing is sent anywhere.
+   */
+  fun snapshot(): String? {
+    val upright = landmarkedFrame ?: return null
+    val mirror = Matrix().apply { preScale(-1f, 1f) }
+    val frame = Bitmap.createBitmap(upright, 0, 0, upright.width, upright.height, mirror, true)
+    val folder = File(context.cacheDir, "face-tracker").apply { mkdirs() }
+    val file = File(folder, "${UUID.randomUUID()}.jpg")
+    file.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+    folder.listFiles()?.filter { it != file }?.forEach { it.delete() }
+    return Uri.fromFile(file).toString()
   }
 
   // Analysis thread.
@@ -286,6 +313,9 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     frameWidth = upright.width
     frameHeight = upright.height
+    pendingFrames[timestamp] = upright
+    // LIVE_STREAM drops frames it cannot keep up with, so only the newest few can still get a result.
+    while (pendingFrames.size > MAX_PENDING_FRAMES) pendingFrames.pollFirstEntry()
     if (!active || generation != sessionGeneration) return
     try {
       current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
@@ -298,7 +328,10 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private fun onResult(result: FaceLandmarkerResult) {
     if (result.timestampMs() <= discardResultsBeforeMs) return
     framesWithoutResult.set(0)
+    val frame = pendingFrames.remove(result.timestampMs())
+    pendingFrames.headMap(result.timestampMs()).clear()
     val face = result.faceLandmarks().firstOrNull()
+    landmarkedFrame = if (face.isNullOrEmpty()) null else frame
     if (face.isNullOrEmpty()) {
       post {
         if (result.timestampMs() > discardResultsBeforeMs) setStatus("noFace")
@@ -338,5 +371,6 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     // About 5 s at 30 fps: long enough for a GPU to prepare its first result, while a slow but
     // working GPU (the emulator's, about 0.5 s per result) answers within a dozen frames.
     const val GPU_SILENT_FRAME_LIMIT = 150
+    const val MAX_PENDING_FRAMES = 4
   }
 }

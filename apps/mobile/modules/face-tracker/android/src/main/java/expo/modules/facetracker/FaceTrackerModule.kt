@@ -38,6 +38,11 @@ class FaceTrackerModule : Module() {
         view.setActive(active)
       }
 
+      // The diagnosed frame as a JPEG file URI in the app's cache, or null before a face is found.
+      AsyncFunction("takeSnapshotAsync") { view: FaceTrackerView ->
+        view.snapshot()
+      }
+
       OnViewDestroys { view: FaceTrackerView ->
         view.release()
       }

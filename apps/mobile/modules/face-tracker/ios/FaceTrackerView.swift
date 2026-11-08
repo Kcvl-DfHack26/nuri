@@ -1,6 +1,8 @@
 import AVFoundation
+import CoreImage
 import ExpoModulesCore
 import MediaPipeTasksVision
+import UIKit
 
 // Shows the front camera and runs MediaPipe Face Landmarker (LIVE_STREAM) on its frames on device.
 // Frames and landmarks never leave the device. Landmarks are sent to JavaScript normalized to the
@@ -30,6 +32,10 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   private var captures: [
     Int: (at: CFTimeInterval, generation: Int, size: CGSize, orientation: AVCaptureVideoOrientation)
   ] = [:]
+  // Frames sent to MediaPipe by timestamp, and the one whose landmarks were sent last, kept only so
+  // a snapshot shows the same frame that was diagnosed. Few are kept: held buffers stop the camera.
+  private var pendingBuffers: [Int: CVPixelBuffer] = [:]
+  private var landmarkedBuffer: CVPixelBuffer?
   private var lastTimestamp = -1
 
   required init(appContext: AppContext? = nil) {
@@ -99,6 +105,8 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     acceptingFrames = false
     sessionGeneration += 1
     captures.removeAll()
+    pendingBuffers.removeAll()
+    landmarkedBuffer = nil
     lock.unlock()
     // A resumed camera must report its first state even when it matches the previous session.
     lastStatus = nil
@@ -127,6 +135,8 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       self.orient(self.videoOutput?.connection(with: .video), to: next)
       self.lock.lock()
       self.captures.removeAll()
+      self.pendingBuffers.removeAll()
+      self.landmarkedBuffer = nil
       self.lock.unlock()
     }
   }
@@ -193,6 +203,36 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     return try FaceLandmarker(options: options)
   }
 
+  /// Saves the frame of the landmarks sent last as a JPEG in the app's caches and returns its file
+  /// URL, or nil when no face was found yet. It is mirrored like the preview, so it looks as the
+  /// person saw it. Older snapshots are deleted once it is written, so at most one stays on the
+  /// device. Nothing is sent anywhere.
+  func snapshot() throws -> String? {
+    lock.lock()
+    let pixelBuffer = landmarkedBuffer
+    lock.unlock()
+    guard let pixelBuffer else {
+      return nil
+    }
+    let mirrored = CIImage(cvPixelBuffer: pixelBuffer).oriented(.upMirrored)
+    guard let image = CIContext().createCGImage(mirrored, from: mirrored.extent),
+      let data = UIImage(cgImage: image).jpegData(compressionQuality: 0.85)
+    else {
+      return nil
+    }
+    let manager = FileManager.default
+    let folder = manager.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("face-tracker", isDirectory: true)
+    try manager.createDirectory(at: folder, withIntermediateDirectories: true)
+    let file = folder.appendingPathComponent("\(UUID().uuidString).jpg")
+    try data.write(to: file)
+    for old in (try? manager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+    where old.lastPathComponent != file.lastPathComponent {
+      try? manager.removeItem(at: old)
+    }
+    return file.absoluteString
+  }
+
   // MARK: Camera frames (video queue)
 
   func captureOutput(
@@ -225,6 +265,10 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     if captures.count > 30 {
       captures = captures.filter { $0.key > timestamp - 2000 }
     }
+    pendingBuffers[timestamp] = pixelBuffer
+    if pendingBuffers.count > 2, let oldest = pendingBuffers.keys.min() {
+      pendingBuffers.removeValue(forKey: oldest)
+    }
     lock.unlock()
     do {
       try landmarker.detectAsync(image: image, timestampInMilliseconds: timestamp)
@@ -241,6 +285,10 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   ) {
     lock.lock()
     let capture = captures.removeValue(forKey: timestampInMilliseconds)
+    let frame = pendingBuffers.removeValue(forKey: timestampInMilliseconds)
+    pendingBuffers = pendingBuffers.filter { $0.key > timestampInMilliseconds }
+    let hasFace = !(result?.faceLandmarks.first?.isEmpty ?? true)
+    landmarkedBuffer = hasFace ? frame : nil
     lock.unlock()
     guard let capture else {
       return

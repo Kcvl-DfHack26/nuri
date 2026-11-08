@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 
 /** Landmarks of one face, normalized to the upright, unmirrored camera frame. */
@@ -27,7 +28,17 @@ export type FaceTrackerStatusEvent = {
   message?: string;
 };
 
+/** Methods of a mounted FaceTrackerView. */
+export type FaceTrackerViewRef = {
+  /**
+   * Saves the frame of the landmarks sent last as a JPEG in the app's cache, mirrored like the
+   * preview; null when no face was found yet.
+   */
+  takeSnapshotAsync(): Promise<string | null>;
+};
+
 export type FaceTrackerViewProps = {
+  ref?: Ref<FaceTrackerViewRef> | undefined;
   /** Runs the camera and face tracking while true. */
   active: boolean;
   onLandmarks?: (event: { nativeEvent: FaceLandmarksEvent }) => void;
