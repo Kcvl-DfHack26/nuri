@@ -10,18 +10,6 @@ type PartId = (typeof makeupParts)[number];
  */
 export type MakeupLayer = { part: PartId; color: string; shape?: MakeupShape | null | undefined };
 
-// Draw the skin first so line work and brows stay on top.
-const paintOrder: readonly PartId[] = [
-  'base',
-  'shading',
-  'highlight',
-  'cheek',
-  'eye',
-  'lip',
-  'lash',
-  'brow',
-];
-
 /** The middle of a step's recommended colors, e.g. a shadow's mid tone. */
 export function paintColor(colors: readonly string[]) {
   return colors[Math.floor(colors.length / 2)] ?? '#000000';
@@ -33,17 +21,4 @@ export function paintColor(colors: readonly string[]) {
  */
 export function recipeLayers(recipeId: string, layers: MakeupLayer[]): MakeupLayer[] {
   return recipeId.startsWith(postedRecipeIdPrefix) ? layers.filter((layer) => layer.shape) : layers;
-}
-
-/** Finish layers in paint order, keeping the last step's color and shape for each part. */
-export function finishLayers(
-  steps: readonly { part: PartId; colors: readonly string[]; shape?: MakeupShape | null }[],
-): MakeupLayer[] {
-  const byPart = new Map(
-    steps.map((step) => [step.part, { color: paintColor(step.colors), shape: step.shape }]),
-  );
-  return paintOrder.flatMap((part) => {
-    const layer = byPart.get(part);
-    return layer === undefined ? [] : [{ part, ...layer }];
-  });
 }
