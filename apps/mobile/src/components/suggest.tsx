@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 
 import { Icon } from '@expo/ui';
+import { Directory, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router, useFocusEffect, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -55,6 +56,9 @@ const heroCrop: PhotoCrop = {
 };
 
 type Result = { faceType: FaceType; brow: BrowShape | null; photo: string | undefined };
+
+// Where the face tracker saves camera frames in the app's cache (FaceTrackerView on both platforms).
+const savedFrameFolder = 'face-tracker';
 
 // The photo's local URI is passed to ⑭ only to show it; it stays on the device.
 function openResult(result: Result) {
@@ -114,6 +118,24 @@ export function Suggest() {
   const latest = useRef<FacePhotoLandmarks | null>(null);
   // The camera frame saved for the adopted result, deleted once another result replaces it.
   const savedFrame = useRef<string | null>(null);
+  // The last result lives only while the app runs, so frames a previous run saved are not shown.
+  useEffect(() => {
+    const folder = new Directory(Paths.cache, savedFrameFolder);
+    if (folder.exists) {
+      folder.delete();
+    }
+  }, []);
+
+  /** Shows a result and lets go of the camera frame the previous one showed. */
+  function adopt(result: Result, frame: string | null) {
+    if (savedFrame.current && savedFrame.current !== frame) {
+      deleteFile(savedFrame.current);
+    }
+    savedFrame.current = frame;
+    setPhoto(result.photo);
+    setLast(result);
+    openResult(result);
+  }
   // Counts camera sessions, so a shot that finishes after the camera closed opens nothing.
   const cameraSession = useRef(0);
   const closeCamera = useCallback(() => {
@@ -133,8 +155,7 @@ export function Suggest() {
       if ('message' in outcome) {
         setMessage(outcome.message);
       } else {
-        setLast(outcome);
-        openResult(outcome);
+        adopt(outcome, null);
       }
     } finally {
       setAnalyzing(false);
@@ -196,14 +217,8 @@ export function Suggest() {
         }
         return;
       }
-      if (savedFrame.current && savedFrame.current !== snapshot?.uri) {
-        deleteFile(savedFrame.current);
-      }
-      savedFrame.current = snapshot?.uri ?? null;
       closeCamera();
-      setPhoto(outcome.photo);
-      setLast(outcome);
-      openResult(outcome);
+      adopt(outcome, snapshot?.uri ?? null);
     } finally {
       setAnalyzing(false);
     }

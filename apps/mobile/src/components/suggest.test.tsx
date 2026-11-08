@@ -32,6 +32,10 @@ jest.mock('@/theme/colors', () => ({
 }));
 jest.mock('expo-image', () => ({ Image: () => null }));
 jest.mock('@/lib/files', () => ({ deleteFile: jest.fn() }));
+jest.mock('expo-file-system', () => ({
+  Paths: { cache: 'cache' },
+  Directory: jest.fn(() => ({ exists: false, delete: jest.fn() })),
+}));
 jest.mock('expo-image-picker', () => ({ launchImageLibraryAsync: jest.fn() }));
 jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: () => true },
@@ -191,18 +195,38 @@ test('diagnoses the saved camera frame with its own landmarks and shows it on th
 
 test('deletes a camera frame that is not shown and keeps the adopted one', async () => {
   mockRequestCamera.mockResolvedValue(true);
+  diagnose.mockReturnValue({ kind: 'ok', faceType: 'oval', brow: null });
   await render(<Suggest />);
-  await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
-  await act(async () => {
-    mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
-    await Promise.resolve();
+  const shoot = async (uri: string) => {
+    await fireEvent.press(screen.getByRole('button', { name: 'カメラで診断' }));
+    await act(async () => {
+      mockTracker.props?.onLandmarks?.({ nativeEvent: { ...landmarks, latencyMs: 30 } });
+      await Promise.resolve();
+    });
+    mockSnapshot.mockResolvedValueOnce({ ...landmarks, uri });
+    await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
+  };
+  await shoot('file:///kept.jpg');
+  await waitFor(() => {
+    expect(router.push).toHaveBeenCalledTimes(1);
   });
-  mockSnapshot.mockResolvedValueOnce({ ...landmarks, uri: 'file:///turned.jpg' });
+  // A turned face is not adopted: its frame is deleted and the previous result keeps its photo.
   diagnose.mockReturnValueOnce({ kind: 'notFrontal' });
-  await fireEvent.press(screen.getByRole('button', { name: '撮影して診断' }));
+  await shoot('file:///turned.jpg');
   expect(await screen.findByText('正面を向いた写真で試してください')).toBeOnTheScreen();
   expect(deleteFile).toHaveBeenCalledWith('file:///turned.jpg');
-  expect(router.push).not.toHaveBeenCalled();
+  expect(deleteFile).not.toHaveBeenCalledWith('file:///kept.jpg');
+  await fireEvent.press(screen.getByRole('button', { name: 'やめる' }));
+  await fireEvent.press(screen.getByRole('button', { name: '前回の診断' }));
+  expect(router.push).toHaveBeenLastCalledWith({
+    pathname: '/diagnosis',
+    params: { face: 'oval', photo: 'file:///kept.jpg' },
+  });
+  // A photo from the library replaces the result, so the camera frame is let go.
+  await fireEvent.press(screen.getByRole('button', { name: '写真から診断' }));
+  await waitFor(() => {
+    expect(deleteFile).toHaveBeenCalledWith('file:///kept.jpg');
+  });
 });
 
 test('explains when the camera is not allowed or the face is lost, and closes the camera', async () => {

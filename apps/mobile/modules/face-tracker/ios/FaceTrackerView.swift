@@ -312,8 +312,11 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       points.append(Double(landmark.y))
     }
     if let frame {
+      // A camera stopped meanwhile keeps nothing from the session it ended.
       lock.lock()
-      landmarked = (frame, points)
+      if acceptingFrames, capture.generation == sessionGeneration {
+        landmarked = (frame, points)
+      }
       lock.unlock()
     }
     let latencyMs = (CACurrentMediaTime() - capture.at) * 1000
