@@ -22,6 +22,8 @@ APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integ
 
 GitHub Actionsの `quality` は生成型・静的検査・Bun/Jest・PostgreSQL統合テストを実行する。`quality` と並行して動く `mobile-bundle` はExpo DoctorとiOS／Androidのexportを行い、`mobile-bundles` を保存する。
 
+モバイルの `src` は `bun run lint` でReact DoctorのOxlintプラグインも実行する。Effectの解除漏れや不安定な依存、TanStack Queryのクライアント再生成や購読範囲、React Nativeのリストと条件付き描画を検査する。ルールは `oxlint.config.ts` で指定し、違反はローカルとCIの両方でエラーになる。
+
 React Queryを使う画面テストでは `apps/mobile/src/lib/test/query-client.tsx` のfixtureを使う。テストごとにキャッシュを分離し、`gcTime: Infinity` でJest終了を妨げるタイマーの登録を防ぐ。
 
 PRに確認したSHA・実行コマンドと環境・結果・未確認項目を記録する。過去の検証記録には旧project名や当時の構成を含む。
