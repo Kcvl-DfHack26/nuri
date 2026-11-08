@@ -16,7 +16,6 @@ const target = {
   repository: 'owner/repo',
   headRepository: 'owner/repo',
   state: 'open',
-  base: 'main',
   sha,
   requestedSha: sha,
 };
@@ -52,13 +51,21 @@ describe('preview request', () => {
     }).not.toThrow();
   });
 
+  test('links the same preview origin for Web, the API and Expo Go', () => {
+    const origin = 'https://pr-130---nuri-preview-example-an.a.run.app';
+    const comment = renderPreviewComment({ sha, origin });
+    expect(comment).toContain(`[Expo Web](${origin}/)`);
+    expect(comment).toContain(`${origin}/api/recipes?offset=0`);
+    expect(comment).toContain('exps://pr-130---nuri-preview-example-an.a.run.app');
+    expect(comment).toContain(`${origin}/expo-go/qr.svg?sha=${sha}`);
+  });
+
   test.each([
     { actorType: 'Bot' },
     { permission: 'read' },
     { headRepository: 'outsider/fork' },
     { headRepository: undefined },
     { state: 'closed' },
-    { base: 'release' },
     { sha: 'b'.repeat(40) },
     { sha: 'main' },
   ])('rejects unauthorized or stale targets: %j', (patch) => {

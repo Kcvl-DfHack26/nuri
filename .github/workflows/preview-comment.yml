@@ -2,7 +2,6 @@ name: Preview request
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
-    branches: [main]
 permissions:
   contents: read
   pull-requests: write
@@ -18,7 +17,7 @@ jobs:
       # Metadata only: never check out or execute the PR in pull_request_target.
       - uses: actions/checkout@v7.0.1
         with:
-          ref: ${{ github.workflow_sha }}
+          ref: refs/heads/main
           persist-credentials: false
       - uses: actions/github-script@v9.0.0
         with:

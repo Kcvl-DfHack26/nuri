@@ -28,6 +28,33 @@ COPY apps/emulate/package.json apps/emulate/package.json
 COPY packages/shared/package.json packages/shared/package.json
 RUN bun install --frozen-lockfile --production --filter @starter/api --ignore-scripts
 
+FROM dependencies AS preview-dependencies
+RUN bun install --frozen-lockfile --production --filter @starter/api --filter @starter/mobile --ignore-scripts
+
+FROM build AS preview-build
+RUN bun build apps/api/src/seed.ts --target=node --outdir=apps/api/dist-preview --external=pg
+
+FROM postgres:17.7-bookworm AS preview
+RUN apt-get update && apt-get install -y --no-install-recommends nginx-light qrencode \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
+COPY --from=preview-dependencies --chown=postgres:postgres /app/node_modules /app/node_modules
+COPY --from=preview-dependencies --chown=postgres:postgres /app/apps /app/apps
+COPY package.json tsconfig.json /app/
+COPY packages/shared /app/packages/shared
+COPY --chown=postgres:postgres apps/mobile /app/apps/mobile
+COPY --from=build /app/apps/mobile/dist /app/apps/mobile/dist
+COPY --from=build /app/apps/api/dist /app/apps/api/dist
+COPY --from=build /app/apps/api/drizzle /app/apps/api/drizzle
+COPY --from=build /app/apps/api/assets /app/apps/api/assets
+COPY --from=preview-build /app/apps/api/dist-preview/seed.js /app/apps/api/dist/seed.js
+COPY scripts/preview-start.sh scripts/preview-nginx.conf /app/scripts/
+WORKDIR /app
+USER postgres
+ENTRYPOINT []
+EXPOSE 8080
+CMD ["bash", "scripts/preview-start.sh"]
+
 FROM node-base
 ENV NODE_ENV=production PORT=8080 EXPO_WEB_ROOT=/app/apps/api/web
 WORKDIR /app/apps/api

@@ -1,0 +1,58 @@
+name: Manage PR preview infrastructure
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Plan only, or apply to the isolated PR preview resources
+        type: choice
+        options: [plan, apply]
+        default: plan
+permissions:
+  contents: read
+concurrency:
+  group: nuri-preview-cloud
+  queue: max
+jobs:
+  opentofu:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify the current main passed CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
+          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success" --jq '[.workflow_runs[] | select(.event == "push")] | length')
+          test "$passed" -gt 0
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_INFRA_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_INFRA_SERVICE_ACCOUNT }}
+      - uses: opentofu/setup-opentofu@v2.0.2
+        with:
+          tofu_version: 1.13.8
+          tofu_wrapper: false
+      - name: Plan and optionally apply the preview stack
+        working-directory: infra/preview
+        shell: bash
+        env:
+          OPERATION: ${{ inputs.operation }}
+          TF_IN_AUTOMATION: 'true'
+        run: |
+          umask 077
+          plan="$RUNNER_TEMP/nuri-preview.tfplan"
+          tofu init -input=false -lockfile=readonly
+          tofu plan -input=false -no-color -lock-timeout=5m -out="$plan"
+          if [[ "$OPERATION" == apply ]]; then
+            tofu show -json "$plan" | jq -e 'all(.resource_changes[]?; .change.actions | index("delete") | not)' >/dev/null
+            tofu apply -input=false -no-color -lock-timeout=5m "$plan"
+            tofu output -no-color
+          fi

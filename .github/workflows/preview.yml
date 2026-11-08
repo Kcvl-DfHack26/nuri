@@ -1,7 +1,12 @@
-name: Publish preview
+name: Publish or clean up PR preview
 on:
   issue_comment:
     types: [edited]
+  pull_request_target:
+    types: [closed]
+    branches: [main]
+  schedule:
+    - cron: '41 17 * * *'
   workflow_dispatch:
     inputs:
       pr:
@@ -11,14 +16,14 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: publish-preview-${{ github.event.issue.number || inputs.pr }}
-  cancel-in-progress: false
+  group: nuri-preview-cloud
+  queue: max
 jobs:
   request:
     if: >-
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.pull_request && github.event.sender.type == 'User' &&
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request && github.event.sender.type == 'User' &&
       contains(github.event.comment.body, '<!-- expo-hono-opentofu-starter-preview-request -->')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -49,7 +54,7 @@ jobs:
             if (!/^[1-9]\d{0,8}$/.test(number ?? '')) throw new Error('PR番号が不正です');
             const { data: permission } = await github.rest.repos.getCollaboratorPermissionLevel({ ...context.repo, username: context.actor });
             const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
-            assertPreviewTarget({ actorType: payload.sender?.type, permission: permission.permission, repository: `${context.repo.owner}/${context.repo.repo}`, headRepository: pr.head.repo?.full_name, state: pr.state, base: pr.base.ref, sha: pr.head.sha, requestedSha });
+            assertPreviewTarget({ actorType: payload.sender?.type, permission: permission.permission, repository: `${context.repo.owner}/${context.repo.repo}`, headRepository: pr.head.repo?.full_name, state: pr.state, sha: pr.head.sha, requestedSha });
             const comments = await github.paginate(github.rest.issues.listComments, { ...context.repo, issue_number: pr.number });
             let comment = comments.find(c => c.user?.login === 'github-actions[bot]' && c.body?.startsWith(`${previewMarker}\n`));
             if (isComment && (!comment || comment.id !== payload.comment.id || comment.body !== payload.comment.body || previewSha(comment.body) !== pr.head.sha)) throw new Error('最新のpreviewコメントから実行してください');
@@ -65,48 +70,74 @@ jobs:
 
   publish:
     needs: request
-    if: needs.request.outputs.pr != ''
+    if: needs.request.outputs.pr != '' && vars.PREVIEW_GCP_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: preview
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
     outputs:
-      comment: ${{ steps.preview.outputs.comment }}
+      origin: ${{ steps.preview.outputs.origin }}
     steps:
-      # Only the authorized, same-repository commit reaches this job.
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: controller
+          persist-credentials: false
+      # This directory is only the Docker build context. Its code never runs on the host.
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ needs.request.outputs.sha }}
+          path: source
           persist-credentials: false
-      - uses: actions/setup-node@v7.1.0
+      - uses: google-github-actions/auth@v3
         with:
-          node-version-file: .node-version
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-      - run: bun install --frozen-lockfile
-      - name: Use the repository EAS CLI
-        run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Check the PR is still current
-        uses: actions/github-script@v9.0.0
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Publish and check the Cloud Run preview
+        id: preview
+        working-directory: controller
         env:
+          GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+        run: bash scripts/preview-cloud.sh publish "$PREVIEW_PR" "$PREVIEW_SHA" "$GITHUB_WORKSPACE/source"
+
+  cleanup:
+    if: >-
+      github.ref == 'refs/heads/main' && vars.PREVIEW_GCP_ENABLED == 'true' &&
+      (github.event_name == 'schedule' ||
+      (github.event_name == 'pull_request_target' && github.event.pull_request.head.repo.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
         with:
-          script: |
-            const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(process.env.PREVIEW_PR) });
-            if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA) throw new Error('PRが更新・終了されたため配信を中止します');
-      - name: Publish iOS and Android updates
-        id: preview
-        uses: expo/expo-github-action/preview@9.0.1
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
+          service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v3.0.1
+      - name: Delete closed PR revisions and images
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        with:
-          working-directory: apps/mobile
-          command: eas update --branch pr-${{ needs.request.outputs.pr }} --environment preview --platform all --message "PR ${{ needs.request.outputs.pr }} @ ${{ needs.request.outputs.sha }}" --non-interactive
-          comment: false
+          GH_TOKEN: ${{ github.token }}
+          PREVIEW_PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == schedule ]]; then
+            bash scripts/preview-cloud.sh sweep
+          else
+            bash scripts/preview-cloud.sh cleanup "$PREVIEW_PR"
+          fi
 
   report:
     needs: [request, publish]
@@ -128,7 +159,7 @@ jobs:
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
           PREVIEW_COMMENT: ${{ needs.request.outputs.comment }}
           PREVIEW_RESULT: ${{ needs.publish.result }}
-          PREVIEW_UPDATE_COMMENT: ${{ needs.publish.outputs.comment }}
+          PREVIEW_ORIGIN: ${{ needs.publish.outputs.origin }}
         with:
           script: |
             const { previewSha, renderPreviewComment } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/preview-comment.ts`);
@@ -136,5 +167,6 @@ jobs:
             const { data: comment } = await github.rest.issues.getComment({ ...context.repo, comment_id: Number(process.env.PREVIEW_COMMENT) });
             if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA || previewSha(comment.body) !== pr.head.sha) return;
             const success = process.env.PREVIEW_RESULT === 'success';
-            const body = renderPreviewComment({ sha: pr.head.sha, status: success ? '✅ このコミットのpreviewを配信しました。' : '❌ previewを配信できませんでした。ログを確認して再実行できます。', runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`, updateComment: success ? process.env.PREVIEW_UPDATE_COMMENT : undefined });
+            const status = success ? '✅ このコミットのpreviewを配信しました。' : process.env.PREVIEW_RESULT === 'skipped' ? 'Cloud Runプレビューは設定待ちです。' : '❌ previewを配信できませんでした。ログを確認して再実行できます。';
+            const body = renderPreviewComment({ sha: pr.head.sha, status, runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`, origin: success ? process.env.PREVIEW_ORIGIN : undefined });
             await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });

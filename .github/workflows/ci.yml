@@ -104,9 +104,12 @@ jobs:
       - run: tofu -chdir=infra validate
       - run: tofu -chdir=infra/bootstrap init -backend=false -lockfile=readonly
       - run: tofu -chdir=infra/bootstrap validate
+      - run: tofu -chdir=infra/preview init -backend=false -lockfile=readonly
+      - run: tofu -chdir=infra/preview validate
       - run: tflint --init
       - run: tflint --chdir=infra --config="$GITHUB_WORKSPACE/.tflint.hcl"
       - run: tflint --chdir=infra/bootstrap --config="$GITHUB_WORKSPACE/.tflint.hcl"
+      - run: tflint --chdir=infra/preview --config="$GITHUB_WORKSPACE/.tflint.hcl"
   container:
     runs-on: ubuntu-latest
     steps:

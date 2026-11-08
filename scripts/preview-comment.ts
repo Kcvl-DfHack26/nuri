@@ -35,19 +35,14 @@ export function assertPreviewTarget(input: {
   repository: string;
   headRepository: string | undefined;
   state: string;
-  base: string;
   sha: string;
   requestedSha?: string;
 }) {
   if (input.actorType !== 'User' || !['write', 'admin'].includes(input.permission)) {
     throw new Error('previewの配信には利用者のwrite権限が必要です');
   }
-  if (
-    input.state !== 'open' ||
-    input.headRepository !== input.repository ||
-    input.base !== 'main'
-  ) {
-    throw new Error('同じリポジトリからmainへ向けた公開中PRだけ配信できます');
+  if (input.state !== 'open' || input.headRepository !== input.repository) {
+    throw new Error('同じリポジトリの公開中PRだけ配信できます');
   }
   if (
     !/^[a-f0-9]{40}$/.test(input.sha) ||
@@ -61,11 +56,12 @@ export function renderPreviewComment(input: {
   sha: string;
   status?: string;
   runUrl?: string;
-  updateComment?: string;
+  origin?: string;
 }) {
+  const origin = input.origin;
   return [
     previewMarker,
-    '### expo-hono-opentofu-starter preview',
+    '### nuri PRプレビュー',
     '',
     `対象SHA: ${input.sha}`,
     '',
@@ -74,8 +70,18 @@ export function renderPreviewComment(input: {
     '',
     requestLine,
     '',
-    'リポジトリにwrite権限がある人がチェックすると、iOS / Androidのpreviewを配信します。',
-    'QRは対応するDevelopment Buildで開いてください。Expo Goはローカル開発サーバーを使います。',
-    input.updateComment ? `\n${input.updateComment}` : '',
+    'リポジトリにwrite権限がある人がチェックすると、このPRのプレビューを作成します。',
+    ...(origin
+      ? [
+          '',
+          `- [Expo Web](${origin}/)`,
+          `- [Hono APIのレシピ](${origin}/api/recipes?offset=0)`,
+          `- Expo Goの接続先 \`exps://${new URL(origin).host}\``,
+          '',
+          `![対応するExpo Goで開くQR](${origin}/expo-go/qr.svg?sha=${input.sha})`,
+          '',
+          'Expo Goはプロジェクトと同じSDKを使ってください。初回起動時はバンドル生成に時間がかかります。',
+        ]
+      : []),
   ].join('\n');
 }
