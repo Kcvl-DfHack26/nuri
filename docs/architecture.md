@@ -59,6 +59,8 @@ Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v
 
 ⑫-5の「この手順を削除」（#201）は，確認のあと手順を下書きから消して⑫-4に戻る．消した手順の区間はどの手順にも入らない空きになり，隣の手順のバーで広げられる．レシピには手順が1つ以上要るため，最後の1つは消せない．
 
+⑫-8の「塗る範囲」（#202）は，Plan A の見本の顔写真（`face-bare.jpg`）に，範囲のある全部の手順の範囲を⑫-8の手順の色で重ねる．利用者の顔の写真は使わない．見本の写真の468個の特徴点は PC の MediaPipe Face Landmarker で一度だけ求めて `src/lib/sample-face.ts` に持ち，顔の追跡のない Expo Go でも描ける．描画は⑦⑩と同じ `useShapeTexture` と `FaceTexture`．範囲のある手順がないときは出さない．
+
 ⑫-8の投稿の確認（#196）は，本文「サムネイルと手順が、だれでも見られるように公開されます。」を出す．iOS は標準の Alert（見出しが中央，2つのボタンが左右）のまま，Android は Material の Alert が見出しを左寄せ・ボタンを右寄せにするため，`@expo/ui` の Jetpack Compose の `BasicAlertDialog` で見出しを中央に，「キャンセル」と「投稿する」を左右に置く（`post-confirm.android.tsx`）．
 
 SNS取り込み（④）は、ホームの「動画URL」からルートStackのformSheet `/import` を開き、入力・読み取り中・完了・失敗・保存完了を一つのシート内の状態で切り替える。取得方法と権利条件が未決のため、URLは端末内で対応サービス（Instagram・YouTube・TikTok）の投稿URLかを判定するだけで、通信せず固定の見本（`src/components/sns-import-sample.ts`）を表示し、何も保存しない。④-4はシートの上に `fullScreenModal` で重ねる。iOSのネイティブStackはモーダルの後に通常のpush画面を置くとシートの下へ積むため、戻るとシートへ帰れるようにモーダルを重ねる。④-4の保存は `dismissTo` で `saved=1` を渡し、シートを④-5にする。
