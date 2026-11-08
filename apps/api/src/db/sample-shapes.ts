@@ -1,8 +1,8 @@
 import type { MakeupShape } from '@starter/shared';
 
 // Sample makeup shapes for the seeded recipes, in MediaPipe's canonical face texture. Points are
-// landmark numbers moved by dx, dy in UV (the texture is 1 wide; y grows downward). They are drawn
-// on the face's right half (the image's left) and mirrored.
+// landmark numbers moved by dx, dy in UV (the texture is 1 wide; y grows downward). Strokes for one
+// side are drawn on the face's right half (the image's left) and mirrored.
 
 // Brow outline: the upper edge from the tail to the head, then the lower edge back to the tail.
 const browUpper = [70, 63, 105, 66, 107] as const;
@@ -11,9 +11,9 @@ const browLower = [55, 65, 52, 53, 46] as const;
 /** A filled brow moved from the landmarks' brow by dy per point (upper tail→head, lower head→tail). */
 function brow(upperDy: readonly number[], lowerDy: readonly number[]): MakeupShape {
   return {
-    mirror: true,
     strokes: [
       {
+        mirror: true,
         fill: true,
         blur: 0.006,
         opacity: 0.9,
@@ -43,9 +43,9 @@ export const browShapes = {
 
 /** 狐メイク's shadow: from the outer corner, long and horizontal toward the temple. */
 export const foxEyeShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
+      mirror: true,
       fill: true,
       blur: 0.012,
       opacity: 0.85,
@@ -70,14 +70,15 @@ export const foxEyeShape: MakeupShape = {
 
 /** 狐メイク's liner: along the lashes, thicker toward the outer corner, winged up. */
 export const foxLinerShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
+      mirror: true,
       width: 0.004,
       blur: 0.002,
       points: [{ at: 173 }, { at: 157 }, { at: 158 }, { at: 159 }, { at: 160 }],
     },
     {
+      mirror: true,
       width: 0.008,
       blur: 0.002,
       points: [
@@ -94,9 +95,9 @@ export const foxLinerShape: MakeupShape = {
 
 /** 狐メイク's shading: the temples, the sides of the face and the jaw. */
 export const foxShadingShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
+      mirror: true,
       width: 0.035,
       blur: 0.02,
       opacity: 0.8,
@@ -107,6 +108,7 @@ export const foxShadingShape: MakeupShape = {
       ],
     },
     {
+      mirror: true,
       width: 0.04,
       blur: 0.02,
       opacity: 0.8,
@@ -117,6 +119,7 @@ export const foxShadingShape: MakeupShape = {
       ],
     },
     {
+      mirror: true,
       width: 0.04,
       blur: 0.022,
       opacity: 0.7,
@@ -131,9 +134,9 @@ export const foxShadingShape: MakeupShape = {
 
 /** 狐メイク's cheek: from the cheekbone diagonally up toward the temple. */
 export const foxCheekShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
+      mirror: true,
       fill: true,
       blur: 0.03,
       opacity: 0.85,
@@ -155,6 +158,10 @@ const faceOval = [
   10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148,
   176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109,
 ] as const;
+// The right eye's lid edges, from the outer corner over the upper lid and back under it.
+const eyeOutline = [
+  33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7,
+] as const;
 // The outer edge of the lips, clockwise from the right corner of the mouth.
 const lipOuter = [
   61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146,
@@ -166,13 +173,16 @@ const lipInner = [
 
 /** 透明感の韓国風's base: the whole face, sheer and soft at the edges. */
 export const koreanBaseShape: MakeupShape = {
-  mirror: false,
-  strokes: [{ fill: true, blur: 0.05, opacity: 0.6, points: faceOval.map((at) => ({ at })) }],
+  strokes: [
+    { fill: true, blur: 0.05, opacity: 0.6, points: faceOval.map((at) => ({ at })) },
+    // Not on the eyes or the lips.
+    { erase: true, mirror: true, fill: true, blur: 0.01, points: eyeOutline.map((at) => ({ at })) },
+    { erase: true, fill: true, blur: 0.01, points: lipOuter.map((at) => ({ at })) },
+  ],
 };
 
 /** 透明感の韓国風's highlight: the nose bridge, the middle of the forehead and the cheekbones. */
 export const koreanHighlightShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
       width: 0.018,
@@ -182,6 +192,7 @@ export const koreanHighlightShape: MakeupShape = {
     },
     { width: 0.03, blur: 0.02, opacity: 0.4, points: [{ at: 151, dy: 0.02 }, { at: 9 }] },
     {
+      mirror: true,
       width: 0.03,
       blur: 0.02,
       opacity: 0.8,
@@ -192,9 +203,9 @@ export const koreanHighlightShape: MakeupShape = {
 
 /** 透明感の韓国風's cheek: a round flush on the apples of the cheeks. */
 export const koreanCheekShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
+      mirror: true,
       fill: true,
       blur: 0.035,
       opacity: 0.7,
@@ -214,18 +225,19 @@ export const koreanCheekShape: MakeupShape = {
 
 /** 透明感の韓国風's lip: a gradient lip, deepest just inside. */
 export const koreanLipShape: MakeupShape = {
-  mirror: false,
   strokes: [
     { fill: true, blur: 0.012, opacity: 0.55, points: lipOuter.map((at) => ({ at })) },
-    { fill: true, blur: 0.01, opacity: 0.8, points: lipInner.map((at) => ({ at })) },
+    { width: 0.025, blur: 0.012, opacity: 0.6, points: [...lipInner, 78].map((at) => ({ at })) },
+    // Not inside the open mouth.
+    { erase: true, fill: true, blur: 0.004, points: lipInner.map((at) => ({ at })) },
   ],
 };
 
 /** 猫メイク's shadow: the outer third, pulled out and slightly down. */
 export const catEyeShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
+      mirror: true,
       fill: true,
       blur: 0.012,
       opacity: 0.85,
@@ -244,9 +256,9 @@ export const catEyeShape: MakeupShape = {
 
 /** 猫メイク's liner: a long, sharp wing past the outer corner. */
 export const catLinerShape: MakeupShape = {
-  mirror: true,
   strokes: [
     {
+      mirror: true,
       width: 0.006,
       blur: 0.002,
       points: [

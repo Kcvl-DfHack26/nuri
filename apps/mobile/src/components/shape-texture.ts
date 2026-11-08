@@ -1,6 +1,14 @@
 import type { SkImage } from '@shopify/react-native-skia';
+import type { MakeupShape } from '@starter/shared';
 
-import { BlurStyle, PaintStyle, Skia, StrokeCap, StrokeJoin } from '@shopify/react-native-skia';
+import {
+  BlendMode,
+  BlurStyle,
+  PaintStyle,
+  Skia,
+  StrokeCap,
+  StrokeJoin,
+} from '@shopify/react-native-skia';
 import { makeupShapeSchema } from '@starter/shared';
 import { useMemo } from 'react';
 
@@ -11,10 +19,11 @@ const size = 512;
 
 /**
  * A step's shape drawn on device into a white, transparent texture laid out like MediaPipe's
- * canonical face texture, for FaceTexture to color and map onto the face. Null when the step has no
- * shape or an invalid one, so the part's standard texture is used.
+ * canonical face texture, for FaceTexture to color and map onto the face. The shape comes from the
+ * API's JSON, so it is validated here; null when the step has no shape or an invalid one, so the
+ * part's standard texture is used.
  */
-export function useShapeTexture(shape: unknown): SkImage | null {
+export function useShapeTexture(shape: MakeupShape | null | undefined): SkImage | null {
   return useMemo(() => {
     const parsed = makeupShapeSchema.safeParse(shape);
     if (!parsed.success) {
@@ -39,6 +48,9 @@ export function useShapeTexture(shape: unknown): SkImage | null {
       paint.setAntiAlias(true);
       paint.setColor(Skia.Color('white'));
       paint.setAlphaf(stroke.opacity);
+      if (stroke.erase) {
+        paint.setBlendMode(BlendMode.DstOut);
+      }
       if (stroke.closed) {
         builder.close();
         paint.setStyle(PaintStyle.Fill);

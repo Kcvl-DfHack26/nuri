@@ -10,6 +10,8 @@ export type ShapeStroke = {
   points: Point[];
   /** A filled outline; otherwise a line `width` wide with round ends. */
   closed: boolean;
+  /** Cuts the stroke out of what is drawn before it. */
+  erase: boolean;
   width: number;
   /** Soft edge, as the blur's sigma. */
   blur: number;
@@ -21,14 +23,14 @@ const samplesPerSegment = 8;
 
 /**
  * The strokes of a shape in a `size`×`size` texture laid out like MediaPipe's canonical face
- * texture, with the mirrored copies when the shape asks for them. Each point is its landmark's UV
- * moved by dx, dy; a mirrored copy flips u around 0.5, where the canonical UV is symmetric.
+ * texture, in drawing order, each followed by its mirrored copy when it asks for one. Each point is
+ * its landmark's UV moved by dx, dy; a mirrored copy flips u around 0.5, where the canonical UV is
+ * symmetric.
  */
 export function shapeStrokes(shape: MakeupShape, size: number): ShapeStroke[] {
   const uv = canonicalFaceMesh.textureCoordinates;
-  const sides = shape.mirror ? [false, true] : [false];
-  return sides.flatMap((mirrored) =>
-    shape.strokes.map((stroke) => {
+  return shape.strokes.flatMap((stroke) =>
+    (stroke.mirror ? [false, true] : [false]).map((mirrored) => {
       const anchors = stroke.points.map(({ at, dx = 0, dy = 0 }) => {
         const landmark = uv[at] ?? { x: 0.5, y: 0.5 };
         const u = landmark.x + dx;
@@ -38,6 +40,7 @@ export function shapeStrokes(shape: MakeupShape, size: number): ShapeStroke[] {
       return {
         points: smoothCurve(anchors, closed),
         closed,
+        erase: stroke.erase ?? false,
         width: (stroke.width ?? 0.02) * size,
         blur: ((stroke.blur ?? 0) * size) / 2,
         opacity: stroke.opacity ?? 1,

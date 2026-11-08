@@ -25,7 +25,7 @@ test('paints parts in display order and uses the last step for repeated parts', 
 });
 
 test('keeps the shape of the last step for each part', () => {
-  const arch = { mirror: true, strokes: [{ points: [{ at: 105 }] }] };
+  const arch = { strokes: [{ mirror: true, points: [{ at: 105 }] }] };
   expect(
     finishLayers([
       { part: 'brow', colors: ['#201008'], shape: null },

@@ -1,4 +1,4 @@
-import type { makeupParts } from '@starter/shared';
+import type { MakeupShape, makeupParts } from '@starter/shared';
 
 type PartId = (typeof makeupParts)[number];
 
@@ -6,7 +6,7 @@ type PartId = (typeof makeupParts)[number];
  * One part painted over the face in a color, in the step's shape (`makeupShapeSchema`) or, without
  * one, the part's standard texture.
  */
-export type MakeupLayer = { part: PartId; color: string; shape?: unknown };
+export type MakeupLayer = { part: PartId; color: string; shape?: MakeupShape | null | undefined };
 
 // Draw the skin first so line work and brows stay on top.
 const paintOrder: readonly PartId[] = [
@@ -27,7 +27,7 @@ export function paintColor(colors: readonly string[]) {
 
 /** Finish layers in paint order, keeping the last step's color and shape for each part. */
 export function finishLayers(
-  steps: readonly { part: PartId; colors: readonly string[]; shape?: unknown }[],
+  steps: readonly { part: PartId; colors: readonly string[]; shape?: MakeupShape | null }[],
 ): MakeupLayer[] {
   const byPart = new Map(
     steps.map((step) => [step.part, { color: paintColor(step.colors), shape: step.shape }]),
