@@ -147,3 +147,11 @@ test('asks a guest to log in instead of showing a profile', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'ログイン' }));
   expect(router.push).toHaveBeenCalledWith('/account');
 });
+
+test('retries the follow and like counts when they fail to load', async () => {
+  mockProfile.mockRejectedValueOnce(new Error('通信エラー'));
+  await render(<MyPage />, { wrapper: TestQueryProvider });
+  expect(await screen.findByText('フォロワーなどの数を読み込めませんでした。')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
+  expect(await screen.findByLabelText('フォロワー 328')).toBeOnTheScreen();
+});

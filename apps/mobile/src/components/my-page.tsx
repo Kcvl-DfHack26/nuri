@@ -94,7 +94,16 @@ export function MyPage() {
         </View>
         {user ? (
           <>
-            <ProfileCounts profile={profile.data} />
+            {profile.isError ? (
+              <Feedback
+                message="フォロワーなどの数を読み込めませんでした。"
+                onRetry={() => {
+                  void profile.refetch();
+                }}
+              />
+            ) : (
+              <ProfileCounts profile={profile.data} />
+            )}
             <RecipeSection
               title="投稿"
               empty="まだ投稿したレシピはありません"
