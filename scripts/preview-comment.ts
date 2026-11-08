@@ -67,7 +67,7 @@ export function renderPreviewComment(input: {
   const heading = pullRequest
     ? `PR [#${pullRequest.number}](${pullRequest.url}) · [\`${sha.slice(0, 7)}\`](${pullRequest.url}/commits/${sha})`
     : `nuri PRプレビュー · \`${sha.slice(0, 7)}\``;
-  const status = input.status ?? (canRequest ? '未配信' : '設定待ち');
+  const status = input.status ?? (canRequest ? '⚪ 未配信' : '🔧 設定待ち');
   const time = deployment
     ? new Intl.DateTimeFormat('sv-SE', {
         timeZone: 'Asia/Tokyo',
@@ -84,13 +84,13 @@ export function renderPreviewComment(input: {
   return [
     previewMarker,
     `<!-- nuri-preview-sha: ${sha} -->`,
-    `### ${heading}${runUrl ? ` · [Actions ↗](${runUrl})` : ''}`,
+    `### 🚀 ${heading}${runUrl ? ` · [Actions ↗](${runUrl})` : ''}`,
     '',
     '| プレビュー | ビルド・デプロイ | デプロイ日時 (JST) |',
     '| --- | --- | --- |',
-    `| **Expo Web**<br>${webUrl ? `[${webUrl}](${webUrl})` : '—'} | ${status} | ${time} |`,
-    `| **Hono API**<br>${apiUrl ? `[${apiUrl}](${apiUrl})` : '—'} | ${status} | ${time} |`,
-    `| **Expo Go**<br>${go} | ${status} | ${time} |`,
+    `| 🌐 **Expo Web**<br>${webUrl ? `[${webUrl}](${webUrl})` : '—'} | ${status} | ${time} |`,
+    `| ⚡ **Hono API**<br>${apiUrl ? `[${apiUrl}](${apiUrl})` : '—'} | ${status} | ${time} |`,
+    `| 📱 **Expo Go**<br>${go} | ${status} | ${time} |`,
     '',
     ...(canRequest
       ? [requestLine, '', 'write権限を持つ人がチェックすると、3つのプレビューを一緒に配信します。']
@@ -99,13 +99,18 @@ export function renderPreviewComment(input: {
       ? ['Expo Goはプロジェクトと同じSDKを使ってください。初回起動時はバンドルを生成します。']
       : []),
     '',
-    '<details>',
-    '<summary>無料枠・GCPの概算・cleanup</summary>',
+    '#### 💰 利用枠と費用の目安',
     '',
-    '- Expo Free は月 Android 15／iOS 15 ビルド、Workflows 60分、Update 1,000 MAU。このプレビューの消費はすべて0。 [Expo料金表](https://expo.dev/pricing)',
-    '- Cloud Run は最小0台。1 vCPU・2 GiBの課金時間10分で約 $0.017。Registryに1 GiBを7日保存すると約 $0.023。いずれも共有の無料枠、リクエスト、外向き通信を別にした目安。 [Cloud Run料金表](https://cloud.google.com/run/pricing) · [Registry料金表](https://cloud.google.com/artifact-registry/pricing)',
-    '- 更新成功後に旧リビジョンとイメージを削除。マージ・クローズ後はタグも削除し、取りこぼしは日次で回収。Registryは14日を超えるイメージを定期削除。',
+    '- **Expo Freeの月間枠** Android 15ビルド · iOS 15ビルド · Workflows 60分 · Update 1,000 MAU [Expo料金表](https://expo.dev/pricing)',
+    '- **プレビューでのExpo消費** 0ビルド · 0分 · 0 MAU',
+    '- **Cloud Run（東京）** 約 $0.017（1 vCPU・2 GiB × 課金時間10分、最小0台） [Cloud Run料金表](https://cloud.google.com/run/pricing)',
+    '- **Artifact Registry** 約 $0.023（1 GiB × 7日間） [Registry料金表](https://cloud.google.com/artifact-registry/pricing)',
+    '- **GCP合計** 約 $0.040（共有無料枠の差し引き前、リクエストと外向き通信は別）',
     '',
-    '</details>',
+    '#### 🧹 Cleanup',
+    '',
+    '- **更新成功後** 旧リビジョン・イメージを削除',
+    '- **マージ・クローズ後** PRのタグ・リビジョン・イメージを削除',
+    '- **定期処理** 取りこぼしを日次で回収し、14日を超えるイメージを削除',
   ].join('\n');
 }

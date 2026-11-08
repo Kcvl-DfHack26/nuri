@@ -141,6 +141,8 @@ jobs:
       contents: read
       pull-requests: read
       id-token: write
+    outputs:
+      logs: ${{ steps.logs.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -151,16 +153,61 @@ jobs:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Delete closed PR revisions and images
+      - name: Delete closed PR tags, revisions and images
+        id: cleanup
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_PR: ${{ github.event.pull_request.number }}
+          PREVIEW_CLEANUP_REPORTS: ${{ runner.temp }}/preview-cleanup.ndjson
         run: |
+          result=0
           if [[ "$GITHUB_EVENT_NAME" == schedule ]]; then
-            bash scripts/preview-cloud.sh sweep
+            bash scripts/preview-cloud.sh sweep || result=$?
           else
-            bash scripts/preview-cloud.sh cleanup "$PREVIEW_PR"
+            bash scripts/preview-cloud.sh cleanup "$PREVIEW_PR" || result=$?
           fi
+          if [[ -s "$PREVIEW_CLEANUP_REPORTS" ]]; then
+            echo 'has_reports=true' >> "$GITHUB_OUTPUT"
+          fi
+          exit "$result"
+      - uses: actions/upload-artifact@v7.0.2
+        id: logs
+        if: always() && steps.cleanup.outputs.has_reports == 'true'
+        with:
+          name: preview-cleanup-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-cleanup.ndjson
+          retention-days: 1
+
+  report-cleanup:
+    name: Report preview cleanup on PRs
+    needs: cleanup
+    if: always() && needs.cleanup.outputs.logs != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          artifact-ids: ${{ needs.cleanup.outputs.logs }}
+          path: ${{ runner.temp }}/preview-cleanup
+      - uses: actions/github-script@v9.0.0
+        with:
+          script: |
+            const { readFile } = await import('node:fs/promises');
+            const reports = await readFile(`${process.env.RUNNER_TEMP}/preview-cleanup/preview-cleanup.ndjson`, 'utf8');
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
+            for (const line of reports.trimEnd().split('\n')) {
+              const { pr, log, exitCode } = JSON.parse(line);
+              const result = exitCode === 0 ? '✅ 削除完了' : `❌ 失敗（終了コード ${exitCode}）`;
+              const excerpt = log.length > 58_000 ? `${log.slice(0, 58_000)}\n… 続きは Actions の実行ログを参照` : log.trimEnd();
+              const body = ['### 🧹 Preview Cleanup', '', result, '', '```text', excerpt, '```', '', `[Actions の実行ログ](${runUrl})`].join('\n');
+              try {
+                await github.rest.issues.createComment({ ...context.repo, issue_number: pr, body });
+              } catch (error) {
+                core.setFailed(`PR #${pr} の cleanup コメントを投稿できませんでした。${error.message}`);
+              }
+            }
 
   report:
     needs: [request, publish]
@@ -191,6 +238,7 @@ jobs:
             const { data: comment } = await github.rest.issues.getComment({ ...context.repo, comment_id: Number(process.env.PREVIEW_COMMENT) });
             if (pr.state !== 'open' || pr.head.sha !== process.env.PREVIEW_SHA || previewSha(comment.body) !== pr.head.sha) return;
             const success = process.env.PREVIEW_RESULT === 'success';
-            const status = success ? '✅ 完了' : process.env.PREVIEW_RESULT === 'skipped' ? '設定待ち' : '❌ 失敗';
-            const body = renderPreviewComment({ sha: pr.head.sha, pullRequest: { number: pr.number, url: pr.html_url }, status, runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`, deployment: success ? { origin: process.env.PREVIEW_ORIGIN, createdAt: process.env.PREVIEW_DEPLOYED_AT } : undefined });
+            const skipped = process.env.PREVIEW_RESULT === 'skipped';
+            const status = success ? '✅ 完了' : skipped ? undefined : '❌ 失敗';
+            const body = renderPreviewComment({ sha: pr.head.sha, pullRequest: { number: pr.number, url: pr.html_url }, status, canRequest: !skipped, runUrl: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`, deployment: success ? { origin: process.env.PREVIEW_ORIGIN, createdAt: process.env.PREVIEW_DEPLOYED_AT } : undefined });
             await github.rest.issues.updateComment({ ...context.repo, comment_id: comment.id, body });

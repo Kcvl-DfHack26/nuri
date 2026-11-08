@@ -1,4 +1,4 @@
-name: Report OpenTofu apply
+name: Report OpenTofu operation
 on:
   workflow_call:
     inputs:
@@ -8,9 +8,15 @@ on:
       target:
         type: string
         required: true
+      operation:
+        type: string
+        required: true
       result:
         type: string
         required: true
+      log:
+        type: string
+        required: false
 permissions:
   pull-requests: write
 jobs:
@@ -23,22 +29,38 @@ jobs:
         env:
           PR_NUMBER: ${{ inputs.pr }}
           TARGET: ${{ inputs.target }}
+          OPERATION: ${{ inputs.operation }}
           RESULT: ${{ inputs.result }}
+          OPERATION_LOG: ${{ inputs.log }}
         with:
           script: |
-            if (!/^[1-9]\d{0,8}$/.test(process.env.PR_NUMBER)) throw new Error('Invalid PR number');
-            if (!['nuri-staging', 'nuri-preview'].includes(process.env.TARGET)) throw new Error('Invalid target');
-            const number = Number(process.env.PR_NUMBER);
+            const { PR_NUMBER, TARGET, OPERATION, RESULT, OPERATION_LOG } = process.env;
+            if (!/^[1-9]\d{0,8}$/.test(PR_NUMBER)) throw new Error('Invalid PR number');
+            if (!['nuri-staging', 'nuri-preview'].includes(TARGET)) throw new Error('Invalid target');
+            if (!['apply', 'destroy'].includes(OPERATION)) throw new Error('Invalid operation');
+            const number = Number(PR_NUMBER);
             const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: number });
-            if (!pr.merged || pr.base.ref !== 'main') throw new Error('Apply results require a PR merged into main');
-            const result = process.env.RESULT === 'success'
-              ? '✅ 適用完了'
-              : process.env.RESULT === 'cancelled'
+            if (!pr.merged || pr.base.ref !== 'main') throw new Error('OpenTofu results require a PR merged into main');
+            const action = OPERATION === 'apply' ? 'Apply' : 'Destroy';
+            const result = RESULT === 'success'
+              ? '✅ 完了'
+              : RESULT === 'cancelled'
                 ? '⏹️ 実行中止'
                 : '❌ ワークフロー失敗';
-            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const log = OPERATION_LOG || '実行ログなし。Actionsで停止箇所を確認。';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/attempts/${process.env.GITHUB_RUN_ATTEMPT}`;
             await github.rest.issues.createComment({
               ...context.repo,
               issue_number: number,
-              body: `### OpenTofu apply · \`${process.env.TARGET}\`\n\n${result}\n\nSHA \`${context.sha}\` · [Actions 実行ログ](${runUrl})`,
+              body: [
+                `### 🧱 OpenTofu ${action} · \`${TARGET}\``,
+                '',
+                result,
+                '',
+                '```text',
+                log,
+                '```',
+                '',
+                `SHA \`${context.sha}\` · [Actions 実行ログ](${runUrl})`,
+              ].join('\n'),
             });

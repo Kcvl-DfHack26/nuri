@@ -13,31 +13,59 @@ pr_info() { gh api "repos/$GITHUB_REPOSITORY/pulls/$1"; }
 
 delete_unused() {
   local pr=$1 keep_revision=$2 keep_digest=$3 revision digest revisions digests
-  revisions=$(gcloud run revisions list --service="$service" --format='value(metadata.name)')
+  if ! revisions=$(gcloud run revisions list --service="$service" --format='value(metadata.name)'); then
+    printf 'Failed to list Cloud Run revisions.\n' >&3
+    return 1
+  fi
   while IFS= read -r revision; do
-    if [[ "$revision" == "$service-pr-$pr-"* && "$revision" != "$keep_revision" ]]; then
-      gcloud run revisions delete "$revision" --quiet
+    if [[ "$revision" =~ ^$service-pr-$pr-[a-z0-9-]+$ && "$revision" != "$keep_revision" ]]; then
+      printf 'Deleting Cloud Run revision %s\n' "$revision" >&3
+      gcloud run revisions delete "$revision" --quiet || return
     fi
   done <<< "$revisions"
-  digests=$(gcloud artifacts docker images list "$registry/pr-$pr" --format='value(version)')
+  if ! digests=$(gcloud artifacts docker images list "$registry/pr-$pr" --format='value(version)'); then
+    printf 'Failed to list Artifact Registry images.\n' >&3
+    return 1
+  fi
   while IFS= read -r digest; do
     if [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ && "$digest" != "$keep_digest" ]]; then
-      gcloud artifacts docker images delete "$registry/pr-$pr@$digest" --delete-tags --quiet
+      printf 'Deleting Artifact Registry image pr-%s@%s\n' "$pr" "$digest" >&3
+      gcloud artifacts docker images delete "$registry/pr-$pr@$digest" --delete-tags --quiet || return
     fi
   done <<< "$digests"
 }
 
-cleanup() {
-  local pr=$1 info tags
-  check_pr_number "$pr"
-  info=$(pr_info "$pr")
-  if ! jq -e '.state == "closed"' >/dev/null <<< "$info"; then return; fi
-  tags=$(gcloud run services describe "$service" --format=json |
-    jq -r --arg tag "pr-$pr" --arg candidate "candidate-pr-$pr" '[.status.traffic[]?.tag | select(. == $tag or . == $candidate)] | join(",")')
+cleanup_resources() {
+  local pr=$1 tags
+  if ! tags=$(gcloud run services describe "$service" --format=json |
+    jq -r --arg tag "pr-$pr" --arg candidate "candidate-pr-$pr" '[.status.traffic[]?.tag | select(. == $tag or . == $candidate)] | join(",")'); then
+    printf 'Failed to read Cloud Run traffic tags.\n' >&3
+    return 1
+  fi
   if [[ -n "$tags" ]]; then
-    gcloud run services update-traffic "$service" --remove-tags="$tags" --quiet
+    printf 'Removing Cloud Run tags %s\n' "$tags" >&3
+    gcloud run services update-traffic "$service" --remove-tags="$tags" --quiet || return
   fi
   delete_unused "$pr" '' ''
+}
+
+cleanup() {
+  local pr=$1 info state log result=0
+  check_pr_number "$pr" || return
+  info=$(pr_info "$pr") || return
+  state=$(jq -er '.state | select(. == "open" or . == "closed")' <<< "$info") || return
+  [[ "$state" == closed ]] || return 0
+
+  # Capture only the operation messages on fd 3. Command diagnostics stay in Actions.
+  log=$(cleanup_resources "$pr" 3>&1 1>&2) || result=$?
+  if [[ -n "$log" ]]; then
+    printf '%s\n' "$log"
+    if [[ -n "${PREVIEW_CLEANUP_REPORTS:-}" ]]; then
+      jq -cn --argjson pr "$pr" --rawfile log /dev/stdin --argjson exitCode "$result" \
+        '{pr: $pr, log: $log, exitCode: $exitCode}' <<< "$log" >> "$PREVIEW_CLEANUP_REPORTS" || return
+    fi
+  fi
+  return "$result"
 }
 
 publish() {
@@ -88,7 +116,7 @@ publish() {
   current=$(gcloud run services describe "$service" --format=json |
     jq -er --arg tag "$tag" --arg revision "$revision" '.status.traffic[] | select(.tag == $tag and .revisionName == $revision) | .url')
   [[ "$current" == "$origin" ]]
-  delete_unused "$pr" "$revision" "$digest"
+  delete_unused "$pr" "$revision" "$digest" 3>/dev/null
   created_at=$(gcloud run revisions describe "$revision" --format='value(metadata.creationTimestamp)')
   [[ "$created_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z$ ]]
   printf 'origin=%s\ndeployed_at=%s\n' "$origin" "$created_at" >> "$GITHUB_OUTPUT"
@@ -105,9 +133,11 @@ case "${1:?}" in
       sed -nE "s/^$service-pr-([1-9][0-9]{0,8})-[a-f0-9]{12}$/\1/p" <<< "$revisions"
       sed -nE 's|.*/packages/pr-([1-9][0-9]{0,8})$|\1|p' <<< "$packages"
     } | sort -u)
+    result=0
     while IFS= read -r pr; do
-      if [[ -n "$pr" ]]; then cleanup "$pr"; fi
+      if [[ -n "$pr" ]]; then cleanup "$pr" || result=1; fi
     done <<< "$prs"
+    exit "$result"
     ;;
   *) exit 2 ;;
 esac
