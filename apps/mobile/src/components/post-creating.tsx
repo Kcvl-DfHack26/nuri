@@ -1,18 +1,26 @@
+import type { PostAnalysis } from '@starter/shared';
+
 import { Icon } from '@expo/ui';
+import { recipeStepsMax } from '@starter/shared';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
-import { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import type { Cosmetic, PostDraft } from '@/components/post-draft';
+import type { PlannedStep } from '@/lib/post-steps';
 
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { usePostDraft } from '@/components/post-draft';
-import { arPhotos } from '@/components/recipes';
+import { arPhotos, partColors } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
+import { apiUrl } from '@/lib/api';
 import { backOrHome } from '@/lib/navigation';
+import { analyzePostVideo } from '@/lib/post-analysis';
 import { planSteps } from '@/lib/post-steps';
 import { cn } from '@/lib/utils';
 
@@ -22,25 +30,136 @@ const CHECK = Icon.select({
   android: import('@expo/material-symbols/check.xml'),
 });
 
-const stages = ['動画を読み込む', '手順の区切りを確認する', '手順の場面を切り出す'];
+const markStages = ['動画を読み込む', '手順の区切りを確認する', '手順の場面を切り出す'];
+const analysisStages = ['動画を読み込む', '動画から手順を読み取る', '手順の場面を切り出す'];
 
-// Plan A ⑫-3 手順書を作成中. The draft's steps are made from the video's marks, each with the frame
-// at its start; the user picks each step's part and texts on ⑫-5. Plan A's stages for finding
-// cosmetics, areas and descriptions are left out until something analyzes the video.
+/** A step ⑫-3 is about to make, with what the analysis found when there was one. */
+type Planned = PlannedStep & { description: string; cosmetics: Cosmetic[] };
+type Plan = { steps: Planned[]; analyzed: boolean };
+
+function planFromMarks(video: NonNullable<PostDraft['video']>): Plan {
+  return {
+    steps: planSteps(video.marks, video.durationMs).map((step) => ({
+      ...step,
+      description: '',
+      cosmetics: [],
+    })),
+    analyzed: false,
+  };
+}
+
+/** The steps Gemini found, in order, cut to the video and to the API's step limit. */
+function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Plan | null {
+  const steps = analysis.steps
+    // A step that ends before it starts is a misreading; it would make a negative segment.
+    .filter((step) => step.end > step.start)
+    .sort((a, b) => a.start - b.start)
+    .slice(0, recipeStepsMax)
+    .map((step) => {
+      const endMs = Math.round(step.end * 1000);
+      return {
+        part: step.part,
+        startMs: Math.round(step.start * 1000),
+        endMs: durationMs === null ? endMs : Math.min(endMs, durationMs),
+        description: step.description,
+        // The cosmetics Gemini saw in the step start chosen; the user removes wrong ones on ⑫-5.
+        cosmetics: step.cosmetics.flatMap((index) => {
+          const found = analysis.cosmetics[index];
+          return found
+            ? [
+                {
+                  id: `analysis-${index}`,
+                  name: [found.brand, found.name].filter(Boolean).join(' '),
+                  category: found.category,
+                  shade: '',
+                  color: partColors[step.part],
+                },
+              ]
+            : [];
+        }),
+      };
+    });
+  return steps.length > 0 ? { steps, analyzed: true } : null;
+}
+
+// Plan A ⑫-3 手順書を作成中. Right before the video leaves the device, a native alert asks to send
+// it (#81); the API reads it with Gemini (#142) and its steps, texts and cosmetics fill the draft.
+// やめる returns to ⑫-1. Without an API, or when the analysis fails, the steps are made from the
+// marks and the user fills them on ⑫-5. Each step gets the frame at its start, cut on the device.
 export function PostCreating() {
   const insets = useSafeAreaInsets();
   const { draft, setDraft, trackFile } = usePostDraft();
   const video = draft.video;
-  const plan = useMemo(() => (video ? planSteps(video.marks, video.durationMs) : []), [video]);
+  const [sending, setSending] = useState(false);
+  const [analyzedPlan, setPlan] = useState<Plan | null>(null);
+  // Without an API nothing is sent or asked; the steps come from the marks right away.
+  const markPlan = useMemo(() => (video && !apiUrl ? planFromMarks(video) : null), [video]);
+  const plan = analyzedPlan ?? markPlan;
   const [cut, setCut] = useState(0);
+  const asked = useRef(false);
+  const request = useRef<AbortController | null>(null);
+  useEffect(
+    () => () => {
+      request.current?.abort();
+    },
+    [],
+  );
   useEffect(() => {
-    if (!video) {
+    if (!video || !apiUrl || asked.current) {
+      return;
+    }
+    asked.current = true;
+    const send = () => {
+      const controller = new AbortController();
+      request.current = controller;
+      setSending(true);
+      analyzePostVideo(video, controller.signal).then(
+        (analysis) => {
+          const analyzed = planFromAnalysis(analysis, video.durationMs);
+          if (!analyzed) {
+            // Gemini saw no makeup, e.g. in a test clip; say so instead of quietly falling back.
+            Alert.alert(
+              '動画からメイクの手順を見つけられませんでした',
+              '区切りから手順を作ります。',
+            );
+            setSending(false);
+            setPlan(planFromMarks(video));
+            return;
+          }
+          if (analysis.title) {
+            setDraft((current) => ({ ...current, title: current.title || analysis.title }));
+          }
+          setPlan(analyzed);
+        },
+        (error: unknown) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+          const message = error instanceof Error ? error.message : '';
+          Alert.alert('動画から手順書を作れませんでした', `${message}区切りから手順を作ります。`);
+          setSending(false);
+          setPlan(planFromMarks(video));
+        },
+      );
+    };
+    Alert.alert(
+      '動画を送って手順書を作りますか',
+      'メイクの動画をサーバーに送り、Geminiで手順と使ったコスメを読み取ります。動画には顔と声が入っています。読み取りが終わったら、動画はサーバーに残しません。',
+      [
+        { text: 'やめる', style: 'cancel', onPress: backOrHome },
+        { text: '送る', onPress: send },
+      ],
+      { cancelable: true, onDismiss: backOrHome },
+    );
+  }, [video, setDraft]);
+  useEffect(() => {
+    if (!video || !plan) {
       return;
     }
     let active = true;
     const cutFrames = async () => {
       const images: (string | null)[] = [];
-      for (const step of plan) {
+      for (const step of plan.steps) {
         // A frame that cannot be cut leaves the step without a photo instead of stopping the post.
         const image = await getThumbnailAsync(video.uri, { time: step.startMs, quality: 0.5 }).then(
           ({ uri }) => {
@@ -57,11 +176,11 @@ export function PostCreating() {
       }
       setDraft((current) => ({
         ...current,
-        steps: plan.map((step, index) => ({
+        steps: plan.steps.map((step, index) => ({
           part: step.part,
           title: '',
-          description: '',
-          cosmetics: [],
+          description: step.description,
+          cosmetics: step.cosmetics,
           segment: { startMs: step.startMs, endMs: step.endMs },
           image: images[index] ?? null,
         })),
@@ -95,9 +214,18 @@ export function PostCreating() {
       </View>
     );
   }
-  const progress = plan.length > 0 ? Math.round((cut / plan.length) * 100) : 0;
-  // Loading the video and splitting it at the marks are done once the frames are being cut.
-  const done = cut === plan.length ? stages.length : stages.length - 1;
+  const stages = sending || plan?.analyzed ? analysisStages : markStages;
+  const total = plan?.steps.length ?? 0;
+  // Reading the video takes the first half of the bar; cutting the frames, the rest.
+  let progress = sending ? 25 : 0;
+  if (plan) {
+    progress = Math.round((sending ? 50 : 0) + (cut / Math.max(total, 1)) * (sending ? 50 : 100));
+  }
+  // Loading the video and finding the steps are done once the frames are being cut.
+  let done = 1;
+  if (plan) {
+    done = cut === total ? stages.length : stages.length - 1;
+  }
   return (
     <View className="flex-1 bg-white">
       <StatusBar style="dark" />
@@ -145,7 +273,9 @@ export function PostCreating() {
           ))}
         </View>
         <Text className="font-maru text-meta text-ink-secondary">
-          区切りごとに{plan.length}つの手順を作ります。閉じると作成をやめます
+          {plan
+            ? `${plan.analyzed ? '動画から' : '区切りごとに'}${total}つの手順を作ります。閉じると作成をやめます`
+            : '動画から手順を読み取っています。閉じると作成をやめます'}
         </Text>
       </View>
     </View>

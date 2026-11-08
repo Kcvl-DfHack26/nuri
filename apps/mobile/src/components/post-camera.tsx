@@ -5,7 +5,7 @@ import { recipeStepsMax } from '@starter/shared';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
-import { launchImageLibraryAsync } from 'expo-image-picker';
+import { launchImageLibraryAsync, UIImagePickerControllerQualityType } from 'expo-image-picker';
 import { router, useIsFocused, useNavigation, usePreventRemove } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
@@ -30,13 +30,17 @@ const ADD = Icon.select({ ios: 'plus', android: import('@expo/material-symbols/a
 
 // The system picker hands over only the chosen video, so no photo library permission is asked.
 async function pickVideo() {
-  const result = await launchImageLibraryAsync({ mediaTypes: 'videos' });
+  // iOS exports the chosen video at a medium size so it fits the analysis API's limit (#151).
+  const result = await launchImageLibraryAsync({
+    mediaTypes: 'videos',
+    videoQuality: UIImagePickerControllerQualityType.Medium,
+  });
   const video = result.assets?.[0];
   if (result.canceled || !video) {
     return;
   }
-  // The URI stays on the device in the post's data. Consent is asked where a video is first
-  // sent, which is not built yet (#81).
+  // The URI stays on the device in the post's data. Consent is asked on ⑫-3, right before the
+  // video is sent for analysis (#81).
   router.push({
     pathname: '/post/creating',
     params: video.duration
@@ -310,7 +314,8 @@ export function PostRecording() {
     setStartedAt(Date.now());
     setNow(Date.now());
     recording.current = camera.current
-      .recordAsync()
+      // avc1 lets iOS apply videoBitrate; H.264 is also what Gemini reads most widely.
+      .recordAsync({ codec: 'avc1' })
       .then((result) => {
         const end = ending.current;
         if (!result) {
@@ -347,6 +352,10 @@ export function PostRecording() {
               ref={camera}
               facing="front"
               mode="video"
+              // About 7.5 MB a minute, so recordings of up to about 4 minutes fit the analysis
+              // API's 30 MB limit (#151). Gemini looks at about one frame a second.
+              videoQuality="720p"
+              videoBitrate={1_000_000}
               style={StyleSheet.absoluteFill}
               onCameraReady={start}
               onMountError={() => {
