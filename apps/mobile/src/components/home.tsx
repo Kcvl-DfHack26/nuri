@@ -1,7 +1,7 @@
 import { Icon } from '@expo/ui';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { router, useIsFocused } from 'expo-router';
+import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -30,7 +30,9 @@ type Scope = 'whole' | 'parts';
 // Plan A ① ホーム（全体メイク） and ② ホーム（部位メイク）.
 export function Home() {
   const insets = useSafeAreaInsets();
-  const [scope, setScope] = useState<Scope>('whole');
+  // The segment lives in the route, so another tab can open a given list (⑭ opens ①).
+  const { scope: scopeParam } = useLocalSearchParams<{ scope?: string }>();
+  const scope: Scope = scopeParam === 'parts' ? 'parts' : 'whole';
   // The make tab stays mounted under other tabs; only claim the status bar while it is shown.
   const focused = useIsFocused();
   // The header and segment float over the grid; measure them so larger text never overlaps it.
@@ -64,7 +66,12 @@ export function Home() {
           setSegmentHeight(event.nativeEvent.layout.height);
         }}
       >
-        <ScopeSegment value={scope} onChange={setScope} />
+        <ScopeSegment
+          value={scope}
+          onChange={(value) => {
+            router.setParams({ scope: value });
+          }}
+        />
       </View>
     </View>
   );

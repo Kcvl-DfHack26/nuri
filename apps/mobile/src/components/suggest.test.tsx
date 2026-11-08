@@ -371,7 +371,7 @@ test('fills the recommendations with up to ten recipes and opens the full list',
   expect(cards[1]).toHaveProp('accessibilityLabel', 'メイク0、mio');
 
   await fireEvent.press(screen.getByRole('button', { name: 'おすすめメイクをすべて見る' }));
-  expect(router.navigate).toHaveBeenCalledWith('/');
+  expect(router.navigate).toHaveBeenCalledWith({ pathname: '/', params: { scope: 'whole' } });
 });
 
 test('says when no diagnosis was made and goes back', async () => {

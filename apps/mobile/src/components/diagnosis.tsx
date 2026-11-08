@@ -198,8 +198,8 @@ function Recommendations({ faceType }: { faceType: FaceType }) {
           accessibilityLabel="おすすめメイクをすべて見る"
           className="min-h-12 justify-center pl-3 active:opacity-70"
           onPress={() => {
-            // ① lists every whole-face recipe, newest first.
-            router.navigate('/');
+            // ① lists every whole-face recipe, newest first, even if the parts list was left open.
+            router.navigate({ pathname: '/', params: { scope: 'whole' } });
           }}
         >
           <Text className="font-maru-bold text-label text-accent-rose">すべて見る</Text>
