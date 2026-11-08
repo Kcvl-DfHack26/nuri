@@ -193,11 +193,11 @@ export function RecipeContent({
         <Hero recipe={recipe} steps={steps} />
       </View>
       <View
-        className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-white"
+        className="absolute inset-x-0 bottom-0 rounded-t-sheet bg-white"
         style={{ top: sheetTop, boxShadow: '0px -6px 24px rgba(196, 61, 112, 0.1)' }}
       >
         <ScrollView
-          className="rounded-t-[28px]"
+          className="rounded-t-sheet"
           contentInsetAdjustmentBehavior="never"
           contentContainerClassName="gap-3 px-5 pt-5"
           contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
@@ -276,7 +276,7 @@ export function RecipeContent({
                     <View key={index} className="items-center gap-1">
                       <View
                         className={cn(
-                          'size-[46px] items-center justify-center rounded-full',
+                          'size-11.5 items-center justify-center rounded-full',
                           part.iconBackground,
                         )}
                       >
@@ -285,7 +285,7 @@ export function RecipeContent({
                           source={part.icon}
                           style={{ width: 22, height: 22 }}
                         />
-                        <View className="absolute -top-0.5 left-[30px] size-[18px] items-center justify-center rounded-full border-[1.5px] border-white bg-accent-rose">
+                        <View className="absolute -top-0.5 left-7.5 size-4.5 items-center justify-center rounded-full border-fine border-white bg-accent-rose">
                           <Text className="font-maru-bold text-micro text-white">{index + 1}</Text>
                         </View>
                       </View>
@@ -320,7 +320,7 @@ export function RecipeContent({
       </View>
       <View
         pointerEvents="none"
-        className="absolute inset-x-0 top-0 h-[110px]"
+        className="absolute inset-x-0 top-0 h-27.5"
         style={{
           backgroundImage:
             'linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0))',
@@ -340,7 +340,7 @@ export function RecipeContent({
         {onPost ? (
           <>
             <View className="flex-1 items-center">
-              <View className="min-h-9 justify-center rounded-full border border-black bg-white px-[22px]">
+              <View className="min-h-9 justify-center rounded-full border border-black bg-white px-5.5">
                 <Text className="font-maru-bold text-label text-ink-primary">プレビュー</Text>
               </View>
             </View>
@@ -373,7 +373,7 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
   // Plan A's guides and pins are drawn on its own photo of the fox recipe.
   if (recipe.id !== planARecipe) {
     return (
-      <View className="aspect-[390/540] w-full overflow-hidden bg-neutral-soft">
+      <View className="aspect-390/540 w-full overflow-hidden bg-neutral-soft">
         <Image
           accessible={false}
           source={{ uri: apiAssetUrl(recipe.image) }}
@@ -384,7 +384,7 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
     );
   }
   return (
-    <View className="aspect-[390/540] w-full overflow-hidden">
+    <View className="aspect-390/540 w-full overflow-hidden">
       <CroppedPhoto source={arPhotos.finished} crop={heroCrop} />
       {[guideFace, guideCheek, guideShading, guideBrow].map((guide, index) => (
         <Image
@@ -405,7 +405,7 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
           // Steps are identified by their position; a part may appear twice.
           <Fragment key={index}>
             <View
-              className="absolute size-[22px] items-center justify-center rounded-full bg-white/95"
+              className="absolute size-5.5 items-center justify-center rounded-full bg-white/95"
               style={{
                 ...atFrame(place.pin.x, place.pin.y),
                 boxShadow: '0px 2px 6px rgba(196, 61, 112, 0.25)',
@@ -414,7 +414,7 @@ function Hero({ recipe, steps }: { recipe: RecipeData; steps: StepSummary[] }) {
               <View className="size-2.5 rounded-full bg-accent-rose" />
             </View>
             <View
-              className="absolute flex-row items-center gap-[5px] rounded-[14px] border border-white bg-white/80 py-[3px] pl-[3px] pr-2.5"
+              className="absolute flex-row items-center gap-1.25 rounded-thumbnail border border-white bg-white/80 py-0.75 pl-0.75 pr-2.5"
               style={{
                 ...atFrame(place.label.x, place.label.y),
                 boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)',
@@ -447,7 +447,7 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
     : undefined;
   const content = (
     <>
-      <View className="size-[52px] overflow-hidden rounded-[14px] bg-neutral-soft">
+      <View className="size-13 overflow-hidden rounded-thumbnail bg-neutral-soft">
         {product.image ? (
           <Image
             accessible={false}
@@ -477,7 +477,7 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
     </>
   );
   const className =
-    'flex-row items-center gap-3 rounded-[18px] border border-line-soft bg-bg-surface p-2.5';
+    'flex-row items-center gap-3 rounded-card border border-line-soft bg-bg-surface p-2.5';
   // VoiceOver reads the row as one element, so 買う is also offered as an action on the row.
   const purchase = openShop
     ? {
@@ -534,7 +534,7 @@ function PostBar({
   const white = useTokenColor('--color-bg-surface');
   return (
     <View
-      className="absolute inset-x-0 bottom-0 bg-[rgba(242,242,242,0.85)] px-4 pt-3"
+      className="absolute inset-x-0 bottom-0 bg-tab-glass px-4 pt-3"
       style={{ paddingBottom: Math.max(bottom, 12) }}
     >
       <Pressable
@@ -544,7 +544,7 @@ function PostBar({
         disabled={posting}
         onPress={onPost}
         className={cn(
-          'min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80',
+          'min-h-13 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80',
           posting && 'opacity-60',
         )}
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}

@@ -47,7 +47,7 @@ export function PostDone() {
           accessible
           accessibilityRole="image"
           accessibilityLabel={draft.thumbnail ? 'サムネイルの写真' : '仕上がりの見本の写真'}
-          className="size-[220px] overflow-hidden rounded-full border-[6px] border-pastel-pink"
+          className="size-55 overflow-hidden rounded-full border-6 border-pastel-pink"
         >
           {draft.thumbnail ? (
             <Image
@@ -77,7 +77,7 @@ export function PostDone() {
               key={stat.label}
               accessible
               accessibilityLabel={`${stat.label} ${stat.value}`}
-              className="flex-1 items-center gap-0.5 rounded-[18px] bg-bg-base px-2 py-3"
+              className="flex-1 items-center gap-0.5 rounded-card bg-bg-base px-2 py-3"
             >
               <Text className="font-maru-bold text-headline text-ink-primary">{stat.value}</Text>
               <Text className="font-maru text-meta text-ink-secondary">{stat.label}</Text>
@@ -101,7 +101,7 @@ export function PostDone() {
             accessibilityRole="button"
             accessibilityLabel="友だちに共有（準備中）"
             accessibilityState={{ disabled: true }}
-            className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full border border-black bg-white px-[18px]"
+            className="min-h-13 flex-row items-center justify-center gap-1.5 rounded-full border border-black bg-white px-4.5"
           >
             <SocialIcon name={SHARE} size={20} color={ink} />
             <Text className="font-maru-bold text-action text-ink-primary">友だちに共有</Text>

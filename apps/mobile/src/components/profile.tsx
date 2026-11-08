@@ -85,7 +85,7 @@ export function Profile({ id }: { id: string }) {
             ) : null}
           </View>
           {/* Recipes use Plan A's light palette, so they keep a white card in dark mode too. */}
-          <View className="mx-5 mt-4 rounded-[20px] bg-white px-3 pb-4 pt-1">
+          <View className="mx-5 mt-4 rounded-panel bg-white px-3 pb-4 pt-1">
             <RecipeSection
               title="レシピ"
               empty="まだ投稿したレシピはありません"

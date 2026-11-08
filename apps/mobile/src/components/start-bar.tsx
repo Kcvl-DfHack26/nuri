@@ -33,7 +33,7 @@ export function StartBar({
   const disabled = !onStart;
   return (
     <View
-      className="absolute inset-x-0 bottom-0 flex-row items-center gap-2.5 bg-[rgba(242,242,242,0.85)] px-4 pt-3"
+      className="absolute inset-x-0 bottom-0 flex-row items-center gap-2.5 bg-tab-glass px-4 pt-3"
       style={{ paddingBottom: Math.max(bottom, 12) }}
     >
       {favorite ? (
@@ -42,7 +42,7 @@ export function StartBar({
           accessibilityLabel="お気に入り"
           accessibilityState={{ selected: favorite.favorited }}
           onPress={favorite.onPress}
-          className="size-[52px] items-center justify-center rounded-full bg-white active:opacity-70"
+          className="size-13 items-center justify-center rounded-full bg-white active:opacity-70"
         >
           {/* Android ships only outlined symbols, so the rose color also marks a favorite. */}
           <SocialIcon
@@ -57,7 +57,7 @@ export function StartBar({
           accessibilityRole="button"
           accessibilityLabel="お気に入り（準備中）"
           accessibilityState={{ disabled: true }}
-          className="size-[52px] items-center justify-center rounded-full bg-white"
+          className="size-13 items-center justify-center rounded-full bg-white"
         >
           <SocialIcon name={HEART} size={22} color={ink} />
         </View>
@@ -69,7 +69,7 @@ export function StartBar({
         disabled={disabled}
         onPress={onStart}
         className={cn(
-          'min-h-[52px] flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80',
+          'min-h-13 flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-5 active:opacity-80',
           disabled && 'opacity-50',
         )}
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}

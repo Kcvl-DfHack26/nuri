@@ -69,7 +69,7 @@ export function RecipeSearch() {
         <GlassIconButton
           icon={BACK}
           label="戻る"
-          className="border-black/[0.08] bg-white"
+          className="border-black/8 bg-white"
           onPress={() => {
             backOrHome();
           }}

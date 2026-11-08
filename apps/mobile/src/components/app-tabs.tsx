@@ -54,7 +54,7 @@ export function AppTabs() {
       <TabList asChild>
         <View
           accessibilityRole="tablist"
-          className="absolute inset-x-0 bottom-0 gap-1.5 rounded-t-[28px] bg-tab-glass"
+          className="absolute inset-x-0 bottom-0 gap-1.5 rounded-t-sheet bg-tab-glass"
           // TabList sets space-between through style, which wins over className.
           style={{
             display: keyboardShown ? 'none' : 'flex',
@@ -106,11 +106,11 @@ function TabButton({
       accessibilityLabel={label}
       accessibilityState={{ selected: isFocused }}
       // Plan A gives each tab 76pt; narrow windows shrink the tabs instead of pushing them off screen.
-      className="min-h-[58px] min-w-12 max-w-[76px] flex-1 active:opacity-70"
+      className="min-h-14.5 min-w-12 max-w-19 flex-1 active:opacity-70"
     >
       {/* TabTrigger lays its child out as a row, so the icon and label stack in this view. */}
       <View className="flex-1 items-center justify-center gap-0.5">
-        <View className="size-[30px] items-center justify-center">
+        <View className="size-7.5 items-center justify-center">
           <Image
             accessible={false}
             source={isFocused ? selectedIcon : icon}

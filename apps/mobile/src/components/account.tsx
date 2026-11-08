@@ -110,10 +110,10 @@ export function Account() {
         }}
       >
         <Collage />
-        <View className="mt-[22px] items-center gap-1.5">
+        <View className="mt-5.5 items-center gap-1.5">
           <Text
             accessibilityRole="header"
-            className="text-center font-maru-black text-[52px] leading-[72px] text-accent-rose"
+            className="text-center font-maru-black text-login-wordmark text-accent-rose"
           >
             nuri
           </Text>
@@ -121,7 +121,7 @@ export function Account() {
             あの子のメイクをわたしの顔で
           </Text>
         </View>
-        <View className="mt-[27px] gap-2.5">
+        <View className="mt-6.75 gap-2.5">
           {actions}
           {session.data ? null : (
             // Plan A draws this link in light blue; ink-secondary keeps it readable (WCAG AA) on white.
@@ -266,7 +266,7 @@ function SignInOptions({
 // Three tilted sample photos with sparkles, positioned on Plan A's 390pt-wide canvas.
 function Collage() {
   return (
-    <View className="h-[300px] w-[390px] self-center">
+    <View className="h-75 w-97.5 self-center">
       <CollagePhoto
         source={recipeFox}
         left={33.84}
@@ -309,7 +309,7 @@ function CollagePhoto({
 }) {
   return (
     <View
-      className="absolute rounded-[22px] bg-white p-[5px]"
+      className="absolute rounded-control-compact bg-white p-1.25"
       style={{
         left,
         top,
@@ -367,8 +367,8 @@ function PillButton({
       disabled={disabled}
       onPress={onPress}
       className={cn(
-        'min-h-[52px] items-center justify-center rounded-full px-[18px] py-2 active:opacity-80',
-        tone === 'rose' ? 'bg-accent-rose' : 'border-[1.5px] border-black/15 bg-white',
+        'min-h-13 items-center justify-center rounded-full px-4.5 py-2 active:opacity-80',
+        tone === 'rose' ? 'bg-accent-rose' : 'border-fine border-black/15 bg-white',
         disabled && 'opacity-50',
       )}
       style={tone === 'rose' ? { boxShadow: SHADOW } : undefined}
@@ -438,7 +438,7 @@ function EmailInput({
       editable={editable}
       onChangeText={onChange}
       onSubmitEditing={onSubmit}
-      className="min-h-[52px] rounded-full border-[1.5px] border-line-soft bg-white px-[18px] py-3 font-maru text-action text-ink-primary"
+      className="min-h-13 rounded-full border-fine border-line-soft bg-white px-4.5 py-3 font-maru text-action text-ink-primary"
     />
   );
 }

@@ -145,6 +145,7 @@ export function Suggest() {
       <Hero photo={photo} />
       <View className="absolute inset-x-0 top-0 items-center">
         <View
+          // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- This half point is part of the header gradient geometry.
           className="w-full items-center px-4 pb-[24.5px]"
           style={{
             paddingTop: insets.top + 7.5,
@@ -227,7 +228,7 @@ function Controls({
             : undefined
         }
       >
-        <View className="size-[52px] items-center justify-center rounded-full border border-black bg-bg-surface">
+        <View className="size-13 items-center justify-center rounded-full border border-black bg-bg-surface">
           <SocialIcon name={PHOTO} size={24} color={ink} />
         </View>
       </Action>
@@ -243,10 +244,10 @@ function Controls({
         }
       >
         <View
-          className="size-[84px] items-center justify-center rounded-full bg-bg-surface"
+          className="size-21 items-center justify-center rounded-full bg-bg-surface"
           style={{ boxShadow: '0px 8px 24px rgba(196, 61, 112, 0.14)' }}
         >
-          <View className="size-[68px] items-center justify-center rounded-full bg-accent-rose">
+          <View className="size-17 items-center justify-center rounded-full bg-accent-rose">
             <SocialIcon name={CAMERA} size={28} color={surface} />
           </View>
         </View>
@@ -256,7 +257,7 @@ function Controls({
         accessibilityLabel={onLast ? '前回の診断' : '前回の診断（まだありません）'}
         onPress={onLast}
       >
-        <View className="size-[52px] items-center justify-center rounded-full border border-black bg-bg-surface">
+        <View className="size-13 items-center justify-center rounded-full border border-black bg-bg-surface">
           <SocialIcon name={HISTORY} size={24} color={ink} />
         </View>
       </Action>
@@ -276,7 +277,7 @@ function Hero({ photo }: { photo: string | undefined }) {
       accessible
       accessibilityRole="image"
       accessibilityLabel={photo ? '診断する写真' : '顔の形を見る見本の写真'}
-      className="flex-1 overflow-hidden rounded-b-[36px]"
+      className="flex-1 overflow-hidden rounded-b-camera-preview"
       onLayout={(event) => {
         const { width: layoutWidth, height: layoutHeight } = event.nativeEvent.layout;
         setSize({ width: layoutWidth, height: layoutHeight });
@@ -302,6 +303,7 @@ function Hero({ photo }: { photo: string | undefined }) {
         >
           <CroppedPhoto source={arPhotos.camera} crop={heroCrop} />
           <View
+            // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- The overlay height follows the Plan A photo crop.
             className="absolute inset-x-0 h-[4.84%]"
             style={{
               top: '54.5%',
@@ -330,7 +332,7 @@ function Tag({ className, children }: { className?: string; children: ReactNode 
   return (
     <View
       className={cn(
-        'flex-row items-center gap-[5px] rounded-2xl border border-white bg-white/78 py-1.5 pl-2 pr-3',
+        'flex-row items-center gap-1.25 rounded-2xl border border-white bg-white/78 py-1.5 pl-2 pr-3',
         className,
       )}
       style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
@@ -361,7 +363,7 @@ function Action({
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      className="w-[107px] items-center justify-end gap-1.5 active:opacity-70"
+      className="w-26.75 items-center justify-end gap-1.5 active:opacity-70"
     >
       {children}
       <Text className="text-center font-maru-bold text-label text-ink-primary">{label}</Text>

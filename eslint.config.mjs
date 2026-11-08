@@ -1,3 +1,5 @@
+import betterTailwindcss from 'eslint-plugin-better-tailwindcss';
+import { getDefaultSelectors } from 'eslint-plugin-better-tailwindcss/defaults';
 import boundaries from 'eslint-plugin-boundaries';
 import drizzle from 'eslint-plugin-drizzle';
 import hono from 'eslint-plugin-hono';
@@ -187,7 +189,34 @@ export default [
   },
   {
     files: ['apps/mobile/src/**/*.{ts,tsx}'],
+    plugins: { 'better-tailwindcss': betterTailwindcss },
+    settings: {
+      'better-tailwindcss': {
+        cwd: `${import.meta.dirname}/apps/mobile`,
+        entryPoint: 'global.css',
+        selectors: [
+          ...getDefaultSelectors(),
+          { kind: 'attribute', name: '^\\w+ClassName$', match: [{ type: 'strings' }] },
+          { kind: 'variable', name: '^\\w+ClassName$', match: [{ type: 'strings' }] },
+        ],
+      },
+    },
     rules: {
+      'better-tailwindcss/no-unknown-classes': 'error',
+      'better-tailwindcss/no-duplicate-classes': 'error',
+      'better-tailwindcss/no-concatenated-classes': 'error',
+      'better-tailwindcss/no-restricted-classes': [
+        'error',
+        {
+          restrict: [
+            {
+              // Match bracketed values/properties at the end, leaving selector variants alone.
+              pattern: '(?:^|:)!?(?:[\\w-]+[-/])?\\[.*\\](?:/[\\w.]+)?!?$',
+              message: 'Use a Tailwind utility or a named token in apps/mobile/global.css.',
+            },
+          ],
+        },
+      ],
       'no-restricted-imports': [
         'error',
         {

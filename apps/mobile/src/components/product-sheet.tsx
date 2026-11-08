@@ -46,7 +46,7 @@ export function ProductSheet({ id }: { id: string }) {
   }
   const { info } = product;
   return (
-    <View style={{ height }} className="bg-white px-5 pt-[30px]">
+    <View style={{ height }} className="bg-white px-5 pt-7.5">
       <View className="flex-row items-center gap-3.5">
         <Image
           accessible={false}
@@ -76,7 +76,7 @@ export function ProductSheet({ id }: { id: string }) {
           accessibilityRole="button"
           accessibilityLabel="購入先を見る（準備中）"
           accessibilityState={{ disabled: true }}
-          className="min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px]"
+          className="min-h-13 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5"
           style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
         >
           <SocialIcon name={CART} size={20} color="white" />
@@ -134,10 +134,10 @@ function ProductDetails({ info }: { info: ProductInfo }) {
               }}
               className={cn(
                 'size-10 items-center justify-center rounded-full',
-                selected && 'border-[2.5px] border-accent-rose',
+                selected && 'border-selected border-accent-rose',
               )}
             >
-              <View className="size-[30px] rounded-full" style={{ backgroundColor: color.hex }} />
+              <View className="size-7.5 rounded-full" style={{ backgroundColor: color.hex }} />
             </Pressable>
           );
         })}
@@ -147,7 +147,7 @@ function ProductDetails({ info }: { info: ProductInfo }) {
         accessibilityRole="button"
         accessibilityLabel="自分の顔で色味を見る（準備中）"
         accessibilityState={{ disabled: true }}
-        className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-pastel-pink px-[18px]"
+        className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-pastel-pink px-4.5"
       >
         <SocialIcon name={CAMERA} size={20} color={rose} />
         <Text className="font-maru-bold text-label text-accent-rose">自分の顔で色味を見る</Text>
@@ -176,7 +176,7 @@ function ProductDetails({ info }: { info: ProductInfo }) {
         {info.freeFrom.map((label) => (
           <View
             key={label}
-            className="min-h-[26px] flex-row items-center gap-1 rounded-[13px] bg-pastel-mint px-2.5"
+            className="min-h-6.5 flex-row items-center gap-1 rounded-chip bg-pastel-mint px-2.5"
           >
             <SocialIcon name={CHECK} size={12} color={ink} />
             <Text className="font-maru-bold text-micro text-ink-primary">{label}</Text>

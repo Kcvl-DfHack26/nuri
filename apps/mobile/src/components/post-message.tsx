@@ -69,7 +69,7 @@ export function PostMessage() {
           onPress={() => {
             router.back();
           }}
-          className="min-h-16 flex-row items-center gap-3 rounded-[18px] bg-bg-base py-2 pl-3.5 pr-2.5 active:opacity-80"
+          className="min-h-16 flex-row items-center gap-3 rounded-card bg-bg-base py-2 pl-3.5 pr-2.5 active:opacity-80"
         >
           <View className="size-10 items-center justify-center rounded-full bg-bg-surface">
             <Image
@@ -90,7 +90,7 @@ export function PostMessage() {
           </View>
           <Text className="font-maru-bold text-label text-accent-rose">確認する</Text>
         </Pressable>
-        <View className="gap-1.5 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface p-3.5">
+        <View className="gap-1.5 rounded-card border-fine border-line-soft bg-bg-surface p-3.5">
           <Text className="font-maru-bold text-label text-ink-secondary">タイトル（必須）</Text>
           <TextInput
             accessibilityLabel="タイトル"
@@ -107,7 +107,7 @@ export function PostMessage() {
             {draft.title.length}/{titleLimit}
           </Text>
         </View>
-        <View className="gap-1.5 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface p-3.5">
+        <View className="gap-1.5 rounded-card border-fine border-line-soft bg-bg-surface p-3.5">
           <Text className="font-maru-bold text-label text-ink-secondary">メッセージ</Text>
           <TextInput
             accessibilityLabel="メッセージ"
@@ -119,7 +119,7 @@ export function PostMessage() {
             onChangeText={(message) => {
               setDraft((current) => ({ ...current, message }));
             }}
-            className="min-h-[63px] p-0 font-maru text-ui text-ink-primary"
+            className="min-h-15.75 p-0 font-maru text-ui text-ink-primary"
             style={{ textAlignVertical: 'top' }}
           />
           <Text className="text-right font-maru-bold text-micro text-ink-secondary">
@@ -139,14 +139,14 @@ export function PostMessage() {
                   tags: current.tags.filter((item) => item !== tag),
                 }));
               }}
-              className="min-h-[30px] flex-row items-center gap-1 rounded-full bg-pastel-pink pl-3 pr-2 active:opacity-70"
+              className="min-h-7.5 flex-row items-center gap-1 rounded-full bg-pastel-pink pl-3 pr-2 active:opacity-70"
             >
               <Text className="font-maru-bold text-label text-accent-rose">{tag}</Text>
               <SocialIcon name={REMOVE} size={12} color={ink} />
             </Pressable>
           ))}
         </View>
-        <View className="min-h-12 flex-row items-center gap-2 rounded-full border-[1.5px] border-line-soft bg-white pl-4 pr-1">
+        <View className="min-h-12 flex-row items-center gap-2 rounded-full border-fine border-line-soft bg-white pl-4 pr-1">
           <TextInput
             accessibilityLabel="タグ"
             maxLength={tagLimit}
@@ -169,7 +169,7 @@ export function PostMessage() {
             <Text className="font-maru-bold text-label text-ink-primary">追加</Text>
           </Pressable>
         </View>
-        <View className="overflow-hidden rounded-[18px] border-[1.5px] border-line-soft bg-white">
+        <View className="overflow-hidden rounded-card border-fine border-line-soft bg-white">
           <PublishOption
             title="使ったコスメを公開"
             detail="手順に使ったコスメの名前と色を載せます"
@@ -299,17 +299,17 @@ function ThumbnailPicker() {
         onPress={() => {
           setEditingAt(thumbnail?.timeMs ?? 0);
         }}
-        className="h-[220px] overflow-hidden rounded-[20px] bg-bg-base active:opacity-90"
+        className="h-55 overflow-hidden rounded-panel bg-bg-base active:opacity-90"
       >
         <ThumbnailContent frame={shown} hasVideo={Boolean(video)} failed={defaultFailed} />
         {canEdit && editingAt === null ? (
-          <View className="absolute bottom-2.5 right-2.5 rounded-[15px] bg-white/85 px-3 py-[5px]">
+          <View className="absolute bottom-2.5 right-2.5 rounded-overlay-label bg-white/85 px-3 py-1.25">
             <Text className="font-maru-bold text-label text-ink-primary">タップして変更</Text>
           </View>
         ) : null}
       </Pressable>
       {editingAt !== null && video?.durationMs ? (
-        <View className="gap-1 rounded-[18px] bg-bg-base px-3.5 py-3">
+        <View className="gap-1 rounded-card bg-bg-base px-3.5 py-3">
           <NativeHost matchContents={{ vertical: true }} style={{ alignSelf: 'stretch' }}>
             <Slider
               testID="サムネイルの時点"

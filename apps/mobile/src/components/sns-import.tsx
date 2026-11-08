@@ -216,8 +216,8 @@ function UrlField({
   return (
     <View
       className={cn(
-        'min-h-[52px] flex-row items-center gap-2 rounded-[26px] bg-white pl-3.5 pr-1.5',
-        invalid ? 'border-[1.5px] border-accent-rose' : 'border border-black',
+        'min-h-13 flex-row items-center gap-2 rounded-control bg-white pl-3.5 pr-1.5',
+        invalid ? 'border-fine border-accent-rose' : 'border border-black',
       )}
     >
       <SocialIcon name={LINK} size={20} color={secondary} />
@@ -229,7 +229,7 @@ function UrlField({
         onChangeText={onChange}
         onSubmitEditing={onSubmit}
         placeholder="投稿のURLを貼り付け"
-        placeholderTextColorClassName="accent-[#9f9f9f]"
+        placeholderTextColorClassName="accent-link-placeholder"
         cursorColorClassName="accent-accent-rose"
         selectionColorClassName="accent-accent-rose"
         keyboardType="url"
@@ -256,7 +256,7 @@ function InputContent() {
         accessibilityRole="button"
         accessibilityLabel="コピーしたリンクを使う（準備中）"
         accessibilityState={{ disabled: true }}
-        className="flex-row items-center gap-3 rounded-[18px] bg-bg-base py-3 pl-3.5 pr-3"
+        className="flex-row items-center gap-3 rounded-card bg-bg-base py-3 pl-3.5 pr-3"
       >
         <SocialIcon name={LINK} size={22} color={rose} />
         <View className="flex-1 gap-px">
@@ -308,7 +308,7 @@ function PostSummary({ done }: { done: boolean }) {
   const ink = useTokenColor('--color-ink-primary');
   return (
     <View className="flex-row items-start gap-3">
-      <View className="h-24 w-[72px] items-center justify-center overflow-hidden rounded-[14px]">
+      <View className="h-24 w-18 items-center justify-center overflow-hidden rounded-thumbnail">
         <CroppedPhoto source={samplePost.photo} crop={samplePost.crop} />
         <View className="size-7 items-center justify-center rounded-full bg-white/80">
           <SocialIcon name={PLAY} size={14} color={ink} />
@@ -317,7 +317,8 @@ function PostSummary({ done }: { done: boolean }) {
       <View className="flex-1 items-start gap-1">
         <View
           className={cn(
-            'min-h-[22px] flex-row items-center gap-1 rounded-[11px] px-2',
+            // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- Keep the fixed radius of this 22pt progress badge when text wraps.
+            'min-h-5.5 flex-row items-center gap-1 rounded-[11px] px-2',
             done ? 'bg-pastel-mint' : 'bg-pastel-pink',
           )}
         >
@@ -335,7 +336,7 @@ function PostSummary({ done }: { done: boolean }) {
 
 function ResultCard({ children }: { children: ReactNode }) {
   return (
-    <View className="gap-3.5 rounded-[22px] border-[1.5px] border-line-soft bg-bg-surface p-3.5">
+    <View className="gap-3.5 rounded-control-compact border-fine border-line-soft bg-bg-surface p-3.5">
       {children}
     </View>
   );
@@ -369,13 +370,13 @@ function ReadingCard({ stage }: { stage: number }) {
             className="flex-row items-center gap-2.5"
           >
             {state === 'done' ? (
-              <View className="size-[22px] items-center justify-center rounded-full bg-accent-rose">
+              <View className="size-5.5 items-center justify-center rounded-full bg-accent-rose">
                 <SocialIcon name={CHECK} size={14} color={surface} />
               </View>
             ) : (
               <View
                 className={cn(
-                  'size-[22px] rounded-full border-2',
+                  'size-5.5 rounded-full border-2',
                   state === 'active' ? 'border-accent-rose' : 'border-ink-primary/30',
                 )}
               />
@@ -468,7 +469,7 @@ function ErrorContent() {
           この投稿は読み取れませんでした
         </Text>
       </View>
-      <View className="gap-2.5 rounded-[18px] bg-bg-base px-4 py-3.5">
+      <View className="gap-2.5 rounded-card bg-bg-base px-4 py-3.5">
         <Text className="font-maru-bold text-label text-ink-primary">
           こんなときは読み取れません
         </Text>
@@ -492,11 +493,11 @@ function SavedContent() {
   const surface = useTokenColor('--color-bg-surface');
   return (
     <View className="flex-1 items-center justify-center gap-2.5 py-4">
-      <View className="h-[140px] w-28">
-        <View className="absolute inset-0 overflow-hidden rounded-[20px]">
+      <View className="h-35 w-28">
+        <View className="absolute inset-0 overflow-hidden rounded-panel">
           <CroppedPhoto source={samplePost.photo} crop={samplePost.crop} />
         </View>
-        <View className="absolute left-[89px] top-[117px] size-[34px] items-center justify-center rounded-full border-[3px] border-bg-surface bg-accent-rose">
+        <View className="absolute left-22.25 top-29.25 size-8.5 items-center justify-center rounded-full border-3 border-bg-surface bg-accent-rose">
           <SocialIcon name={CHECK} size={20} color={surface} />
         </View>
       </View>
@@ -515,7 +516,7 @@ function SavedContent() {
           `コスメ ${samplePost.productCount}`,
           '元の投稿へのリンク付き',
         ].map((chip) => (
-          <View key={chip} className="min-h-[26px] justify-center rounded-[13px] bg-bg-base px-2.5">
+          <View key={chip} className="min-h-6.5 justify-center rounded-chip bg-bg-base px-2.5">
             <Text className="font-maru text-meta text-ink-primary">{chip}</Text>
           </View>
         ))}
@@ -547,7 +548,7 @@ function SheetButton({
       disabled={disabled || pending}
       onPress={onPress}
       className={cn(
-        'min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-[26px] px-[18px] active:opacity-80',
+        'min-h-13 flex-row items-center justify-center gap-1.5 rounded-control px-4.5 active:opacity-80',
         outline ? 'border border-black bg-white' : 'bg-accent-rose',
         disabled && 'opacity-50',
       )}

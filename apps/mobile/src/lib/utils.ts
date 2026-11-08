@@ -3,9 +3,12 @@ import type { ClassValue } from 'clsx';
 import { clsx } from 'clsx';
 import { extendTailwindMerge } from 'tailwind-merge';
 
-// Register global.css typography tokens so they never replace text color utilities.
+// Keep global.css typography and border widths distinct from color utilities.
 const twMerge = extendTailwindMerge({
   extend: {
+    classGroups: {
+      'border-w': ['border-fine', 'border-selected'],
+    },
     theme: {
       text: [
         'body',
@@ -19,6 +22,8 @@ const twMerge = extendTailwindMerge({
         'heading',
         'headline',
         'display',
+        'login-wordmark',
+        'match-score',
       ],
     },
   },

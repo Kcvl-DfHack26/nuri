@@ -79,6 +79,10 @@ Fallowはスターターが提供するText／Buttonだけを明示的な公開�
 
 ## 検証
 
+`bun run lint` はモバイルの `className`、`contentContainerClassName` などの Uniwind 用 props、`cn`・`cva` のクラス文字列を検査する。Tailwind v4 の設定は `apps/mobile/global.css` を参照する。lint の先頭で Uniwind の生成処理を実行し、プラットフォームのバリアントとライト／ダークの色名を ESLint でも解決できるようにする。
+
+任意値は同じ値を表せる Tailwind のクラス（`min-h-13`、`gap-0.75`、`aspect-175/118` など）を優先する。画面間で共有する色・角丸・文字サイズは `global.css` のトークンを使う。写真やグラデーションの配置など、固有の値が必要な場合はその行だけ lint の例外とし、理由を書く。クラスを変数から組み立てず、条件ごとに完全なクラス文字列を選ぶ。
+
 `uniwind-types.d.ts` はUniwindが生成した宣言をそのまま追跡する。設定変更後に `bun run --cwd apps/mobile styles:generate` を実行する。CSS import用の公式 `expo/types` はtsconfigから明示的に読み込み、未追跡の `expo-env.d.ts` に依存しない。CIはUniwindの型を再生成して差分がないことを確認してから通常チェックを実行するので、型検査のためにMetroを起動する必要はない。
 
 ```bash

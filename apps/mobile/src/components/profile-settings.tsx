@@ -238,7 +238,7 @@ function Editor({
         <View className="items-center gap-2">
           <View className="size-24">
             <ProfilePhoto size={96} image={image} />
-            <View className="absolute left-[66px] top-[66px] size-8 items-center justify-center rounded-full border-2 border-bg-surface bg-accent-rose">
+            <View className="absolute left-16.5 top-16.5 size-8 items-center justify-center rounded-full border-2 border-bg-surface bg-accent-rose">
               <SocialIcon name={CAMERA} size={18} color="white" />
             </View>
           </View>
@@ -388,7 +388,7 @@ function Field({
   return (
     <View className="gap-1.5">
       <Text className="font-maru-bold text-label text-ink-primary">{label}</Text>
-      <View className="min-h-12 justify-center rounded-2xl border border-black bg-bg-surface px-3.5 py-[13px]">
+      <View className="min-h-12 justify-center rounded-2xl border border-black bg-bg-surface px-3.5 py-3.25">
         {children}
       </View>
       {caption ? (
@@ -412,7 +412,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
         {title}
       </Text>
-      <View className="overflow-hidden rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface">
+      <View className="overflow-hidden rounded-card border-fine border-line-soft bg-bg-surface">
         {children}
       </View>
     </View>
@@ -435,7 +435,7 @@ function Row({ label, value, onPress }: { label: string; value?: string; onPress
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      className="min-h-[52px] flex-row items-center gap-2 py-2 pl-3.5 pr-3 active:opacity-70"
+      className="min-h-13 flex-row items-center gap-2 py-2 pl-3.5 pr-3 active:opacity-70"
     >
       <Text className="flex-1 font-maru-bold text-label text-ink-primary">{label}</Text>
       {value ? (
@@ -460,7 +460,7 @@ function SwitchRow({
   disabled?: boolean;
 }) {
   return (
-    <View className="min-h-[62px] gap-px py-2 pl-3.5 pr-3">
+    <View className="min-h-15.5 gap-px py-2 pl-3.5 pr-3">
       <Host matchContents={{ vertical: true }} style={{ minHeight: 48 }}>
         <NativeSwitch
           label={onValueChange ? title : `${title}（準備中）`}

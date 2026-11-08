@@ -124,7 +124,7 @@ function ScopeSegment({ value, onChange }: { value: Scope; onChange: (value: Sco
   return (
     <View
       accessibilityRole="tablist"
-      className="flex-row rounded-[26px] bg-[rgba(216,216,216,0.6)] p-1"
+      className="flex-row rounded-control bg-home-switch-track p-1"
       style={{ boxShadow: '0px 8px 12px rgba(196, 61, 112, 0.14)' }}
     >
       {options.map((option) => {
@@ -140,7 +140,7 @@ function ScopeSegment({ value, onChange }: { value: Scope; onChange: (value: Sco
               onChange(option.value);
             }}
             className={cn(
-              'min-h-11 w-[104px] items-center justify-center rounded-[22px]',
+              'min-h-11 w-26 items-center justify-center rounded-control-compact',
               selected && 'bg-bg-surface',
             )}
           >
@@ -238,7 +238,7 @@ function PartCard({
   const countLabel = count === undefined ? '' : `${count}レシピ`;
   const label = countLabel ? `${part.label}、${countLabel}` : part.label;
   const className =
-    'h-[124px] grow basis-[40%] justify-end overflow-hidden rounded-3xl border-2 border-white p-2';
+    'h-31 grow basis-2/5 justify-end overflow-hidden rounded-3xl border-2 border-white p-2';
   const style = { boxShadow: '0px 4px 14px rgba(196, 61, 112, 0.1)' };
   const content = (
     <>
@@ -250,12 +250,9 @@ function PartCard({
             'linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(109,109,109,0.3))',
         }}
       />
-      <View className="flex-row items-center gap-[7px] self-start rounded-[18px] border border-white bg-white/80 py-[5px] pl-[5px] pr-3">
+      <View className="flex-row items-center gap-1.75 self-start rounded-card border border-white bg-white/80 py-1.25 pl-1.25 pr-3">
         <View
-          className={cn(
-            'size-[30px] items-center justify-center rounded-full',
-            part.iconBackground,
-          )}
+          className={cn('size-7.5 items-center justify-center rounded-full', part.iconBackground)}
         >
           <Image accessible={false} source={part.icon} style={{ width: 18, height: 18 }} />
         </View>

@@ -47,7 +47,7 @@ export function PostReview() {
         contentContainerClassName="gap-2.5 px-4 pb-6 pt-3"
       >
         <View
-          className="flex-row items-center gap-3 rounded-[20px] p-3.5"
+          className="flex-row items-center gap-3 rounded-panel p-3.5"
           style={{ backgroundImage: `linear-gradient(to right, ${pink}, ${peach})` }}
         >
           <View className="size-10 items-center justify-center rounded-full bg-bg-surface">
@@ -94,18 +94,18 @@ function StepCard({ step, index }: { step: PostStep; index: number }) {
       onPress={() => {
         router.push(`/post/step/${index}`);
       }}
-      className="flex-row items-center gap-3 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface py-2.5 pl-2.5 pr-2 active:opacity-70"
+      className="flex-row items-center gap-3 rounded-card border-fine border-line-soft bg-bg-surface py-2.5 pl-2.5 pr-2 active:opacity-70"
     >
-      <View className="h-[84px] w-[68px] overflow-hidden rounded-[14px]">
+      <View className="h-21 w-17 overflow-hidden rounded-thumbnail">
         <StepFrame step={step} />
-        <View className="absolute left-[5px] top-[5px] size-[22px] items-center justify-center rounded-full bg-accent-rose">
+        <View className="absolute left-1.25 top-1.25 size-5.5 items-center justify-center rounded-full bg-accent-rose">
           <Text className="font-maru-bold text-micro text-bg-surface">{index + 1}</Text>
         </View>
-        <View className="absolute left-[39px] top-[55px] size-6 items-center justify-center rounded-full bg-bg-surface">
+        <View className="absolute left-9.75 top-13.75 size-6 items-center justify-center rounded-full bg-bg-surface">
           <SocialIcon name={PLAY} size={14} color={ink} />
         </View>
       </View>
-      <View className="flex-1 gap-[3px]">
+      <View className="flex-1 gap-0.75">
         <Text className="font-maru-bold text-action text-ink-primary">{title}</Text>
         {summary ? <Text className="font-maru text-meta text-ink-secondary">{summary}</Text> : null}
         <Text className="font-maru text-meta text-accent-rose">区間 {length}</Text>

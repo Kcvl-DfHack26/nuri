@@ -59,7 +59,7 @@ export function MyPage() {
         contentContainerStyle={{ paddingTop: scrollTop + 8, paddingBottom: scrollBottom + 28 }}
       >
         <View className="flex-row items-center gap-3.5">
-          <View className="size-16 items-center justify-center overflow-hidden rounded-full border-[3px] border-accent-pink">
+          <View className="size-16 items-center justify-center overflow-hidden rounded-full border-3 border-accent-pink">
             <ProfilePhoto size={58} image={user?.image} />
           </View>
           <View className="flex-1 gap-0.5">
@@ -227,12 +227,12 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${recipe.title}、${recipe.author.name}、いいね${likes}`}
-      className="flex-1 gap-[5px] active:opacity-80"
+      className="flex-1 gap-1.25 active:opacity-80"
       onPress={() => {
         router.push(`/recipes/${recipe.id}`);
       }}
     >
-      <View className="aspect-[173/230] w-full overflow-hidden rounded-[18px] bg-neutral-soft">
+      <View className="aspect-173/230 w-full overflow-hidden rounded-card bg-neutral-soft">
         <Image
           accessible={false}
           source={{ uri: apiAssetUrl(recipe.image) }}
@@ -242,7 +242,7 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
       </View>
       <View className="w-full gap-px px-1 pt-0.5">
         <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-        <View className="flex-row items-center gap-[3px]">
+        <View className="flex-row items-center gap-0.75">
           <Text className="flex-1 font-maru text-meta text-ink-secondary">
             {recipe.author.name}
           </Text>
