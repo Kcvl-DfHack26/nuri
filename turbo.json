@@ -25,7 +25,9 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^typecheck"],
+      "outputs": []
+    },
+    "//#test:scripts": {
       "outputs": []
     },
     "build": {

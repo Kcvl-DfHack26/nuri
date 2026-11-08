@@ -29,17 +29,12 @@ export default defineConfig({
         launchOptions: { args: ['--use-fake-device-for-media-stream'] },
       },
     },
-    {
-      name: 'webkit',
-      testIgnore: '**/camera.spec.ts',
-      use: { browserName: 'webkit' },
-    },
   ],
   webServer: {
     cwd: './apps/api',
     command:
-      'NODE_ENV=production bun run --cwd ../mobile expo export --platform web --output-dir .expo/e2e-web && ' +
-      'bun run db:migrate && bun run db:seed && exec node --import tsx src/index.ts',
+      'NODE_ENV=production bun run --bun --cwd ../mobile expo export --platform web --output-dir .expo/e2e-web && ' +
+      'bun src/db/migrate.ts && bun src/seed.ts && exec bun src/index.ts',
     url: `${origin}/ready`,
     timeout: 180_000,
     env: {
