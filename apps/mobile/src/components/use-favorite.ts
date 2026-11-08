@@ -3,14 +3,14 @@ import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
 import { authClient } from '@/lib/api';
-import { changeFavorite, recipeKeys, setCachedFavorite } from '@/lib/recipes';
+import { changeFavorite, recipeKeys, recipeOptions, setCachedFavorite } from '@/lib/recipes';
 
 const favoriteMutations = ['favorite'];
 
 /**
  * The heart of one recipe, the same on ①'s cards, ③, ⑤ and ⑭ (#191). Guests are sent to ⑱ first
  * (#42). The change shows at once in every cached copy of this recipe and is rolled back if the
- * server rejects it; other recipes and the lists themselves are not fetched again.
+ * server rejects it; other recipes and the whole lists are not fetched again.
  */
 export function useFavorite(recipe: { id: string; favorited: boolean }) {
   const client = useQueryClient();
@@ -21,26 +21,24 @@ export function useFavorite(recipe: { id: string; favorited: boolean }) {
   const toggle = useMutation({
     mutationKey,
     mutationFn: (favorited: boolean) => changeFavorite(recipe.id, favorited),
-    onMutate: async (favorited) => {
-      // A fetch already under way would overwrite the change with older data. Loads without data
-      // yet are left alone: cancelling them would leave their screens waiting with nothing.
-      await client.cancelQueries({
-        queryKey: recipeKeys.all,
-        predicate: (query) => query.state.data !== undefined,
-      });
-      return setCachedFavorite(client, recipe.id, !favorited);
-    },
+    // Nothing is cancelled, so loads of other recipes and pages carry on; a fetch that overlaps
+    // the change is put right when it settles.
+    onMutate: (favorited) => setCachedFavorite(client, recipe.id, !favorited),
     onError: (error, favorited, changed) => {
       // Undo only the caches this change touched; a copy that already showed the new state stays.
       setCachedFavorite(client, recipe.id, favorited, changed ?? []);
       Alert.alert('お気に入りを変更できませんでした', error.message);
     },
-    onSettled: () => {
-      // Only the favorites list changes membership; the other lists already show the change.
-      // Refetch once the last pending heart settles, so the result never undoes another change.
-      if (client.isMutating({ mutationKey: favoriteMutations }) === 1) {
-        return client.invalidateQueries({ queryKey: recipeKeys.favorites });
-      }
+    onSettled: async () => {
+      // ⑤ of this recipe, the one screen showing it alone, is fetched again. Of the lists only the
+      // favorites list changes membership; it waits for the last pending heart so the result
+      // never undoes another change.
+      await Promise.all([
+        client.invalidateQueries({ queryKey: recipeOptions(recipe.id).queryKey }),
+        client.isMutating({ mutationKey: favoriteMutations }) === 1
+          ? client.invalidateQueries({ queryKey: recipeKeys.favorites })
+          : undefined,
+      ]);
     },
   });
   return {

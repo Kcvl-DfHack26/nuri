@@ -80,6 +80,7 @@ jest.mock('@/lib/face-diagnosis', () => ({
   diagnoseFace: jest.fn(),
 }));
 jest.mock('@/lib/api', () => ({
+  authClient: { useSession: () => ({ data: null }) },
   apiUrl: 'http://localhost:8080',
   apiAssetUrl: (path: string) => path,
   api: { api: { recipes: { $get: () => mockGetRecipes() } } },

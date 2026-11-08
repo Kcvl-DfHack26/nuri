@@ -150,7 +150,7 @@ test('keeps the chosen list in the route', async () => {
   await render(<Home />, { wrapper: TestQueryProvider });
   expect(screen.getByRole('tab', { name: '全体 顔まるごと' })).toBeSelected();
   expect(
-    await screen.findByRole('button', { name: '狐メイク、mio、いいね1.2k' }),
+    await screen.findByRole('button', { name: '狐メイク、mio、お気に入り1.2k' }),
   ).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('tab', { name: '部位 パーツ別' }));
   expect(router.setParams).toHaveBeenCalledWith({ scope: 'parts' });
