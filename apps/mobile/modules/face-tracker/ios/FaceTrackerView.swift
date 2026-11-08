@@ -29,15 +29,13 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   private let lock = NSLock()
   private var sessionGeneration = 0
   private var acceptingFrames = false
+  private var trackLandmarks = true
   private var captures: [
     Int: (at: CFTimeInterval, generation: Int, size: CGSize, orientation: AVCaptureVideoOrientation)
   ] = [:]
-  // At most one frame sent to MediaPipe and still waiting for its result, and the last such frame
-  // with a face together with its landmarks, kept only so a snapshot and the landmarks it is
-  // diagnosed with come from one frame. Holding one at a time never drops it before its result
-  // and keeps the camera's buffers free.
-  private var pendingBuffers: [Int: CVPixelBuffer] = [:]
-  private var landmarked: (buffer: CVPixelBuffer, points: [Double], at: CFTimeInterval)?
+  // The latest camera buffer is independent of live tracking, so a still-photo diagnosis can use
+  // it when MediaPipe briefly misses a face. Replacing it keeps only one buffer in memory.
+  private var latestFrame: (buffer: CVPixelBuffer, at: CFTimeInterval)?
   private var lastTimestamp = -1
 
   required init(appContext: AppContext? = nil) {
@@ -77,6 +75,12 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     }
   }
 
+  func setTrackLandmarks(_ value: Bool) {
+    lock.lock()
+    trackLandmarks = value
+    lock.unlock()
+  }
+
   private func start() {
     guard AVCaptureDevice.authorizationStatus(for: .video) == .authorized else {
       emitStatus("permissionDenied")
@@ -107,8 +111,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     acceptingFrames = false
     sessionGeneration += 1
     captures.removeAll()
-    pendingBuffers.removeAll()
-    landmarked = nil
+    latestFrame = nil
     lock.unlock()
     // A resumed camera must report its first state even when it matches the previous session.
     lastStatus = nil
@@ -137,8 +140,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
       self.orient(self.videoOutput?.connection(with: .video), to: next)
       self.lock.lock()
       self.captures.removeAll()
-      self.pendingBuffers.removeAll()
-      self.landmarked = nil
+      self.latestFrame = nil
       self.lock.unlock()
     }
   }
@@ -205,15 +207,12 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     return try FaceLandmarker(options: options)
   }
 
-  /// Saves the last frame with a face as a JPEG in the app's caches and returns its file URL with
-  /// that frame's landmarks, or nil when no face was found yet. The photo is mirrored like the
-  /// preview, so it looks as the person saw it; the landmarks stay upright and unmirrored, like
-  /// onLandmarks. JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
-  func snapshot() throws -> [String: Any]? {
+  /// Saves the current frame as a mirrored JPEG in the app's cache, or nil before a frame arrives.
+  /// JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
+  func snapshot() throws -> String? {
     lock.lock()
-    let frame = landmarked
+    let frame = latestFrame
     lock.unlock()
-    // The tracker misses a face for single frames, so a face from just before still counts.
     guard let frame, CACurrentMediaTime() - frame.at <= 1.5 else {
       return nil
     }
@@ -230,12 +229,7 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     try manager.createDirectory(at: folder, withIntermediateDirectories: true)
     let file = folder.appendingPathComponent("\(UUID().uuidString).jpg")
     try data.write(to: file)
-    return [
-      "uri": file.absoluteString,
-      "points": frame.points,
-      "width": Double(CVPixelBufferGetWidth(pixelBuffer)),
-      "height": Double(CVPixelBufferGetHeight(pixelBuffer)),
-    ]
+    return file.absoluteString
   }
 
   // MARK: Camera frames (video queue)
@@ -244,9 +238,19 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
     from connection: AVCaptureConnection
   ) {
-    guard let landmarker, let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
+    guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
       return
     }
+    lock.lock()
+    guard acceptingFrames else {
+      lock.unlock()
+      return
+    }
+    latestFrame = (pixelBuffer, CACurrentMediaTime())
+    let shouldTrack = trackLandmarks
+    lock.unlock()
+    guard shouldTrack else { return }
+    guard let landmarker else { return }
     let presentation = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
     let timestamp = Int(CMTimeGetSeconds(presentation) * 1000)
     guard let image = try? MPImage(sampleBuffer: sampleBuffer, orientation: .up) else {
@@ -270,9 +274,6 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     if captures.count > 30 {
       captures = captures.filter { $0.key > timestamp - 2000 }
     }
-    if pendingBuffers.isEmpty {
-      pendingBuffers[timestamp] = pixelBuffer
-    }
     lock.unlock()
     do {
       try landmarker.detectAsync(image: image, timestampInMilliseconds: timestamp)
@@ -289,8 +290,6 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
   ) {
     lock.lock()
     let capture = captures.removeValue(forKey: timestampInMilliseconds)
-    let frame = pendingBuffers.removeValue(forKey: timestampInMilliseconds)
-    pendingBuffers = pendingBuffers.filter { $0.key > timestampInMilliseconds }
     lock.unlock()
     guard let capture else {
       return
@@ -308,14 +307,6 @@ class FaceTrackerView: ExpoView, AVCaptureVideoDataOutputSampleBufferDelegate,
     for landmark in face {
       points.append(Double(landmark.x))
       points.append(Double(landmark.y))
-    }
-    if let frame {
-      // A camera stopped meanwhile keeps nothing from the session it ended.
-      lock.lock()
-      if acceptingFrames, capture.generation == sessionGeneration {
-        landmarked = (frame, points, CACurrentMediaTime())
-      }
-      lock.unlock()
     }
     let latencyMs = (CACurrentMediaTime() - capture.at) * 1000
     DispatchQueue.main.async {

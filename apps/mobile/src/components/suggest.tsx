@@ -55,9 +55,6 @@ const heroCrop: PhotoCrop = {
   top: '-9.75%',
 };
 
-// How old the last face may be when 撮影する is pressed, like the tracker's snapshot.
-const faceMaxAgeMs = 1500;
-
 // Where the face tracker saves camera frames in the app's cache (FaceTrackerView on both platforms).
 const savedFrameFolder = 'face-tracker';
 
@@ -103,16 +100,10 @@ export function Suggest() {
   const [message, setMessage] = useState<string>();
   const [last, setLast] = useState<DiagnosisResult>();
 
-  // カメラで診断 shows the same live face tracking as ⑦ in the hero, and 撮影する diagnoses the
-  // landmarks of the frame on screen and saves that frame in the app's cache to show on ⑭. The
-  // system camera app returned no photo on some devices, and photos it or expo-camera took on the
-  // Android emulator had no face that the still-photo detector could find.
+  // カメラで診断 shows the front camera in the hero. 撮影する saves its current frame and diagnoses
+  // that photo with the same still-image detector as 写真から. Live tracking may miss single frames.
   const tracker = useRef<FaceTrackerViewRef>(null);
   const [capturing, setCapturing] = useState(false);
-  const [faceFound, setFaceFound] = useState(false);
-  // The last landmarks with a face and when they came. The tracker misses a face for single
-  // frames, so landmarks from just before still count when 撮影する is pressed.
-  const latest = useRef<{ landmarks: FacePhotoLandmarks; at: number } | null>(null);
   // The camera frame saved for the adopted result, deleted once another result replaces it.
   const savedFrame = useRef<string | null>(null);
   // The last result lives only while the app runs, so frames a previous run saved are not shown.
@@ -142,8 +133,6 @@ export function Suggest() {
   const closeCamera = useCallback(() => {
     cameraSession.current += 1;
     setCapturing(false);
-    setFaceFound(false);
-    latest.current = null;
   }, []);
   // Leaving ⑬ closes the camera.
   useFocusEffect(useCallback(() => closeCamera, [closeCamera]));
@@ -191,8 +180,6 @@ export function Suggest() {
         return;
       }
       setPhoto(undefined);
-      setFaceFound(false);
-      latest.current = null;
       setCapturing(true);
     } catch {
       setMessage('カメラを開けませんでした。もう一度お試しください');
@@ -200,34 +187,28 @@ export function Suggest() {
   }
 
   async function diagnoseFrame() {
-    const recent =
-      latest.current && Date.now() - latest.current.at <= faceMaxAgeMs
-        ? latest.current.landmarks
-        : null;
-    if (!recent) {
-      setMessage('顔を枠に合わせてください');
-      return;
-    }
     const session = cameraSession.current;
     setMessage(undefined);
     setAnalyzing(true);
     try {
-      // The saved frame is diagnosed with the landmarks found in it, so the result and its photo
-      // match. Without a saved frame the latest landmarks are diagnosed, only without a photo.
-      const snapshot = await tracker.current?.takeSnapshotAsync().catch(() => null);
-      const outcome = outcomeOf(snapshot ?? recent, snapshot?.uri);
+      const frame = await tracker.current?.takeSnapshotAsync().catch(() => null);
+      if (!frame) {
+        if (session === cameraSession.current) {
+          setMessage('カメラの映像を保存できませんでした。もう一度お試しください');
+        }
+        return;
+      }
+      const outcome = await diagnosePhoto(frame);
       // A frame that is not shown is deleted right away, so it never stays on the device.
       if (session !== cameraSession.current || 'message' in outcome) {
-        if (snapshot) {
-          deleteFile(snapshot.uri);
-        }
+        deleteFile(frame);
         if (session === cameraSession.current && 'message' in outcome) {
           setMessage(outcome.message);
         }
         return;
       }
       closeCamera();
-      adopt(outcome, snapshot?.uri ?? null);
+      adopt(outcome, frame);
     } finally {
       setAnalyzing(false);
     }
@@ -245,26 +226,8 @@ export function Suggest() {
             <FaceTrackerView
               ref={tracker}
               active={focused}
+              trackLandmarks={false}
               style={StyleSheet.absoluteFill}
-              onLandmarks={(event) => {
-                latest.current = { landmarks: event.nativeEvent, at: Date.now() };
-                if (!faceFound) {
-                  setFaceFound(true);
-                  setMessage(undefined);
-                }
-              }}
-              onStatus={(event) => {
-                const { status } = event.nativeEvent;
-                if (status === 'tracking') {
-                  return;
-                }
-                setFaceFound(false);
-                if (status === 'noFace') {
-                  setMessage('顔を枠に合わせてください');
-                } else {
-                  setMessage('カメラを開けませんでした。もう一度お試しください');
-                }
-              }}
             />
           ) : undefined
         }
