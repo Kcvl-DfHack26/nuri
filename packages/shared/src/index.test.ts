@@ -4,7 +4,6 @@ import {
   postAnalysisSchema,
   postAnalysisVideoMaxBytes,
   feedQuerySchema,
-  postInputSchema,
   profileInputSchema,
   profilePatchSchema,
   makeupShapeSchema,
@@ -16,13 +15,6 @@ import {
   recipeThumbnailMaxBytes,
 } from './index';
 
-test('trims posts and rejects empty or unbounded content', () => {
-  expect(postInputSchema.parse({ body: '  こんにちは  ' }).body).toBe('こんにちは');
-  for (const body of ['', '  ', 'あ'.repeat(501)]) {
-    expect(postInputSchema.safeParse({ body }).success).toBe(false);
-  }
-  expect(postInputSchema.safeParse({ body: 'あ'.repeat(500) }).success).toBe(true);
-});
 test('bounds pagination and profile input', () => {
   expect(feedQuerySchema.parse({})).toEqual({ offset: 0 });
   for (const offset of ['-1', '1.5', '10001', 'NaN']) {

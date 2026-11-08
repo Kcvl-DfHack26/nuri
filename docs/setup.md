@@ -90,7 +90,7 @@ bun run devices      # ホストのExpo Device Hub
 bun run dev:go       # API・DBとExpo Go用トンネル付きMetro
 bun run services:up  # API・DB・Metroをバックグラウンド起動
 bun run db:migrate
-bun run db:seed      # 4ユーザーの画像・8投稿・いいね。既存の利用者データは保持
+bun run db:seed      # サンプルのユーザー・レシピ。既存の利用者データは保持
 bun run test:integration # 起動済みのDBを使用
 bun run services:down
 ```

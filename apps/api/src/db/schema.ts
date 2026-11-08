@@ -110,35 +110,6 @@ export const rateLimit = pgTable('rate_limit', {
   lastRequest: bigint('last_request', { mode: 'number' }).notNull(),
 });
 
-export const post = pgTable(
-  'post',
-  {
-    id: text('id').primaryKey(),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-    body: text('body').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    index('post_created_at_idx').on(table.createdAt),
-    index('post_user_id_idx').on(table.userId),
-  ],
-);
-
-export const like = pgTable(
-  'like',
-  {
-    postId: text('post_id')
-      .notNull()
-      .references(() => post.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-  },
-  (table) => [primaryKey({ columns: [table.postId, table.userId] })],
-);
-
 /** Who follows whom (#195). A user cannot follow themselves. */
 export const follow = pgTable(
   'follow',
