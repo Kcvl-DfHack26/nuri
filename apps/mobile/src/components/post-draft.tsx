@@ -1,12 +1,12 @@
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import * as Crypto from 'expo-crypto';
-import { File } from 'expo-file-system';
 import { createContext, use, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { PartId } from '@/components/recipes';
 
 import { parts } from '@/components/recipes';
+import { deleteFile } from '@/lib/files';
 import { formatClock } from '@/lib/post-edit';
 
 import detailProductBrowPencil from '../../assets/plan-a/detail/product-brow-pencil.jpg';
@@ -135,13 +135,6 @@ type PostDraftContextValue = {
 const PostDraftContext = createContext<PostDraftContextValue | null>(null);
 
 // Mounted by the post flow's layout, so leaving the flow discards the draft.
-function deleteFile(uri: string) {
-  const file = new File(uri);
-  if (file.exists) {
-    file.delete();
-  }
-}
-
 export function PostDraftProvider({
   videoUri,
   videoDurationMs,

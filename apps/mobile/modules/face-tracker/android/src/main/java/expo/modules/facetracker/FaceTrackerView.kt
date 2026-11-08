@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.net.Uri
 import android.os.SystemClock
 import android.util.Range
 import android.view.Surface
@@ -29,6 +30,9 @@ import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
 import expo.modules.kotlin.AppContext
 import expo.modules.kotlin.viewevent.EventDispatcher
 import expo.modules.kotlin.views.ExpoView
+import java.io.File
+import java.util.UUID
+import java.util.concurrent.ConcurrentSkipListMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -73,6 +77,12 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private var lastStatus: String? = null
   private var lastMessage: String? = null
 
+  // At most one frame sent to MediaPipe and still waiting for its result, and the last such frame
+  // with a face together with its landmarks, kept only so a snapshot and the landmarks it is
+  // diagnosed with come from one frame. Holding one at a time never drops it before its result.
+  private val pendingFrames = ConcurrentSkipListMap<Long, Bitmap>()
+  private class LandmarkedFrame(val bitmap: Bitmap, val points: List<Double>)
+  @Volatile private var landmarkedFrame: LandmarkedFrame? = null
   @Volatile private var frameWidth = 0
   @Volatile private var frameHeight = 0
 
@@ -172,9 +182,33 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     discardResultsBeforeMs = SystemClock.uptimeMillis()
     cameraProvider?.unbind(*useCases)
     useCases = emptyArray()
+    pendingFrames.clear()
+    landmarkedFrame = null
     // A resumed camera must report its first state even when it matches the previous session.
     lastStatus = null
     lastMessage = null
+  }
+
+  /**
+   * Saves the last frame with a face as a JPEG in the app's cache and returns its file URI with
+   * that frame's landmarks, or null when no face was found yet. The photo is mirrored like the
+   * preview, so it looks as the person saw it; the landmarks stay upright and unmirrored, like
+   * onLandmarks. JavaScript deletes the file once it is no longer shown. Nothing is sent anywhere.
+   */
+  fun snapshot(): Map<String, Any>? {
+    val landmarked = landmarkedFrame ?: return null
+    val upright = landmarked.bitmap
+    val mirror = Matrix().apply { preScale(-1f, 1f) }
+    val frame = Bitmap.createBitmap(upright, 0, 0, upright.width, upright.height, mirror, true)
+    val folder = File(context.cacheDir, "face-tracker").apply { mkdirs() }
+    val file = File(folder, "${UUID.randomUUID()}.jpg")
+    file.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+    return mapOf(
+      "uri" to Uri.fromFile(file).toString(),
+      "points" to landmarked.points,
+      "width" to upright.width.toDouble(),
+      "height" to upright.height.toDouble()
+    )
   }
 
   // Analysis thread.
@@ -286,6 +320,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     frameWidth = upright.width
     frameHeight = upright.height
+    if (pendingFrames.isEmpty()) pendingFrames[timestamp] = upright
     if (!active || generation != sessionGeneration) return
     try {
       current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
@@ -298,8 +333,11 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private fun onResult(result: FaceLandmarkerResult) {
     if (result.timestampMs() <= discardResultsBeforeMs) return
     framesWithoutResult.set(0)
+    val frame = pendingFrames.remove(result.timestampMs())
+    pendingFrames.headMap(result.timestampMs()).clear()
     val face = result.faceLandmarks().firstOrNull()
     if (face.isNullOrEmpty()) {
+      landmarkedFrame = null
       post {
         if (result.timestampMs() > discardResultsBeforeMs) setStatus("noFace")
       }
@@ -310,6 +348,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       points.add(landmark.x().toDouble())
       points.add(landmark.y().toDouble())
     }
+    if (frame != null) landmarkedFrame = LandmarkedFrame(frame, points)
     val latencyMs = (SystemClock.uptimeMillis() - result.timestampMs()).toDouble()
     val width = frameWidth.toDouble()
     val height = frameHeight.toDouble()
