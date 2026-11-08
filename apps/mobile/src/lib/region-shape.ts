@@ -9,26 +9,33 @@ type Stroke = MakeupShape['strokes'][number];
 type ShapePoint = Stroke['points'][number];
 /** A landmark, or the midpoint of two. */
 type Landmark = number | readonly [number, number];
+/** The landmarks of a paired part: the subject's right, then left. */
+type Sided = readonly [Landmark, Landmark];
 
 const uv = canonicalFaceMesh.textureCoordinates;
 const at = (index: number): Point => uv[index] ?? { x: 0.5, y: 0.5 };
 
-// The words Gemini picks (#46) as MediaPipe landmark numbers; Gemini never answers numbers. Paired
-// parts are drawn on the subject's right side, the left half of the canonical UV, and mirrored.
-const sided: Partial<Record<Region['start'], Landmark>> = {
-  browHead: 107,
-  browPeak: 105,
-  browTail: 46,
-  eyeInner: 133,
-  eyeOuter: 33,
-  irisCenter: [159, 145],
-  irisOuter: [161, 163],
-  noseWing: 129,
-  mouthCorner: 61,
-  cheekboneTop: 117,
-  cheekCenter: 50,
-  temple: 139,
-  jawAngle: 172,
+// The words Gemini picks (#46) as MediaPipe landmark numbers; Gemini never answers numbers.
+const sided: Partial<Record<Region['start'], Sided>> = {
+  browHead: [107, 336],
+  browPeak: [105, 334],
+  browTail: [46, 276],
+  eyeInner: [133, 362],
+  eyeOuter: [33, 263],
+  irisCenter: [
+    [159, 145],
+    [386, 374],
+  ],
+  irisOuter: [
+    [161, 163],
+    [388, 390],
+  ],
+  noseWing: [129, 358],
+  mouthCorner: [61, 291],
+  cheekboneTop: [117, 346],
+  cheekCenter: [50, 280],
+  temple: [139, 368],
+  jawAngle: [172, 397],
 };
 const center: Partial<Record<Region['start'], Landmark>> = {
   glabella: 9,
@@ -40,13 +47,28 @@ const center: Partial<Record<Region['start'], Landmark>> = {
   chin: 152,
   foreheadCenter: 151,
 };
-// The right brow and eye, each from the outer end to the inner end.
-const browUpper = [70, 63, 105, 66, 107];
-const browLower = [46, 53, 52, 65, 55];
-// The upper lid skips 246, which bends up at the outer corner in many faces.
-const upperLid = [33, 161, 160, 159, 158, 157, 173, 133];
-const lowerLid = [33, 7, 163, 144, 145, 153, 154, 155, 133];
-const eyeOpening = [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7];
+// The right, then the left brow and eye, each from the outer end to the inner end.
+const browUpper = [
+  [70, 63, 105, 66, 107],
+  [300, 293, 334, 296, 336],
+] as const;
+const browLower = [
+  [46, 53, 52, 65, 55],
+  [276, 283, 282, 295, 285],
+] as const;
+// The upper lid skips 246/466, which bend up at the outer corner in many faces.
+const upperLid = [
+  [33, 161, 160, 159, 158, 157, 173, 133],
+  [263, 388, 387, 386, 385, 384, 398, 362],
+] as const;
+const lowerLid = [
+  [33, 7, 163, 144, 145, 153, 154, 155, 133],
+  [263, 249, 390, 373, 374, 380, 381, 382, 362],
+] as const;
+const eyeOpening = [
+  [33, 246, 161, 160, 159, 158, 157, 173, 133, 155, 154, 153, 145, 144, 163, 7],
+  [263, 466, 388, 387, 386, 385, 384, 398, 362, 382, 381, 380, 374, 373, 390, 249],
+] as const;
 const upperLip = [
   61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191, 78,
 ];
@@ -81,6 +103,7 @@ const blur = 0.004;
 // How many lid landmarks a line drawn inward from a corner covers, by length.
 const inwardSteps: Record<Region['length'], number> = { none: 2, short: 2, medium: 3, long: 5 };
 
+const side = (right: boolean) => (right ? 0 : 1);
 const clampOffset = (value: number) => Math.max(-0.2, Math.min(0.2, value));
 
 /** A shape point at `target`, written as the nearest of `near`'s landmarks plus a small offset. */
@@ -100,31 +123,35 @@ function landmarkOf(entry: Landmark): { point: Point; near: number } {
   };
 }
 
-function anchor(name: Region['start']): { point: Point; near: number } | null {
-  const landmark = sided[name] ?? center[name];
+function anchor(name: Region['start'], right: boolean): { point: Point; near: number } | null {
+  const pair = sided[name];
+  const landmark = pair ? pair[side(right)] : center[name];
   if (landmark !== undefined) {
     return landmarkOf(landmark);
   }
   if (name === 'browTailLine') {
     // Where the line from the nose wing through the outer eye corner reaches the brow tail's height.
-    const wing = at(129);
-    const corner = at(33);
-    const tail = at(46);
+    const wing = at(right ? 129 : 358);
+    const corner = at(right ? 33 : 263);
+    const tail = at(right ? 46 : 276);
     const t = (tail.y - wing.y) / (corner.y - wing.y);
-    return { point: { x: wing.x + (corner.x - wing.x) * t, y: tail.y }, near: 46 };
+    return {
+      point: { x: wing.x + (corner.x - wing.x) * t, y: tail.y },
+      near: right ? 46 : 276,
+    };
   }
   return null;
 }
 
-/** A paired part's area, drawn on the right side and mirrored; the midline and the lips are not. */
+/** Whether an area belongs to a paired part; the midline and the lips are not paired. */
 function isPaired(region: Region) {
   const central = (name: Region['end']) => name === 'none' || name in center || lipAreas.has(name);
   return !central(region.start) || !central(region.end);
 }
 
-function direction(name: Region['direction']): Point {
-  // The subject's right side is the left half of the canonical UV.
-  const out = -1;
+function direction(name: Region['direction'], right: boolean): Point {
+  // The canonical UV has the subject's right on the left half.
+  const out = right ? -1 : 1;
   const vectors: Record<Region['direction'], Point> = {
     none: { x: out, y: 0 },
     outward: { x: out, y: 0 },
@@ -149,14 +176,15 @@ const nearestIndex = (points: readonly Point[], target: Point) =>
     0,
   );
 
-function areaStrokes(name: Region['start'] | Region['clip']): Stroke[] {
+function areaStrokes(name: Region['start'] | Region['clip'], right: boolean): Stroke[] {
   const fill = (indices: readonly number[], erase = false): Stroke => ({
     points: indices.map((index) => ({ at: index })),
     fill: true,
     ...(erase ? { erase: true } : { blur }),
   });
   if (name === 'brow') {
-    return [fill([...browUpper, ...[...browLower].reverse()])];
+    const k = side(right);
+    return [fill([...browUpper[k], ...[...browLower[k]].reverse()])];
   }
   if (name === 'upperLip') {
     return [fill(upperLip)];
@@ -171,18 +199,19 @@ function areaStrokes(name: Region['start'] | Region['clip']): Stroke[] {
 }
 
 /** A line along the brow's middle, as wide as the brow at most, stretched past the tail if asked. */
-function browStroke(region: Region): Stroke {
-  const middles = browLower.map((lower, index) => {
-    const upper = browUpper[index] ?? lower;
+function browStroke(region: Region, right: boolean): Stroke {
+  const k = side(right);
+  const middles = browLower[k].map((lower, index) => {
+    const upper = browUpper[k][index] ?? lower;
     return { x: (at(upper).x + at(lower).x) / 2, y: (at(upper).y + at(lower).y) / 2, near: lower };
   });
   const thickness =
-    browUpper.reduce((sum, upper, index) => {
-      const lower = browLower[index] ?? upper;
+    browUpper[k].reduce((sum, upper, index) => {
+      const lower = browLower[k][index] ?? upper;
       return sum + Math.hypot(at(upper).x - at(lower).x, at(upper).y - at(lower).y);
-    }, 0) / browUpper.length;
-  const start = anchor(region.start);
-  const end = region.end === 'none' ? null : anchor(region.end);
+    }, 0) / browUpper[k].length;
+  const start = anchor(region.start, right);
+  const end = region.end === 'none' ? null : anchor(region.end, right);
   const from = start ? nearestIndex(middles, start.point) : 0;
   const to = end ? nearestIndex(middles, end.point) : from;
   const [lo, hi] = from <= to ? [from, to] : [to, from];
@@ -201,10 +230,13 @@ function browStroke(region: Region): Stroke {
 }
 
 /** A line along an eyelid between two eye landmarks, with a short wing past the outer corner. */
-function lidStroke(region: Region, lower: boolean): Stroke {
-  const contour = (lower ? lowerLid : upperLid).map((index) => ({ ...at(index), near: index }));
-  const start = anchor(region.start);
-  const end = region.end === 'none' ? null : anchor(region.end);
+function lidStroke(region: Region, lower: boolean, right: boolean): Stroke {
+  const contour = (lower ? lowerLid : upperLid)[side(right)].map((index) => ({
+    ...at(index),
+    near: index,
+  }));
+  const start = anchor(region.start, right);
+  const end = region.end === 'none' ? null : anchor(region.end, right);
   const from = start ? nearestIndex(contour, start.point) : 0;
   let to = end ? nearestIndex(contour, end.point) : from;
   if (!end && region.direction === 'inward') {
@@ -215,7 +247,7 @@ function lidStroke(region: Region, lower: boolean): Stroke {
   const wing = lengths[region.length];
   const corner = contour[0];
   if (lo === 0 && !lower && wing > 0 && corner && region.direction !== 'inward') {
-    const way = direction(region.direction);
+    const way = direction(region.direction, right);
     points.unshift(
       pointAt({ x: corner.x + way.x * wing, y: corner.y + way.y * wing }, corner.near),
     );
@@ -227,15 +259,15 @@ function lidStroke(region: Region, lower: boolean): Stroke {
   return { points, width: widths.line, blur };
 }
 
-function ellipseStroke(region: Region): Stroke | null {
-  const start = anchor(region.start);
+function ellipseStroke(region: Region, right: boolean): Stroke | null {
+  const start = anchor(region.start, right);
   if (!start) {
     return null;
   }
-  const end = region.end === 'none' ? null : anchor(region.end);
+  const end = region.end === 'none' ? null : anchor(region.end, right);
   const axis = end
     ? { x: end.point.x - start.point.x, y: end.point.y - start.point.y }
-    : direction(region.direction);
+    : direction(region.direction, right);
   // The ellipse sits on the start; the end only tilts it. Blush from the cheekbone toward the
   // temple stays on the cheekbone instead of moving up beside the eye.
   const centerPoint = start.point;
@@ -260,13 +292,13 @@ function ellipseStroke(region: Region): Stroke | null {
   return { points, fill: true, blur };
 }
 
-function straightStroke(region: Region): Stroke | null {
-  const start = anchor(region.start);
+function straightStroke(region: Region, right: boolean): Stroke | null {
+  const start = anchor(region.start, right);
   if (!start) {
     return null;
   }
-  const end = region.end === 'none' ? null : anchor(region.end);
-  const way = direction(region.direction);
+  const end = region.end === 'none' ? null : anchor(region.end, right);
+  const way = direction(region.direction, right);
   const length = lengths[region.length] || widths.band;
   const to = end
     ? pointAt(end.point, end.near)
@@ -278,26 +310,27 @@ function straightStroke(region: Region): Stroke | null {
   };
 }
 
-function regionStrokes(region: Region): Stroke[] {
+/** The strokes of one area on the subject's right side, or with `right` false, the left side. */
+function regionStrokes(region: Region, right: boolean): Stroke[] {
   if (region.shape === 'area') {
-    const area = areaStrokes(region.start);
-    return area.length > 0 ? area : areaStrokes(region.clip);
+    const area = areaStrokes(region.start, right);
+    return area.length > 0 ? area : areaStrokes(region.clip, right);
   }
   if (region.shape === 'ellipse' || region.shape === 'dot') {
-    const ellipse = ellipseStroke(region);
+    const ellipse = ellipseStroke(region, right);
     return ellipse ? [ellipse] : [];
   }
   if (browAnchors.has(region.start) || region.start === 'brow' || region.start === 'browTailLine') {
-    return [browStroke(region)];
+    return [browStroke(region, right)];
   }
   if (region.start === 'upperLidEdge' || region.start === 'lowerLidEdge') {
-    return [lidStroke({ ...region, start: 'eyeOuter' }, region.start === 'lowerLidEdge')];
+    return [lidStroke({ ...region, start: 'eyeOuter' }, region.start === 'lowerLidEdge', right)];
   }
   if (eyeAnchors.has(region.start)) {
     // Gemini names the lid only in its description.
-    return [lidStroke(region, region.detail.includes('下まぶた'))];
+    return [lidStroke(region, region.detail.includes('下まぶた'), right)];
   }
-  const straight = straightStroke(region);
+  const straight = straightStroke(region, right);
   return straight ? [straight] : [];
 }
 
@@ -314,7 +347,8 @@ export function regionShape(regions: readonly Region[]): MakeupShape | null {
   let touchesLips = false;
   for (const region of regions) {
     const paired = isPaired(region);
-    for (const stroke of regionStrokes(region)) {
+    // A paired area is drawn on the subject's right side and mirrored to the left.
+    for (const stroke of regionStrokes(region, true)) {
       const painted = paired ? { ...stroke, mirror: true } : stroke;
       // The same area seen on the left and on the right is one mirrored stroke.
       const key = JSON.stringify(painted);
@@ -332,7 +366,7 @@ export function regionShape(regions: readonly Region[]): MakeupShape | null {
   const cut: Stroke[] = [];
   if (touchesEyes) {
     cut.push({
-      points: eyeOpening.map((index) => ({ at: index })),
+      points: eyeOpening[0].map((index) => ({ at: index })),
       fill: true,
       erase: true,
       mirror: true,
