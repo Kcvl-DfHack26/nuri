@@ -23,3 +23,13 @@ test('paints parts in display order and uses the last step for repeated parts', 
   ]);
   expect(finishLayers([])).toEqual([]);
 });
+
+test('keeps the shape of the last step for each part', () => {
+  const arch = { strokes: [{ mirror: true, points: [{ at: 105 }] }] };
+  expect(
+    finishLayers([
+      { part: 'brow', colors: ['#201008'], shape: null },
+      { part: 'brow', colors: ['#402010'], shape: arch },
+    ]),
+  ).toEqual([{ part: 'brow', color: '#402010', shape: arch }]);
+});

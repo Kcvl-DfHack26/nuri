@@ -262,6 +262,7 @@ export function recipeRoutes(db: Database, auth: Auth) {
                 hint: true,
                 product: true,
                 colors: true,
+                shape: true,
               },
               orderBy: { position: 'asc' },
             },

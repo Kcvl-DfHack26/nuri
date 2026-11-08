@@ -125,7 +125,11 @@ function StepsContent({
           {camera.preview ??
             (canTrackFace ? (
               <FaceMakeupCamera
-                layers={overlayVisible ? [{ part: step.part, color: paintColor(step.colors) }] : []}
+                layers={
+                  overlayVisible
+                    ? [{ part: step.part, color: paintColor(step.colors), shape: step.shape }]
+                    : []
+                }
                 annotation={overlayVisible ? { part: step.part, label: step.label } : undefined}
               />
             ) : (

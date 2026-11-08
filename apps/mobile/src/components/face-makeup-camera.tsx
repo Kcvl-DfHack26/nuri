@@ -19,6 +19,7 @@ import type { Point, Size } from '@/lib/face-landmarks';
 import type { MakeupLayer } from '@/lib/face-makeup';
 
 import { FaceTexture } from '@/components/face-texture';
+import { useShapeTexture } from '@/components/shape-texture';
 import { Text } from '@/components/ui/text';
 import { toViewPoints } from '@/lib/face-landmarks';
 import { canonicalVertexCount } from '@/lib/face-mesh';
@@ -217,21 +218,14 @@ export function FaceMakeupCamera({
       />
       {meshReady ? (
         <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
-          {layers.map(({ part, color }) => {
-            const texture = textures[part];
-            if (!texture) {
-              return null;
-            }
-            return (
-              <FaceTexture
-                key={part}
-                points={points}
-                texture={texture}
-                color={color}
-                opacity={opacity[part]}
-              />
-            );
-          })}
+          {layers.map((layer) => (
+            <LayerTexture
+              key={layer.part}
+              layer={layer}
+              points={points}
+              standard={textures[layer.part]}
+            />
+          ))}
         </Canvas>
       ) : null}
       {tracking && annotation && pin ? (
@@ -260,6 +254,30 @@ export function FaceMakeupCamera({
         </View>
       ) : null}
     </View>
+  );
+}
+
+// One layer on the face: its step's shape when it has one, otherwise the part's standard texture.
+function LayerTexture({
+  layer,
+  points,
+  standard,
+}: {
+  layer: MakeupLayer;
+  points: Point[];
+  standard: SkImage | null;
+}) {
+  const texture = useShapeTexture(layer.shape) ?? standard;
+  if (!texture) {
+    return null;
+  }
+  return (
+    <FaceTexture
+      points={points}
+      texture={texture}
+      color={layer.color}
+      opacity={opacity[layer.part]}
+    />
   );
 }
 
