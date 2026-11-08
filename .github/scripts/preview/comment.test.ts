@@ -3,9 +3,10 @@ import { describe, expect, test } from 'bun:test';
 import {
   assertPreviewTarget,
   parsePreviewRequest,
+  previewSetupPendingMarker,
   previewSha,
   renderPreviewComment,
-} from './preview-comment';
+} from './comment';
 
 const sha = 'a'.repeat(40);
 const before = renderPreviewComment({ sha });
@@ -16,7 +17,6 @@ const target = {
   repository: 'owner/repo',
   headRepository: 'owner/repo',
   state: 'open',
-  base: 'main',
   sha,
   requestedSha: sha,
 };
@@ -24,6 +24,10 @@ const target = {
 describe('preview request', () => {
   test('accepts the bot checkbox transition and returns its exact commit', () => {
     expect(parsePreviewRequest({ author: 'github-actions[bot]', body, before })).toBe(sha);
+  });
+
+  test('recognizes the SHA on an existing preview comment', () => {
+    expect(previewSha(`${before.split('\n')[0]}\n対象SHA: ${sha}`)).toBe(sha);
   });
 
   test('ignores forged comments, checked comments and bot status edits', () => {
@@ -52,13 +56,41 @@ describe('preview request', () => {
     }).not.toThrow();
   });
 
+  test('shows full URLs, a QR in the Expo Go cell and the JST deployment time', () => {
+    const origin = 'https://pr-130---nuri-preview-example-an.a.run.app';
+    const comment = renderPreviewComment({
+      sha,
+      status: '✅ 完了',
+      deployment: { origin, createdAt: '2026-11-08T21:10:00Z' },
+    });
+    const api = `${origin}/api/recipes?offset=0`;
+    expect(comment).toContain(`[${origin}/](${origin}/)`);
+    expect(comment).toContain(`[${api}](${api})`);
+    expect(comment).toContain(
+      `| 📱 **Expo Go**<br>\`exps://${new URL(origin).host}\`<br><img src="${origin}/expo-go/qr.svg?sha=${sha}" alt="Expo Goで開くQR" width="128"> | ✅ 完了 | 2026-11-09 06:10 |`,
+    );
+    expect(before).toContain('| 📱 **Expo Go**<br>— | ⚪ 未配信 | — |');
+  });
+
+  test('shows setup status without an active request when publishing is unavailable', () => {
+    const pending = renderPreviewComment({ sha, canRequest: false });
+    expect(pending).toContain(previewSetupPendingMarker);
+    expect(pending).toContain('| 🌐 **Expo Web**<br>— | 🔧 設定待ち | — |');
+    expect(pending).toContain('| ⚡ **Hono API**<br>— | 🔧 設定待ち | — |');
+    expect(pending).toContain('| 📱 **Expo Go**<br>— | 🔧 設定待ち | — |');
+    expect(pending).toContain('- **GCP合計**');
+    expect(pending).toContain('- **マージ・クローズ後**');
+    expect(pending).not.toContain('<details>');
+    expect(pending).not.toContain('- [ ]');
+    expect(previewSha(pending)).toBe(sha);
+  });
+
   test.each([
     { actorType: 'Bot' },
     { permission: 'read' },
     { headRepository: 'outsider/fork' },
     { headRepository: undefined },
     { state: 'closed' },
-    { base: 'release' },
     { sha: 'b'.repeat(40) },
     { sha: 'main' },
   ])('rejects unauthorized or stale targets: %j', (patch) => {

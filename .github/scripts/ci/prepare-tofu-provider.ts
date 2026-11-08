@@ -8,7 +8,7 @@ if (!runnerTemp || !githubEnv) {
   throw new Error('RUNNER_TEMP and GITHUB_ENV are required');
 }
 
-const lock = await Bun.file('infra/.terraform.lock.hcl').text();
+const lock = await Bun.file(Bun.argv[2] ?? 'infra/.terraform.lock.hcl').text();
 const provider = /provider "registry\.opentofu\.org\/hashicorp\/google" \{([^}]*)\}/.exec(
   lock,
 )?.[1];

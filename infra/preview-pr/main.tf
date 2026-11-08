@@ -1,0 +1,82 @@
+terraform {
+  required_version = "~> 1.13.0"
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 8.10"
+    }
+  }
+  backend "gcs" {}
+}
+
+variable "pr_number" {
+  description = "The GitHub pull request that owns this preview."
+  type        = string
+  nullable    = false
+  validation {
+    condition     = can(regex("^[1-9][0-9]{0,8}$", var.pr_number))
+    error_message = "The pull request number must contain 1 to 9 digits without a leading zero."
+  }
+}
+
+variable "project_id" {
+  description = "ID of the dedicated preview GCP project."
+  type        = string
+  nullable    = false
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{4,28}[a-z0-9]$", var.project_id)) && var.project_id != "kcvlb4"
+    error_message = "Set a valid preview project ID distinct from the kcvlb4 staging project."
+  }
+}
+
+locals {
+  project = var.project_id
+  region  = "asia-northeast1"
+  name    = "nuri-preview-pr-${var.pr_number}"
+}
+
+provider "google" {
+  project = local.project
+  region  = local.region
+}
+
+resource "google_cloud_run_v2_service" "preview" {
+  name                 = local.name
+  location             = local.region
+  ingress              = "INGRESS_TRAFFIC_ALL"
+  deletion_protection  = false
+  default_uri_disabled = false
+  invoker_iam_disabled = true
+  scaling {
+    min_instance_count = 0
+    max_instance_count = 1
+  }
+  template {
+    service_account = "nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
+    timeout         = "180s"
+    scaling {
+      min_instance_count = 0
+      max_instance_count = 1
+    }
+    containers {
+      image = "us-docker.pkg.dev/cloudrun/container/hello"
+      ports { container_port = 8080 }
+      resources {
+        limits   = { cpu = "1", memory = "2Gi" }
+        cpu_idle = true
+      }
+    }
+  }
+
+  # CI が検証済みのイメージ、リビジョンとトラフィックを管理する。
+  lifecycle {
+    ignore_changes = [
+      template[0].revision,
+      template[0].containers[0].image,
+      template[0].containers[0].env,
+      traffic,
+      client,
+      client_version,
+    ]
+  }
+}
