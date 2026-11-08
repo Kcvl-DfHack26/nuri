@@ -94,7 +94,7 @@ export function MakeCompare({ id }: { id: string }) {
         </Slice>
         <View
           pointerEvents="none"
-          className="absolute inset-y-0 w-[3px] bg-white"
+          className="absolute inset-y-0 w-0.75 bg-white"
           style={{ left: x - 1.5, boxShadow: '0px 0px 6px rgba(0, 0, 0, 0.18)' }}
         />
         <View
@@ -107,6 +107,7 @@ export function MakeCompare({ id }: { id: string }) {
             const delta = event.nativeEvent.actionName === 'increment' ? STEP : -STEP;
             setPosition(clamp(shown + delta));
           }}
+          // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- The compare handle aligns with the eyes in the Plan A crop.
           className="absolute top-[39.1%] size-12 items-center justify-center rounded-full bg-white"
           style={{ left: x - HANDLE_SIZE / 2, boxShadow: '0px 4px 7px rgba(196, 61, 112, 0.2)' }}
         >
@@ -115,7 +116,7 @@ export function MakeCompare({ id }: { id: string }) {
       </View>
       <View
         pointerEvents="none"
-        className="absolute inset-x-0 top-0 h-[170px]"
+        className="absolute inset-x-0 top-0 h-42.5"
         style={{
           backgroundImage:
             'linear-gradient(to bottom, rgba(255,255,255,0.75), rgba(255,255,255,0))',
@@ -133,7 +134,7 @@ export function MakeCompare({ id }: { id: string }) {
           }}
         />
         {/* Shrinks so large text wraps the title instead of pushing the share button away. */}
-        <View className="min-h-9 shrink flex-row items-center rounded-[18px] border border-white bg-white/70 px-4">
+        <View className="min-h-9 shrink flex-row items-center rounded-card border border-white bg-white/70 px-4">
           <Text
             accessibilityRole="header"
             className="shrink text-center font-maru-bold text-label text-ink-primary"
@@ -155,7 +156,7 @@ export function MakeCompare({ id }: { id: string }) {
         <Tag label="After" className="mr-4 self-end bg-accent-rose" textClassName="text-white" />
       </Slice>
       <View
-        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-[28px] bg-white/86 px-4 pt-[18px]"
+        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-sheet bg-white/86 px-4 pt-4.5"
         style={{
           paddingBottom: insets.bottom + 12,
           boxShadow: '0px -6px 12px rgba(196, 61, 112, 0.12)',
@@ -258,7 +259,7 @@ function Tag({
 }) {
   return (
     <View
-      className={cn('rounded-[15px] border border-white px-3 py-[5px]', className)}
+      className={cn('rounded-overlay-label border border-white px-3 py-1.25', className)}
       style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
     >
       <Text className={cn('font-maru-bold text-label', textClassName)}>{label}</Text>
@@ -277,7 +278,7 @@ function LayerChip({ part, label, visible }: { part: PartId; label: string; visi
       accessibilityLabel={`${label}（準備中）`}
       accessibilityState={{ checked: visible, disabled: true }}
       className={cn(
-        'min-h-9 flex-row items-center gap-1 rounded-[18px] border-[1.5px] px-3',
+        'min-h-9 flex-row items-center gap-1 rounded-card border-fine px-3',
         visible ? 'border-accent-rose bg-pastel-pink' : 'border-line-soft bg-white',
       )}
     >
@@ -312,7 +313,7 @@ function Controls() {
         accessibilityRole="button"
         accessibilityLabel="写真を保存（準備中）"
         accessibilityState={{ disabled: true }}
-        className="size-[52px] items-center justify-center rounded-full bg-neutral-soft"
+        className="size-13 items-center justify-center rounded-full bg-neutral-soft"
       >
         <SocialIcon name={DOWNLOAD} size={22} color={ink} />
       </View>
@@ -321,7 +322,7 @@ function Controls() {
         accessibilityRole="button"
         accessibilityLabel="レシピを投稿する（準備中）"
         accessibilityState={{ disabled: true }}
-        className="min-h-[52px] flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px]"
+        className="min-h-13 flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5"
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
       >
         <SocialIcon name={PLUS} size={20} color="white" />

@@ -37,6 +37,23 @@
   --color-neutral-soft: #e8e8ec;
   /* TabBar/Glass fill. */
   --color-tab-glass: rgb(242 242 242 / 0.85);
+  --color-post-panel: rgb(241 241 241 / 0.85);
+  --color-home-switch-track: rgb(216 216 216 / 0.6);
+  --color-link-placeholder: #9f9f9f;
+  --color-part-brow: #ffd5ad;
+  --color-part-lip: #ffa7c2;
+
+  /* Plan A surfaces and controls use these radii across screens. */
+  --radius-compact: 5px;
+  --radius-chip: 13px;
+  --radius-thumbnail: 14px;
+  --radius-overlay-label: 15px;
+  --radius-card: 18px;
+  --radius-panel: 20px;
+  --radius-control-compact: 22px;
+  --radius-control: 26px;
+  --radius-sheet: 28px;
+  --radius-camera-preview: 36px;
 
   /* Zen Maru Gothic ships one family per weight on native platforms. */
   --font-maru: ZenMaruGothic_500Medium;
@@ -60,6 +77,20 @@
   --text-headline--line-height: 30px;
   --text-display: 28px;
   --text-display--line-height: 36px;
+  --text-login-wordmark: 52px;
+  --text-login-wordmark--line-height: 72px;
+  --text-match-score: 60px;
+  --text-match-score--line-height: 76px;
+}
+
+@utility border-fine {
+  @apply border;
+  border-width: 1.5px;
+}
+
+@utility border-selected {
+  @apply border;
+  border-width: 2.5px;
 }
 
 @layer theme {

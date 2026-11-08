@@ -135,7 +135,7 @@ export function PostCamera() {
   return (
     <View className="flex-1 bg-white">
       {focused ? <StatusBar style="dark" /> : null}
-      <View className="flex-1 overflow-hidden rounded-b-[36px] bg-bg-surface">
+      <View className="flex-1 overflow-hidden rounded-b-camera-preview bg-bg-surface">
         {focused && access.granted && !opening ? (
           <CameraView facing="front" mode="video" style={StyleSheet.absoluteFill} />
         ) : null}
@@ -182,7 +182,7 @@ export function PostCamera() {
         ) : null}
       </View>
       <View
-        className="-mt-6 flex-row items-end justify-center gap-[11px] px-4"
+        className="-mt-6 flex-row items-end justify-center gap-2.75 px-4"
         style={{ paddingBottom: bottom }}
       >
         <CameraAction
@@ -191,7 +191,7 @@ export function PostCamera() {
             void pickVideo();
           })}
         >
-          <View className="size-[52px] items-center justify-center rounded-full border border-ink-primary bg-bg-surface">
+          <View className="size-13 items-center justify-center rounded-full border border-ink-primary bg-bg-surface">
             <SocialIcon name={IMAGE} size={24} color={ink} />
           </View>
         </CameraAction>
@@ -206,10 +206,10 @@ export function PostCamera() {
           })}
         >
           <View
-            className="size-[84px] items-center justify-center rounded-full bg-bg-surface"
+            className="size-21 items-center justify-center rounded-full bg-bg-surface"
             style={{ boxShadow: '0px 8px 24px rgba(196, 61, 112, 0.14)' }}
           >
-            <View className="size-[68px] rounded-full bg-accent-rose" />
+            <View className="size-17 rounded-full bg-accent-rose" />
           </View>
         </CameraAction>
         <CameraAction label="下書き">
@@ -376,7 +376,7 @@ export function PostRecording() {
         className="absolute inset-x-20 items-center gap-2"
         style={{ top: insets.top + 12 }}
       >
-        <View className="flex-row items-center gap-2 rounded-[20px] bg-bg-surface py-2 pl-3 pr-3.5">
+        <View className="flex-row items-center gap-2 rounded-panel bg-bg-surface py-2 pl-3 pr-3.5">
           <View className="size-2.5 rounded-full bg-accent-rose" />
           <Text
             accessibilityLabel={`録画時間 ${spokenElapsed(elapsed)}`}
@@ -390,10 +390,10 @@ export function PostRecording() {
         </View>
       </View>
       <View
-        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-[28px] bg-[rgba(241,241,241,0.85)] px-5 pt-4"
+        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-sheet bg-post-panel px-5 pt-4"
         style={{ paddingBottom: Math.max(insets.bottom, 12) }}
       >
-        <View className="h-2 flex-row gap-[3px]" accessible={false}>
+        <View className="h-2 flex-row gap-0.75" accessible={false}>
           {steps.map((length, index) => (
             <View
               key={index}
@@ -406,9 +406,9 @@ export function PostRecording() {
         </View>
         <View className="flex-row items-center justify-between">
           <CameraAction label="一時停止">
-            <View className="size-[52px] flex-row items-center justify-center gap-[5px] rounded-full border border-ink-primary">
-              <View className="h-[18px] w-[5px] rounded-sm bg-ink-primary" />
-              <View className="h-[18px] w-[5px] rounded-sm bg-ink-primary" />
+            <View className="size-13 flex-row items-center justify-center gap-1.25 rounded-full border border-ink-primary">
+              <View className="h-4.5 w-1.25 rounded-sm bg-ink-primary" />
+              <View className="h-4.5 w-1.25 rounded-sm bg-ink-primary" />
             </View>
           </CameraAction>
           <CameraAction
@@ -422,8 +422,8 @@ export function PostRecording() {
                   }
             }
           >
-            <View className="size-[72px] items-center justify-center rounded-full bg-bg-surface">
-              <View className="size-[26px] rounded-md bg-accent-rose" />
+            <View className="size-18 items-center justify-center rounded-full bg-bg-surface">
+              <View className="size-6.5 rounded-md bg-accent-rose" />
             </View>
           </CameraAction>
           <CameraAction
@@ -437,7 +437,7 @@ export function PostRecording() {
                   }
             }
           >
-            <View className="size-[52px] items-center justify-center rounded-full bg-accent-rose">
+            <View className="size-13 items-center justify-center rounded-full bg-accent-rose">
               <SocialIcon name={ADD} size={26} color="white" />
             </View>
           </CameraAction>

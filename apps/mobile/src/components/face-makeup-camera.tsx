@@ -267,7 +267,7 @@ function Pin({ point, label, view }: { point: Point; label: string; view: Size }
   return (
     <View pointerEvents="none" className="absolute inset-0">
       <View
-        className="absolute size-[22px] items-center justify-center rounded-full bg-white/95"
+        className="absolute size-5.5 items-center justify-center rounded-full bg-white/95"
         style={{
           left: point.x - 11,
           top: point.y - 11,
@@ -277,7 +277,7 @@ function Pin({ point, label, view }: { point: Point; label: string; view: Size }
         <View className="size-2.5 rounded-full bg-accent-rose" />
       </View>
       <View
-        className="absolute rounded-[14px] border border-white bg-white/80 px-2.5 py-[3px]"
+        className="absolute rounded-thumbnail border border-white bg-white/80 px-2.5 py-0.75"
         style={{
           top: point.y - 13,
           ...(onLeft ? { right: view.width - point.x + 16 } : { left: point.x + 16 }),

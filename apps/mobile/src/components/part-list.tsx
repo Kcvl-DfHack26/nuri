@@ -37,7 +37,7 @@ const CHECK = Icon.select({
 });
 
 // Plan A draws these header buttons solid because they sit on white, not on a photo.
-const solidButton = 'border-black/[0.08] bg-white';
+const solidButton = 'border-black/8 bg-white';
 
 type StyleFilter = 'round' | 'beginner' | 'natural';
 
@@ -123,7 +123,7 @@ export function PartList({ part }: { part: string }) {
       <FilterChips value={filter} onChange={setFilter} />
       <ScrollView
         contentInsetAdjustmentBehavior="never"
-        contentContainerClassName="flex-row flex-wrap gap-x-2 gap-y-[21px] px-4"
+        contentContainerClassName="flex-row flex-wrap gap-x-2 gap-y-5.25 px-4"
         contentContainerStyle={{ paddingTop: 42, paddingBottom: insets.bottom + 96 }}
       >
         {status ? <View className="w-full">{status}</View> : null}
@@ -197,7 +197,8 @@ function FilterChips({
           >
             <View
               className={cn(
-                'min-h-[34px] flex-row items-center gap-1 rounded-[17px] px-3.5',
+                // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- Keep the fixed radius of this 34pt filter chip when text wraps.
+                'min-h-8.5 flex-row items-center gap-1 rounded-[17px] px-3.5',
                 selected ? 'bg-accent-rose' : 'bg-neutral-soft',
               )}
             >
@@ -243,8 +244,8 @@ function StyleCard({
     >
       <View
         className={cn(
-          'aspect-[175/118] w-full overflow-hidden rounded-2xl bg-neutral-soft',
-          selected ? 'border-[3px] border-accent-rose' : 'border border-black/[0.06]',
+          'aspect-175/118 w-full overflow-hidden rounded-2xl bg-neutral-soft',
+          selected ? 'border-3 border-accent-rose' : 'border border-black/6',
         )}
       >
         <Image
@@ -254,13 +255,13 @@ function StyleCard({
           style={{ width: '100%', height: '100%' }}
         />
         {recommended ? (
-          <View className="absolute bottom-[11px] left-1.5 flex-row items-center gap-[3px] rounded-xl bg-white/85 py-[3px] pl-1.5 pr-2">
+          <View className="absolute bottom-2.75 left-1.5 flex-row items-center gap-0.75 rounded-xl bg-white/85 py-0.75 pl-1.5 pr-2">
             <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
             <Text className="font-maru-bold text-micro text-accent-rose">丸顔におすすめ</Text>
           </View>
         ) : null}
         {selected ? (
-          <View className="absolute bottom-2 right-2 size-[26px] items-center justify-center rounded-full bg-accent-rose">
+          <View className="absolute bottom-2 right-2 size-6.5 items-center justify-center rounded-full bg-accent-rose">
             <SocialIcon name={CHECK} size={16} color="white" />
           </View>
         ) : null}

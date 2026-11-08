@@ -53,23 +53,23 @@ export function SnsImportSteps() {
         {sampleSteps.map((step, index) => (
           <View
             key={step.part}
-            className="flex-row items-center gap-3 rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface py-2.5 pl-2.5 pr-2"
+            className="flex-row items-center gap-3 rounded-card border-fine border-line-soft bg-bg-surface py-2.5 pl-2.5 pr-2"
           >
             <View
               accessible
               accessibilityLabel={`手順${index + 1}、${step.label}、${step.hint}、区間 ${step.segment}`}
               className="flex-1 flex-row items-center gap-3"
             >
-              <View className="h-[84px] w-[68px] overflow-hidden rounded-[14px]">
+              <View className="h-21 w-17 overflow-hidden rounded-thumbnail">
                 <CroppedPhoto source={samplePost.photo} crop={step.crop} />
-                <View className="absolute left-[5px] top-[5px] size-[22px] items-center justify-center rounded-full bg-accent-rose">
+                <View className="absolute left-1.25 top-1.25 size-5.5 items-center justify-center rounded-full bg-accent-rose">
                   <Text className="font-maru-bold text-micro text-bg-surface">{index + 1}</Text>
                 </View>
-                <View className="absolute bottom-[5px] right-[5px] size-6 items-center justify-center rounded-full bg-bg-surface">
+                <View className="absolute bottom-1.25 right-1.25 size-6 items-center justify-center rounded-full bg-bg-surface">
                   <SocialIcon name={PLAY} size={14} color={ink} />
                 </View>
               </View>
-              <View className="flex-1 gap-[3px]">
+              <View className="flex-1 gap-0.75">
                 <Text className="font-maru-bold text-action text-ink-primary">{step.label}</Text>
                 <Text className="font-maru text-meta text-ink-secondary">{step.hint}</Text>
                 <Text className="font-maru text-meta text-accent-rose">区間 {step.segment}</Text>
@@ -123,7 +123,7 @@ export function SnsImportSteps() {
         </View>
       </View>
       <View
-        className="absolute inset-x-0 bottom-0 rounded-t-[28px] bg-[rgba(241,241,241,0.85)] px-4 pt-3"
+        className="absolute inset-x-0 bottom-0 rounded-t-sheet bg-post-panel px-4 pt-3"
         style={{ paddingBottom: Math.max(insets.bottom, 12) }}
         onLayout={(event) => {
           setFooterHeight(event.nativeEvent.layout.height);
@@ -135,7 +135,7 @@ export function SnsImportSteps() {
             // Nothing is stored yet; the sheet below shows ④-5 for the fixed sample.
             router.dismissTo({ pathname: '/import', params: { saved: '1' } });
           }}
-          className="min-h-[52px] items-center justify-center rounded-[26px] bg-accent-rose px-[18px] active:opacity-80"
+          className="min-h-13 items-center justify-center rounded-control bg-accent-rose px-4.5 active:opacity-80"
           style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
         >
           <Text className="font-maru-bold text-action text-white">レシピとして保存</Text>
@@ -148,7 +148,7 @@ export function SnsImportSteps() {
 function SourceCredit() {
   return (
     <View
-      className="flex-row items-center gap-3 rounded-[20px] p-3.5"
+      className="flex-row items-center gap-3 rounded-panel p-3.5"
       style={{ backgroundImage: 'linear-gradient(to right, #ffd4e0, #ffe0cf)' }}
     >
       <View className="size-10 items-center justify-center rounded-full bg-bg-surface">
@@ -181,7 +181,7 @@ function StepMenu({ label }: { label: string }) {
       accessibilityRole="button"
       accessibilityLabel={`${label}の操作（準備中）`}
       accessibilityState={{ disabled: true }}
-      className="h-12 w-[22px] items-center justify-center"
+      className="h-12 w-5.5 items-center justify-center"
     >
       <SocialIcon name={MORE} size={22} color={secondary} />
     </View>

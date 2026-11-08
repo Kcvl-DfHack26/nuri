@@ -60,6 +60,7 @@ export function MakeFinish({ id }: { id: string }) {
   const fade = (
     <View
       pointerEvents="none"
+      // eslint-disable-next-line better-tailwindcss/no-restricted-classes -- The gradient is sized to the Plan A photo composition.
       className="absolute inset-x-0 bottom-0 h-[45.4%]"
       style={{
         backgroundImage:
@@ -121,7 +122,7 @@ export function MakeFinish({ id }: { id: string }) {
       >
         <Text
           accessibilityRole="header"
-          className="font-maru-black text-[60px] leading-[76px] text-accent-rose"
+          className="font-maru-black text-match-score text-accent-rose"
         >
           Finish!
         </Text>
@@ -133,7 +134,7 @@ export function MakeFinish({ id }: { id: string }) {
           onPress={() => {
             router.dismissTo('/');
           }}
-          className="min-h-[52px] w-full flex-row items-center justify-center gap-1.5 rounded-full border border-line-soft bg-white px-[18px] active:opacity-70"
+          className="min-h-13 w-full flex-row items-center justify-center gap-1.5 rounded-full border border-line-soft bg-white px-4.5 active:opacity-70"
         >
           <Image accessible={false} source={sparkleInk} style={{ width: 20, height: 20 }} />
           <Text className="font-maru-bold text-action text-ink-primary">次のメイクを試す？</Text>

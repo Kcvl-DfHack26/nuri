@@ -12,7 +12,7 @@ export function GoogleButton({ disabled, onPress }: { disabled: boolean; onPress
       variant="outline"
       disabled={disabled}
       onPress={onPress}
-      className="min-h-[52px] w-full flex-row gap-3 rounded-full px-[18px] py-3"
+      className="min-h-13 w-full flex-row gap-3 rounded-full px-4.5 py-3"
       style={{ backgroundColor: '#ffffff', borderColor: '#747775' }}
     >
       <Image

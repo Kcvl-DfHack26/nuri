@@ -69,7 +69,7 @@ export function PrimaryButton({
       disabled={unbuilt || disabled}
       onPress={onPress}
       className={cn(
-        'min-h-[52px] flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px] active:opacity-80',
+        'min-h-13 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5 active:opacity-80',
         disabled && 'opacity-50',
       )}
       style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
@@ -91,7 +91,7 @@ export function BottomCta({
   const insets = useSafeAreaInsets();
   return (
     <View
-      className={cn('bg-[rgba(241,241,241,0.85)] px-4 pt-3', rounded && 'rounded-t-[28px]')}
+      className={cn('bg-post-panel px-4 pt-3', rounded && 'rounded-t-sheet')}
       style={{ paddingBottom: Math.max(insets.bottom, 12) }}
     >
       {children}

@@ -255,7 +255,7 @@ function BrowCard({ current, suited }: { current: BrowShape | null; suited: Brow
   const ink = useTokenColor('--color-ink-primary');
   const summary = browAdvice[suited];
   return (
-    <View className="overflow-hidden rounded-[18px] border-[1.5px] border-line-soft bg-bg-surface">
+    <View className="overflow-hidden rounded-card border-fine border-line-soft bg-bg-surface">
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`眉、${summary}`}
@@ -265,7 +265,7 @@ function BrowCard({ current, suited }: { current: BrowShape | null; suited: Brow
         }}
         className="min-h-12 flex-row items-center gap-3 py-2.5 pl-2.5 pr-3 active:opacity-70"
       >
-        <View className="size-[38px] items-center justify-center rounded-full bg-pastel-peach">
+        <View className="size-9.5 items-center justify-center rounded-full bg-pastel-peach">
           <Image accessible={false} source={parts.brow.icon} style={{ width: 20, height: 20 }} />
         </View>
         <View className="flex-1 gap-px">
@@ -288,7 +288,7 @@ function BrowCard({ current, suited }: { current: BrowShape | null; suited: Brow
               <View
                 key={stat.label}
                 accessible
-                className={cn('flex-1 gap-0.5 rounded-[14px] px-3 py-2.5', stat.background)}
+                className={cn('flex-1 gap-0.5 rounded-thumbnail px-3 py-2.5', stat.background)}
               >
                 <Text className="font-maru text-meta text-ink-secondary">{stat.label}</Text>
                 <Text className="font-maru-bold text-label text-ink-primary">{stat.value}</Text>
@@ -300,7 +300,7 @@ function BrowCard({ current, suited }: { current: BrowShape | null; suited: Brow
             onPress={() => {
               router.push('/parts/brow');
             }}
-            className="min-h-12 flex-row items-center justify-center gap-1 rounded-[24px] border border-black px-4 active:opacity-70"
+            className="min-h-12 flex-row items-center justify-center gap-1 rounded-3xl border border-black px-4 active:opacity-70"
           >
             <Text className="font-maru-bold text-label text-ink-primary">眉のメイクを見る</Text>
             <SocialIcon name={NEXT} size={18} color={ink} />
@@ -325,12 +325,12 @@ function RecommendationCard({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={[recipe.title, recipe.author.name, matched].filter(Boolean).join('、')}
-      className="w-[172px] gap-[5px] active:opacity-80"
+      className="w-43 gap-1.25 active:opacity-80"
       onPress={() => {
         router.push(`/recipes/${recipe.id}`);
       }}
     >
-      <View className="h-[180px] w-full overflow-hidden rounded-[18px] bg-neutral-soft">
+      <View className="h-45 w-full overflow-hidden rounded-card bg-neutral-soft">
         <Image
           accessible={false}
           source={{ uri: apiAssetUrl(recipe.image) }}
@@ -339,20 +339,20 @@ function RecommendationCard({
         />
         {matched ? (
           <View
-            className="absolute left-2 top-2 flex-row items-center gap-[5px] rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
+            className="absolute left-2 top-2 flex-row items-center gap-1.25 rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
             style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
           >
             <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
             <Text className="font-maru-bold text-micro text-accent-rose">{matched}</Text>
           </View>
         ) : null}
-        <View className="absolute bottom-2 right-2 size-[30px] items-center justify-center rounded-full bg-white/85">
+        <View className="absolute bottom-2 right-2 size-7.5 items-center justify-center rounded-full bg-white/85">
           <SocialIcon name={HEART} size={16} color={ink} />
         </View>
       </View>
       <View className="w-full gap-px px-1 pt-0.5">
         <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-        <View className="flex-row items-center gap-[3px]">
+        <View className="flex-row items-center gap-0.75">
           <Text className="flex-1 font-maru text-meta text-ink-secondary">
             {recipe.author.name}
           </Text>

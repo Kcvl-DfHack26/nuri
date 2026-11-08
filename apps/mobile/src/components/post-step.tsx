@@ -110,7 +110,7 @@ export function PostStepEdit({ index }: { index: string }) {
         automaticallyAdjustKeyboardInsets
         contentContainerClassName="gap-4 px-4 pb-6 pt-2"
       >
-        <View className="aspect-[358/190] w-full items-center justify-center overflow-hidden rounded-[20px]">
+        <View className="aspect-358/190 w-full items-center justify-center overflow-hidden rounded-panel">
           <View className="absolute inset-0">
             <StepFrame step={step} />
           </View>
@@ -119,7 +119,7 @@ export function PostStepEdit({ index }: { index: string }) {
             accessibilityRole="button"
             accessibilityLabel="区間を再生（準備中）"
             accessibilityState={{ disabled: true }}
-            className="size-[52px] items-center justify-center rounded-full bg-bg-surface"
+            className="size-13 items-center justify-center rounded-full bg-bg-surface"
           >
             <SocialIcon name={PLAY} size={28} color={ink} />
           </View>
@@ -152,7 +152,7 @@ export function PostStepEdit({ index }: { index: string }) {
             onChangeText={(title) => {
               updateStep(position, { title });
             }}
-            className="rounded-2xl border border-ink-primary bg-bg-surface px-3.5 py-[13px] font-maru text-ui text-ink-primary"
+            className="rounded-2xl border border-ink-primary bg-bg-surface px-3.5 py-3.25 font-maru text-ui text-ink-primary"
           />
         </Field>
         <Field label="説明">
@@ -164,7 +164,7 @@ export function PostStepEdit({ index }: { index: string }) {
             onChangeText={(description) => {
               updateStep(position, { description });
             }}
-            className="rounded-2xl border border-ink-primary bg-bg-surface px-3.5 py-[13px] font-maru text-ui text-ink-primary"
+            className="rounded-2xl border border-ink-primary bg-bg-surface px-3.5 py-3.25 font-maru text-ui text-ink-primary"
           />
         </Field>
         <AreaPreview step={step} />
@@ -273,7 +273,7 @@ function AreaPreview({ step }: { step: PostStep }) {
       <View
         accessible
         accessibilityLabel={zone ? '両眉の塗る範囲' : '塗る範囲はまだありません'}
-        className="aspect-[358/200] w-full overflow-hidden rounded-[20px]"
+        className="aspect-358/200 w-full overflow-hidden rounded-panel"
       >
         <CroppedPhoto source={arPhotos.camera} crop={faceCrop} />
         {zone ? (
@@ -328,7 +328,7 @@ function CosmeticRow({
   return (
     <View
       className={cn(
-        'min-h-12 flex-row items-center gap-3 rounded-[18px] border-[1.5px] px-3 py-2.5',
+        'min-h-12 flex-row items-center gap-3 rounded-card border-fine px-3 py-2.5',
         selected ? 'border-accent-rose bg-bg-base' : 'border-line-soft bg-bg-surface',
       )}
     >
@@ -405,7 +405,7 @@ export function PostCosmeticPicker({ index }: { index: string }) {
           accessibilityRole="button"
           accessibilityLabel="すべて（準備中）"
           accessibilityState={{ disabled: true }}
-          className="min-h-8 justify-center rounded-2xl border-[1.5px] border-line-soft px-3.5"
+          className="min-h-8 justify-center rounded-2xl border-fine border-line-soft px-3.5"
         >
           <Text className="font-maru-bold text-label text-ink-primary">すべて</Text>
         </View>

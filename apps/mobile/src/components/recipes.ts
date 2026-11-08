@@ -41,7 +41,7 @@ export const parts: Record<PartId, { label: string; icon: number; iconBackground
   brow: {
     label: '眉',
     icon: iconsBrow,
-    iconBackground: 'bg-[#ffd5ad]',
+    iconBackground: 'bg-part-brow',
   },
   eye: {
     label: 'アイメイク',
@@ -71,7 +71,7 @@ export const parts: Record<PartId, { label: string; icon: number; iconBackground
   lip: {
     label: 'リップ',
     icon: iconsLip,
-    iconBackground: 'bg-[#ffa7c2]',
+    iconBackground: 'bg-part-lip',
   },
 };
 

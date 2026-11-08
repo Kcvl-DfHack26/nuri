@@ -23,12 +23,12 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
       accessibilityRole="button"
       accessibilityLabel={`${recipe.title}、${recipe.author.name}、いいね${likes}`}
       // Half of the row, so a lone last card keeps the grid's width.
-      className="max-w-[50%] flex-1 gap-[5px] active:opacity-80"
+      className="max-w-1/2 flex-1 gap-1.25 active:opacity-80"
       onPress={() => {
         router.push(`/recipes/${recipe.id}`);
       }}
     >
-      <View className="aspect-[192/233] w-full overflow-hidden rounded-[5px] bg-neutral-soft">
+      <View className="aspect-192/233 w-full overflow-hidden rounded-compact bg-neutral-soft">
         <Image
           accessible={false}
           source={{ uri: apiAssetUrl(recipe.image) }}
@@ -39,7 +39,7 @@ export function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
           <SocialIcon name={HEART} size={18} color={ink} />
         </View>
       </View>
-      <View className="w-full gap-[5px] px-2">
+      <View className="w-full gap-1.25 px-2">
         <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
         <View className="flex-row items-center gap-1">
           <Text className="flex-1 font-maru text-meta text-ink-secondary">

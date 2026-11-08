@@ -139,7 +139,7 @@ function StepsContent({
       )}
       <View
         pointerEvents="none"
-        className="absolute inset-x-0 top-0 h-[200px]"
+        className="absolute inset-x-0 top-0 h-50"
         style={{
           backgroundImage: 'linear-gradient(to bottom, rgba(255,255,255,0.7), rgba(255,255,255,0))',
         }}
@@ -153,7 +153,7 @@ function StepsContent({
               backOrHome();
             }}
           />
-          <View className="min-h-9 flex-row items-center gap-1.5 rounded-[18px] border border-white bg-white/70 px-3.5">
+          <View className="min-h-9 flex-row items-center gap-1.5 rounded-card border border-white bg-white/70 px-3.5">
             <Text className="font-maru-bold text-label text-ink-primary">{title}</Text>
             <Text className="font-maru text-meta text-ink-secondary">
               {current + 1}/{steps.length}
@@ -182,7 +182,7 @@ function StepsContent({
         <Instruction step={step} number={current + 1} />
       </View>
       <View
-        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-[28px] bg-white/80 px-4 pt-4"
+        className="absolute inset-x-0 bottom-0 gap-3.5 rounded-t-sheet bg-white/80 px-4 pt-4"
         style={{
           paddingBottom: insets.bottom + 12,
           boxShadow: '0px -6px 12px rgba(196, 61, 112, 0.12)',
@@ -206,7 +206,7 @@ function Instruction({ step, number }: { step: RecipeStep; number: number }) {
   const ink = useTokenColor('--color-ink-primary');
   return (
     <View
-      className="flex-row items-center gap-3 rounded-[20px] border border-white bg-white/80 py-3 pl-3 pr-3.5"
+      className="flex-row items-center gap-3 rounded-panel border border-white bg-white/80 py-3 pl-3 pr-3.5"
       style={{ boxShadow: '0px 6px 10px rgba(196, 61, 112, 0.12)' }}
     >
       <View className="size-8 items-center justify-center rounded-full bg-accent-rose">
@@ -219,7 +219,7 @@ function Instruction({ step, number }: { step: RecipeStep; number: number }) {
         <Text className="font-maru text-meta text-ink-secondary">{step.hint}</Text>
       </View>
       {/* Voice guidance is not built yet; this mirrors Plan A's status chip only. */}
-      <View className="min-h-[26px] flex-row items-center gap-[3px] rounded-[13px] bg-pastel-mint pl-1.5 pr-2">
+      <View className="min-h-6.5 flex-row items-center gap-0.75 rounded-chip bg-pastel-mint pl-1.5 pr-2">
         <SocialIcon name={MIC} size={14} color={ink} />
         <Text className="font-maru-bold text-micro text-ink-primary">音声ON</Text>
       </View>
@@ -283,12 +283,12 @@ function StepList({
             onPress={() => {
               onSelect(position);
             }}
-            className="min-w-12 items-center gap-[3px] active:opacity-70"
+            className="min-w-12 items-center gap-0.75 active:opacity-70"
           >
             <View
               className={cn(
-                'size-[38px] items-center justify-center rounded-full',
-                active ? 'border-[2.5px] border-accent-rose bg-white' : 'bg-neutral-soft',
+                'size-9.5 items-center justify-center rounded-full',
+                active ? 'border-selected border-accent-rose bg-white' : 'bg-neutral-soft',
               )}
             >
               <Image
@@ -331,7 +331,7 @@ function Controls({
         disabled={isFirst}
         onPress={onPrevious}
         className={cn(
-          'size-[52px] items-center justify-center rounded-full bg-neutral-soft active:opacity-70',
+          'size-13 items-center justify-center rounded-full bg-neutral-soft active:opacity-70',
           isFirst && 'opacity-50',
         )}
       >
@@ -340,7 +340,7 @@ function Controls({
       <Pressable
         accessibilityRole="button"
         onPress={onNext}
-        className="min-h-[52px] flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-[18px] active:opacity-80"
+        className="min-h-13 flex-1 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5 active:opacity-80"
         style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
       >
         <SocialIcon name={NEXT} size={20} color="white" />
@@ -351,7 +351,7 @@ function Controls({
         accessibilityRole="button"
         accessibilityLabel="音声で操作（準備中）"
         accessibilityState={{ disabled: true }}
-        className="size-[52px] items-center justify-center rounded-full bg-pastel-mint"
+        className="size-13 items-center justify-center rounded-full bg-pastel-mint"
       >
         <SocialIcon name={MIC} size={22} color={ink} />
       </View>

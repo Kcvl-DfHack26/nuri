@@ -115,7 +115,7 @@ export function PostCreating() {
         />
       </View>
       <View
-        className="absolute inset-x-0 bottom-0 gap-4 rounded-t-[28px] bg-[rgba(241,241,241,0.85)] px-5 pt-[22px]"
+        className="absolute inset-x-0 bottom-0 gap-4 rounded-t-sheet bg-post-panel px-5 pt-5.5"
         style={{ paddingBottom: Math.max(insets.bottom, 12) + 6 }}
       >
         <View className="flex-row items-center gap-2">
@@ -132,9 +132,12 @@ export function PostCreating() {
           accessibilityRole="progressbar"
           accessibilityLabel="手順書の作成"
           accessibilityValue={{ min: 0, max: 100, now: progress }}
-          className="h-2.5 overflow-hidden rounded-[5px] bg-ink-primary/15"
+          className="h-2.5 overflow-hidden rounded-compact bg-ink-primary/15"
         >
-          <View className="h-full rounded-[5px] bg-accent-rose" style={{ width: `${progress}%` }} />
+          <View
+            className="h-full rounded-compact bg-accent-rose"
+            style={{ width: `${progress}%` }}
+          />
         </View>
         <View className="gap-2.5">
           {stages.map((stage, index) => (
@@ -166,13 +169,13 @@ function Stage({ label, state }: { label: string; state: StageState }) {
       className="flex-row items-center gap-2.5"
     >
       {state === 'done' ? (
-        <View className="size-[22px] items-center justify-center rounded-full bg-accent-rose">
+        <View className="size-5.5 items-center justify-center rounded-full bg-accent-rose">
           <SocialIcon name={CHECK} size={14} color="white" />
         </View>
       ) : (
         <View
           className={cn(
-            'size-[22px] rounded-full border-2',
+            'size-5.5 rounded-full border-2',
             state === 'current' ? 'border-accent-rose' : 'border-ink-primary/30',
           )}
         />
