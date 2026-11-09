@@ -17,6 +17,20 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
       'react-native-nitro-google-signin',
       { iosUrlScheme: googleIosClientId.split('.').reverse().join('.') },
     ]);
+  } else {
+    // Autolinking installs Google Sign-In even when OAuth is unconfigured.
+    plugins.push([
+      'expo-build-properties',
+      {
+        ios: {
+          extraPods: [
+            { name: 'AppCheckCore', modular_headers: true },
+            { name: 'GoogleUtilities', modular_headers: true },
+            { name: 'RecaptchaInterop', modular_headers: true },
+          ],
+        },
+      },
+    ]);
   }
   return withLocalhostCA({
     ...config,
