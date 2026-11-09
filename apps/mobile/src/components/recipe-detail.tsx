@@ -358,6 +358,8 @@ function Hero({ recipe }: { recipe: RecipeData }) {
 function ProductRow({ product }: { product: RecipeData['products'][number] }) {
   const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
+  // Only products with Plan A detail data open ⑥ until product details come from the API.
+  const hasDetails = findProduct(product.id) !== undefined;
   // Only an https shop opens, whatever the API returns.
   const purchaseUrl = purchaseUrlSchema.safeParse(product.purchaseUrl).data;
   // The shop opens in the in-app browser (Safari View Controller or Custom Tabs).
@@ -396,7 +398,8 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
           <Text className="font-maru-bold text-micro text-ink-primary">買う</Text>
         </Pressable>
       ) : null}
-      <SocialIcon name={NEXT} webGlyph="›" size={18} color={secondary} />
+      {/* Only rows that open ⑥ show the chevron. */}
+      {hasDetails ? <SocialIcon name={NEXT} webGlyph="›" size={18} color={secondary} /> : null}
     </>
   );
   const className =
@@ -412,8 +415,7 @@ function ProductRow({ product }: { product: RecipeData['products'][number] }) {
         },
       }
     : {};
-  // Only products with Plan A detail data open ⑥ until product details come from the API.
-  if (!findProduct(product.id)) {
+  if (!hasDetails) {
     // The row itself does nothing yet; with a shop, 買う stays its own button for screen readers.
     if (openShop) {
       return <View className={className}>{content}</View>;

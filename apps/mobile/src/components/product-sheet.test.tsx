@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 
 import { ProductSheet } from './product-sheet';
 
@@ -22,7 +23,7 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
-test('switches the color and keeps unbuilt actions disabled', async () => {
+test('switches the color', async () => {
   await render(<ProductSheet id="celane-brow-pencil" />);
   expect(screen.getByRole('header', { name: '極細アイブロウペンシル' })).toBeOnTheScreen();
   expect(screen.getByRole('radio', { name: '03 モカブラウン' })).toBeChecked();
@@ -31,10 +32,21 @@ test('switches the color and keeps unbuilt actions disabled', async () => {
   expect(screen.getByRole('radio', { name: '05 ブラウンブラック' })).toBeChecked();
   expect(screen.getByRole('radio', { name: '03 モカブラウン' })).not.toBeChecked();
   expect(screen.getByText('05 ブラウンブラック')).toBeOnTheScreen();
+});
 
-  expect(screen.getByRole('button', { name: '購入先を見る（準備中）' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: '自分の顔で色味を見る（準備中）' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: '全18成分を見る（準備中）' })).toBeDisabled();
+test('says the color check and the shop are coming', async () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  await render(<ProductSheet id="celane-brow-pencil" />);
+
+  await fireEvent.press(screen.getByRole('button', { name: '自分の顔で色味を見る（準備中）' }));
+  expect(alert).toHaveBeenLastCalledWith(
+    '準備中',
+    '自分の顔で色味を確かめる機能は、いま準備しています。',
+  );
+  await fireEvent.press(screen.getByRole('button', { name: '購入先を見る（準備中）' }));
+  expect(alert).toHaveBeenLastCalledWith('準備中', '購入先の案内は、いま準備しています。');
+  // Listing every ingredient is not planned, so the sheet no longer offers it.
+  expect(screen.queryByText(/成分を見る/)).toBeNull();
 });
 
 test('closes the sheet', async () => {
