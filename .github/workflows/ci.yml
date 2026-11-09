@@ -96,10 +96,10 @@ jobs:
       - *checkout
       - *setup-bun
       - *install
-      - name: Migrate Test Database
-        run: bun run --cwd apps/api src/db/migrate.ts
-      - name: Initialize Test Storage
-        run: bun run --cwd apps/api storage:init
+      - name: Prepare Integration Services
+        run: |
+          bun run --cwd apps/api src/db/migrate.ts
+          bun run --cwd apps/api storage:init
       - name: Run API Integration Tests
         run: bun run --cwd apps/api test:integration
 
