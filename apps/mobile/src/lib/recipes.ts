@@ -5,6 +5,7 @@ import { hashKey, infiniteQueryOptions, queryOptions } from '@tanstack/react-que
 import { Share } from 'react-native';
 
 import { api } from '@/lib/api';
+import { requireSignedInMutationOk } from '@/lib/api-errors';
 
 const allRecipes = ['recipes'] as const;
 export const recipeKeys = {
@@ -80,11 +81,7 @@ export async function changeFavorite(id: string, favorited: boolean) {
   const response = favorited
     ? await endpoint.$delete({ param: { id } })
     : await endpoint.$put({ param: { id } });
-  if (!response.ok) {
-    throw new Error(
-      response.status === 401 ? 'ログインし直してください。' : 'お気に入りを変更できませんでした。',
-    );
-  }
+  requireSignedInMutationOk(response, 'お気に入りを変更できませんでした。');
 }
 
 /** Whether a cached recipe list or ⑤ holds the recipe with this ID. */

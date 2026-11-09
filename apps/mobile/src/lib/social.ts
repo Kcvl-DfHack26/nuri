@@ -4,6 +4,7 @@ import type { InferRequestType, InferResponseType } from 'hono/client';
 import { queryOptions } from '@tanstack/react-query';
 
 import { api } from '@/lib/api';
+import { requireSignedInMutationOk } from '@/lib/api-errors';
 
 export const userKeys = { all: ['user'] as const };
 
@@ -59,11 +60,7 @@ export async function changeFollow(id: string, following: boolean) {
   const response = following
     ? await endpoint.$delete({ param: { id } })
     : await endpoint.$put({ param: { id } });
-  if (!response.ok) {
-    throw new Error(
-      response.status === 401 ? 'ログインし直してください。' : 'フォローを変更できませんでした。',
-    );
-  }
+  requireSignedInMutationOk(response, 'フォローを変更できませんでした。');
 }
 
 /**

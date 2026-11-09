@@ -15,6 +15,7 @@ import { Avatar } from '@/components/avatar';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { PrimaryButton } from '@/components/post-chrome';
+import { RecipeCardMetadata } from '@/components/recipe-card';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
@@ -27,7 +28,6 @@ const SETTINGS = Icon.select({
   ios: 'gearshape.fill',
   android: import('@expo/material-symbols/settings.xml'),
 });
-const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 const PERSON = Icon.select({
   ios: 'person.fill',
   android: import('@expo/material-symbols/person.xml'),
@@ -279,7 +279,6 @@ export function RecipeSection({
 }
 
 function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
-  const secondary = useTokenColor('--color-ink-secondary');
   const likes = formatCount(recipe.likeCount);
   return (
     <Pressable
@@ -298,16 +297,7 @@ function RecipeCard({ recipe }: { recipe: RecipeSummary }) {
           style={{ width: '100%', height: '100%' }}
         />
       </View>
-      <View className="w-full gap-px px-1 pt-0.5">
-        <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-        <View className="flex-row items-center gap-0.75">
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">
-            {recipe.author.name}
-          </Text>
-          <SocialIcon name={HEART} size={13} color={secondary} />
-          <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
-        </View>
-      </View>
+      <RecipeCardMetadata recipe={recipe} likes={likes} />
     </Pressable>
   );
 }

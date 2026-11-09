@@ -31,8 +31,10 @@ jobs:
         run: |
           bun run --bun --cwd apps/mobile styles:generate
           git diff --exit-code -- apps/mobile/uniwind-types.d.ts
-      - name: Check Formatting, Lint, Types, and Dead Code
-        run: bun run --bun --parallel format:check lint typecheck deadcode
+      - name: Check Fallow Dead Code and Duplication
+        run: bun run --bun --parallel deadcode dupes
+      - name: Check Formatting, Lint, and Types
+        run: bun run --bun --parallel format:check lint typecheck
       - name: Check Commit Messages
         if: github.event_name == 'pull_request'
         env:

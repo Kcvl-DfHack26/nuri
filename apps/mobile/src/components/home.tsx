@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -173,7 +173,6 @@ function ScopeSegment({ value, onChange }: { value: Scope; onChange: (value: Sco
 
 function RecipeGrid({ top, bottom }: { top: number; bottom: number }) {
   const list = useInfiniteQuery({ ...recipeListOptions(), enabled: Boolean(apiUrl) });
-  const items = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
   const status = !apiUrl ? (
     <Feedback message="接続先が未設定です。セットアップ後にレシピを表示できます。" />
   ) : list.isPending ? (
@@ -188,23 +187,11 @@ function RecipeGrid({ top, bottom }: { top: number; bottom: number }) {
   ) : null;
   return (
     <RecipeList
-      data={items}
+      query={list}
+      status={status}
+      emptyMessage="レシピはまだありません"
       contentContainerStyle={{ paddingTop: top, paddingBottom: bottom, gap: 14 }}
       contentInsetAdjustmentBehavior="never"
-      // A failed next page keeps the loaded cards and shows the retry above them.
-      ListHeaderComponent={status ? <View className="px-4">{status}</View> : undefined}
-      ListEmptyComponent={
-        status ? undefined : (
-          <View className="px-4">
-            <Feedback message="レシピはまだありません" />
-          </View>
-        )
-      }
-      onEndReached={() => {
-        if (list.hasNextPage && !list.isFetchingNextPage && !list.isError) {
-          void list.fetchNextPage();
-        }
-      }}
     />
   );
 }

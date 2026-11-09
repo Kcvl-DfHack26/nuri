@@ -13,7 +13,7 @@ import type { FaceType } from '@/lib/face-diagnosis';
 import type { MyProfile } from '@/lib/social';
 
 import { Feedback } from '@/components/feedback';
-import { GlassIconButton } from '@/components/glass-icon-button';
+import { FloatingBackHeader } from '@/components/floating-back-header';
 import { ProfilePhoto } from '@/components/my-page';
 import { BottomCta, PrimaryButton } from '@/components/post-chrome';
 import { PushSettings } from '@/components/push-settings';
@@ -27,10 +27,6 @@ import { recipeKeys } from '@/lib/recipes';
 import { changeProfile, myProfileKeys, myProfileOptions, userKeys } from '@/lib/social';
 import { useTokenColor } from '@/theme/tokens';
 
-const BACK = Icon.select({
-  ios: 'chevron.left',
-  android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
-});
 const CAMERA = Icon.select({
   ios: 'camera',
   android: import('@expo/material-symbols/photo_camera.xml'),
@@ -101,39 +97,13 @@ export function ProfileSettings() {
           />
         </ScrollView>
       )}
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 top-0"
-        style={{
-          height: insets.top + headerHeight + 20,
-          backgroundImage:
-            'linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0.97) 82%, rgba(255,255,255,0) 100%)',
-        }}
+      <FloatingBackHeader
+        title="プロフィール設定"
+        insetTop={insets.top}
+        height={headerHeight}
+        topOffset={8}
+        onHeight={setHeaderHeight}
       />
-      <View
-        className="absolute inset-x-4 min-h-11 flex-row items-center gap-2"
-        style={{ top: insets.top + 8 }}
-        onLayout={(event) => {
-          setHeaderHeight(event.nativeEvent.layout.height);
-        }}
-      >
-        <GlassIconButton
-          icon={BACK}
-          label="戻る"
-          className="border-black/8 bg-white"
-          onPress={() => {
-            backOrHome();
-          }}
-        />
-        <Text
-          accessibilityRole="header"
-          className="flex-1 text-center font-maru-bold text-heading text-ink-primary"
-        >
-          プロフィール設定
-        </Text>
-        {/* Balances the back button so the title stays centered. */}
-        <View className="size-10" />
-      </View>
     </View>
   );
 }

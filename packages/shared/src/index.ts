@@ -107,7 +107,7 @@ const jpegBase64Prefix = '/9j/';
 const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
 
 /** One step of a recipe posted from ③ (⑫): the part, its texts, the cosmetics used and a color. */
-export const recipeStepInputSchema = z.object({
+const recipeStepInputSchema = z.object({
   part: z.enum(makeupParts),
   label: z.string().trim().min(1).max(20),
   title: z.string().trim().min(1).max(40),

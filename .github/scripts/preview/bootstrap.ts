@@ -4,23 +4,6 @@ import { join } from 'node:path';
 
 const directory = 'infra/preview';
 
-async function verifyMain() {
-  const { GITHUB_REPOSITORY: repo, GITHUB_SHA: sha } = Bun.env;
-  if (!repo || !sha) {
-    throw new Error('GitHub Actions repository and SHA are required');
-  }
-  const head = await $`gh api repos/${repo}/git/ref/heads/main --jq .object.sha`.text();
-  if (head.trim() !== sha) {
-    throw new Error('The current main SHA has changed');
-  }
-  const runs = `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&status=success`;
-  const passed =
-    await $`gh api ${runs} --jq '[.workflow_runs[] | select(.event == "push")] | length'`.text();
-  if (!/^[1-9]\d*$/.test(passed.trim())) {
-    throw new Error('No successful CI push run for this main SHA');
-  }
-}
-
 async function manage() {
   const {
     OPERATION: operation,
@@ -60,13 +43,4 @@ async function manage() {
   }
 }
 
-switch (Bun.argv[2]) {
-  case 'verify':
-    await verifyMain();
-    break;
-  case 'manage':
-    await manage();
-    break;
-  default:
-    throw new Error('Expected preview bootstrap verify or manage');
-}
+await manage();

@@ -1,5 +1,4 @@
-import { $ } from 'bun';
-
+import { requireMainWithPassingCi } from '../ci/verify-main';
 import { requireEnv } from './context';
 
 const repo = requireEnv('GITHUB_REPOSITORY');
@@ -18,14 +17,4 @@ if (
   throw new Error('Use the dedicated OpenTofu identity');
 }
 
-const head = await $`gh api repos/${repo}/git/ref/heads/main --jq .object.sha`.text();
-if (head.trim() !== sha) {
-  throw new Error('The current main SHA has changed');
-}
-
-const runs = `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${sha}&status=success`;
-const passed =
-  await $`gh api ${runs} --jq '[.workflow_runs[] | select(.event == "push")] | length'`.text();
-if (!/^[1-9]\d*$/.test(passed.trim())) {
-  throw new Error('No successful CI push run for this main SHA');
-}
+await requireMainWithPassingCi(repo, sha);

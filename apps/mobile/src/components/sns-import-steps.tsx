@@ -10,6 +10,7 @@ import { CroppedPhoto } from '@/components/cropped-photo';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { samplePost, sampleSteps } from '@/components/sns-import-sample';
 import { SocialIcon } from '@/components/social-icon';
+import { StepCardContent } from '@/components/step-card-content';
 import { Text } from '@/components/ui/text';
 import { backOrHome } from '@/lib/navigation';
 import { useTokenColor } from '@/theme/tokens';
@@ -19,10 +20,6 @@ import sparkleRose from '../../assets/plan-a/import/sparkle-rose.svg';
 const BACK = Icon.select({
   ios: 'chevron.left',
   android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
-});
-const PLAY = Icon.select({
-  ios: 'play.fill',
-  android: import('@expo/material-symbols/play_arrow.xml'),
 });
 const MORE = Icon.select({
   ios: 'ellipsis',
@@ -60,20 +57,14 @@ export function SnsImportSteps() {
               accessibilityLabel={`手順${index + 1}、${step.label}、${step.hint}、区間 ${step.segment}`}
               className="flex-1 flex-row items-center gap-3"
             >
-              <View className="h-21 w-17 overflow-hidden rounded-thumbnail">
+              <StepCardContent
+                number={index + 1}
+                title={step.label}
+                summary={step.hint}
+                length={step.segment}
+              >
                 <CroppedPhoto source={samplePost.photo} crop={step.crop} />
-                <View className="absolute left-1.25 top-1.25 size-5.5 items-center justify-center rounded-full bg-accent-rose">
-                  <Text className="font-maru-bold text-micro text-bg-surface">{index + 1}</Text>
-                </View>
-                <View className="absolute bottom-1.25 right-1.25 size-6 items-center justify-center rounded-full bg-bg-surface">
-                  <SocialIcon name={PLAY} size={14} color={ink} />
-                </View>
-              </View>
-              <View className="flex-1 gap-0.75">
-                <Text className="font-maru-bold text-action text-ink-primary">{step.label}</Text>
-                <Text className="font-maru text-meta text-ink-secondary">{step.hint}</Text>
-                <Text className="font-maru text-meta text-accent-rose">区間 {step.segment}</Text>
-              </View>
+              </StepCardContent>
             </View>
             <StepMenu label={step.label} />
           </View>

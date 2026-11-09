@@ -16,6 +16,20 @@ import { useTokenColor } from '@/theme/tokens';
 
 const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 
+export function RecipeCardMetadata({ recipe, likes }: { recipe: RecipeSummary; likes: string }) {
+  const secondary = useTokenColor('--color-ink-secondary');
+  return (
+    <View className="w-full gap-px px-1 pt-0.5">
+      <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
+      <View className="flex-row items-center gap-0.75">
+        <Text className="flex-1 font-maru text-meta text-ink-secondary">{recipe.author.name}</Text>
+        <SocialIcon name={HEART} size={13} color={secondary} />
+        <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
+      </View>
+    </View>
+  );
+}
+
 // Plan A ①'s recipe card in a two-column grid; search results reuse it. Opens the recipe's ⑤.
 export function RecipeCard({ recipe, width }: { recipe: RecipeSummary; width: DimensionValue }) {
   const secondary = useTokenColor('--color-ink-secondary');
