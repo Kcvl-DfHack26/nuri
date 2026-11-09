@@ -16,7 +16,8 @@ flowchart LR
   EAS[Expo Build / Update] --> Phone
 ```
 
-- Node.js 24、Bun 1.4.4、Expo 58、React Native 0.88、React 19.3。ネイティブ依存は `expo install` で互換版を選ぶ。
+- Node.js 26 LTS、Bun 1.4.4、Expo 58、React Native 0.88、React 19.3。ネイティブ依存は `expo install` で互換版を選ぶ。
+- 依存導入・ローカルの補助コマンド・Metro・CIの検査はBunで実行する。APIサーバー、PRプレビューの実行環境、PortlessとEASの配布処理ではNode.jsを使う。
 - Bun Workspaces + Turborepo。モバイルのネイティブモジュールを一つに解決するため、Bunの **hoisted linker** を明示する。
 - Expo Routerは画面ルーティング専用。Honoを別サーバーとしてCloud Runで動かす。
 - `@starter/api/contract` は `AppType` のtype-only公開入口。モバイルはHono RPCの型を再利用し、API実装をbundleへ混入させない。

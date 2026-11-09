@@ -92,10 +92,10 @@ mainのCI成功後、Actionsが同じコンテナイメージでDB migrationを�
 
 [Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を土台にしています。初期設定、環境変数、Google Cloud・GitHub・EASの準備は[セットアップ手順](docs/setup.md)を参照してください。
 
-ローカルサーバーはDocker Composeで起動します。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless 0.16.0を用意します。WindowsではWSL2のLinuxファイルシステムで作業し、Docker DesktopのWSL integrationを有効にします。
+ローカルサーバーはDocker Composeで起動します。ホストにGit、Docker Engine + Compose v2、Bun、Node.js 26（固定版は `.node-version`）、Portless 0.16.0を用意します。WindowsではWSL2のLinuxファイルシステムで作業し、Docker DesktopのWSL integrationを有効にします。
 
 ```sh
-npm install --global portless@0.16.0
+bun install --global portless@0.16.0
 sh scripts/worktree-init.sh
 # ホストで一度だけ。既存のHTTPS/443 proxyは再利用する
 portless proxy start --https --port 443

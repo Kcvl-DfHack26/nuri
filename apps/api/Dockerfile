@@ -1,6 +1,6 @@
 FROM oven/bun:1.4.4 AS bun
 
-FROM node:24.19.0-bookworm-slim AS node-base
+FROM node:26.13.0-bookworm-slim AS node-base
 
 FROM node-base AS build
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
@@ -17,7 +17,7 @@ COPY packages/shared packages/shared
 COPY tsconfig.json tsconfig.json
 RUN bun run --cwd apps/api build
 RUN CI=1 EXPO_NO_TELEMETRY=1 EXPO_PUBLIC_API_URL=/ \
-    bun run --cwd apps/mobile expo export --platform web && test -s apps/mobile/dist/index.html
+    bun run --bun --cwd apps/mobile expo export --platform web && test -s apps/mobile/dist/index.html
 
 FROM bun AS dependencies
 WORKDIR /app
@@ -35,7 +35,7 @@ FROM build AS preview-build
 RUN bun build apps/api/src/seed.ts --target=node --outdir=apps/api/dist-preview --external=pg --external=@google-cloud/storage
 
 FROM postgres:17.7-bookworm AS preview
-RUN apt-get update && apt-get install -y --no-install-recommends nginx-light qrencode \
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 nginx-light qrencode \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
 COPY --from=preview-dependencies --chown=postgres:postgres /app/node_modules /app/node_modules

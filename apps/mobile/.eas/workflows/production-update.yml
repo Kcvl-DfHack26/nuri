@@ -2,7 +2,7 @@
 name: Production update
 defaults:
   tools:
-    node: '24.19.0'
+    node: '26.13.0'
     bun: '1.4.4'
 on:
   workflow_dispatch: {}

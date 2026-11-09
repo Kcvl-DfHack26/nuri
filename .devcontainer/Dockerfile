@@ -1,6 +1,6 @@
 FROM oven/bun:1.4.4 AS bun
 FROM ghcr.io/terraform-linters/tflint:v0.65.0 AS tflint
-FROM node:24.19.0-bookworm
+FROM node:26.13.0-bookworm
 
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update && apt-get install -y --no-install-recommends google-cloud-cli \
     && rm -rf /var/lib/apt/lists/* \
     && echo 'node ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/node
-RUN npm install --global @openai/codex@0.166.0
+RUN BUN_INSTALL=/usr/local bun install --global @openai/codex@0.166.0
 RUN mkdir -p /workspace/node_modules /workspace/apps/mobile/node_modules /workspace/apps/api/node_modules /workspace/packages/shared/node_modules /home/node/.bun /home/node/.expo /home/node/.config/gcloud && chown -R node:node /workspace /home/node
 USER node
 WORKDIR /workspace

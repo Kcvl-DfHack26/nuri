@@ -4,13 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=../api/.env --import tsx src/index.ts",
+    "dev": "bun --env-file=../api/.env src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "emulate": "0.13.0"
-  },
-  "devDependencies": {
-    "tsx": "4.23.15"
   }
 }
