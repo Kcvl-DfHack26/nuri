@@ -53,7 +53,7 @@ test('a denied camera request keeps the sample and the recipe usable', async ({ 
   await expect(page.getByLabel('カメラ映像', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'ガイドを隠す' })).toBeVisible();
   await page.getByRole('button', { name: '次へ', exact: true }).click();
-  await expect(page.getByText('2/5', { exact: true })).toBeVisible();
+  await expect(page.getByText('2/8', { exact: true })).toBeVisible();
 });
 
 test.describe('with a permitted virtual camera', () => {
