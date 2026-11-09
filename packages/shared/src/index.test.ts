@@ -7,6 +7,7 @@ import {
   profileInputSchema,
   profilePatchSchema,
   makeupShapeSchema,
+  productKindImage,
   purchaseUrlSchema,
   recipeInputSchema,
   recipeListQuerySchema,
@@ -154,4 +155,11 @@ test('accepts makeup shapes on canonical landmarks and needs an area for a fill'
   ]) {
     expect(makeupShapeSchema.safeParse({ strokes }).success).toBe(false);
   }
+});
+
+test('picks one photo per kind of cosmetic, shading and highlight sharing one', () => {
+  expect(productKindImage('lip')).toBe('/product-kinds/lip.jpg');
+  expect(productKindImage('shading')).toBe('/product-kinds/highlight-shading.jpg');
+  expect(productKindImage('highlight')).toBe('/product-kinds/highlight-shading.jpg');
+  expect(productKindImage('base')).toBeNull();
 });

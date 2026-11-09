@@ -18,6 +18,7 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { useStepCamera } from '@/components/use-step-camera';
 import { apiUrl } from '@/lib/api';
+import { colorName } from '@/lib/color';
 import { paintColor, recipeLayers } from '@/lib/face-makeup';
 import { backOrHome } from '@/lib/navigation';
 import { recipeOptions } from '@/lib/recipes';
@@ -31,7 +32,6 @@ const EYE_OFF = Icon.select({
   android: import('@expo/material-symbols/visibility_off.xml'),
 });
 const MIC = Icon.select({ ios: 'mic', android: import('@expo/material-symbols/mic.xml') });
-const PLAY = Icon.select({ ios: 'play', android: import('@expo/material-symbols/play_arrow.xml') });
 const BACK = Icon.select({
   ios: 'chevron.left',
   android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
@@ -249,8 +249,12 @@ function Instruction({ step, number }: { step: RecipeStep; number: number }) {
   );
 }
 
+/** ⑦'s suggested colors by name (#224): a color code tells a reader nothing. */
+function colorNames(colors: string[]) {
+  return [...new Set(colors.map((color) => colorName(color) ?? color))].join('・');
+}
+
 function ProductRow({ step }: { step: RecipeStep }) {
-  const ink = useTokenColor('--color-ink-primary');
   return (
     <View className="flex-row items-center gap-3">
       <View className="flex-row overflow-hidden rounded-xl" accessible={false}>
@@ -265,19 +269,8 @@ function ProductRow({ step }: { step: RecipeStep }) {
       <View className="flex-1 gap-px">
         <Text className="font-maru-bold text-label text-ink-primary">{step.product}</Text>
         <Text className="font-maru text-meta text-ink-secondary">
-          おすすめ色 {step.colors.join('・')}
+          おすすめ色 {colorNames(step.colors)}
         </Text>
-      </View>
-      <View
-        accessible
-        accessibilityRole="button"
-        accessibilityLabel="お手本を再生（準備中）"
-        accessibilityState={{ disabled: true }}
-        className="size-12 items-center justify-center"
-      >
-        <View className="size-9 items-center justify-center rounded-full bg-neutral-soft">
-          <SocialIcon name={PLAY} webGlyph="▷" size={16} color={ink} />
-        </View>
       </View>
     </View>
   );

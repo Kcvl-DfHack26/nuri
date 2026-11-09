@@ -45,14 +45,9 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 
 Googleとマジックリンクは、大文字・小文字を区別しない同じ確認済みメールアドレスで同一アカウントに入る。Better Authがメールを正規化し、PostgreSQLの既存の `user.email` 一意制約で重複を防ぐ。マイページから「プロフィール設定」を開き、設定項目の末尾にある「アカウント」でGoogle連携状態を確認できる。既存のApple連携とユーザーデータは保持する。Appleでのみログインしていた利用者は、登録メールにマジックリンクを受け取れる場合、同じアカウントを利用できる。非公開メールの転送が止まっている場合はこの経路を使えない。
 
-## ネイティブのGoogle One Tap
+## アプリからのGoogleログイン
 
-AndroidのCredential ManagerとiOSのGoogle Sign-In SDKを、Expoが案内する [react-native-nitro-google-signin](https://docs.expo.dev/guides/google-authentication/) から呼ぶ。Better AuthがGoogleのIDトークンを検証し、既存のGoogle OAuthと同じprovider IDでセッションを作る。
-
-- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` はAPIの `GOOGLE_CLIENT_ID` と同じWeb OAuthクライアントIDを設定する。
-- Androidは `com.kcvl.nuri` と使用する署名証明書のSHA-1を [Google Auth Platform](https://console.cloud.google.com/auth/clients) のAndroid OAuthクライアントに登録する。
-- iOSは `com.kcvl.nuri` のiOS OAuthクライアントを作り、`EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` に設定する。Expo config pluginが戻り先のURL schemeを組み込む。
-- これらの公開IDを設定して新しいネイティブビルドを作る。Expo Go、Web、Emulate、プラットフォーム用のID未設定時はブラウザのOAuthを使う。
+iOS、Android、WebでBetter AuthのブラウザOAuthを使う。Google Cloudのウェブ用OAuthクライアントはAPIに設定する。iOSとAndroidではBetter AuthのExpo clientが認証ブラウザを開き、完了後にアプリへ戻ってセッションを保存する。ローカルのEmulateも同じ入口を使う。
 
 ## Android仮想端末でGoogleとメールを試す（#51）
 

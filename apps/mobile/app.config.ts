@@ -10,19 +10,13 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
   const appleTeamId = process.env.APPLE_TEAM_ID;
   const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
   const rpId = process.env.EXPO_PUBLIC_PASSKEY_RP_ID;
-  const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
-  const plugins = [...(config.plugins ?? [])];
-  if (googleIosClientId) {
-    plugins.push([
-      'react-native-nitro-google-signin',
-      { iosUrlScheme: googleIosClientId.split('.').reverse().join('.') },
-    ]);
-  }
   return withLocalhostCA({
     ...config,
     name: config.name ?? 'nuri',
     slug: config.slug ?? 'nuri',
-    plugins,
+    ...(process.env.NURI_STAGING_RELEASE === '1'
+      ? { updates: { ...config.updates, enabled: false } }
+      : {}),
     android: { ...config.android, ...(googleServicesFile ? { googleServicesFile } : {}) },
     ios: {
       ...config.ios,

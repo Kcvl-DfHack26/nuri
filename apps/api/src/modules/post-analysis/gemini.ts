@@ -1,7 +1,7 @@
 import type { PostAnalysis } from '@starter/shared';
 
 import { ApiError, GoogleGenAI } from '@google/genai';
-import { postAnalysisSchema, recipeStepsMax } from '@starter/shared';
+import { cheekSchema, postAnalysisSchema, recipeStepsMax } from '@starter/shared';
 import { z } from 'zod';
 
 /** A video from ⑫-3 and the times (seconds) the user tapped 手順を区切る while recording. */
@@ -23,6 +23,8 @@ const answerSchema = postAnalysisSchema.extend({
         end: z.string().trim().max(12),
         // Checked after the answer, so a malformed color reads as unknown instead of failing.
         color: z.string().trim().max(20).nullable(),
+        // Gemini always answers the blush type, null outside a cheek step (#224).
+        cheek: cheekSchema.nullable(),
       }),
     )
     .max(recipeStepsMax),
@@ -88,7 +90,12 @@ steps[].regions には，その手順で実際に色を足した範囲を書く�
 - shape: dot=点，line=線，band=幅のある線，ellipse=楕円，arc=線の目印に沿う弧，area=部位全体．
 - length: end がないときに start から伸ばす長さ．none・short・medium・long から選ぶ．数字では答えない．太さは答えない．
 - direction: outward=外側へ，inward=内側へ，upOutward=斜め上・外側へ，downOutward=斜め下・外側へ，up=上へ，down=下へ，none=なし．
-- clip: 範囲をこの部位の中だけに限る場合に選ぶ（例：上唇の中央だけなら upperLip）．なければ none．`;
+- clip: 範囲をこの部位の中だけに限る場合に選ぶ（例：上唇の中央だけなら upperLip）．なければ none．
+
+steps[].cheek には，part が cheek の手順だけ，チークの入れ方の型を答える．ほかの部位では null にする．利用者の話した言葉と，実際に塗った所に最も近い型を選ぶ．
+- style: round=頬の中心に丸く（例：「頬の真ん中にふんわり」「にっこりして高い所に丸く」），high=頬骨の高い位置に横長（例：「頬骨に沿って」「高めに横に」），diagonal=頬骨からこめかみへ斜め上（例：「こめかみに向かって斜めに」「シャープに」），low=小鼻の高さに横長（例：「低めに」「小鼻の横から」），underEye=目のすぐ下に横に広く（例：「目の下に」「ハート型に」「涙袋の下に」），triangle=黒目の下・こめかみ側・小鼻の高さを結ぶ三角形（例：「三角に」「逆三角形に」「三角ゾーンに」）．
+- size: small=狭め，medium=ふつう，large=広め．最初に筆を置いた所や色が濃く見える所ではなく，ぼかして広げた後に色が乗った範囲の広さで選ぶ．「ふんわり」「ぼかす」「なじませる」「広げる」「くるくる」などと言ったり，ブラシで広く動かしたりしたときは medium 以上にする．迷ったら medium にする．
+- チークの regions には，目やまぶたの目印（eyeInner，eyeOuter，irisCenter，irisOuter，upperLidEdge，lowerLidEdge）を使わない．`;
 
 /** The instructions for one video, with the user's marks when there are any. */
 export function analysisPrompt(marks: number[]) {

@@ -1,7 +1,7 @@
-import expoMetroConfig = require('expo/metro-config');
-import uniwindMetro = require('uniwind/metro');
+const { getDefaultConfig } = require('expo/metro-config') as typeof import('expo/metro-config');
+const { withUniwindConfig } = require('uniwind/metro') as typeof import('uniwind/metro');
 
-export = uniwindMetro.withUniwindConfig(expoMetroConfig.getDefaultConfig(__dirname), {
+module.exports = withUniwindConfig(getDefaultConfig(__dirname), {
   cssEntryFile: './global.css',
   dtsFile: './uniwind-types.d.ts',
 });
