@@ -26,6 +26,9 @@ jobs:
         if: hashFiles('.github/scripts/preview/initialize.ts') != ''
         with:
           bun-version-file: .bun-version
+      - name: Install Preview Script Dependencies
+        if: hashFiles('.github/scripts/preview/initialize.ts') != ''
+        run: bun install --production --frozen-lockfile --ignore-scripts --filter './'
       - name: Update Preview Comment
         if: hashFiles('.github/scripts/preview/initialize.ts') != ''
         env:

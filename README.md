@@ -40,8 +40,9 @@
 - 📷 **写真から顔タイプを診断する** — カメラや選んだ写真から顔の特徴を読み取り、診断結果を確認できます。
 - 🎬 **動画からレシピを作る** — 録画した動画や端末の動画から手順書を作り、内容を編集して投稿できます。
 - 🔐 **Googleでログインする** — Better Authで認証とセッションを管理し、投稿やお気に入りなどをアカウントに紐付けます。
+- 👤 **プロフィール写真を変更する** — 写真を選んで端末上で確認し、「保存する」を押したときにだけ送信します。
 
-動画から生成する色は現在、部位ごとの既定値です。塗る範囲は意味情報から作る初期形状で、動画の画素から輪郭を直接抽出する方式ではありません。[動画由来の色推定と初期形状の改善](https://github.com/Kcvl-DfHack26/nuri/issues/203)を予定しています。SNSのURL取り込み画面は固定サンプルで、実際の投稿を取得する処理は未実装です。メールログインは[送信ドメインを用意してから提供](https://github.com/Kcvl-DfHack26/nuri/issues/177)する予定です。
+動画から手順ごとの色を推定し、編集画面のパレットで調整できます。塗る範囲の初期形状は、解析が返した部位と範囲を基に端末で作ります。SNSのURL取り込み画面は固定サンプルで、実際の投稿を取得する処理は未実装です。メールログインは[送信ドメインを用意してから提供](https://github.com/Kcvl-DfHack26/nuri/issues/177)する予定です。
 
 📱 **主要機能の確認はiOS・AndroidのDevelopment Buildで。** WebにもAPIと連動したレシピ閲覧などはありますが、顔追跡AR・写真診断を含む一連の体験はネイティブ版で確認します。[端末で動かす手順](docs/setup.md)
 
@@ -67,7 +68,8 @@ TypeScriptを中心に、端末内の顔処理とGoogle Cloud上の動画解析�
 | 顔追跡・AR      | MediaPipe Face Landmarker、React Native Skia                          | 端末内の特徴点検出、UVメッシュへの描画                               |
 | 動画解析        | Vertex AI、Gemini 3.8 Flash、Google Gen AI SDK                        | 手順と塗布範囲の意味情報の抽出、コスメ候補の検索確認                 |
 | API・入力検証   | Hono、Hono Client、Zod、Node.js                                       | 型を共有するAPI、入力検証、認可                                      |
-| 認証・DB        | Better Auth、Drizzle ORM、Cloud SQL / PostgreSQL                      | ユーザー・セッション・レシピ・手順・色・形・画像の保存               |
+| 認証・DB        | Better Auth、Drizzle ORM、Cloud SQL / PostgreSQL                      | ユーザー・セッション・レシピ・手順・投稿サムネイルの保存             |
+| 画像ストレージ  | Cloud Storage、Floci（ローカル）                                      | seed画像とプロフィール写真を非公開バケットに保存し、Hono APIで配信   |
 | 実行・配信基盤  | Cloud Run、Artifact Registry、Secret Manager                          | APIとWebの実行、コンテナ配信、秘密情報の注入                         |
 | インフラ・CI/CD | OpenTofu、GitHub Actions、WIF、Expo EAS                               | リソース定義、検査、キーレス認証、ネイティブビルドとUpdateの配布設定 |
 | 開発・検証      | Bun workspaces、Turborepo、Docker Compose、Bun test、Jest、Playwright | 開発環境、依存管理、単体・統合・Webの検証                            |
@@ -100,15 +102,17 @@ portless proxy start --https --port 443
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-依存導入・未作成の環境ファイル生成・DB migrationが自動で行われます。API・MetroのURLとPostgreSQLのvolumeはworktreeごとに分離します。Dev Containerは編集・検査に使い、アプリの起動・停止はホストのPortlessで行います。
+Composeが依存と未作成の環境ファイルを用意し、FlociのPostgreSQL 17へのmigrationと画像バケットの初期化を済ませてからAPIを起動します。API・MetroのURL、DB、バケットはworktreeごとに分離します。旧ローカルDBのデータは[移行手順](docs/setup.md#旧postgresqlのデータを移す)で引き継げます。サンプルのレシピと画像は起動後に `bun run db:seed` で投入できます。Dev Containerは編集・検査に使い、アプリの起動・停止はホストで行います。
 
 顔追跡などのネイティブ機能には**Development Buildが必要**です。Expo Goは初期のUI確認に限り、ネイティブモジュールを使う機能の確認には使えません。端末接続・ビルド・API接続は[セットアップ手順](docs/setup.md)に従ってください。
 
 終了時は次を実行します。自worktreeのrouteとコンテナだけを終了し、volumeを保持します。
 
 ```sh
-PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down
+sh scripts/services-down.sh
 ```
+
+PRプレビューはPRごとのCloud Runと非公開画像バケットを使います。OpenTofuがリソースを管理し、GitHub Actionsが候補の疎通確認と配信を行います。URLはPRコメント、実行結果はActionsで確認できます。[PRプレビュー](docs/preview.md)
 
 ## 📂 リポジトリ構成
 
@@ -129,18 +133,18 @@ PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down
 
 ホストにBun 1.4.4を用意して `bun install --frozen-lockfile && bun run setup` を実行すると、以下の短縮コマンドを使えます。Composeを操作するコマンドはホストで実行してください。
 
-| コマンド                                        | 内容                                               |
-| ----------------------------------------------- | -------------------------------------------------- |
-| `bun run setup`                                 | worktree設定と未作成のアプリenvを生成              |
-| `bun run dev` / `bun run dev:devices`           | DB・API・Metroを起動 / Simulator・Emulator用に起動 |
-| `bun run check`                                 | 整形、型付きlint、型検査、Bun/Jestテスト、Fallow   |
-| `bun run test:integration`                      | PostgreSQLを使った認証・認可テスト                 |
-| `bun run test:e2e`                              | Chromium・WebKitのWeb E2E（要ローカルDB）          |
-| `bun run db:generate` / `bun run db:migrate`    | migration生成 / 適用                               |
-| `bun run db:seed`                               | ローカルのサンプルデータを用意                     |
-| `bun run doctor` / `bun run export:mobile`      | Expoの互換性確認 / iOS・Androidのbundle生成        |
-| `bun run build:api`                             | Node.js向けAPI build                               |
-| `bun run services:up` / `bun run services:down` | DB・API・Metroをバックグラウンドで起動 / 停止      |
+| コマンド                                        | 内容                                                             |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| `bun run setup`                                 | worktree設定と未作成のアプリenvを生成                            |
+| `bun run dev` / `bun run dev:devices`           | DB・API・Metroを起動 / Simulator・Emulator用に起動               |
+| `bun run check`                                 | 整形、型付きlint、型検査、Bun/Jestテスト、未使用・重複コード検査 |
+| `bun run test:integration`                      | 実PostgreSQLとFlociを使うAPI統合テスト                           |
+| `bun run test:e2e`                              | ChromiumのWeb E2E（要ローカルPostgreSQLとFloci）                 |
+| `bun run db:generate` / `bun run db:migrate`    | migration生成 / 適用                                             |
+| `bun run db:seed`                               | ローカルのサンプルレシピと画像を投入                             |
+| `bun run doctor` / `bun run export:mobile`      | Expoの互換性確認 / iOS・Androidのbundle生成                      |
+| `bun run build:api`                             | Node.js向けAPI build                                             |
+| `bun run services:up` / `bun run services:down` | DB・API・Metroをバックグラウンドで起動 / 停止                    |
 
 通常のCIにGoogle CloudやExpoのsecretは不要です。実際の動画解析やクラウド配信には対応する環境設定が必要です。検証の分担と実機確認は[テスト方針](docs/testing.md)を参照してください。
 
