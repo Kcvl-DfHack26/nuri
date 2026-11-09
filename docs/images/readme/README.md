@@ -1,5 +1,17 @@
 # README掲載画像
 
+## PRとREADMEに載せる図
+
+構成やデータの流れを伝える図を作成・更新するときは、リポジトリの [`diagram-design`](../../../.agents/skills/diagram-design/SKILL.md) を読む。導入元は [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design)。作業用のworktreeにスキルを追加し直す場合は、ルートで次を実行する。
+
+```sh
+bunx skills add cathrynlavery/diagram-design --agent codex --skill diagram-design --copy --yes
+```
+
+1. 対象の実装と文書を照合し、読者が図で確かめる内容を決める。初回はスキルのスタイル設定を確認し、nuriの配色と読みやすい日本語のラベルを使う。図の中でも実装済みと予定を区別する。
+2. スキルに従ってHTMLとSVGで図を作り、ブラウザーで日本語の表示、ラベル、矢印、欠けを確認する。公開用には[スキルの書き出し手順](../../../.agents/skills/diagram-design/references/export.md)に従ってPNGにし、GitHubで使う幅でも読めることを確かめる。
+3. READMEの画像はこのディレクトリに置き、代替テキストと根拠となる実装・文書へのリンクを添える。PRの画像は `github-issue-pr-ops` の添付手順を使い、説明の近くに埋め込んで表示を確認する。
+
 ## Figmaのデザイン
 
 2026年11月9日に[Figma Plan A](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426)（現在の名前は「実装plan」）からPNGを取得した。Figmaファイルの編集は行っていない。
