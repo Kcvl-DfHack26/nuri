@@ -26,6 +26,7 @@ jest.mock('@/theme/colors', () => ({
 }));
 jest.mock('@/lib/api', () => ({
   apiUrl: 'http://localhost:8080',
+  authClient: { useSession: () => ({ data: null }) },
   apiAssetUrl: (path: string) => path,
   api: { api: { recipes: { $get: () => mockGetRecipes() } } },
 }));

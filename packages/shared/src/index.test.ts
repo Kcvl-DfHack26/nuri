@@ -4,7 +4,6 @@ import {
   postAnalysisSchema,
   postAnalysisVideoMaxBytes,
   feedQuerySchema,
-  postInputSchema,
   profileInputSchema,
   profilePatchSchema,
   makeupShapeSchema,
@@ -16,25 +15,28 @@ import {
   recipeThumbnailMaxBytes,
 } from './index';
 
-test('trims posts and rejects empty or unbounded content', () => {
-  expect(postInputSchema.parse({ body: '  こんにちは  ' }).body).toBe('こんにちは');
-  for (const body of ['', '  ', 'あ'.repeat(501)]) {
-    expect(postInputSchema.safeParse({ body }).success).toBe(false);
-  }
-  expect(postInputSchema.safeParse({ body: 'あ'.repeat(500) }).success).toBe(true);
-});
 test('bounds pagination and profile input', () => {
   expect(feedQuerySchema.parse({})).toEqual({ offset: 0 });
   for (const offset of ['-1', '1.5', '10001', 'NaN']) {
     expect(feedQuerySchema.safeParse({ offset }).success).toBe(false);
   }
   expect(profileInputSchema.safeParse({ name: ' ' }).success).toBe(false);
-  const valid = { name: ' はなこ ', handle: 'hanako_1', bio: 'こんにちは', isPublic: false };
+  const valid = {
+    name: ' はなこ ',
+    handle: 'hanako_1',
+    bio: 'こんにちは',
+    isPublic: false,
+    faceType: null,
+  };
   expect(profileInputSchema.parse(valid).name).toBe('はなこ');
   expect(profileInputSchema.safeParse({ ...valid, handle: 'Hana' }).success).toBe(false);
   expect(profileInputSchema.safeParse({ ...valid, bio: 'あ'.repeat(43) }).success).toBe(false);
   expect(profilePatchSchema.safeParse({}).success).toBe(false);
   expect(profilePatchSchema.safeParse({ name: '更新' }).success).toBe(true);
+  // Only the five diagnosed face types or none; no skin tone.
+  expect(profilePatchSchema.safeParse({ faceType: 'round' }).success).toBe(true);
+  expect(profilePatchSchema.safeParse({ faceType: null }).success).toBe(true);
+  expect(profilePatchSchema.safeParse({ faceType: 'round_yellow' }).success).toBe(false);
 });
 test('accepts only slug recipe IDs and bounded recipe searches', () => {
   expect(recipeParamsSchema.parse({ id: 'fox' }).id).toBe('fox');

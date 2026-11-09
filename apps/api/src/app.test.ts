@@ -33,7 +33,6 @@ describe('HTTP contract', () => {
     expect(await response.json()).toEqual({ status: 'unavailable' });
   });
   test('validates pagination and protects writes before touching the database', async () => {
-    expect((await app.request('/api/posts?offset=-1')).status).toBe(400);
     expect((await app.request('/api/recipes?offset=-1')).status).toBe(400);
     expect((await app.request('/api/recipes/Not%20a%20slug')).status).toBe(400);
     expect((await app.request('/api/recipes?part=nose')).status).toBe(400);
@@ -41,18 +40,9 @@ describe('HTTP contract', () => {
     expect((await app.request('/api/me/favorites')).status).toBe(401);
     expect((await app.request('/api/recipes/fox/favorite', { method: 'PUT' })).status).toBe(401);
     expect((await app.request('/api/me')).status).toBe(401);
-    expect(
-      (
-        await app.request('/api/posts', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: '{"body":"hello"}',
-        })
-      ).status,
-    ).toBe(401);
   });
   test.each([
-    ['/api/posts', 64 * 1024 + 1, 413],
+    ['/api/auth/mobile-magic-link', 64 * 1024 + 1, 413],
     ['/api/recipes', 2.5 * 1024 * 1024, 401],
     ['/api/recipes', 2.5 * 1024 * 1024 + 1, 413],
     ['/api/post-analyses', 30_000_000 + 64 * 1024, 401],
@@ -62,7 +52,7 @@ describe('HTTP contract', () => {
     expect(response.status).toBe(status);
   });
   test('rejects cross-origin writes and exposes only configured login methods', async () => {
-    const rejected = await app.request('/api/posts', {
+    const rejected = await app.request('/api/recipes', {
       method: 'POST',
       headers: { origin: 'https://untrusted.example', 'content-type': 'application/json' },
       body: '{}',
@@ -130,6 +120,7 @@ test('serves the Expo SPA without rewriting API, missing assets, or the future L
       '/recipes/fox/unknown',
       '/about/',
       '/unknown',
+      '/settings',
     ]) {
       expect((await hosted.request(path)).status).toBe(404);
     }

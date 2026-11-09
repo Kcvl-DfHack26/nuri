@@ -58,15 +58,6 @@ function Navigation() {
           options={{ headerShown: false, presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="recipes/[id]/compare" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="compose"
-          options={{
-            title: '投稿',
-            presentation: 'formSheet',
-            sheetAllowedDetents: [0.65, 1],
-            sheetGrabberVisible: true,
-          }}
-        />
         <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
         <Stack.Screen name="auth-callback" options={{ title: 'ログイン' }} />
       </Stack>

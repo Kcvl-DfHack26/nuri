@@ -105,13 +105,13 @@ export function createApp(
       .route('/api', pushRoutes(db, auth, env.EXPO_PUSH_ACCESS_TOKEN))
       .route(
         '/api',
-        socialRoutes(
+        recipeRoutes(
           db,
           auth,
           createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN, env.BETTER_AUTH_URL),
         ),
       )
-      .route('/api', recipeRoutes(db, auth))
+      .route('/api', socialRoutes(db, auth))
       .route('/api', postAnalysisRoutes(requireSession(auth), analyzePost))
       .route('/', expoWebRoutes(env.EXPO_WEB_ROOT))
       .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500))

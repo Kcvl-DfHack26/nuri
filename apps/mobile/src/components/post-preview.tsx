@@ -9,6 +9,8 @@ import { Alert } from 'react-native';
 import type { PostDraft } from '@/components/post-draft';
 import type { RecipeDetail, RecipeInput } from '@/lib/recipes';
 
+import { AreaSummary } from '@/components/post-area-summary';
+import { usePostConfirm } from '@/components/post-confirm';
 import { stepTitle, usePostDraft } from '@/components/post-draft';
 import { RecipeContent } from '@/components/recipe-detail';
 import { partColors, parts } from '@/components/recipes';
@@ -114,6 +116,9 @@ export function PostPreview() {
     },
   });
   const fields = postFields(draft);
+  const confirm = usePostConfirm(() => {
+    post.mutate(draft);
+  });
   const recipe: RecipeDetail = {
     id: 'preview',
     title: draft.title.trim(),
@@ -150,21 +155,26 @@ export function PostPreview() {
       Alert.alert('投稿できません', 'サムネイルにする場面を選んでください。');
       return;
     }
-    Alert.alert(
-      '投稿して公開しますか',
-      'サムネイルの写真と手順をサーバーに送り、だれでも見られるように公開します。写真に顔が写っている場合は、その顔も公開されます。動画は送りません。',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '投稿する',
-          onPress: () => {
-            post.mutate(draft);
-          },
-        },
-      ],
-    );
+    confirm.ask();
   };
+  const areaSummary = (
+    <AreaSummary
+      areas={draft.steps.flatMap((step, index) => {
+        const color = fields.steps[index]?.color;
+        return step.shape && color ? [{ shape: step.shape, color }] : [];
+      })}
+    />
+  );
   return (
-    <RecipeContent recipe={recipe} steps={fields.steps} onPost={onPost} posting={post.isPending} />
+    <>
+      <RecipeContent
+        recipe={recipe}
+        steps={fields.steps}
+        onPost={onPost}
+        posting={post.isPending}
+        areas={areaSummary}
+      />
+      {confirm.dialog}
+    </>
   );
 }

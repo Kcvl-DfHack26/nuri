@@ -2,6 +2,7 @@ import type { MakeupShape } from '@starter/shared';
 import type { Dispatch, ReactNode, SetStateAction } from 'react';
 
 import * as Crypto from 'expo-crypto';
+import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { createContext, use, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { PartId } from '@/components/recipes';
@@ -61,7 +62,6 @@ export type PostDraft = {
   /** Frame of the video shown on ①'s recipe card; null until one is chosen on ⑫-7. */
   thumbnail: { uri: string; timeMs: number } | null;
   publishCosmetics: boolean;
-  publishBefore: boolean;
   /** The saved recipe's ID once ⑫-8 posted it, so the post is never sent twice. */
   postedId: string | null;
 };
@@ -104,7 +104,6 @@ const emptyDraft: Omit<PostDraft, 'key'> = {
   tags: [],
   thumbnail: null,
   publishCosmetics: true,
-  publishBefore: false,
   postedId: null,
 };
 
@@ -114,7 +113,7 @@ export function stepTitle(step: PostStep) {
 }
 
 /** A step's 区間 length, e.g. 1:12, or — when the video's length is unknown. */
-export function segmentLength(step: PostStep) {
+export function segmentLength(step: Pick<PostStep, 'segment'>) {
   const { startMs, endMs } = step.segment;
   return endMs === null ? '—' : formatClock(endMs - startMs);
 }
@@ -209,4 +208,38 @@ export function usePostDraft() {
     throw new Error('usePostDraft must be used inside PostDraftProvider');
   }
   return value;
+}
+
+/**
+ * Cuts the frame at a step's new start, after ⑫-4 added the step or ⑫-5 moved it. The frame is kept
+ * only while the step still starts there; a frame that cannot be cut leaves the part's icon.
+ */
+export function useCutStepFrame() {
+  const { draft, setDraft, trackFile } = usePostDraft();
+  const videoUri = draft.video?.uri ?? null;
+  return useCallback(
+    (index: number, startMs: number) => {
+      if (!videoUri) {
+        return;
+      }
+      const update = (image: string | null) => {
+        setDraft((current) => ({
+          ...current,
+          steps: current.steps.map((step, at) =>
+            at === index && step.segment.startMs === startMs ? { ...step, image } : step,
+          ),
+        }));
+      };
+      getThumbnailAsync(videoUri, { time: startMs, quality: 0.7 }).then(
+        ({ uri }) => {
+          trackFile(uri);
+          update(uri);
+        },
+        () => {
+          update(null);
+        },
+      );
+    },
+    [videoUri, setDraft, trackFile],
+  );
 }

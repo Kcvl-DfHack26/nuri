@@ -1,11 +1,12 @@
 import type { MakeupShape } from '@starter/shared';
 
-import { makeupParts, recipeSources } from '@starter/shared';
+import { faceTypeIds, makeupParts, recipeSources } from '@starter/shared';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
   bytea,
+  check,
   index,
   integer,
   jsonb,
@@ -24,6 +25,8 @@ export const user = pgTable('user', {
   handle: text('handle').unique(),
   bio: text('bio').default('').notNull(),
   isPublic: boolean('is_public').default(true).notNull(),
+  /** The face type chosen on ⑰-2 or saved from ⑭ (#194); only its owner reads it. */
+  faceType: text('face_type', { enum: faceTypeIds }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -118,33 +121,23 @@ export const rateLimit = pgTable('rate_limit', {
   lastRequest: bigint('last_request', { mode: 'number' }).notNull(),
 });
 
-export const post = pgTable(
-  'post',
+/** Who follows whom (#195). A user cannot follow themselves. */
+export const follow = pgTable(
+  'follow',
   {
-    id: text('id').primaryKey(),
-    userId: text('user_id')
+    followerId: text('follower_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
-    body: text('body').notNull(),
+    followeeId: text('followee_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    index('post_created_at_idx').on(table.createdAt),
-    index('post_user_id_idx').on(table.userId),
+    primaryKey({ columns: [table.followerId, table.followeeId] }),
+    index('follow_followee_id_idx').on(table.followeeId),
+    check('follow_not_self', sql`${table.followerId} <> ${table.followeeId}`),
   ],
-);
-
-export const like = pgTable(
-  'like',
-  {
-    postId: text('post_id')
-      .notNull()
-      .references(() => post.id, { onDelete: 'cascade' }),
-    userId: text('user_id')
-      .notNull()
-      .references(() => user.id, { onDelete: 'cascade' }),
-  },
-  (table) => [primaryKey({ columns: [table.postId, table.userId] })],
 );
 
 export const recipe = pgTable(
@@ -162,7 +155,7 @@ export const recipe = pgTable(
       .notNull()
       .default(sql`'{}'::text[]`),
     durationMinutes: integer('duration_minutes').notNull(),
-    // Display-only until saving recipes is built.
+    /** A sample's carried-over popularity; the heart shows it plus the recipe's favorites (#191). */
     likeCount: integer('like_count').notNull().default(0),
     source: text('source', { enum: recipeSources }),
     /** The one part a part recipe (②③) works on; null for a whole-face recipe (①). */

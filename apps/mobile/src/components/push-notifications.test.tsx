@@ -125,17 +125,21 @@ test('requests OS permission from settings and registers the current session', a
 });
 
 test('consumes a cold-start tap and opens only validated routes for the signed-in account', async () => {
-  mockGetLastResponse.mockReturnValueOnce(tap({ kind: 'post-liked', recipientId: 'viewer' }));
+  mockGetLastResponse.mockReturnValueOnce(
+    tap({ kind: 'recipe-liked', recipientId: 'viewer', recipeId: 'fox' }),
+  );
   await renderWithClient(<PushNotifications />);
   await waitFor(() => {
     expect(router.navigate).toHaveBeenCalledWith({
-      pathname: '/users/[id]',
-      params: { id: 'viewer' },
+      pathname: '/recipes/[id]',
+      params: { id: 'fox' },
     });
   });
   expect(mockClearResponse).toHaveBeenCalledTimes(1);
 
   await act(() => {
+    mockOpen?.(tap({ kind: 'recipe-liked', recipientId: 'viewer' }));
+    mockOpen?.(tap({ kind: 'post-liked', recipientId: 'viewer' }));
     mockOpen?.(tap({ kind: 'recipe-ready', recipientId: 'another-account', recipeId: 'fox' }));
     mockOpen?.(
       tap({ kind: 'recipe-ready', recipientId: 'viewer', recipeId: 'https://example.com' }),
@@ -199,16 +203,16 @@ test('removes the old response listener and rejects queued taps after switching 
     expect(mockOpen).not.toBe(previousOpen);
   });
   await act(() => {
-    previousOpen?.(tap({ kind: 'post-liked', recipientId: 'viewer' }));
-    mockOpen?.(tap({ kind: 'post-liked', recipientId: 'viewer' }));
+    previousOpen?.(tap({ kind: 'recipe-liked', recipientId: 'viewer', recipeId: 'fox' }));
+    mockOpen?.(tap({ kind: 'recipe-liked', recipientId: 'viewer', recipeId: 'fox' }));
   });
   expect(router.navigate).not.toHaveBeenCalled();
   await act(() => {
-    mockOpen?.(tap({ kind: 'post-liked', recipientId: 'another-account' }));
+    mockOpen?.(tap({ kind: 'recipe-liked', recipientId: 'another-account', recipeId: 'fox' }));
   });
   expect(router.navigate).toHaveBeenCalledWith({
-    pathname: '/users/[id]',
-    params: { id: 'another-account' },
+    pathname: '/recipes/[id]',
+    params: { id: 'fox' },
   });
 });
 

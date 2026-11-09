@@ -1,5 +1,5 @@
 import { Icon } from '@expo/ui';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { router, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,16 +10,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BrowShape, DiagnosisResult, FaceType } from '@/lib/face-diagnosis';
 import type { RecipeSummary } from '@/lib/recipes';
 
+import { CardFavorite } from '@/components/card-favorite';
 import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
+import { PrimaryButton } from '@/components/post-chrome';
 import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
-import { apiAssetUrl, apiUrl } from '@/lib/api';
+import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
 import { browShapes, eyeShapes, faceTypes, midfaces, readResultParams } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
 import { formatCount, recipeListOptions } from '@/lib/recipes';
+import { changeProfile, myProfileKeys, myProfileOptions } from '@/lib/social';
 import { cn } from '@/lib/utils';
 import { useTokenColor } from '@/theme/tokens';
 
@@ -112,6 +115,7 @@ export function Diagnosis() {
                 </Text>
               </View>
             </View>
+            <SaveFaceType faceType={result.faceType} />
             <Basis result={result} />
             <View className="mx-4 gap-2.5">
               <View className="gap-0.5 pl-1">
@@ -175,6 +179,51 @@ export function Diagnosis() {
   );
 }
 
+/**
+ * Saves the diagnosed face type to the signed-in user's profile (#194), where ⑰ and ⑰-2 show it.
+ * Guests are sent to ⑱ first (#42). Only the type is sent, never the photo or its landmarks.
+ */
+function SaveFaceType({ faceType }: { faceType: FaceType }) {
+  const client = useQueryClient();
+  const { data: session } = authClient.useSession();
+  const profile = useQuery({
+    ...myProfileOptions(session?.user.id),
+    enabled: Boolean(session && apiUrl),
+  });
+  const save = useMutation({
+    mutationFn: () => changeProfile({ faceType }),
+    onSuccess: () => client.invalidateQueries({ queryKey: myProfileKeys.all }),
+  });
+  const saved = profile.data?.faceType === faceType;
+  // Without an API there is nowhere to save to, like the other server actions.
+  if (!apiUrl) {
+    return null;
+  }
+  return (
+    <View className="mx-4 gap-1.5">
+      <PrimaryButton
+        label={saved ? 'プロフィールに保存済み' : '顔タイプをプロフィールに保存'}
+        disabled={saved || save.isPending || (Boolean(session) && profile.isPending)}
+        onPress={() => {
+          if (!session) {
+            router.push('/account');
+            return;
+          }
+          save.mutate();
+        }}
+      />
+      {save.error ? (
+        <Text accessibilityRole="alert" className="font-maru text-meta text-accent-rose">
+          {save.error.message}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+// Enough cards to swipe through; all fit in the first page of the recipe list.
+const recommendationCount = 10;
+
 // Recipes tagged for this face type come first; the rest of the newest recipes fill the row.
 function Recommendations({ faceType }: { faceType: FaceType }) {
   const list = useInfiniteQuery({ ...recipeListOptions(), enabled: Boolean(apiUrl) });
@@ -183,21 +232,24 @@ function Recommendations({ faceType }: { faceType: FaceType }) {
   const recipes = [
     ...items.filter((recipe) => recipe.tags.includes(tag)),
     ...items.filter((recipe) => !recipe.tags.includes(tag)),
-  ].slice(0, 3);
+  ].slice(0, recommendationCount);
   return (
     <View className="gap-2.5">
       <View className="flex-row items-center justify-between px-5">
         <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
           おすすめメイク!!
         </Text>
-        <View
-          accessible
+        <Pressable
           accessibilityRole="button"
-          accessibilityLabel="おすすめメイクをすべて見る（準備中）"
-          accessibilityState={{ disabled: true }}
+          accessibilityLabel="おすすめメイクをすべて見る"
+          className="min-h-12 justify-center pl-3 active:opacity-70"
+          onPress={() => {
+            // ① lists every whole-face recipe, newest first, even if the parts list was left open.
+            router.navigate({ pathname: '/', params: { scope: 'whole' } });
+          }}
         >
           <Text className="font-maru-bold text-label text-accent-rose">すべて見る</Text>
-        </View>
+        </Pressable>
       </View>
       {!apiUrl ? (
         <View className="px-5">
@@ -356,48 +408,53 @@ function RecommendationCard({
   recipe: RecipeSummary;
   matched: string | undefined;
 }) {
-  const ink = useTokenColor('--color-ink-primary');
   const secondary = useTokenColor('--color-ink-secondary');
   const likes = formatCount(recipe.likeCount);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={[recipe.title, recipe.author.name, matched].filter(Boolean).join('、')}
-      className="w-43 gap-1.25 active:opacity-80"
-      onPress={() => {
-        router.push(`/recipes/${recipe.id}`);
-      }}
-    >
-      <View className="h-45 w-full overflow-hidden rounded-card bg-neutral-soft">
-        <Image
-          accessible={false}
-          source={{ uri: apiAssetUrl(recipe.image) }}
-          contentFit="cover"
-          style={{ width: '100%', height: '100%' }}
-        />
-        {matched ? (
-          <View
-            className="absolute left-2 top-2 flex-row items-center gap-1.25 rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
-            style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
-          >
-            <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
-            <Text className="font-maru-bold text-micro text-accent-rose">{matched}</Text>
+    <View className="w-43">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={[recipe.title, recipe.author.name, matched].filter(Boolean).join('、')}
+        className="gap-1.25 active:opacity-80"
+        onPress={() => {
+          router.push(`/recipes/${recipe.id}`);
+        }}
+      >
+        <View className="h-45 w-full overflow-hidden rounded-card bg-neutral-soft">
+          <Image
+            accessible={false}
+            source={{ uri: apiAssetUrl(recipe.image) }}
+            contentFit="cover"
+            style={{ width: '100%', height: '100%' }}
+          />
+          {matched ? (
+            <View
+              className="absolute left-2 top-2 flex-row items-center gap-1.25 rounded-2xl border border-white bg-white/85 py-1.5 pl-2 pr-3"
+              style={{ boxShadow: '0px 3px 5px rgba(196, 61, 112, 0.12)' }}
+            >
+              <Image accessible={false} source={sparkleRose} style={{ width: 12, height: 12 }} />
+              <Text className="font-maru-bold text-micro text-accent-rose">{matched}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View className="w-full gap-px px-1 pt-0.5">
+          <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
+          <View className="flex-row items-center gap-0.75">
+            <Text className="flex-1 font-maru text-meta text-ink-secondary">
+              {recipe.author.name}
+            </Text>
+            <SocialIcon name={HEART} size={13} color={secondary} />
+            <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
           </View>
-        ) : null}
-        <View className="absolute bottom-2 right-2 size-7.5 items-center justify-center rounded-full bg-white/85">
-          <SocialIcon name={HEART} size={16} color={ink} />
         </View>
-      </View>
-      <View className="w-full gap-px px-1 pt-0.5">
-        <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-        <View className="flex-row items-center gap-0.75">
-          <Text className="flex-1 font-maru text-meta text-ink-secondary">
-            {recipe.author.name}
-          </Text>
-          <SocialIcon name={HEART} size={13} color={secondary} />
-          <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
-        </View>
-      </View>
-    </Pressable>
+      </Pressable>
+      {/* Plan A puts the heart at the photo's bottom right: 180 - 8 - 30 from the top. */}
+      <CardFavorite
+        recipe={recipe}
+        title={recipe.title}
+        iconSize={16}
+        className="right-2 top-35.5 size-7.5 bg-white/85"
+      />
+    </View>
   );
 }

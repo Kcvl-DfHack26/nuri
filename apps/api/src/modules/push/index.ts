@@ -39,13 +39,13 @@ export function pushRoutes(db: Database, auth: Auth, accessToken: string | undef
 }
 
 type PushData = z.infer<typeof pushDataSchema>;
-type PostLiked = Extract<PushData, { kind: 'post-liked' }> & {
+type RecipeLiked = Extract<PushData, { kind: 'recipe-liked' }> & {
   actorName: string;
-  postBody: string;
-  actorImage: string | null;
+  recipeTitle: string;
+  recipeImage: string;
 };
-type RecipeProgress = Exclude<PushData, { kind: 'post-liked' }> & { recipeTitle?: string };
-type PushEvent = PostLiked | RecipeProgress;
+type RecipeProgress = Exclude<PushData, { kind: 'recipe-liked' }> & { recipeTitle?: string };
+type PushEvent = RecipeLiked | RecipeProgress;
 
 const recipeMessages = {
   'recipe-started': {
@@ -76,13 +76,13 @@ function excerpt(text: string, limit: number) {
 }
 
 async function notificationContent(db: Database, event: PushEvent) {
-  if (event.kind === 'post-liked') {
+  if (event.kind === 'recipe-liked') {
     const actor = excerpt(event.actorName, 24);
     return {
-      title: actor ? `❤️ ${actor}さんがいいねしました` : '❤️ 投稿にいいねが届きました',
-      body: `投稿「${excerpt(event.postBody, 48)}」`,
+      title: actor ? `❤️ ${actor}さんがいいねしました` : '❤️ レシピにいいねが届きました',
+      body: `レシピ「${excerpt(event.recipeTitle, 48)}」`,
       channelId: 'likes',
-      image: event.actorImage,
+      image: event.recipeImage,
     } as const;
   }
   const [published] =

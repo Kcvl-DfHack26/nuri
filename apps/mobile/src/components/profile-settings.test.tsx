@@ -2,12 +2,42 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
+import type { RecipeDetail } from '@/lib/recipes';
+
+import { favoriteListOptions, recipeListOptions, recipeOptions } from '@/lib/recipes';
 import { createTestQueryClient } from '@/lib/test/query-client';
 
 import { ProfileSettings } from './profile-settings';
 
 jest.mock('@expo/ui', () => ({
   Icon: Object.assign(() => null, { select: () => 'icon' }),
+  // The stand-in shows the selected item's label; pressing it picks 丸顔.
+  Picker: Object.assign(
+    ({
+      testID,
+      selectedValue,
+      onValueChange,
+      children,
+    }: {
+      testID: string;
+      selectedValue: string;
+      onValueChange: (value: string) => void;
+      children: { props: { label: string; value: string } }[];
+    }) => {
+      const { Pressable } = jest.requireActual<typeof import('react-native')>('react-native');
+      const selected = children.flat().find((item) => item.props.value === selectedValue);
+      return (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${testID} ${selected?.props.label ?? ''}`}
+          onPress={() => {
+            onValueChange('round');
+          }}
+        />
+      );
+    },
+    { Item: () => null },
+  ),
   Host: jest.requireActual<typeof import('react-native')>('react-native').View,
   Switch: ({
     label,
@@ -104,6 +134,21 @@ const viewer: Session = {
     session: { id: 'current-session' },
   },
 };
+const cachedRecipe: RecipeDetail = {
+  id: 'fox',
+  title: '狐メイク',
+  image: '/sample-recipes/fox.jpg',
+  tags: [],
+  durationMinutes: 10,
+  source: null,
+  part: null,
+  summary: null,
+  likeCount: 0,
+  favorited: false,
+  author: { id: 'viewer', name: 'はなこ', image: null },
+  products: [],
+  steps: [],
+};
 const mockUseSession = jest.fn((): Session & { isPending: boolean } => ({
   ...viewer,
   isPending: false,
@@ -121,7 +166,9 @@ afterEach(() => {
 });
 const mockGetProfile = jest.fn(async () => ({
   status: 200,
-  json: async () => ({ profile: { name: 'はなこ', handle: null, bio: '', isPublic: true } }),
+  json: async () => ({
+    profile: { name: 'はなこ', handle: null, bio: '', isPublic: true, faceType: null },
+  }),
 }));
 const mockPutProfile = jest.fn(async (_input: { json: unknown }) => ({ status: 200 }));
 const mockAccounts = jest.fn(async () => ({
@@ -170,6 +217,46 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
     json: { name: 'はな', handle: 'hana_1', bio: 'よろしく', isPublic: false },
   });
   expect(mockNotify).toHaveBeenCalled();
+});
+
+test('refreshes cached recipe authors after saving a profile', async () => {
+  const client = createTestQueryClient();
+  const detail = recipeOptions('fox').queryKey;
+  const lists = [recipeListOptions({}).queryKey, favoriteListOptions('viewer').queryKey];
+  for (const key of lists) {
+    client.setQueryData(key, { pages: [], pageParams: [] });
+  }
+  client.setQueryData(detail, cachedRecipe);
+  client.setQueryData(['unrelated'], []);
+  await renderWithClient(<ProfileSettings />, client);
+  await screen.findByLabelText('表示名');
+  await fireEvent.changeText(screen.getByLabelText('表示名'), '更新した名前');
+  await saveProfile();
+
+  for (const key of [detail, ...lists]) {
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  }
+  expect(client.getQueryState(['unrelated'])?.isInvalidated).toBe(false);
+  // Even a fresh cached detail must fetch the saved author's name when opened again.
+  const updated = await client.fetchQuery({
+    queryKey: detail,
+    staleTime: Infinity,
+    queryFn: async () => ({
+      ...cachedRecipe,
+      author: { ...cachedRecipe.author, name: '更新した名前' },
+    }),
+  });
+  expect(updated.author.name).toBe('更新した名前');
+});
+
+test('chooses a face type and saves it, never showing a skin tone', async () => {
+  await renderWithClient(<ProfileSettings />);
+  const picker = await screen.findByRole('button', { name: '顔タイプ 未設定' });
+  expect(screen.queryByText(/イエベ/)).toBeNull();
+  await fireEvent.press(picker);
+  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeOnTheScreen();
+  await saveProfile();
+  expect(mockPutProfile).toHaveBeenCalledWith({ json: { faceType: 'round' } });
 });
 
 test('adds and removes passkeys inline in the account section', async () => {
@@ -246,7 +333,7 @@ test('saves a privacy change when the existing display name exceeds the edit lim
   mockGetProfile.mockResolvedValueOnce({
     status: 200,
     json: async () => ({
-      profile: { name: 'x'.repeat(41), handle: null, bio: '', isPublic: true },
+      profile: { name: 'x'.repeat(41), handle: null, bio: '', isPublic: true, faceType: null },
     }),
   });
   await renderWithClient(<ProfileSettings />);
@@ -289,9 +376,12 @@ test('lets a guest log in from the profile settings', async () => {
 });
 
 test('keeps the edited name and shows why saving or logging out failed', async () => {
+  const client = createTestQueryClient();
+  const detail = recipeOptions('fox').queryKey;
+  client.setQueryData(detail, cachedRecipe);
   mockPutProfile.mockResolvedValueOnce({ status: 500 });
   mockSignOut.mockResolvedValueOnce({ error: { message: 'failed' } });
-  await renderWithClient(<ProfileSettings />);
+  await renderWithClient(<ProfileSettings />, client);
   await screen.findByLabelText('表示名');
   await fireEvent.changeText(screen.getByLabelText('表示名'), 'はな');
   await fireEvent.press(screen.getByRole('button', { name: '保存する' }));
@@ -300,6 +390,7 @@ test('keeps the edited name and shows why saving or logging out failed', async (
   ).toBeOnTheScreen();
   expect(screen.getByLabelText('表示名')).toHaveProp('value', 'はな');
   expect(screen.getByRole('button', { name: '保存する' })).toBeEnabled();
+  expect(client.getQueryState(detail)?.isInvalidated).toBe(false);
 
   await fireEvent.press(screen.getByRole('button', { name: 'ログアウト' }));
   expect(

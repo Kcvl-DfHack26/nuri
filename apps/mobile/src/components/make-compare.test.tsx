@@ -8,9 +8,14 @@ import { MakeCompare } from './make-compare';
 import { MakeFinish } from './make-finish';
 
 // The live camera needs the native face tracker and Skia; Expo Go and Jest use Plan A's photo.
+// A test can switch to a stand-in camera to check what the live finish would paint.
+let mockCanTrackFace = false;
+const mockFaceMakeupCamera = jest.fn((_: { layers: readonly unknown[] }) => null);
 jest.mock('@/components/face-makeup-camera', () => ({
-  canTrackFace: false,
-  FaceMakeupCamera: () => null,
+  get canTrackFace() {
+    return mockCanTrackFace;
+  },
+  FaceMakeupCamera: (props: { layers: readonly unknown[] }) => mockFaceMakeupCamera(props),
 }));
 jest.mock('@expo/ui', () => {
   const reactNative = jest.requireActual<typeof import('react-native')>('react-native');
@@ -78,6 +83,19 @@ test('shares the recipe as text from the finish screen, as Plan A has no way to 
   expect(screen.getByRole('button', { name: '写真を保存（準備中）' })).toBeDisabled();
   await fireEvent.press(await screen.findByRole('button', { name: '共有', disabled: false }));
   expect(share).toHaveBeenCalledWith({ message: '狐メイク（mio）をnuriで試しました' });
+});
+
+test('shows the live finish at once and without step guides once the recipe loads', async () => {
+  mockCanTrackFace = true;
+  try {
+    await render(<MakeFinish id="fox" />, { wrapper: TestQueryProvider });
+    expect(screen.getByText('メイクのできあがり')).toBeOnTheScreen();
+    expect(await screen.findByText('狐メイクのできあがり')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: '共有', disabled: false })).toBeOnTheScreen();
+    expect(mockFaceMakeupCamera.mock.lastCall?.[0].layers).toEqual([]);
+  } finally {
+    mockCanTrackFace = false;
+  }
 });
 
 test('moves the divider with accessibility actions and goes back', async () => {

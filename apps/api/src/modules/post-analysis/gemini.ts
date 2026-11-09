@@ -1,7 +1,7 @@
 import type { PostAnalysis } from '@starter/shared';
 
 import { ApiError, GoogleGenAI } from '@google/genai';
-import { postAnalysisSchema } from '@starter/shared';
+import { postAnalysisSchema, recipeStepsMax } from '@starter/shared';
 import { z } from 'zod';
 
 /** A video from ⑫-3 and the times (seconds) the user tapped 手順を区切る while recording. */
@@ -11,8 +11,19 @@ export type PostAnalyzer = (video: PostVideo) => Promise<PostAnalysis>;
 
 const model = 'gemini-3.8-flash';
 
-/** What Gemini answers before the cosmetics are checked by search. */
+/**
+ * What Gemini answers before the times are read and the cosmetics are checked by search. Times
+ * are "m:ss" text: asked for seconds, Gemini wrote 1:07 as 107 (#185).
+ */
 const answerSchema = postAnalysisSchema.extend({
+  steps: z
+    .array(
+      postAnalysisSchema.shape.steps.element.extend({
+        start: z.string().trim().max(12),
+        end: z.string().trim().max(12),
+      }),
+    )
+    .max(recipeStepsMax),
   cosmetics: z
     .array(
       postAnalysisSchema.shape.cosmetics.element
@@ -57,7 +68,7 @@ const verificationSchema = z.object({ found: z.boolean() });
 const prompt = `あなたはメイクの手順書を作るアシスタントです．入力は，利用者がインカメラで自分を撮ったメイク動画です．
 次のことをJSONで答えてください．
 - title: レシピの題名（20字程度）．summary: メイク全体の説明（80字程度）．
-- steps: 手順ごとの区間（start・end は動画の先頭からの秒），部位（part），利用者向けの短い説明（description，60字程度，「〜する」の形）．
+- steps: 手順ごとの区間（start・end は動画の先頭からの時刻を「分:秒」で書く．例：0:05，1:07．1分を過ぎた時刻は 107 ではなく 1:07 と書く），部位（part），利用者向けの短い説明（description，60字程度，「〜する」の形）．
   part は base=ベース，brow=眉，eye=アイシャドウ，lash=アイライン，cheek=チーク，shading=シェーディング，highlight=ハイライト，lip=リップ．
 - cosmetics: 動画に映っているコスメ．パッケージの文字が読めない場合は推測しすぎず confidence を low にし，存在が確かでない商品名を作らない．evidence に判断の根拠を書く．steps[].cosmetics には使ったコスメの番号を入れる．
 - 利用者が話した内容も，部位・説明・コスメ・塗った範囲の判断に使う．
@@ -81,8 +92,31 @@ export function analysisPrompt(marks: number[]) {
   if (marks.length === 0) {
     return prompt;
   }
-  const times = marks.map((mark) => `${mark.toFixed(1)}秒`).join('，');
+  const times = marks.map((mark) => clockText(mark)).join('，');
   return `${prompt}\n利用者は録画中に次の時刻で手順を区切りました: ${times}．これを手順の区切りの基準にし，明らかにずれている場合だけ補正してください．`;
+}
+
+/** Seconds from an "m:ss" time such as 1:07 or 0:05.5; null when the text is not one. */
+export function clockSeconds(text: string) {
+  const match = /^(\d{1,3}):([0-5]\d(?:\.\d+)?)$/.exec(text.trim());
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+/** Gemini's steps with their "m:ss" times in seconds; a step whose time cannot be read is left out. */
+export function answerSteps<T extends { start: string; end: string }>(
+  steps: readonly T[],
+): (Omit<T, 'start' | 'end'> & { start: number; end: number })[] {
+  return steps.flatMap((step) => {
+    const start = clockSeconds(step.start);
+    const end = clockSeconds(step.end);
+    return start === null || end === null ? [] : [{ ...step, start, end }];
+  });
+}
+
+/** An "m:ss.s" time for seconds, e.g. 62.5 → 1:02.5, as the marks are written for Gemini. */
+export function clockText(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${(seconds - minutes * 60).toFixed(1).padStart(4, '0')}`;
 }
 
 /** Reads the one-line JSON a search answer starts with, also when Gemini wraps it in a fence. */
@@ -166,6 +200,7 @@ export function geminiAnalyzer(project: string, location: string): PostAnalyzer 
     const checks = await Promise.all(answer.cosmetics.map((cosmetic) => verify(cosmetic)));
     return postAnalysisSchema.parse({
       ...answer,
+      steps: answerSteps(answer.steps),
       cosmetics: answer.cosmetics.map(({ evidence: _evidence, ...cosmetic }, index) => ({
         ...cosmetic,
         ...checks[index],

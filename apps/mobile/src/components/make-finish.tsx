@@ -9,11 +9,9 @@ import { canTrackFace, FaceMakeupCamera } from '@/components/face-makeup-camera'
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { MediaLayout } from '@/components/media-layout';
-import { RecipeStatus } from '@/components/recipe-detail';
 import { arPhotos } from '@/components/recipes';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
-import { finishLayers, recipeLayers } from '@/lib/face-makeup';
 import { backOrHome } from '@/lib/navigation';
 import { recipeOptions, shareRecipe } from '@/lib/recipes';
 
@@ -30,33 +28,13 @@ const DOWNLOAD = Icon.select({
   android: import('@expo/material-symbols/download.xml'),
 });
 
-// Plan A ⑩ 完成: every step of the recipe painted on the tracked face at once. Without the face
-// tracker (Expo Go), Plan A's finished photo stands in.
+// Plan A ⑩ 完成: the made-up face as it is, with no step guides over it. The painted areas guide ⑦'s
+// steps and would look unnatural on the finished face (#190). Without the face tracker (Expo Go),
+// Plan A's finished photo stands in.
 export function MakeFinish({ id }: { id: string }) {
   const insets = useSafeAreaInsets();
-  const query = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
-  const recipe = query.data;
-  // The live finish paints the recipe's steps, so it needs them; Expo Go shows Plan A's photo.
-  if (canTrackFace && !recipe) {
-    return (
-      <RecipeStatus
-        loading={query.isPending && Boolean(apiUrl)}
-        message={finishStatusMessage({
-          hasApi: Boolean(apiUrl),
-          isMissing: recipe === null,
-          isError: query.isError,
-        })}
-        onRetry={
-          query.isError
-            ? () => {
-                void query.refetch();
-              }
-            : undefined
-        }
-      />
-    );
-  }
-  const layers = recipeLayers(id, finishLayers(recipe?.steps ?? []));
+  // Only the title and 共有 use the recipe, so the finish shows at once without waiting for it.
+  const { data: recipe } = useQuery({ ...recipeOptions(id), enabled: Boolean(apiUrl) });
   const fade = (
     <View
       pointerEvents="none"
@@ -82,7 +60,7 @@ export function MakeFinish({ id }: { id: string }) {
       media={
         <>
           {canTrackFace ? (
-            <FaceMakeupCamera layers={layers}>
+            <FaceMakeupCamera layers={[]}>
               {fade}
               {sparkles}
             </FaceMakeupCamera>
@@ -146,25 +124,4 @@ export function MakeFinish({ id }: { id: string }) {
       }
     />
   );
-}
-
-function finishStatusMessage({
-  hasApi,
-  isMissing,
-  isError,
-}: {
-  hasApi: boolean;
-  isMissing: boolean;
-  isError: boolean;
-}) {
-  if (!hasApi) {
-    return '接続先が未設定です。セットアップ後に表示できます。';
-  }
-  if (isMissing) {
-    return 'レシピが見つかりません';
-  }
-  if (isError) {
-    return 'レシピを読み込めませんでした。通信状況を確認してお試しください。';
-  }
-  return 'レシピを読み込んでいます';
 }

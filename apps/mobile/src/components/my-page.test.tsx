@@ -43,6 +43,7 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
 jest.mock('@/lib/api', () => ({
+  apiUrl: 'http://localhost:8080',
   apiAssetUrl: (path: string) => path,
   authClient: {
     useSession: () => mockUseSession(),
@@ -50,7 +51,16 @@ jest.mock('@/lib/api', () => ({
   api: {
     api: {
       recipes: { $get: () => mockPosted() },
-      me: { favorites: { $get: () => mockFavorites() } },
+      me: {
+        favorites: { $get: () => mockFavorites() },
+        profile: {
+          $get: async () => ({
+            status: 200,
+            json: async () => ({ profile: { faceType: 'round' } }),
+          }),
+        },
+      },
+      users: { ':id': { $get: () => mockProfile() } },
     },
   },
 }));
@@ -67,6 +77,12 @@ const page = (items: unknown[], nextOffset: number | null = null) => ({
 });
 const mockPosted = jest.fn(async () => page([recipe('own', '自分のメイク')]));
 const mockFavorites = jest.fn(async () => page([recipe('fox', '狐メイク')]));
+const mockProfile = jest.fn(async () => ({
+  status: 200,
+  json: async () => ({
+    user: { id: 'viewer', followerCount: 328, followingCount: 96, likeCount: 2400 },
+  }),
+}));
 
 type Session = { data: { user: { id: string; name: string; email: string } } | null };
 const viewer: Session = {
@@ -85,12 +101,16 @@ afterEach(() => {
 
 test('shows the signed-in profile with posted and favorite recipes and opens them', async () => {
   await render(<MyPage />, { wrapper: TestQueryProvider });
-  const posted = await screen.findByRole('button', { name: '自分のメイク、はなこ、いいね1.2k' });
-  const favorite = await screen.findByRole('button', { name: '狐メイク、はなこ、いいね1.2k' });
+  const posted = await screen.findByRole('button', {
+    name: '自分のメイク、はなこ、お気に入り1.2k',
+  });
+  const favorite = await screen.findByRole('button', { name: '狐メイク、はなこ、お気に入り1.2k' });
   expect(screen.getByRole('header', { name: 'はなこ' })).toBeOnTheScreen();
-  // Following and likes are not built, so Plan A's sample counts are not shown.
-  for (const label of ['フォロワー', 'フォロー中', 'いいね', '328', '96', '2.4k']) {
-    expect(screen.queryByText(label)).toBeNull();
+  // The face type saved on ⑰-2 or from ⑭ shows under the name.
+  expect(await screen.findByText('丸顔')).toBeOnTheScreen();
+  // The counts come from the user's profile.
+  for (const label of ['フォロワー 328', 'フォロー中 96', 'いいね 2.4k']) {
+    expect(await screen.findByLabelText(label)).toBeOnTheScreen();
   }
   expect(screen.queryByText(/見本です/)).toBeNull();
 
@@ -110,7 +130,7 @@ test('loads more favorites past the first page', async () => {
   await render(<MyPage />, { wrapper: TestQueryProvider });
   await fireEvent.press(await screen.findByRole('button', { name: 'もっと見る' }));
   expect(
-    await screen.findByRole('button', { name: '猫メイク、はなこ、いいね1.2k' }),
+    await screen.findByRole('button', { name: '猫メイク、はなこ、お気に入り1.2k' }),
   ).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'もっと見る' })).toBeNull();
 });
@@ -125,7 +145,7 @@ test('shows empty sections and retries a failed list', async () => {
   ).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
   expect(
-    await screen.findByRole('button', { name: '狐メイク、はなこ、いいね1.2k' }),
+    await screen.findByRole('button', { name: '狐メイク、はなこ、お気に入り1.2k' }),
   ).toBeOnTheScreen();
 });
 
@@ -137,4 +157,12 @@ test('asks a guest to log in instead of showing a profile', async () => {
 
   await fireEvent.press(screen.getByRole('button', { name: 'ログイン' }));
   expect(router.push).toHaveBeenCalledWith('/account');
+});
+
+test('retries the follow and like counts when they fail to load', async () => {
+  mockProfile.mockRejectedValueOnce(new Error('通信エラー'));
+  await render(<MyPage />, { wrapper: TestQueryProvider });
+  expect(await screen.findByText('フォロワーなどの数を読み込めませんでした。')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
+  expect(await screen.findByLabelText('フォロワー 328')).toBeOnTheScreen();
 });

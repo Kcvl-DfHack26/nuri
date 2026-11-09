@@ -55,9 +55,7 @@ export function PushNotifications() {
             return;
           }
           const data = parsed.data;
-          if (data.kind === 'post-liked') {
-            router.navigate({ pathname: '/users/[id]', params: { id: data.recipientId } });
-          } else if (data.kind === 'recipe-ready' && data.recipeId) {
+          if ((data.kind === 'recipe-liked' || data.kind === 'recipe-ready') && data.recipeId) {
             router.navigate({ pathname: '/recipes/[id]', params: { id: data.recipeId } });
           } else {
             router.navigate('/import');

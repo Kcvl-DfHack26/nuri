@@ -112,7 +112,7 @@ export default [
               allow: { to: { element: { type: 'api-module', captured: { module: 'auth' } } } },
             },
             {
-              from: { element: { type: 'api-module', captured: { module: 'social' } } },
+              from: { element: { type: 'api-module', captured: { module: 'recipes' } } },
               allow: { to: { element: { type: 'api-module', captured: { module: 'push' } } } },
             },
             {

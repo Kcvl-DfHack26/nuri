@@ -31,7 +31,7 @@ export function PushSettings({ sessionId }: { sessionId: string }) {
       <Text className="font-maru text-meta text-ink-secondary">
         {registered
           ? 'この端末で通知を受け取れます。'
-          : '投稿へのいいねやレシピ作成のお知らせを受け取れます。'}
+          : 'レシピへのいいねや動画レシピ作成のお知らせを受け取れます。'}
       </Text>
       {registration.error || action.isError ? (
         <Text accessibilityLiveRegion="polite" className="font-maru text-meta text-accent-rose">

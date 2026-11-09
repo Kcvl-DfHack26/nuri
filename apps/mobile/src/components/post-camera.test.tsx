@@ -217,7 +217,7 @@ function renderRecording() {
   );
 }
 
-test('records with the marks of 手順を区切る and opens ⑫-3', async () => {
+test('records without 手順を区切る and opens ⑫-3 with no marks', async () => {
   jest.useFakeTimers({ now: 0 });
   await renderRecording();
   await act(() => {
@@ -227,15 +227,16 @@ test('records with the marks of 手順を区切る and opens ⑫-3', async () =>
     jest.advanceTimersByTime(2000);
   });
   expect(screen.getByLabelText('録画時間 0分2秒')).toBeOnTheScreen();
-  await fireEvent.press(screen.getByRole('button', { name: '手順を区切る' }));
-  expect(screen.getByText('手順2 を撮影中')).toBeOnTheScreen();
+  // Gemini finds the steps, so the recording is not split while it runs (#186).
+  expect(screen.queryByRole('button', { name: /手順を区切る/ })).toBeNull();
+  expect(screen.queryByText(/を撮影中/)).toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: '撮影を終える' }));
   expect(mockStopRecording).toHaveBeenCalled();
   await act(async () => {
     mockRecording.current?.resolve({ uri: 'file:///recorded.mov' });
     await Promise.resolve();
   });
-  expect(screen.getByText('file:///recorded.mov 2000')).toBeOnTheScreen();
+  expect(screen.getByText('file:///recorded.mov')).toBeOnTheScreen();
   expect(router.replace).toHaveBeenCalledWith('/post/creating');
   jest.useRealTimers();
 });

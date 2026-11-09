@@ -38,6 +38,7 @@ jest.mock('react-native-safe-area-context', () => ({
 
 jest.mock('@/lib/api', () => ({
   apiUrl: 'http://localhost:8080',
+  authClient: { useSession: () => ({ data: null }) },
   apiAssetUrl: (path: string) => path,
   api: { api: { recipes: { $get: (args: unknown) => mockGetRecipes(args) } } },
 }));
@@ -73,7 +74,9 @@ test('searches once typing pauses and opens a result', async () => {
     await act(() => {
       jest.advanceTimersByTime(300);
     });
-    await fireEvent.press(await screen.findByRole('button', { name: '狐メイク、mio、いいね1.2k' }));
+    await fireEvent.press(
+      await screen.findByRole('button', { name: '狐メイク、mio、お気に入り1.2k' }),
+    );
     expect(mockGetRecipes).toHaveBeenCalledTimes(1);
     expect(mockGetRecipes).toHaveBeenCalledWith({ query: { offset: '0', q: '狐' } });
     expect(router.push).toHaveBeenCalledWith('/recipes/fox');
@@ -104,6 +107,6 @@ test('retries a failed search', async () => {
 
   await fireEvent.press(screen.getByRole('button', { name: 'もう一度試す' }));
   expect(
-    await screen.findByRole('button', { name: '狐メイク、mio、いいね1.2k' }),
+    await screen.findByRole('button', { name: '狐メイク、mio、お気に入り1.2k' }),
   ).toBeOnTheScreen();
 });

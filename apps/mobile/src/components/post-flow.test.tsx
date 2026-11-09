@@ -39,7 +39,60 @@ jest.mock('expo-file-system', () => ({
     base64: () => Promise.resolve(`/9j/${uri}`),
   })),
 }));
+// A stand-in video player that records what ⑫-5 asks of it and lets a test send its events.
+const mockPlayer = {
+  currentTime: 0,
+  status: 'readyToPlay',
+  playing: false,
+  timeUpdateEventInterval: 0,
+  play: jest.fn(),
+  pause: jest.fn(),
+  listeners: new Map<string, (payload: object) => void>(),
+  addListener(name: string, listener: (payload: object) => void) {
+    this.listeners.set(name, listener);
+    return { remove: () => this.listeners.delete(name) };
+  },
+};
+jest.mock('expo-video', () => ({
+  useVideoPlayer: (_source: unknown, setup?: (player: typeof mockPlayer) => void) => {
+    const { useState } = jest.requireActual<typeof import('react')>('react');
+    // Like expo-video, set the player up once.
+    const [player] = useState(() => {
+      setup?.(mockPlayer);
+      return mockPlayer;
+    });
+    return player;
+  },
+  VideoView: () => null,
+}));
+// The frame's face, as the face tracker would find it: the canonical mesh laid over the photo.
+const mockTracker = {
+  value: {
+    detectFaceAsync: jest.fn((_uri: string) => {
+      const { canonicalFaceMesh } =
+        jest.requireActual<typeof import('@/lib/face-mesh')>('@/lib/face-mesh');
+      return Promise.resolve({
+        points: canonicalFaceMesh.textureCoordinates.flatMap((point) => [point.x, point.y]),
+        width: 1000,
+        height: 1000,
+      });
+    }),
+  } as { detectFaceAsync: (uri: string) => Promise<unknown> } | null,
+};
+jest.mock('../../modules/face-tracker/src/FaceTrackerModule', () => ({
+  __esModule: true,
+  get default() {
+    return mockTracker.value;
+  },
+}));
+jest.mock('@shopify/react-native-skia', () => ({
+  Canvas: jest.requireActual<typeof import('react-native')>('react-native').View,
+}));
+jest.mock('@/components/shape-texture', () => ({ useShapeTexture: () => null }));
 jest.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => (() => void) | undefined) => {
+    jest.requireActual<typeof import('react')>('react').useEffect(effect, [effect]);
+  },
   router: {
     push: jest.fn(),
     back: jest.fn(),
@@ -60,13 +113,19 @@ jest.mock('@expo/ui', () => {
   return {
     Icon: Object.assign(() => null, { select: () => 'icon' }),
     Host: View,
-    // Pressing the stand-in moves the slider to 2 seconds.
-    Slider: ({ onValueChange }: { onValueChange: (value: number) => void }) => (
+    // Pressing the stand-in moves the slider to `mockSlider.value`.
+    Slider: ({
+      testID,
+      onValueChange,
+    }: {
+      testID: string;
+      onValueChange: (value: number) => void;
+    }) => (
       <Pressable
         accessibilityRole="adjustable"
-        accessibilityLabel="サムネイルの時点"
+        accessibilityLabel={testID}
         onPress={() => {
-          onValueChange(2000);
+          onValueChange(mockSlider.value);
         }}
       />
     ),
@@ -115,9 +174,24 @@ jest.mock('@/lib/api', () => ({
   },
 }));
 const alert = jest.spyOn(Alert, 'alert');
+const mockSlider = { value: 2000 };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSlider.value = 2000;
+  mockTracker.value = {
+    detectFaceAsync: jest.fn((_uri: string) => {
+      const { canonicalFaceMesh } =
+        jest.requireActual<typeof import('@/lib/face-mesh')>('@/lib/face-mesh');
+      return Promise.resolve({
+        points: canonicalFaceMesh.textureCoordinates.flatMap((point) => [point.x, point.y]),
+        width: 1000,
+        height: 1000,
+      });
+    }),
+  };
+  mockPlayer.currentTime = 0;
+  mockPlayer.listeners.clear();
   mockApi.url = null;
   mockShrink.mockImplementation((uri) => Promise.resolve(uri));
   mockFileSize.mockImplementation(() => 1000);
@@ -419,6 +493,8 @@ const analysis: PostAnalysis = {
       ],
       cosmetics: [0],
     },
+    // Past the 60-second video: a misreading that is dropped.
+    { start: 70, end: 80, part: 'lip', description: '', regions: [], cosmetics: [] },
   ],
   cosmetics: [
     {
@@ -461,6 +537,9 @@ test('asks before sending the video and fills the steps with what Gemini found',
   mockAnalyze.mockResolvedValue(analysis);
   const draft = await renderCreating();
   expect(alert.mock.calls.at(-1)?.[0]).toBe('動画を送って手順書を作りますか');
+  expect(alert.mock.calls.at(-1)?.[1]).toBe(
+    'サーバーに送信しGeminiで動画より手順と使ったコスメを読み取ります。動画はサーバーに残しません。',
+  );
   expect(mockAnalyze).not.toHaveBeenCalled();
   await pressAlertButton('送る');
   await waitFor(() => {
@@ -565,6 +644,55 @@ test('lists the steps made from the video with their segment lengths', async () 
   expect(router.push).toHaveBeenCalledWith('/post/step/1');
 });
 
+test('adds a step on ⑫-4 over the start and end picked on the bar, and opens it', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostReview />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  await fireEvent.press(screen.getByRole('button', { name: '手順を追加' }));
+  // It starts as the second half of the last step; a screen reader moves its start a second.
+  expect(screen.getByText('1:35 〜 2:05')).toBeOnTheScreen();
+  await fireEvent(screen.getByLabelText('区間の開始'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'decrement' },
+  });
+  expect(screen.getByText('1:34 〜 2:05')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '追加' }));
+  const steps = () => latest?.steps ?? [];
+  // The last step is cut back to meet the new one.
+  expect(steps().map((step) => [step.part, step.segment])).toEqual([
+    ['brow', { startMs: 0, endMs: 65_000 }],
+    ['cheek', { startMs: 65_000, endMs: 94_000 }],
+    ['cheek', { startMs: 94_000, endMs: 125_000 }],
+  ]);
+  expect(steps()[2]).toMatchObject({ title: '', description: '', cosmetics: [], shape: null });
+  expect(router.push).toHaveBeenCalledWith('/post/step/2');
+  await waitFor(() => {
+    expect(steps()[2]?.image).toBe('file:///frame-94000.jpg');
+  });
+  // The steps around it keep what they had.
+  expect(steps()[1]?.title).toBe('頬に高めに');
+});
+
+test('closes the panel without adding a step when canceled', async () => {
+  await renderSeeded(<PostReview />);
+  await fireEvent.press(screen.getByRole('button', { name: '手順を追加' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'キャンセル' }));
+  expect(screen.getByRole('button', { name: '手順を追加' })).toBeOnTheScreen();
+  expect(screen.getByText('動画から2つの手順を作りました')).toBeOnTheScreen();
+});
+
+test('cannot add a step without a video to split', async () => {
+  await renderSeeded(<PostReview />, { ...readyDraft, video: null });
+  expect(screen.getByRole('button', { name: '手順を追加（準備中）' })).toBeDisabled();
+});
+
 test('picks the part of a step on ⑫-5 and drops the area read for the old part', async () => {
   let latest: PostDraft | null = null;
   await renderSeeded(
@@ -586,14 +714,192 @@ test('picks the part of a step on ⑫-5 and drops the area read for the old part
   expect(shape()).toBeNull();
 });
 
+test('plays the step on ⑫-5 from its start and stops at its end', async () => {
+  await renderSeeded(<PostStepEdit index="1" />);
+  mockPlayer.currentTime = 0;
+  await fireEvent.press(screen.getByRole('button', { name: '区間を再生' }));
+  expect(mockPlayer.currentTime).toBe(65);
+  expect(mockPlayer.play).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    mockPlayer.listeners.get('timeUpdate')?.({ currentTime: 125 });
+    await Promise.resolve();
+  });
+  expect(mockPlayer.pause).toHaveBeenCalled();
+});
+
+test('says so and cannot play when the video cannot be read', async () => {
+  await renderSeeded(<PostStepEdit index="0" />);
+  await act(async () => {
+    mockPlayer.listeners.get('statusChange')?.({ status: 'error' });
+    await Promise.resolve();
+  });
+  expect(screen.getByText('動画を再生できませんでした')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: '区間を再生' })).toBeDisabled();
+});
+
+test('moves a step’s end on ⑫-5, moving the next step and cutting its frame again', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="0" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  // A screen reader moves the end of the bar a second at a time, as a drag would.
+  await fireEvent(screen.getByLabelText('区間の終了'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'increment' },
+  });
+  const steps = () => latest?.steps ?? [];
+  expect(steps().map((step) => step.segment)).toEqual([
+    { startMs: 0, endMs: 66_000 },
+    { startMs: 66_000, endMs: 125_000 },
+  ]);
+  expect(screen.getByText('0:00 〜 1:06')).toBeOnTheScreen();
+  await waitFor(() => {
+    expect(steps()[1]?.image).toBe('file:///frame-66000.jpg');
+  });
+  // The step that kept its start keeps its frame.
+  expect(steps()[0]?.image).toBe('file:///step-0.jpg');
+});
+
+test('keeps a step inside the video and at least a second long', async () => {
+  await renderSeeded(<PostStepEdit index="0" />);
+  await fireEvent(screen.getByLabelText('区間の開始'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'decrement' },
+  });
+  expect(screen.getByText('0:00 〜 1:05')).toBeOnTheScreen();
+  expect(getThumbnailAsync).not.toHaveBeenCalled();
+});
+
+test('shows the area read for the step on its frame and moves a picked point', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="0" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  const frame = await screen.findByTestId('塗る範囲の場面');
+  await fireEvent(frame, 'layout', { nativeEvent: { layout: { width: 300, height: 300 } } });
+  // The preview shows no points until 編集する.
+  expect(screen.queryByRole('button', { name: '点1' })).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: '編集する' }));
+  // The brow's two points; the first is picked at first.
+  expect(screen.getByRole('button', { name: '点1', selected: true })).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '次の点' }));
+  expect(screen.getByRole('button', { name: '点2', selected: true })).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '右へ' }));
+  await fireEvent.press(screen.getByRole('button', { name: '上へ' }));
+  const shapeOf = () => latest?.steps[0]?.shape;
+  const points = () => shapeOf()?.strokes[0]?.points ?? [];
+  expect(points()[0]).toEqual({ at: 46 });
+  expect(points()[1]?.dx).toBeCloseTo(0.004);
+  expect(points()[1]?.dy).toBeCloseTo(-0.004);
+  await fireEvent.press(screen.getByRole('button', { name: '前の点' }));
+  expect(screen.getByRole('button', { name: '点1', selected: true })).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '太く' }));
+  expect(shapeOf()?.strokes[0]?.width).toBeCloseTo(0.025);
+  await fireEvent.press(screen.getByRole('button', { name: '完了' }));
+  expect(screen.queryByRole('button', { name: '点1' })).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: '編集する' }));
+  await fireEvent.press(screen.getByRole('button', { name: '範囲を消す' }));
+  expect(shapeOf()).toBeNull();
+  expect(screen.getByText('この手順には塗る範囲がありません')).toBeOnTheScreen();
+});
+
+test('adds a plain area to a step without one and opens it for editing', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="1" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+    {
+      ...readyDraft,
+      steps: (readyDraft.steps ?? []).map((step) => ({ ...step, image: 'file:///step.jpg' })),
+    },
+  );
+  expect(screen.getByText('この手順には塗る範囲がありません')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: '範囲を追加' }));
+  const shape = () => latest?.steps[1]?.shape;
+  // The cheek's plain area: an ellipse on both cheeks.
+  expect(shape()?.strokes[0]).toMatchObject({ fill: true, mirror: true });
+  const frame = await screen.findByTestId('塗る範囲の場面');
+  await fireEvent(frame, 'layout', { nativeEvent: { layout: { width: 300, height: 300 } } });
+  expect(screen.getByRole('button', { name: '点1', selected: true })).toBeOnTheScreen();
+});
+
+test('says why the area cannot be shown', async () => {
+  mockTracker.value = null;
+  await renderSeeded(<PostStepEdit index="0" />);
+  expect(screen.getByText('この環境では塗る範囲を表示できません')).toBeOnTheScreen();
+});
+
+test('deletes a step on ⑫-5 after asking and returns to ⑫-4', async () => {
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostStepEdit index="0" />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+  );
+  const steps = () => latest?.steps ?? [];
+  await fireEvent.press(screen.getByRole('button', { name: 'この手順を削除' }));
+  expect(alert.mock.calls.at(-1)?.[0]).toBe('この手順を削除しますか？');
+  await pressAlertButton('キャンセル');
+  expect(steps()).toHaveLength(2);
+  await fireEvent.press(screen.getByRole('button', { name: 'この手順を削除' }));
+  await pressAlertButton('削除');
+  // The cheek step is left, with its own segment; the brow's time is covered by no step.
+  expect(steps().map((step) => [step.part, step.segment])).toEqual([
+    ['cheek', { startMs: 65_000, endMs: 125_000 }],
+  ]);
+  expect(router.back).toHaveBeenCalled();
+});
+
+test('keeps the last step of a recipe', async () => {
+  await renderSeeded(<PostStepEdit index="0" />, {
+    ...readyDraft,
+    steps: (readyDraft.steps ?? []).slice(0, 1),
+  });
+  expect(screen.getByRole('button', { name: 'この手順を削除' })).toBeDisabled();
+});
+
+test('shows every step’s area on the sample face on ⑫-8, and nothing without one', async () => {
+  await renderSeeded(<PostPreview />);
+  // Only the brow has an area in this draft.
+  expect(screen.getByLabelText('見本の顔に1つの手順の塗る範囲を重ねた図')).toBeOnTheScreen();
+  await renderSeeded(<PostPreview />, {
+    ...readyDraft,
+    steps: (readyDraft.steps ?? []).map((step) => ({ ...step, shape: null })),
+  });
+  expect(screen.queryByLabelText(/塗る範囲を重ねた図/)).toBeNull();
+});
+
 test('asks before posting and sends the steps and thumbnail, never the video', async () => {
   const { invalidate } = await renderSeeded(<PostPreview />);
   expect(screen.getByText('狐メイク')).toBeOnTheScreen();
   expect(screen.getByText('プレビュー')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
   expect(alert).toHaveBeenCalledWith(
-    '投稿して公開しますか',
-    expect.stringContaining('サムネイルの写真と手順をサーバーに送り'),
+    'レシピを投稿しますか？',
+    'サムネイルと手順が、だれでも見られるように公開されます。',
     expect.any(Array),
   );
   await pressAlertButton('キャンセル');

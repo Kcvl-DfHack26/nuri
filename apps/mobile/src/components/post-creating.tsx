@@ -63,8 +63,11 @@ function planFromMarks(video: NonNullable<PostDraft['video']>): Plan {
 /** The steps Gemini found, in order, cut to the video and to the API's step limit. */
 function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Plan | null {
   const steps = analysis.steps
-    // A step that ends before it starts is a misreading; it would make a negative segment.
-    .filter((step) => step.end > step.start)
+    // A step that ends before it starts, or starts after the video ends, is a misreading; it would
+    // make a negative segment.
+    .filter(
+      (step) => step.end > step.start && (durationMs === null || step.start * 1000 < durationMs),
+    )
     .sort((a, b) => a.start - b.start)
     .slice(0, recipeStepsMax)
     .map((step) => {
@@ -171,7 +174,7 @@ export function PostCreating() {
     };
     Alert.alert(
       '動画を送って手順書を作りますか',
-      'メイクの動画をサーバーに送り、Geminiで手順と使ったコスメを読み取ります。動画には顔と声が入っています。読み取りが終わったら、動画はサーバーに残しません。',
+      'サーバーに送信しGeminiで動画より手順と使ったコスメを読み取ります。動画はサーバーに残しません。',
       [
         { text: 'やめる', style: 'cancel', onPress: backOrHome },
         { text: '送る', onPress: send },

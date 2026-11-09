@@ -12,7 +12,7 @@ bun run dev
 bun run db:seed
 ```
 
-seedはSNSサンプルの画像付き4ユーザー・8投稿・20件のいいねと、Plan Aのレシピ6件・その作者3人・使うメイク品2点を固定IDで作る。`NODE_ENV=development` かつ `AUTH_EMULATE=true` に限定し、再実行しても重複せず、アプリから作ったユーザー・投稿・いいね・レシピは削除しない。サンプル画像はAPIに同梱し、外部の画像サーバーへ実行時に接続しない。写真の出典は `apps/api/assets/sample-avatars/README.md` と `apps/api/assets/sample-recipes/README.md`。サンプル著者とログインアカウントは別である。
+seedは画像付きのサンプルユーザーと、Plan Aのレシピ6件・その作者3人・使うメイク品2点を固定IDで作る。`NODE_ENV=development` かつ `AUTH_EMULATE=true` に限定し、再実行しても重複せず、アプリから作ったユーザー・レシピは削除しない。サンプル画像はAPIに同梱し、外部の画像サーバーへ実行時に接続しない。写真の出典は `apps/api/assets/sample-avatars/README.md` と `apps/api/assets/sample-recipes/README.md`。サンプル著者とログインアカウントは別である。
 
 | サービス       | PortlessのURL                                   |
 | -------------- | ----------------------------------------------- |
