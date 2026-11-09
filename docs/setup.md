@@ -10,10 +10,10 @@ Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel Emul
 
 コード・設定・文書の変更は、Issueの起票または既存Issueの確認と担当設定から始める。Issueに対応するブランチで実装・検証し、コミット・push・Draft PR作成まで進める。詳細は [AGENTS.md](../AGENTS.md#issue--branch--pr)、独自UIの追加は [UI開発手順](ui.md)を参照。
 
-ローカルのAPI・Metro・FlociはDocker Composeで動かす。FlociはCloud SQL Admin APIとCloud Storageを提供し、PostgreSQL 17を起動する。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。ホストのBunは任意。WindowsではWSL2のLinuxファイルシステムを使う。
+ローカルのAPI・Metro・FlociはDocker Composeで動かす。FlociはCloud SQL Admin APIとCloud Storageを提供し、PostgreSQL 17を起動する。ホストにGit、Docker Engine + Compose v2、Bun（固定版は `.bun-version`）、Node.js 26（固定版は `.node-version`）、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。Portlessの実行にはNode.jsを使う。Bunのグローバルbin（`bun pm bin --global`）をPATHに追加する。WindowsではWSL2のLinuxファイルシステムを使う。
 
 ```sh
-npm install --global portless@0.16.0
+bun install --global portless@0.16.0
 # 例: Issue 123の作業ブランチを用意してから追加
 git worktree add ../nuri-123-example codex/123-example
 cd ../nuri-123-example

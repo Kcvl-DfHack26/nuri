@@ -12,7 +12,7 @@ bun run export:mobile
 
 APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。画像を扱う統合テストは、専用のFlociバケットを `GCS_BUCKET` と `STORAGE_EMULATOR_HOST` で指定する。Compose起動時にworktree専用バケットが作成される。
 
-GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、AndroidのMaestro、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
+GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、AndroidのMaestro、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査・Expo Doctor・バンドル生成はBunで実行する。Honoの配信用コンテナはイメージ内のNode.jsで疎通を確認する。
 
 | 検査                     | 確認すること                                                  |
 | ------------------------ | ------------------------------------------------------------- |

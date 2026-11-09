@@ -64,7 +64,7 @@ else if (!readFileSync('.env.devices', 'utf8').includes('DEVICE_API_ORIGIN=')) p
     );
     const env = { ...process.env };
     env.PATH = `${join(root, 'bin')}:${env.PATH}`;
-    const child = Bun.spawn(['node', join(root, 'scripts/devices.ts')], {
+    const child = Bun.spawn([process.execPath, join(root, 'scripts/devices.ts')], {
       cwd: root,
       env,
       stdout: 'pipe',
@@ -121,7 +121,7 @@ else if (!readFileSync('.env.devices', 'utf8').includes('DEVICE_API_ORIGIN=')) p
     const commandLog = join(root, 'commands.jsonl');
     const previousCommands = await readFile(commandLog, 'utf8');
     await writeFile(join(root, '.env'), legacyEnv);
-    const legacy = Bun.spawn(['node', join(root, 'scripts/devices.ts')], {
+    const legacy = Bun.spawn([process.execPath, join(root, 'scripts/devices.ts')], {
       cwd: root,
       env,
       stdout: 'ignore',

@@ -15,10 +15,10 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test --path-ignore-patterns='**/*.integration.test.ts' ./src",
     "test:integration": "bun test .integration.test.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --env-file-if-exists=.env --import tsx src/db/migrate.ts",
+    "db:generate": "bun --bun drizzle-kit generate",
+    "db:migrate": "bun --env-file=.env src/db/migrate.ts",
     "storage:init": "bun src/init-local-storage.ts",
-    "db:seed": "node --env-file-if-exists=.env --import tsx src/seed.ts"
+    "db:seed": "bun --env-file=.env src/seed.ts"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.17",
