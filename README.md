@@ -107,7 +107,7 @@ PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 終了時は次を実行します。自worktreeのrouteとコンテナだけを終了し、volumeを保持します。
 
 ```sh
-PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down
+sh scripts/services-down.sh
 ```
 
 ## 📂 リポジトリ構成

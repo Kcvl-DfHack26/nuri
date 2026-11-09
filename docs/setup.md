@@ -48,12 +48,12 @@ URL形式は `https://<service>.<project>.localhost`。ホストと、端末用�
 # バックグラウンド起動
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up -d --build api metro
 # 自worktreeだけを終了。DBや認証設定のvolumeは保持する。
-PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down
+sh scripts/services-down.sh
 ```
 
-foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存サービスも終了するには `portless compose --profile '*' down` を使う。detachedのrouteは `portless compose --profile '*' down` まで残る。同一worktreeへの `up` はCompose標準の再利用・更新となるため、既存コンテナへ接続する。別のworktreeは別projectとして起動する。
+foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。FlociとPostgreSQLなどの依存サービスも終了するには `sh scripts/services-down.sh` を使う。detachedのrouteはこのスクリプトの実行まで残る。同一worktreeへの `up` はCompose標準の再利用・更新となるため、既存コンテナへ接続する。別のworktreeは別projectとして起動する。
 
-**API・Metroをplainな `docker compose up` で作り直すとPortlessのポート割当が失われるため、起動・再作成・終了は `portless compose` を使う。** `logs`、`exec`、`ps`、`restart` は通常のComposeでも使える。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。
+**API・Metroをplainな `docker compose up` で作り直すとPortlessのポート割当が失われるため、起動・再作成は `portless compose` を使う。** `logs`、`exec`、`ps`、`restart` は通常のComposeでも使える。終了スクリプトはFloci 0.12.0が停止時に残す場合があるPostgreSQLコンテナを、対象worktreeのラベルで照合して取り除く。その後、Portlessでrouteとネットワークを片付ける。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。
 
 ### 開発用の環境変数
 
@@ -71,7 +71,7 @@ foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存�
 
 worktreeをエディタで開いて **Reopen in Container** を実行する。`initializeCommand` がホストのPOSIX初期化を行い、Composeの `workspace` サービスとそのsetup・DB依存を起動する。API・Metroの公開ポートをエディタが再作成しないよう、`runServices` は編集用 `workspace` だけに限定する。
 
-コンテナ内では `bun run check`、`bun run doctor`、`bun run export:mobile` 等を実行できる。DBを参照するコマンドは `sh scripts/with-local-database.sh <コマンド>` で実行する。Flociからその時点の接続先を取得し、コマンドの `DATABASE_URL` に渡す。Docker socketは渡していないため、Portlessの起動・停止コマンドはホストで実行する。エディタのport forwardは使わない。エディタを閉じてもサービスは停止しないので、作業終了時はホストで `portless compose --profile '*' down` を実行する。
+コンテナ内では `bun run check`、`bun run doctor`、`bun run export:mobile` 等を実行できる。DBを参照するコマンドは `sh scripts/with-local-database.sh <コマンド>` で実行する。Flociからその時点の接続先を取得し、コマンドの `DATABASE_URL` に渡す。Docker socketは渡していないため、Portlessの起動・停止コマンドはホストで実行する。エディタのport forwardは使わない。エディタを閉じてもサービスは停止しないので、作業終了時はホストで `sh scripts/services-down.sh` を実行する。
 
 自動依存導入は `--ignore-scripts` で共有Git hookを変更しない。Dev Containerの初回作成、またはホストの `bun install` / `bun run hooks:install` は同じGitリポジトリで順に行う。Lefthookが共有 `.git/hooks` を更新するためで、準備後のサーバーは並列起動できる。
 
@@ -120,7 +120,7 @@ bun run compose run --rm --no-deps -T migrate \
 bun run dev:api
 ```
 
-通常の `bun run services:down` と再起動で、Flociのメタデータ・GCSオブジェクトとPostgreSQLのデータを保持する。Flociの停止時にFlociがPostgreSQLを止め、起動時に再作成する。新しい接続先をAPIに反映するには、停止後に `bun run dev:api` または `bun run dev` で起動する。
+通常の `bun run services:down` と再起動で、Flociのメタデータ・GCSオブジェクトとPostgreSQLのデータを保持する。終了スクリプトが対象のPostgreSQLを止め、次回起動時にFlociが再作成する。新しい接続先をAPIに反映するには、停止後に `bun run dev:api` または `bun run dev` で起動する。
 
 空のDBとGCSに初期化する場合は、対象worktreeを `bun run services:down` で止める。次の一覧から、そのworktreeのFlociメタデータとCloud SQL volumeを確認し、その2つの名前を指定して `docker volume rm` を実行する。旧 `postgres-data` と他worktreeのvolumeは移行用に保持する。
 
