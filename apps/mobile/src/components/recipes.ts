@@ -165,7 +165,6 @@ export type ProductInfo = {
   colors: { name: string; hex: string }[];
   /** Index into `colors` that the sheet opens with. */
   initialColor: number;
-  ingredientCount: number;
   freeFrom: string[];
   /** Key ingredients with the Plan A dot color class. */
   ingredients: { name: string; role: string; dot: string }[];
@@ -195,7 +194,6 @@ const products: Product[] = [
         { name: '05 ブラウンブラック', hex: '#3E2A20' },
       ],
       initialColor: 2,
-      ingredientCount: 18,
       freeFrom: ['アルコールフリー', '無香料', 'パラベンフリー'],
       ingredients: [
         { name: 'トコフェロール', role: '保湿・酸化を防ぐ', dot: 'bg-pastel-sky' },

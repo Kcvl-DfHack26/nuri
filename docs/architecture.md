@@ -73,7 +73,7 @@ Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v
 
 ⑫-8の投稿の確認（#196）は，本文「サムネイルと手順が、だれでも見られるように公開されます。」を出す．iOS は標準の Alert（見出しが中央，2つのボタンが左右）のまま，Android は Material の Alert が見出しを左寄せ・ボタンを右寄せにするため（見出しと本文の文字は `post-confirm-text.ts` に置く．Android では `./post-confirm` が `post-confirm.android.tsx` 自身になり，文字が空になるため），`@expo/ui` の Jetpack Compose の `BasicAlertDialog` で見出しを中央に，「キャンセル」と「投稿する」を左右に置く（`post-confirm.android.tsx`）．
 
-SNS取り込み（④）は、ホームの「動画URL」からルートStackのformSheet `/import` を開き、入力・読み取り中・完了・失敗・保存完了を一つのシート内の状態で切り替える。取得方法と権利条件が未決のため、URLは端末内で対応サービス（Instagram・YouTube・TikTok）の投稿URLかを判定するだけで、通信せず固定の見本（`src/components/sns-import-sample.ts`）を表示し、何も保存しない。④-4はシートの上に `fullScreenModal` で重ねる。iOSのネイティブStackはモーダルの後に通常のpush画面を置くとシートの下へ積むため、戻るとシートへ帰れるようにモーダルを重ねる。④-4の保存は `dismissTo` で `saved=1` を渡し、シートを④-5にする。
+SNS取り込み（④）は、ホームの「動画URL」からルートStackのformSheet `/import` を開く。取得方法と権利条件が未決のため（#242）、シートは「準備中」と、端末の動画からはシートを閉じて「投稿」でレシピを作れることだけを出す（#262）。URLの入力・読み取り・保存完了を演じる固定の見本は、動く機能と誤解されるため消した。見本の画面（④-1〜④-E）はgitの履歴に残る。
 
 プッシュ通知は `createPushSender` にイベントの種類と受信者IDを渡す。レシピのハート（`recipe_favorite`）は、他の利用者による新規保存が確定した場合に作者へ `recipe-liked` を送る。操作した人の表示名とレシピ名の先頭48文字、公開サムネイルを使う。自己操作・再送・解除は送らない。タップするとレシピIDで詳細を開く。テキスト投稿の削除（#216）とハートの統一（#191）に合わせ、旧投稿API・画面は復活させない。
 

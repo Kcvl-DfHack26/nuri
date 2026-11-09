@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { ProductInfo } from '@/components/recipes';
 
+import { showComingSoon } from '@/components/coming-soon';
 import { findProduct } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
@@ -71,17 +72,18 @@ export function ProductSheet({ id }: { id: string }) {
         </ScrollView>
       </View>
       <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
-        <View
-          accessible
+        <Pressable
           accessibilityRole="button"
           accessibilityLabel="購入先を見る（準備中）"
-          accessibilityState={{ disabled: true }}
-          className="min-h-13 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5"
+          onPress={() => {
+            showComingSoon('購入先の案内');
+          }}
+          className="min-h-13 flex-row items-center justify-center gap-1.5 rounded-full bg-accent-rose px-4.5 active:opacity-80"
           style={{ boxShadow: '0px 8px 10px rgba(196, 61, 112, 0.25)' }}
         >
           <SocialIcon name={CART} size={20} color="white" />
           <Text className="font-maru-bold text-action text-white">購入先を見る</Text>
-        </View>
+        </Pressable>
       </View>
     </View>
   );
@@ -142,35 +144,23 @@ function ProductDetails({ info }: { info: ProductInfo }) {
           );
         })}
       </View>
-      <View
-        accessible
+      <Pressable
         accessibilityRole="button"
         accessibilityLabel="自分の顔で色味を見る（準備中）"
-        accessibilityState={{ disabled: true }}
-        className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-pastel-pink px-4.5"
+        onPress={() => {
+          showComingSoon('自分の顔で色味を確かめる機能');
+        }}
+        className="min-h-12 flex-row items-center justify-center gap-1.5 rounded-full bg-pastel-pink px-4.5 active:opacity-80"
       >
         <SocialIcon name={CAMERA} size={20} color={rose} />
         <Text className="font-maru-bold text-label text-accent-rose">自分の顔で色味を見る</Text>
-      </View>
+      </Pressable>
       <View className="h-px bg-line-soft" />
-      <View className="flex-row items-center justify-between gap-2">
-        <View className="flex-row items-center gap-1.5">
-          <SocialIcon name={FLASK} size={20} color={ink} />
-          <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
-            成分
-          </Text>
-        </View>
-        <View
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel={`全${info.ingredientCount}成分を見る（準備中）`}
-          accessibilityState={{ disabled: true }}
-          className="shrink"
-        >
-          <Text className="font-maru-bold text-label text-accent-rose">
-            全{info.ingredientCount}成分を見る
-          </Text>
-        </View>
+      <View className="flex-row items-center gap-1.5">
+        <SocialIcon name={FLASK} size={20} color={ink} />
+        <Text accessibilityRole="header" className="font-maru-bold text-heading text-ink-primary">
+          成分
+        </Text>
       </View>
       <View className="flex-row flex-wrap gap-1.5">
         {info.freeFrom.map((label) => (

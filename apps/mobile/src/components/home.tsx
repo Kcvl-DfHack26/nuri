@@ -109,7 +109,7 @@ function Header({ top, onHeight }: { top: number; onHeight: (height: number) => 
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="動画URLからレシピを作る"
+            accessibilityLabel="動画URLからレシピを作る（準備中）"
             // The 36pt chip keeps Plan A's look; the slop extends the hit area to 48pt.
             hitSlop={6}
             onPress={() => {
