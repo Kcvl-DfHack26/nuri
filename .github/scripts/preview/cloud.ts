@@ -1,38 +1,32 @@
 import { $ } from 'bun';
 import { appendFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { z } from 'zod';
 
 import { checkCloudPreview } from './check';
-import {
-  hasPreviewService,
-  listPreviewStates,
-  previewImageBucket,
-  removePreviewState,
-  runPreviewTofu,
-} from './state';
+import { commitSha, getPullRequest, prNumber, repository, requireEnv } from './github';
+import { listPreviewStates, removePreviewState, runPreviewTofu } from './state';
 
 const region = 'asia-northeast1';
 const registryHost = `${region}-docker.pkg.dev`;
 const digestPattern = /^sha256:[a-f0-9]{64}$/;
 const runOriginPattern = /^https:\/\/[a-z0-9.-]+\.run\.app$/;
 
-function required(value: string | undefined, name: string): string {
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function pullRequestNumber(value: string | undefined): string {
-  if (!value || !/^[1-9]\d{0,8}$/.test(value)) {
-    throw new Error('Invalid pull request number');
-  }
-  return value;
-}
+const serviceState = z.object({
+  status: z.object({
+    traffic: z
+      .array(
+        z.object({
+          percent: z.number().optional(),
+          revisionName: z.string().optional(),
+          tag: z.string().optional(),
+          url: z.string().optional(),
+        }),
+      )
+      .default([]),
+  }),
+});
+const tags = z.object({ tagBindings: z.array(z.object({ tagValue: z.string() })).default([]) });
 
 function reportError(error: unknown) {
   console.error(
@@ -40,12 +34,8 @@ function reportError(error: unknown) {
   );
 }
 
-const repository = required(Bun.env.GITHUB_REPOSITORY, 'GITHUB_REPOSITORY');
-required(Bun.env.GH_TOKEN, 'GH_TOKEN');
-const project = required(Bun.env.PREVIEW_GCP_PROJECT_ID, 'PREVIEW_GCP_PROJECT_ID');
-if (project !== 'kcvlb4') {
-  throw new Error('Expected the kcvlb4 Google Cloud project');
-}
+requireEnv('GH_TOKEN');
+const project = z.literal('kcvlb4').parse(Bun.env.PREVIEW_GCP_PROJECT_ID);
 const registry = `${registryHost}/${project}/nuri-preview`;
 // kcvlb4 内で、プレビュー用のサービスとレジストリを対象にする。
 const shell = $.env({
@@ -54,30 +44,14 @@ const shell = $.env({
   CLOUDSDK_RUN_REGION: region,
 });
 
-async function pullRequest(pr: string) {
-  const fields = '{state, sha: .head.sha, repository: .head.repo.full_name}';
-  const result: unknown = await shell`gh api repos/${repository}/pulls/${pr} --jq ${fields}`.json();
-  if (!isRecord(result) || (result.state !== 'open' && result.state !== 'closed')) {
-    throw new Error(`Unable to read pull request #${pr}`);
-  }
-  return result;
-}
-
 async function serviceStatus(service: string) {
-  const result: unknown = await shell`gcloud run services describe ${service} --format=json`.json();
-  if (!isRecord(result) || !isRecord(result.status)) {
-    throw new Error('Missing Cloud Run status');
-  }
-  return result.status;
+  return serviceState.parse(
+    await shell`gcloud run services describe ${service} --format=json`.json(),
+  ).status;
 }
 
-function traffic(status: Record<string, unknown>) {
-  const trafficEntries: unknown[] = Array.isArray(status.traffic) ? status.traffic : [];
-  return trafficEntries.filter(isRecord);
-}
-
-function servingRevision(status: Record<string, unknown>) {
-  return traffic(status).find((entry) => entry.percent === 100)?.revisionName;
+function servingRevision(status: z.infer<typeof serviceState>['status']) {
+  return status.traffic.find((entry) => entry.percent === 100)?.revisionName;
 }
 
 type Progress = (line: string) => void;
@@ -108,8 +82,8 @@ async function deleteImages(pr: string, keepDigest?: string, progress?: Progress
 }
 
 async function isClosedOwnPullRequest(pr: string) {
-  const info = await pullRequest(pr);
-  return info.state === 'closed' && info.repository === repository;
+  const info = await getPullRequest(pr);
+  return info.state === 'closed' && info.headRepository === repository;
 }
 
 async function cleanup(pr: string, stateDiscovered = false) {
@@ -137,7 +111,7 @@ async function cleanup(pr: string, stateDiscovered = false) {
         progress(log);
       },
     });
-    if (result === 0) {
+    if (result?.exitCode === 0) {
       await deleteImages(pr, undefined, progress);
       // リソースやイメージの削除に失敗した場合は、定期 cleanup が再試行できるよう state を残す。
       progress(`Removing OpenTofu state for PR #${pr}`);
@@ -213,11 +187,8 @@ async function previewRecipeDigest() {
 }
 
 async function validateOpenPullRequest(pr: string, sha: string) {
-  if (!/^[a-f0-9]{40}$/.test(sha)) {
-    throw new Error('Invalid commit SHA');
-  }
-  const info = await pullRequest(pr);
-  if (info.state !== 'open' || info.sha !== sha || info.repository !== repository) {
+  const info = await getPullRequest(pr);
+  if (info.state !== 'open' || info.sha !== sha || info.headRepository !== repository) {
     throw new Error('Pull request is closed, changed, or from another repository');
   }
 }
@@ -227,11 +198,10 @@ function tagBindingParent(pr: string) {
 }
 
 function previewTagValue() {
-  const value = required(Bun.env.PREVIEW_RUN_TAG_VALUE, 'PREVIEW_RUN_TAG_VALUE');
-  if (!/^tagValues\/[0-9]+$/.test(value)) {
-    throw new Error('Invalid preview tag value ID');
-  }
-  return value;
+  return z
+    .string()
+    .regex(/^tagValues\/[0-9]+$/)
+    .parse(Bun.env.PREVIEW_RUN_TAG_VALUE);
 }
 
 async function hasPreviewTag(parent: string, tagValue: string) {
@@ -250,14 +220,9 @@ async function hasPreviewTag(parent: string, tagValue: string) {
   if (!response.ok) {
     throw new Error(`Could not list preview tag bindings: HTTP ${response.status}`);
   }
-  const result: unknown = await response.json();
-  return (
-    isRecord(result) &&
-    Array.isArray(result.tagBindings) &&
-    result.tagBindings.some(
-      (binding: unknown) => isRecord(binding) && binding.tagValue === tagValue,
-    )
-  );
+  return tags
+    .parse(await response.json())
+    .tagBindings.some((binding) => binding.tagValue === tagValue);
 }
 
 async function attachPreviewTag(pr: string) {
@@ -281,7 +246,7 @@ async function attachPreviewTag(pr: string) {
 async function inspect(pr: string, sha: string, outputPath: string) {
   await validateOpenPullRequest(pr, sha);
   const tagged =
-    (await hasPreviewService(project, pr)) &&
+    (await listPreviewStates(project, pr)).has(pr) &&
     (await hasPreviewTag(tagBindingParent(pr), previewTagValue()));
   const environment = tagged ? 'preview' : 'preview-create';
   await appendFile(outputPath, `environment=${environment}\n`);
@@ -289,7 +254,7 @@ async function inspect(pr: string, sha: string, outputPath: string) {
 
 async function apply(pr: string, sha: string, outputPath: string) {
   await validateOpenPullRequest(pr, sha);
-  const applyExit = await runPreviewTofu(project, pr, 'apply', {
+  const result = await runPreviewTofu(project, pr, 'apply', {
     beforeAttempt: async () => {
       await validateOpenPullRequest(pr, sha);
       return true;
@@ -298,14 +263,18 @@ async function apply(pr: string, sha: string, outputPath: string) {
       await appendFile(outputPath, `tofu_exit=${exitCode}\ntofu_log<<TOFU_LOG\n${log}\nTOFU_LOG\n`);
     },
   });
-  if (applyExit === 0 && Bun.env.PREVIEW_CLOUD_ENVIRONMENT === 'preview-create') {
-    await attachPreviewTag(pr);
+  if (result?.imageBucket) {
+    if (Bun.env.PREVIEW_CLOUD_ENVIRONMENT === 'preview-create') {
+      await attachPreviewTag(pr);
+    }
+    await appendFile(outputPath, `image_bucket=${result.imageBucket}\n`);
   }
-  return applyExit ?? 1;
+  return result?.exitCode ?? 1;
 }
 
 async function publish(pr: string, sha: string, source: string, outputPath: string) {
   await validateOpenPullRequest(pr, sha);
+  const imageBucket = requireEnv('PREVIEW_IMAGE_BUCKET');
   const service = `nuri-preview-pr-${pr}`;
   const serviceUrl = (
     await shell`gcloud run services describe ${service} --format='value(status.url)'`.text()
@@ -343,7 +312,7 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
         .nothrow();
     if (existingRevision.exitCode !== 0) {
       const imageByDigest = `${registry}/${tag}@${digest}`;
-      const previewEnv = `PREVIEW_ORIGIN=${origin},GCS_BUCKET=${previewImageBucket(project, pr)}`;
+      const previewEnv = `PREVIEW_ORIGIN=${origin},GCS_BUCKET=${imageBucket}`;
       await shell`gcloud run deploy ${service} \
         --image=${imageByDigest} --revision-suffix=${revisionSuffix} \
         --no-traffic --port=8080 --min-instances=0 --max-instances=1 \
@@ -352,18 +321,18 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
     }
     await shell`gcloud run services update-traffic ${service} --update-tags=${`${candidate}=${revision}`} --quiet`;
     try {
-      const candidateUrl = traffic(await serviceStatus(service)).find(
+      const candidateUrl = (await serviceStatus(service)).traffic.find(
         (entry) => entry.tag === candidate,
       )?.url;
       if (typeof candidateUrl !== 'string' || !runOriginPattern.test(candidateUrl)) {
         throw new Error('Invalid Cloud Run candidate URL');
       }
       await checkCloudPreview(candidateUrl, origin);
-      const currentPr = await pullRequest(pr);
+      const currentPr = await getPullRequest(pr);
       if (
         currentPr.state !== 'open' ||
         currentPr.sha !== sha ||
-        currentPr.repository !== repository
+        currentPr.headRepository !== repository
       ) {
         throw new Error('Pull request closed or changed during deployment');
       }
@@ -392,24 +361,22 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
 }
 
 const [operation, pr, sha, source] = Bun.argv.slice(2);
-const outputPath = required(Bun.env.GITHUB_OUTPUT, 'GITHUB_OUTPUT');
+const outputPath = requireEnv('GITHUB_OUTPUT');
 if (operation === 'inspect') {
-  await inspect(pullRequestNumber(pr), required(sha, 'SHA'), outputPath);
+  await inspect(prNumber.parse(pr), commitSha.parse(sha), outputPath);
 } else if (operation === 'apply') {
-  process.exitCode = await apply(pullRequestNumber(pr), required(sha, 'SHA'), outputPath);
+  process.exitCode = await apply(prNumber.parse(pr), commitSha.parse(sha), outputPath);
 } else if (operation === 'publish') {
   await publish(
-    pullRequestNumber(pr),
-    required(sha, 'SHA'),
-    required(source, 'source path'),
+    prNumber.parse(pr),
+    commitSha.parse(sha),
+    z.string().min(1).parse(source),
     outputPath,
   );
 } else if (operation === 'cleanup') {
   try {
     process.exitCode =
-      Bun.env.GITHUB_EVENT_NAME === 'schedule'
-        ? await sweep()
-        : await cleanup(pullRequestNumber(pr));
+      Bun.env.GITHUB_EVENT_NAME === 'schedule' ? await sweep() : await cleanup(prNumber.parse(pr));
   } finally {
     const reportPath = Bun.env.PREVIEW_CLEANUP_REPORTS;
     if (reportPath && Bun.file(reportPath).size > 0) {

@@ -38,6 +38,9 @@
     "compose": "env -u WORKTREE_ROOT -u WORKTREE_GIT_COMMON_DIR PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose",
     "db:seed": "bun run compose exec api sh scripts/with-local-database.sh bun run --cwd apps/api db:seed"
   },
+  "dependencies": {
+    "zod": "4.6.7"
+  },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@commitlint/config-conventional": "21.2.4",

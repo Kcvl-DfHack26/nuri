@@ -1,4 +1,16 @@
+import { z } from 'zod';
+
 import { checkExpoWeb, getProbe } from '../check-expo-web';
+
+const recipeFeed = z.object({ items: z.array(z.unknown()).min(1) });
+const mediaImage = z.object({ image: z.string().startsWith('/media/') });
+const seedRecipe = z.object({
+  recipe: mediaImage.extend({
+    author: mediaImage,
+    products: z.tuple([mediaImage]).rest(z.unknown()),
+  }),
+});
+const manifest = z.object({ launchAsset: z.object({ url: z.string() }) });
 
 async function retryProbe<T>(probe: () => Promise<T>): Promise<T> {
   for (let retries = 5; ; retries -= 1) {
@@ -19,43 +31,9 @@ export async function checkCloudPreview(endpoint: string, origin: string) {
   });
   await checkExpoWeb(endpoint);
 
-  const recipes: unknown = await (await getProbe(`${endpoint}/api/recipes?offset=0`)).json();
-  if (
-    !recipes ||
-    typeof recipes !== 'object' ||
-    !('items' in recipes) ||
-    !Array.isArray(recipes.items) ||
-    recipes.items.length === 0
-  ) {
-    throw new Error('Preview recipe feed is empty');
-  }
-
-  const result: unknown = await (await getProbe(`${endpoint}/api/recipes/fox`)).json();
-  if (!result || typeof result !== 'object' || !('recipe' in result)) {
-    throw new Error('Preview seed recipe is missing');
-  }
-  const recipe = result.recipe;
-  if (
-    !recipe ||
-    typeof recipe !== 'object' ||
-    !('image' in recipe) ||
-    !('author' in recipe) ||
-    !recipe.author ||
-    typeof recipe.author !== 'object' ||
-    !('image' in recipe.author) ||
-    !('products' in recipe) ||
-    !Array.isArray(recipe.products)
-  ) {
-    throw new Error('Preview seed recipe has no images');
-  }
-  const products: unknown[] = recipe.products;
-  const [product] = products;
-  const productImage =
-    product && typeof product === 'object' && 'image' in product ? product.image : null;
-  for (const image of [recipe.image, recipe.author.image, productImage]) {
-    if (typeof image !== 'string' || !image.startsWith('/media/')) {
-      throw new Error('Expected the preview seed image to be served by the media API');
-    }
+  recipeFeed.parse(await (await getProbe(`${endpoint}/api/recipes?offset=0`)).json());
+  const { recipe } = seedRecipe.parse(await (await getProbe(`${endpoint}/api/recipes/fox`)).json());
+  for (const { image } of [recipe, recipe.author, recipe.products[0]]) {
     const response = await getProbe(`${endpoint}${image}`);
     if (!response.headers.get('content-type')?.startsWith('image/')) {
       await response.body?.cancel();
@@ -76,18 +54,8 @@ export async function checkCloudPreview(endpoint: string, origin: string) {
         Accept: 'application/expo+json',
       }),
     );
-    const manifest: unknown = await response.json();
-    const launchAsset =
-      manifest && typeof manifest === 'object' && 'launchAsset' in manifest
-        ? manifest.launchAsset
-        : null;
-    if (
-      !launchAsset ||
-      typeof launchAsset !== 'object' ||
-      !('url' in launchAsset) ||
-      typeof launchAsset.url !== 'string' ||
-      !launchAsset.url.startsWith(`${origin}/`)
-    ) {
+    const { launchAsset } = manifest.parse(await response.json());
+    if (!launchAsset.url.startsWith(`${origin}/`)) {
       throw new Error(`Expo Go ${platform} launch asset does not use the public preview origin`);
     }
   }

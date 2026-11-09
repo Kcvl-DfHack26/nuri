@@ -102,3 +102,8 @@ resource "google_storage_bucket_iam_member" "runtime_images" {
   role   = "roles/storage.objectUser"
   member = "serviceAccount:nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
 }
+
+output "image_bucket" {
+  description = "Private image bucket passed to the preview revision."
+  value       = google_storage_bucket.images.name
+}

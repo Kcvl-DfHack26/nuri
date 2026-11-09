@@ -1,4 +1,5 @@
 import { $ } from 'bun';
+import { z } from 'zod';
 
 import { previewMarker } from './comment';
 
@@ -14,32 +15,43 @@ export const repository = requireEnv('GITHUB_REPOSITORY');
 
 export const runUrl = `${Bun.env.GITHUB_SERVER_URL}/${repository}/actions/runs/${Bun.env.GITHUB_RUN_ID}`;
 
+export const prNumber = z.string().regex(/^[1-9]\d{0,8}$/);
+export const commitSha = z.string().regex(/^[a-f0-9]{40}$/);
+const pullRequest = z.object({
+  html_url: z.url(),
+  state: z.enum(['open', 'closed']),
+  head: z.object({
+    repo: z.object({ full_name: z.string() }).nullable(),
+    sha: commitSha,
+  }),
+  base: z.object({ ref: z.string() }),
+});
+const previewComment = z.object({ id: z.int().positive(), body: z.string() });
+
 export async function getPullRequest(number: string) {
-  if (!/^[1-9]\d{0,8}$/.test(number)) {
-    throw new Error('PR番号が不正です');
-  }
-  const endpoint = `repos/${repository}/pulls/${number}`;
-  const fields = '[.html_url, .state, (.head.repo.full_name // ""), .head.sha, .base.ref] | @tsv';
-  const response = await $`gh api ${endpoint} --jq ${fields}`.text();
-  const [url, state, headRepository, sha, baseRef] = response.trimEnd().split('\t');
-  if (!url || !state || !sha || !baseRef) {
-    throw new Error('PR情報を取得できませんでした');
-  }
-  return { number: Number(number), url, state, headRepository, sha, baseRef };
+  const endpoint = `repos/${repository}/pulls/${prNumber.parse(number)}`;
+  const {
+    html_url: url,
+    state,
+    head,
+    base,
+  } = pullRequest.parse(await $`gh api ${endpoint}`.json());
+  return {
+    number: Number(number),
+    url,
+    state,
+    headRepository: head.repo?.full_name ?? '',
+    sha: head.sha,
+    baseRef: base.ref,
+  };
 }
 
 export async function findComment(pr: number) {
   const endpoint = `repos/${repository}/issues/${pr}/comments`;
-  const filter = `first(.[] | select(.user.login == "github-actions[bot]" and (.body // "" | startswith(${JSON.stringify(`${previewMarker}\n`)})))) | [.id, .body] | @base64`;
-  const [row] = (await $`gh api --paginate ${endpoint} --jq ${filter}`.text()).trim().split('\n');
-  if (!row) {
-    return undefined;
-  }
-  const decoded: unknown = JSON.parse(Buffer.from(row, 'base64').toString());
-  if (!Array.isArray(decoded) || typeof decoded[0] !== 'number' || typeof decoded[1] !== 'string') {
-    throw new Error('プレビューコメントを読み取れませんでした');
-  }
-  return { id: decoded[0], body: decoded[1] };
+  const marker = JSON.stringify(`${previewMarker}\n`);
+  const filter = `first(.[][] | select(.user.login == "github-actions[bot]" and (.body // "" | startswith(${marker})))) | {id, body}`;
+  const result = (await $`gh api --paginate --slurp ${endpoint} | jq -c ${filter}`.text()).trim();
+  return result ? previewComment.parse(JSON.parse(result)) : undefined;
 }
 
 export async function updateComment(id: number, body: string) {

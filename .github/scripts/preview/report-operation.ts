@@ -1,22 +1,19 @@
 import { $ } from 'bun';
+import { z } from 'zod';
 
 import { repository, requireEnv } from './github';
 
+export const operationReport = z.object({
+  pr: z.int().min(1).max(999_999_999),
+  log: z.string(),
+  exitCode: z.int().min(0).max(255),
+  cleanupExitCode: z.int().min(1).max(255).optional(),
+});
+
 export async function postOperationReport(
   operation: 'Apply' | 'Destroy',
-  {
-    pr,
-    log,
-    exitCode,
-    cleanupExitCode,
-  }: { pr: number; log: string; exitCode: number; cleanupExitCode?: number },
+  { pr, log, exitCode, cleanupExitCode }: z.infer<typeof operationReport>,
 ) {
-  if (!Number.isSafeInteger(pr) || pr < 1 || pr > 999_999_999) {
-    throw new Error('Invalid pull request number');
-  }
-  if (!Number.isInteger(exitCode) || exitCode < 0 || exitCode > 255) {
-    throw new Error('Invalid OpenTofu exit code');
-  }
   requireEnv('GH_TOKEN');
   const runUrl = `${requireEnv('GITHUB_SERVER_URL')}/${repository}/actions/runs/${requireEnv('GITHUB_RUN_ID')}/attempts/${requireEnv('GITHUB_RUN_ATTEMPT')}`;
   const status =
@@ -50,9 +47,12 @@ export async function postOperationReport(
 }
 
 if (import.meta.main) {
-  await postOperationReport('Apply', {
-    pr: Number(requireEnv('PREVIEW_PR')),
-    log: Bun.env.TOFU_LOG ?? '',
-    exitCode: Number(requireEnv('TOFU_EXIT')),
-  });
+  await postOperationReport(
+    'Apply',
+    operationReport.parse({
+      pr: Number(requireEnv('PREVIEW_PR')),
+      log: Bun.env.TOFU_LOG ?? '',
+      exitCode: Number(requireEnv('TOFU_EXIT')),
+    }),
+  );
 }

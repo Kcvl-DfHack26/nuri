@@ -63,17 +63,15 @@ test('shows changed settings and omits sensitive and unknown values', () => {
 });
 
 test('shows the Destroy target and settings from the preceding state', () => {
-  const resource = {
-    address,
-    values: {
+  const change = {
+    actions: ['delete'],
+    before: {
       ...service,
       template: [{ containers: [{ image: 'https://example.com/image?token=secret' }] }],
     },
+    after: null,
   };
-  const log = operationDetails(
-    { values: { root_module: { resources: [resource] } } },
-    'destroy',
-  ).join('\n');
+  const log = operationDetails({ resource_changes: [{ address, change }] }, 'destroy').join('\n');
   expect(log).toContain('Cloud Run service: nuri-preview-pr-148');
   expect(log).toContain('Action: delete');
   expect(log).toContain('service max instances: 1');

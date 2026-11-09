@@ -50,6 +50,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - &install-preview-dependencies
+        name: Install Preview Script Dependencies
+        run: bun install --production --frozen-lockfile --ignore-scripts --filter './'
       - name: Prepare Preview Comment
         id: request
         env:
@@ -88,6 +91,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
@@ -119,6 +123,7 @@ jobs:
     outputs:
       tofu_log: ${{ steps.apply.outputs.tofu_log }}
       tofu_exit: ${{ steps.apply.outputs.tofu_exit }}
+      image_bucket: ${{ steps.apply.outputs.image_bucket }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -127,6 +132,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
@@ -175,6 +181,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: controller/.bun-version
+      - name: Install Preview Script Dependencies
+        working-directory: controller
+        run: bun install --production --frozen-lockfile --ignore-scripts --filter './'
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
@@ -188,6 +197,7 @@ jobs:
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
           PREVIEW_PR: ${{ needs.request.outputs.pr }}
           PREVIEW_SHA: ${{ needs.request.outputs.sha }}
+          PREVIEW_IMAGE_BUCKET: ${{ needs.apply.outputs.image_bucket }}
         run: bun .github/scripts/preview/cloud.ts publish "$PREVIEW_PR" "$PREVIEW_SHA" "$GITHUB_WORKSPACE/source"
 
   cleanup:
@@ -214,6 +224,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
@@ -256,6 +267,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - uses: actions/download-artifact@v8.0.2
         with:
           artifact-ids: ${{ needs.cleanup.outputs.logs }}
@@ -282,6 +294,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - name: Post Apply Log
         env:
           GH_TOKEN: ${{ github.token }}
@@ -308,6 +321,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - name: Update Preview Comment
         env:
           GH_TOKEN: ${{ github.token }}

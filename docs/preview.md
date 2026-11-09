@@ -23,13 +23,13 @@ Expo Goは `apps/mobile` と同じSDKのビルドを使う。iOS実機では対�
 | `/` のExpo Go向けリクエスト、`.bundle`、ネイティブアセット | Expo CLIのMetro             |
 | `/expo-go/qr.svg`                                          | 同じホストを指すExpo Go用QR |
 
-Honoはコンテナ内の使い捨てPostgreSQLを使う。画像用の非公開GCSバケットは `kcvlb4-nuri-preview-pr-<番号>-media` とし、PRが開いている間は起動やリビジョン更新をまたいで保持する。起動時にmigrationとseedを実行し、画像をバケットに保存してからDBに配信パスを登録する。候補リビジョンではレシピと作者・商品の画像が `/media/**` から読めることを確認する。Googleやメールの実認証は共有stagingの検証を使う。PRプレビューのURLは公開され、信頼済みの同一リポジトリから配信される。preview間では実行用サービスアカウントを共有し、バケットはPRごとの接続先として分離する。検証用の画像だけを使う。
+Honoはコンテナ内の使い捨てPostgreSQLを使う。画像用の非公開GCSバケットは `kcvlb4-nuri-preview-pr-<番号>-media` とし、PRが開いている間は起動やリビジョン更新をまたいで保持する。起動時にmigrationとseedを実行し、画像をバケットに保存してからDBに配信パスを登録する。バケット名は保存済み計画のOpenTofu出力 `image_bucket` から取得し、適用成功後に候補リビジョンに渡す。候補リビジョンではレシピと作者・商品の画像が `/media/**` から読めることを確認する。Googleやメールの実認証は共有stagingの検証を使う。PRプレビューのURLは公開され、信頼済みの同一リポジトリから配信される。preview間では実行用サービスアカウントを共有し、バケットはPRごとの接続先として分離する。検証用の画像だけを使う。
 
 ## 利用枠とcleanup
 
 PRプレビューのビルドはGitHub Actionsで行う。EAS Build・EAS Updateの利用枠は消費しない。1環境につきCloud Runサービスを1つ使い、インスタンス数は最小0、最大1に設定する。アクセス時にはコンテナ起動・MetroのCPUとメモリ、通信量、Artifact RegistryとGCSに費用が発生し得る。アクセスが途切れるとコンテナ内のDBとMetroキャッシュは失われる。バケット内の画像はPRの終了まで残る。Registryは14日を超えるイメージを定期削除する。更新成功時はそのPRの旧イメージを削除する。古いリビジョンはトラフィックを受けず、PRを閉じたときにサービスと一緒に削除される。[Cloud Runの最小インスタンス](https://docs.cloud.google.com/run/docs/configuring/min-instances)
 
-main宛てのPRをマージ・クローズすると、対象PRのstateで `tofu destroy` を実行し、専用サービスと画像バケットをオブジェクトごと削除する。destroyが成功したあとにコンテナイメージとstateを回収する。スタックの途中で閉じたPRや中断したcleanupは日次処理で回収する。
+main宛てのPRをマージ・クローズすると、対象PRのstateで `tofu plan -destroy` を保存し、対象を照合した計画を適用して、専用サービスと画像バケットをオブジェクトごと削除する。destroyが成功したあとにコンテナイメージとstateを回収する。スタックの途中で閉じたPRや中断したcleanupは日次処理で回収する。
 
 **🧱 OpenTofu Apply** と **🧱 OpenTofu Destroy** は実行するたびに、そのプレビューのPRへ新規コメントで投稿する。結果と終了コードは常に表示する。「実行ログとリソース設定」を開くと、Cloud Runサービス名、操作、件数、Applyの設定差分、Destroy前にstateへ記録されていた設定を読める。コメントに載せる設定は、スケーリングやCPU、メモリなどの公開可能な項目に限る。画像バケットとバケットIAMの操作は同じコメントのActionsリンクで確認できる。共有基盤の実行ログはActionsに残す。
 
@@ -44,7 +44,7 @@ Expo Free の月間枠は Android 15／iOS 15 ビルド、Workflows 60分、Upda
 3. OpenTofuの出力 `preview_wif_provider` を、GitHubの `preview` と `preview-create` の両Environmentに `PREVIEW_WIF_PROVIDER` として登録する。`PREVIEW_SERVICE_ACCOUNT` には、それぞれ `preview_service_account` と `preview_creator_service_account` を登録する。`preview_run_tag_key` と `preview_run_tag_value` はRepository Variable `PREVIEW_RUN_TAG_KEY` と `PREVIEW_RUN_TAG_VALUE` に登録する。
 4. Repository Variable `PREVIEW_GCP_ENABLED=true` を設定し、テスト用PRを作成する。設定前から開いていたPRは手動で起動できる。Web、API、Expo Goと **🧱 OpenTofu Apply** を確認したらPRを閉じ、サービスとイメージの削除および **🧱 OpenTofu Destroy** のコメントを確認する。
 
-作成ジョブはOpenTofuでCloud Runサービスを作成したあと、Resource Manager APIでプレビュー専用タグを付ける。OpenTofuが作成直後にサービスの状態を取得するため、作成用アカウントには`kcvlb4`内のCloud Runサービス情報を取得する`run.services.get`を付与する。配信・回収ジョブの更新・削除権限はそのタグ付きサービスに限られる。実行用アカウントのCloud Storage権限は各プレビュー用画像バケット内のオブジェクトに限定する。作成・回収用アカウントは `kcvlb4-nuri-preview-pr-…-media` の名前空間内で既存バケットとそのオブジェクトを管理する。OpenTofuの操作前にstate内のCloud Runサービス、バケット、IAMが対象PRのものか検証する。[Cloud Runのタグ](https://docs.cloud.google.com/run/docs/configuring/tags)
+作成ジョブはOpenTofuでCloud Runサービスを作成したあと、Resource Manager APIでプレビュー専用タグを付ける。OpenTofuが作成直後にサービスの状態を取得するため、作成用アカウントには`kcvlb4`内のCloud Runサービス情報を取得する`run.services.get`を付与する。配信・回収ジョブの更新・削除権限はそのタグ付きサービスに限られる。実行用アカウントのCloud Storage権限は各プレビュー用画像バケット内のオブジェクトに限定する。作成・回収用アカウントは `kcvlb4-nuri-preview-pr-…-media` の名前空間内で既存バケットとそのオブジェクトを管理する。適用・回収はOpenTofuが保存した計画を `tofu show -json` で読み、Cloud Runサービス、バケット、IAMが対象PRのものか照合してから、同じ計画を実行する。[Cloud Runのタグ](https://docs.cloud.google.com/run/docs/configuring/tags)
 
 `PREVIEW_GCP_ENABLED` を無効にすると新規の公開と自動cleanupを停止する。利用終了時は有効な間にPRを閉じ、回収を確認する。
 

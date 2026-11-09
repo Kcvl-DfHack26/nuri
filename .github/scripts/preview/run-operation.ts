@@ -1,19 +1,23 @@
 import { $ } from 'bun';
+import { z } from 'zod';
 
-type Event = {
-  type?: string;
-  changes?: { operation?: string; add?: number; change?: number; remove?: number };
-  hook?: { resource?: { resource_type?: string; resource_name?: string }; action?: string };
-  diagnostic?: { severity?: string; summary?: string };
-};
-
-function eventLine(event: Event) {
+const eventSchema = z.object({
+  type: z.string().optional(),
+  changes: z
+    .object({ operation: z.string(), add: z.int(), change: z.int(), remove: z.int() })
+    .optional(),
+  hook: z
+    .object({
+      resource: z.object({ resource_type: z.string(), resource_name: z.string() }).optional(),
+      action: z.string().optional(),
+    })
+    .optional(),
+  diagnostic: z.object({ severity: z.string(), summary: z.string().optional() }).optional(),
+});
+function eventLine(event: z.infer<typeof eventSchema>) {
   if (event.type === 'change_summary' && event.changes) {
     const { operation, add, change, remove } = event.changes;
-    if (
-      (operation === 'apply' || operation === 'destroy') &&
-      [add, change, remove].every((count) => Number.isSafeInteger(count))
-    ) {
+    if (operation === 'apply' || operation === 'destroy') {
       return `Resources: ${add} added, ${change} changed, ${remove} destroyed.`;
     }
   }
@@ -47,7 +51,7 @@ function eventLine(event: Event) {
 
 type Operation = {
   directory: string;
-  operation: 'apply' | 'destroy';
+  operation: 'plan' | 'apply';
   options: string[];
   env: Record<string, string | undefined>;
   events: string;
@@ -71,7 +75,8 @@ export async function executeOperation({
     excerpt = raw
       .split('\n')
       .filter(Boolean)
-      .map((line) => eventLine(JSON.parse(line) as Event))
+      .map((line) => eventSchema.safeParse(JSON.parse(line)))
+      .flatMap((event) => (event.success ? [eventLine(event.data)] : []))
       .filter((line) => line !== null)
       .slice(-80);
   } catch {
@@ -80,7 +85,13 @@ export async function executeOperation({
 
   return {
     exitCode: result.exitCode,
-    log: [`tofu ${operation}`, ...excerpt, `Exit status: ${result.exitCode}`, '', ...details]
+    log: [
+      `tofu ${operation}${options.includes('-destroy') ? ' -destroy' : ''}`,
+      ...excerpt,
+      `Exit status: ${result.exitCode}`,
+      '',
+      ...details,
+    ]
       .join('\n')
       .trimEnd(),
   };

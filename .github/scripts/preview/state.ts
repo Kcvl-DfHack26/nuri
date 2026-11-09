@@ -1,8 +1,9 @@
 import { $ } from 'bun';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { z } from 'zod';
 
-import { readOperationDetails } from './operation-details';
+import { operationDetails } from './operation-details';
 import { executeOperation } from './run-operation';
 
 const directory = 'infra/preview-pr';
@@ -13,95 +14,55 @@ function bucketName(project: string) {
   return `${project}-nuri-preview-state`;
 }
 
-function recordStateNames(items: unknown, pullRequests: Set<string>) {
-  if (items === undefined) {
-    return;
-  }
-  if (!Array.isArray(items)) {
-    throw new Error('Invalid preview state objects');
-  }
-  const entries: unknown[] = items;
-  for (const item of entries) {
-    if (item && typeof item === 'object' && 'name' in item && typeof item.name === 'string') {
-      const match = statePattern.exec(item.name);
-      if (match?.[1]) {
-        pullRequests.add(match[1]);
-      }
-    }
-  }
-}
-
-async function storageToken() {
-  const token = (await $`gcloud auth print-access-token`.text()).trim();
-  if (!token) {
-    throw new Error('Could not read the preview access token');
-  }
-  return token;
-}
+const stateObjects = z.array(z.object({ name: z.string() }));
 
 export async function listPreviewStates(project: string, pr?: string) {
-  const token = await storageToken();
-  const url = new URL(`https://storage.googleapis.com/storage/v1/b/${bucketName(project)}/o`);
-  url.searchParams.set('prefix', pr ? `pr-${pr}/default.tfstate` : 'pr-');
-  url.searchParams.set('fields', 'items(name),nextPageToken');
-
-  const pullRequests = new Set<string>();
-  for (;;) {
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) {
-      throw new Error(`Could not list preview states: HTTP ${response.status}`);
-    }
-    const result: unknown = await response.json();
-    if (!result || typeof result !== 'object') {
-      throw new Error('Invalid preview state listing');
-    }
-    recordStateNames('items' in result ? result.items : undefined, pullRequests);
-    const page = 'nextPageToken' in result ? result.nextPageToken : undefined;
-    if (typeof page !== 'string' || !page) {
-      return pullRequests;
-    }
-    url.searchParams.set('pageToken', page);
-  }
+  const uri = `gs://${bucketName(project)}/${pr ? `pr-${pr}/*` : '**'}`;
+  const objects = stateObjects.parse(
+    await $`gcloud storage objects list ${uri} --format='json(name)'`.json(),
+  );
+  return new Set(
+    objects.flatMap(({ name }) => {
+      const pr = statePattern.exec(name)?.[1];
+      return pr ? [pr] : [];
+    }),
+  );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
+const changes = z
+  .array(
+    z.object({
+      address: z.string(),
+      mode: z.literal('managed'),
+      previous_address: z.never().optional(),
+      deposed: z.never().optional(),
+      change: z.object({ before: z.record(z.string(), z.unknown()).nullable() }),
+    }),
+  )
+  .default([]);
 
-export async function hasPreviewService(project: string, pr: string) {
-  const object = encodeURIComponent(`pr-${pr}/default.tfstate`);
-  const url = `https://storage.googleapis.com/storage/v1/b/${bucketName(project)}/o/${object}?alt=media`;
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${await storageToken()}` },
-    signal: AbortSignal.timeout(20_000),
-  });
-  if (response.status === 404) {
-    return false;
-  }
-  if (!response.ok) {
-    throw new Error(`Could not read preview state: HTTP ${response.status}`);
-  }
+const previewPlan = z.object({
+  format_version: z.string().regex(/^1\.\d+$/),
+  errored: z.literal(false),
+  resource_changes: changes,
+  resource_drift: changes,
+  planned_values: z
+    .object({
+      outputs: z
+        .object({
+          image_bucket: z.object({ sensitive: z.literal(false), value: z.string() }).optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+});
 
-  return validatePreviewState(await response.json(), project, pr);
-}
-
-export function previewImageBucket(project: string, pr: string) {
-  return `${project}-nuri-preview-pr-${pr}-media`;
-}
-
-// 照合済みのリソースだけを操作する。旧 state や途中まで作成・削除された state も再実行できる。
-export function validatePreviewState(state: unknown, project: string, pr: string) {
-  const resources: unknown = isRecord(state) ? state.resources : null;
-  if (!Array.isArray(resources)) {
-    throw new Error('Invalid OpenTofu preview state');
-  }
-
+// IAM covers the preview namespace. Verify exact PR ownership before applying the saved plan.
+export function validatePreviewPlan(document: unknown, project: string, pr: string) {
+  const plan = previewPlan.parse(document);
   const region = 'asia-northeast1';
   const service = `nuri-preview-pr-${pr}`;
-  const bucket = previewImageBucket(project, pr);
+  const bucket = `${project}-${service}-media`;
   const member = `serviceAccount:nuri-preview-runtime@${project}.iam.gserviceaccount.com`;
   const role = 'roles/storage.objectUser';
   const expected = new Map<string, Record<string, string>>([
@@ -124,41 +85,27 @@ export function validatePreviewState(state: unknown, project: string, pr: string
     ],
   ]);
 
-  const entries: unknown[] = resources;
-  let hasService = false;
-  for (const entry of entries) {
-    if (
-      !isRecord(entry) ||
-      entry.module !== undefined ||
-      entry.mode !== 'managed' ||
-      typeof entry.type !== 'string' ||
-      typeof entry.name !== 'string' ||
-      !Array.isArray(entry.instances) ||
-      entry.instances.length !== 1
-    ) {
-      throw new Error('OpenTofu preview state contains an unexpected resource');
+  // Drift includes resources that refresh removed from the planned changes.
+  for (const changes of [plan.resource_changes, plan.resource_drift]) {
+    const addresses = new Set<string>();
+    for (const {
+      address,
+      change: { before },
+    } of changes) {
+      const fields = expected.get(address);
+      if (
+        !fields ||
+        addresses.has(address) ||
+        (before && Object.entries(fields).some(([key, value]) => before[key] !== value))
+      ) {
+        throw new Error('OpenTofu preview plan points to a resource outside the requested PR');
+      }
+      addresses.add(address);
     }
-
-    const address = `${entry.type}.${entry.name}`;
-    const fields = expected.get(address);
-    const instances: unknown[] = entry.instances;
-    const [instance] = instances;
-    const attributes = isRecord(instance) ? instance.attributes : null;
-    if (
-      !fields ||
-      !isRecord(instance) ||
-      instance.index_key !== undefined ||
-      instance.deposed !== undefined ||
-      !isRecord(attributes) ||
-      Object.entries(fields).some(([key, value]) => attributes[key] !== value)
-    ) {
-      throw new Error(`OpenTofu preview state points to an unexpected resource at ${address}`);
-    }
-
-    expected.delete(address);
-    hasService ||= address === 'google_cloud_run_v2_service.preview';
   }
-  return hasService;
+
+  const imageBucket = plan.planned_values?.outputs?.image_bucket?.value;
+  return imageBucket === bucket ? imageBucket : undefined;
 }
 
 export async function removePreviewState(project: string, pr: string) {
@@ -191,27 +138,50 @@ export async function runPreviewTofu(
     // 同じ作業ツリーで複数PRを処理しても、状態やロックを混ぜない。
     await $`tofu -chdir=${directory} init -reconfigure -input=false -no-color -lockfile=readonly \
       -backend-config=bucket=${bucketName(project)} -backend-config=prefix=pr-${pr}`.env(env);
-    await hasPreviewService(project, pr);
-    let plan: string | undefined;
-    if (operation === 'apply') {
-      plan = join(scratch, 'preview.tfplan');
-      const planOptions = [...options, ...variables, `-out=${plan}`];
-      await $`tofu -chdir=${directory} plan ${planOptions}`.env(env);
+    const plan = join(scratch, 'preview.tfplan');
+    const planOptions = [...options, ...variables, `-out=${plan}`];
+    if (operation === 'destroy') {
+      planOptions.push('-destroy');
     }
-    const details = await readOperationDetails(directory, env, plan);
+    const planning = await executeOperation({
+      directory,
+      operation: 'plan',
+      options: planOptions,
+      env,
+      events: join(scratch, 'plan.jsonl'),
+      details: [],
+    });
+    if (planning.exitCode !== 0) {
+      await hooks.onAttempt(planning);
+      return { exitCode: planning.exitCode };
+    }
+
+    // The JSON includes sensitive attributes. Keep it out of the logs and PR comments.
+    const document: unknown = await $`tofu -chdir=${directory} show -json ${plan}`
+      .env(env)
+      .quiet()
+      .json();
+    const imageBucket = validatePreviewPlan(document, project, pr);
+    if (operation === 'apply' && !imageBucket) {
+      throw new Error('Invalid preview image bucket output');
+    }
     if (hooks.beforeAttempt && !(await hooks.beforeAttempt())) {
       return null;
     }
     const result = await executeOperation({
       directory,
-      operation,
-      options: plan ? [...options, plan] : [...options, ...variables, '-auto-approve'],
+      operation: 'apply',
+      options: [...options, plan],
       env,
-      events: join(scratch, 'events.jsonl'),
-      details,
+      events: join(scratch, 'apply.jsonl'),
+      details: operationDetails(document, operation),
     });
     await hooks.onAttempt(result);
-    return result.exitCode;
+    if (operation === 'destroy' || result.exitCode !== 0) {
+      return { exitCode: result.exitCode };
+    }
+
+    return { exitCode: result.exitCode, imageBucket };
   } finally {
     await rm(scratch, { force: true, recursive: true });
   }
