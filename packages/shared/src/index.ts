@@ -7,6 +7,8 @@ export const feedQuerySchema = z.object({
 });
 /** The face types ⑭ diagnoses, in the order it tries them (#47, #194). */
 export const faceTypeIds = ['long', 'square', 'round', 'heart', 'oval'] as const;
+/** Largest source photo accepted by the profile editor and API. */
+export const profilePhotoMaxBytes = 5 * 1024 * 1024;
 export const profileInputSchema = z.object({
   name: z.string().trim().min(1).max(40),
   handle: z
@@ -19,9 +21,11 @@ export const profileInputSchema = z.object({
   /** Chosen on ⑰-2 or saved from ⑭; null until then. Skin tone is never stored (not diagnosed). */
   faceType: z.enum(faceTypeIds).nullable(),
 });
-export const profilePatchSchema = profileInputSchema
-  .partial()
-  .refine((fields) => Object.keys(fields).length > 0);
+// A photo-only update can leave all text and preference fields unchanged.
+export const profileChangesSchema = profileInputSchema.partial();
+export const profilePatchSchema = profileChangesSchema.refine(
+  (fields) => Object.keys(fields).length > 0,
+);
 
 // Recipe IDs are readable slugs (e.g. fox) so seeded recipes keep stable URLs.
 export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,64}$/) });
@@ -128,7 +132,7 @@ const jpegBase64Prefix = '/9j/';
 const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
 
 /** One step of a recipe posted from ③ (⑫): the part, its texts, the cosmetics used and a color. */
-export const recipeStepInputSchema = z.object({
+const recipeStepInputSchema = z.object({
   part: z.enum(makeupParts),
   label: z.string().trim().min(1).max(20),
   title: z.string().trim().min(1).max(40),

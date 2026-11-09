@@ -33,7 +33,7 @@ jobs:
       - name: Verify Current Main and CI
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/preview/bootstrap.ts verify
+        run: bun .github/scripts/ci/verify-main.ts
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_INFRA_WIF_PROVIDER }}
@@ -46,4 +46,19 @@ jobs:
         env:
           OPERATION: ${{ inputs.operation }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
-        run: bun .github/scripts/preview/bootstrap.ts manage
+        run: |
+          test "$PREVIEW_GCP_PROJECT_ID" = kcvlb4
+          export TF_IN_AUTOMATION=true
+          umask 077
+          plan=$(mktemp "$RUNNER_TEMP/nuri-preview-bootstrap.XXXXXX")
+          trap 'rm -f "$plan"' EXIT
+          tofu -chdir=infra/preview init -input=false -lockfile=readonly
+          tofu -chdir=infra/preview plan -input=false -no-color -lock-timeout=5m \
+            -var="project_id=$PREVIEW_GCP_PROJECT_ID" -out="$plan"
+          if [ "$OPERATION" = apply ]; then
+            # 共有基盤の削除・置換を拒み、検査した計画を適用する。
+            tofu -chdir=infra/preview show -json "$plan" \
+              | jq -e 'all(.resource_changes[]?; .change.actions | index("delete") | not)' >/dev/null
+            tofu -chdir=infra/preview apply -input=false -no-color -lock-timeout=5m "$plan"
+            tofu -chdir=infra/preview output -no-color
+          fi

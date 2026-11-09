@@ -21,8 +21,9 @@
     "test:scripts": "bun test ./scripts ./.github/scripts",
     "test:e2e": "playwright test",
     "test:integration": "bun run compose run --rm --no-deps api bun run --cwd apps/api test:integration",
-    "check": "bun run --parallel format:check lint typecheck test deadcode",
-    "deadcode": "fallow dead-code",
+    "check": "bun run --parallel format:check lint typecheck test deadcode dupes",
+    "deadcode": "fallow dead-code --fail-on-issues",
+    "dupes": "fallow dupes --fail-on-issues",
     "db:generate": "bun run --cwd apps/api db:generate",
     "db:migrate": "bun run compose run --rm migrate",
     "setup": "sh scripts/worktree-init.sh && bun scripts/setup.ts",
@@ -31,11 +32,14 @@
     "export:mobile": "bun run --cwd apps/mobile export",
     "doctor": "bun run --cwd apps/mobile doctor",
     "services:up": "bun run compose up -d --build api metro",
-    "services:down": "bun run compose --profile '*' down",
+    "services:down": "sh scripts/services-down.sh",
     "dev:go": "bun run compose -f compose.yaml -f compose.go.yaml up --build api metro",
     "hooks:install": "lefthook install",
     "compose": "env -u WORKTREE_ROOT -u WORKTREE_GIT_COMMON_DIR PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose",
-    "db:seed": "bun run compose exec api bun run --cwd apps/api db:seed"
+    "db:seed": "bun run compose exec api sh scripts/with-local-database.sh bun run --cwd apps/api db:seed"
+  },
+  "dependencies": {
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.4",

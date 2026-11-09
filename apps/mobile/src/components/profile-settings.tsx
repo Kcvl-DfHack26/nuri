@@ -1,19 +1,30 @@
+import type { ImagePickerAsset } from 'expo-image-picker';
 import type { ReactNode } from 'react';
 
 import { Host, Icon, Picker, Switch as NativeSwitch } from '@expo/ui';
-import { faceTypeIds, profileInputSchema, profilePatchSchema } from '@starter/shared';
+import {
+  faceTypeIds,
+  profileChangesSchema,
+  profileInputSchema,
+  profilePhotoMaxBytes,
+  profilePatchSchema,
+} from '@starter/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  launchImageLibraryAsync,
+  UIImagePickerPreferredAssetRepresentationMode,
+} from 'expo-image-picker';
 import { router, useIsFocused } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { FaceType } from '@/lib/face-diagnosis';
 import type { MyProfile } from '@/lib/social';
 
 import { Feedback } from '@/components/feedback';
-import { GlassIconButton } from '@/components/glass-icon-button';
+import { FloatingBackHeader } from '@/components/floating-back-header';
 import { ProfilePhoto } from '@/components/my-page';
 import { BottomCta, PrimaryButton } from '@/components/post-chrome';
 import { PushSettings } from '@/components/push-settings';
@@ -24,13 +35,15 @@ import { faceTypes } from '@/lib/face-diagnosis';
 import { backOrHome } from '@/lib/navigation';
 import { addPasskey, passkeyListOptions, passkeysAvailable } from '@/lib/passkeys';
 import { recipeKeys } from '@/lib/recipes';
-import { changeProfile, myProfileKeys, myProfileOptions, userKeys } from '@/lib/social';
+import {
+  changeProfile,
+  changeProfileWithPhoto,
+  myProfileKeys,
+  myProfileOptions,
+  userKeys,
+} from '@/lib/social';
 import { useTokenColor } from '@/theme/tokens';
 
-const BACK = Icon.select({
-  ios: 'chevron.left',
-  android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
-});
 const CAMERA = Icon.select({
   ios: 'camera',
   android: import('@expo/material-symbols/photo_camera.xml'),
@@ -40,7 +53,7 @@ const NEXT = Icon.select({
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
 
-// Plan A ⑰-2 プロフィール設定. Photo remains a sample.
+// Plan A ⑰-2 プロフィール設定.
 export function ProfileSettings() {
   const insets = useSafeAreaInsets();
   const session = authClient.useSession();
@@ -101,39 +114,13 @@ export function ProfileSettings() {
           />
         </ScrollView>
       )}
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 top-0"
-        style={{
-          height: insets.top + headerHeight + 20,
-          backgroundImage:
-            'linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0.97) 82%, rgba(255,255,255,0) 100%)',
-        }}
+      <FloatingBackHeader
+        title="プロフィール設定"
+        insetTop={insets.top}
+        height={headerHeight}
+        topOffset={8}
+        onHeight={setHeaderHeight}
       />
-      <View
-        className="absolute inset-x-4 min-h-11 flex-row items-center gap-2"
-        style={{ top: insets.top + 8 }}
-        onLayout={(event) => {
-          setHeaderHeight(event.nativeEvent.layout.height);
-        }}
-      >
-        <GlassIconButton
-          icon={BACK}
-          label="戻る"
-          className="border-black/8 bg-white"
-          onPress={() => {
-            backOrHome();
-          }}
-        />
-        <Text
-          accessibilityRole="header"
-          className="flex-1 text-center font-maru-bold text-heading text-ink-primary"
-        >
-          プロフィール設定
-        </Text>
-        {/* Balances the back button so the title stays centered. */}
-        <View className="size-10" />
-      </View>
     </View>
   );
 }
@@ -162,6 +149,19 @@ function Editor({
   refreshError: boolean;
   onRetry: () => void;
 }) {
+  const [photo, setPhoto] = useState<ImagePickerAsset>();
+  const [pickingPhoto, setPickingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string>();
+  const saving = useRef(false);
+  useEffect(() => {
+    // The web picker creates a blob URL for the local preview.
+    if (Platform.OS === 'web' && photo?.uri.startsWith('blob:')) {
+      const uri = photo.uri;
+      return () => {
+        URL.revokeObjectURL(uri);
+      };
+    }
+  }, [photo]);
   const [form, setForm] = useState(() => ({ base: profile, draft: profile }));
   const current = {
     name: form.draft.name === form.base.name ? profile.name : form.draft.name,
@@ -187,7 +187,7 @@ function Editor({
   const handleInvalid =
     input.handle !== null && !profileInputSchema.shape.handle.safeParse(input.handle).success;
   const save = useMutation({
-    mutationFn: () => changeProfile(changes),
+    mutationFn: () => (photo ? changeProfileWithPhoto(changes, photo) : changeProfile(changes)),
     onSuccess: async () => {
       authClient.$store.notify('$sessionSignal');
       await Promise.all([
@@ -195,7 +195,9 @@ function Editor({
         client.invalidateQueries({ queryKey: userKeys.all }),
         client.invalidateQueries({ queryKey: myProfileKeys.all }),
       ]);
-      backOrHome();
+    },
+    onSettled: () => {
+      saving.current = false;
     },
   });
   const logout = useMutation({
@@ -210,7 +212,26 @@ function Editor({
       router.dismissTo('/');
     },
   });
-  const canSave = profilePatchSchema.safeParse(changes).success && !save.isPending && !refreshError;
+  const busy = pickingPhoto || save.isPending || logout.isPending;
+  const canSave =
+    !busy &&
+    !refreshError &&
+    (photo ? profileChangesSchema : profilePatchSchema).safeParse(changes).success;
+  async function pickPhoto() {
+    setPhotoError(undefined);
+    setPickingPhoto(true);
+    try {
+      const selected = await pickProfilePhoto();
+      if (selected) {
+        setPhoto(selected);
+        save.reset();
+      }
+    } catch (error) {
+      setPhotoError(error instanceof Error ? error.message : photoPickerError);
+    } finally {
+      setPickingPhoto(false);
+    }
+  }
   const error = save.error ?? logout.error;
   return (
     <>
@@ -232,22 +253,21 @@ function Editor({
             </Text>
           </Pressable>
         ) : null}
-        <View className="items-center gap-2">
-          <View className="size-24">
-            <ProfilePhoto size={96} image={image} />
-            <View className="absolute left-16.5 top-16.5 size-8 items-center justify-center rounded-full border-2 border-bg-surface bg-accent-rose">
-              <SocialIcon name={CAMERA} size={18} color="white" />
-            </View>
-          </View>
-          <View
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="写真を変更（準備中）"
-            accessibilityState={{ disabled: true }}
-          >
-            <Text className="font-maru-bold text-label text-accent-rose">写真を変更</Text>
-          </View>
-        </View>
+        <ProfilePhotoEditor
+          image={image}
+          photoUri={photo?.uri}
+          busy={busy}
+          pickingPhoto={pickingPhoto}
+          photoError={photoError}
+          onPick={() => {
+            void pickPhoto();
+          }}
+          onCancel={() => {
+            setPhoto(undefined);
+            setPhotoError(undefined);
+            save.reset();
+          }}
+        />
         <View className="gap-3.5">
           <Field label="表示名">
             <TextInput
@@ -326,8 +346,8 @@ function Editor({
         <AccountSection userId={userId} email={email} />
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ disabled: logout.isPending }}
-          disabled={logout.isPending}
+          accessibilityState={{ disabled: busy }}
+          disabled={busy}
           onPress={() => {
             // Show only the latest failure.
             save.reset();
@@ -363,13 +383,103 @@ function Editor({
           label={save.isPending ? '保存中' : '保存する'}
           disabled={!canSave}
           onPress={() => {
+            if (saving.current) {
+              return;
+            }
+            saving.current = true;
             logout.reset();
-            save.mutate();
+            save.mutate(undefined, { onSuccess: backOrHome });
           }}
         />
       </BottomCta>
     </>
   );
+}
+
+function ProfilePhotoEditor({
+  image,
+  photoUri,
+  busy,
+  pickingPhoto,
+  photoError,
+  onPick,
+  onCancel,
+}: {
+  image: string | null | undefined;
+  photoUri: string | undefined;
+  busy: boolean;
+  pickingPhoto: boolean;
+  photoError: string | undefined;
+  onPick: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <View className="items-center gap-2">
+      <View className="size-24">
+        <ProfilePhoto size={96} image={photoUri ?? image} />
+        <View className="absolute left-16.5 top-16.5 size-8 items-center justify-center rounded-full border-2 border-bg-surface bg-accent-rose">
+          <SocialIcon name={CAMERA} size={18} color="white" />
+        </View>
+      </View>
+      <View className="flex-row flex-wrap justify-center gap-x-4">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: busy, busy: pickingPhoto }}
+          className="min-h-12 min-w-12 items-center justify-center active:opacity-70"
+          disabled={busy}
+          onPress={onPick}
+        >
+          <Text className="font-maru-bold text-label text-accent-rose">
+            {pickingPhoto ? '写真を選択中' : '写真を変更'}
+          </Text>
+        </Pressable>
+        {photoUri ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy }}
+            className="min-h-12 min-w-12 items-center justify-center active:opacity-70"
+            disabled={busy}
+            onPress={onCancel}
+          >
+            <Text className="font-maru-bold text-label text-ink-secondary">選択を取り消す</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {photoUri ? (
+        <Text className="text-center font-maru text-meta text-ink-secondary">
+          保存すると新しい写真が表示されます
+        </Text>
+      ) : null}
+      {photoError ? (
+        <Text
+          accessibilityLiveRegion="polite"
+          className="text-center font-maru text-meta text-accent-rose"
+        >
+          {photoError}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const photoPickerError = '写真を選べませんでした。もう一度お試しください。';
+
+async function pickProfilePhoto() {
+  const picked = await launchImageLibraryAsync({
+    mediaTypes: 'images',
+    quality: 0.8,
+    preferredAssetRepresentationMode: UIImagePickerPreferredAssetRepresentationMode.Compatible,
+  }).catch(() => {
+    throw new Error(photoPickerError);
+  });
+  const selected = picked.assets?.[0];
+  if (!selected || (selected.fileSize ?? selected.file?.size ?? 0) <= profilePhotoMaxBytes) {
+    return selected;
+  }
+  if (Platform.OS === 'web' && selected.uri.startsWith('blob:')) {
+    URL.revokeObjectURL(selected.uri);
+  }
+  throw new Error('写真は5 MB以下にしてください。');
 }
 
 function Field({

@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
+export const storageEnvSchema = z.object({
+  GCS_BUCKET: z.string().trim().min(1),
+  STORAGE_EMULATOR_HOST: z.url({ protocol: /^https?$/ }),
+});
+
 const schema = z.object({
+  ...storageEnvSchema.partial().shape,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
   DATABASE_URL: z.string().min(1),

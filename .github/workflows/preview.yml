@@ -50,6 +50,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - &install-preview-dependencies
+        name: Install Preview Script Dependencies
+        run: bun install --production --frozen-lockfile --ignore-scripts --filter './'
       - name: Prepare Preview Comment
         id: request
         env:
@@ -88,11 +91,17 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
+      - &install-preview-tofu
+        name: Install Verified OpenTofu and Provider
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview-pr/.terraform.lock.hcl
       - name: Select Preview Credentials
         id: inspect
         env:
@@ -117,8 +126,10 @@ jobs:
       pull-requests: read
       id-token: write
     outputs:
-      tofu_log: ${{ steps.apply.outputs.tofu_log }}
-      tofu_exit: ${{ steps.apply.outputs.tofu_exit }}
+      service: ${{ steps.apply.outputs.service }}
+      origin: ${{ steps.apply.outputs.origin }}
+      region: ${{ steps.apply.outputs.region }}
+      image_bucket: ${{ steps.apply.outputs.image_bucket }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -127,15 +138,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Install Verified OpenTofu and Provider
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview-pr/.terraform.lock.hcl
+      - *install-preview-tofu
       - name: Apply Preview Infrastructure
         id: apply
         env:
@@ -153,6 +162,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: preview
+    env:
+      CLOUDSDK_CORE_PROJECT: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
+      CLOUDSDK_RUN_REGION: ${{ needs.apply.outputs.region }}
+      PREVIEW_SERVICE: ${{ needs.apply.outputs.service }}
+      PREVIEW_ORIGIN: ${{ needs.apply.outputs.origin }}
+      PREVIEW_IMAGE_BUCKET: ${{ needs.apply.outputs.image_bucket }}
+      PREVIEW_PR: ${{ needs.request.outputs.pr }}
+      PREVIEW_SHA: ${{ needs.request.outputs.sha }}
     permissions:
       contents: read
       pull-requests: read
@@ -175,20 +192,60 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: controller/.bun-version
+      - name: Install Preview Script Dependencies
+        working-directory: controller
+        run: bun install --production --frozen-lockfile --ignore-scripts --filter './'
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Publish and Verify Preview
-        id: preview
+      - name: Build and Push Preview Image
+        id: image
+        run: |
+          registry="${CLOUDSDK_RUN_REGION:?}-docker.pkg.dev"
+          package="$registry/${CLOUDSDK_CORE_PROJECT:?}/nuri-preview/pr-${PREVIEW_PR:?}"
+          gcloud auth configure-docker "$registry" --quiet
+          docker buildx build --push --provenance=false --platform linux/amd64 \
+            --metadata-file "$RUNNER_TEMP/preview-image.json" \
+            --target preview --build-context preview-scripts=controller/scripts \
+            --file controller/apps/api/Dockerfile \
+            --tag "$package:gha-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" source
+          digest=$(jq -er '."containerimage.digest" | select(test("^sha256:[0-9a-f]{64}$"))' "$RUNNER_TEMP/preview-image.json")
+          printf 'uri=%s@%s\n' "$package" "$digest" >> "$GITHUB_OUTPUT"
+      - name: Deploy Candidate Without Traffic
+        id: candidate
+        env:
+          IMAGE: ${{ steps.image.outputs.uri }}
+        run: |
+          suffix="gha-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf 'revision=%s-%s\n' "${PREVIEW_SERVICE:?}" "$suffix" >> "$GITHUB_OUTPUT"
+          gcloud run deploy "$PREVIEW_SERVICE" --image="${IMAGE:?}" --revision-suffix="$suffix" \
+            --no-traffic --tag=candidate --no-invoker-iam-check \
+            --set-env-vars="PREVIEW_ORIGIN=${PREVIEW_ORIGIN:?},GCS_BUCKET=${PREVIEW_IMAGE_BUCKET:?}" --quiet
+      - name: Verify Candidate
         working-directory: controller
         env:
+          REVISION: ${{ steps.candidate.outputs.revision }}
+        run: |
+          candidate_url=$(gcloud run services describe "$PREVIEW_SERVICE" --format=json |
+            jq -er --arg revision "$REVISION" '.status.traffic[] | select(.tag == "candidate" and .revisionName == $revision) | .url')
+          bun .github/scripts/preview/check.ts "$candidate_url" "$PREVIEW_ORIGIN"
+      - name: Promote Verified Candidate
+        id: preview
+        env:
           GH_TOKEN: ${{ github.token }}
-          PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
-          PREVIEW_PR: ${{ needs.request.outputs.pr }}
-          PREVIEW_SHA: ${{ needs.request.outputs.sha }}
-        run: bun .github/scripts/preview/cloud.ts publish "$PREVIEW_PR" "$PREVIEW_SHA" "$GITHUB_WORKSPACE/source"
+          REVISION: ${{ steps.candidate.outputs.revision }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PREVIEW_PR" |
+            jq -e --arg sha "$PREVIEW_SHA" --arg repo "$GITHUB_REPOSITORY" \
+              '.state == "open" and .head.sha == $sha and .head.repo.full_name == $repo' > /dev/null
+          gcloud run services update-traffic "$PREVIEW_SERVICE" \
+            --to-revisions="$REVISION=100" --remove-tags=candidate --quiet
+          printf 'origin=%s\ndeployed_at=%s\n' "$PREVIEW_ORIGIN" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - name: Remove Failed Candidate Tag
+        if: (failure() || cancelled()) && steps.candidate.outputs.revision != ''
+        run: gcloud run services update-traffic "$PREVIEW_SERVICE" --remove-tags=candidate --quiet
 
   cleanup:
     name: Clean Up Closed Previews
@@ -204,8 +261,6 @@ jobs:
       contents: read
       pull-requests: read
       id-token: write
-    outputs:
-      logs: ${{ steps.logs.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -214,81 +269,19 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_WIF_PROVIDER }}
           service_account: ${{ vars.PREVIEW_SERVICE_ACCOUNT }}
       - uses: google-github-actions/setup-gcloud@v3.0.1
-      - name: Install Verified OpenTofu and Provider
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/ci/prepare-opentofu.ts infra/preview-pr/.terraform.lock.hcl
+      - *install-preview-tofu
       - name: Delete Closed Preview Resources
-        id: cleanup
         env:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
           PREVIEW_PR: ${{ github.event.pull_request.number }}
-          PREVIEW_CLEANUP_REPORTS: ${{ runner.temp }}/preview-cleanup.ndjson
         run: bun .github/scripts/preview/cloud.ts cleanup "$PREVIEW_PR"
-      - uses: actions/upload-artifact@v7.0.2
-        id: logs
-        if: always() && steps.cleanup.outputs.has_reports == 'true'
-        with:
-          name: preview-cleanup-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/preview-cleanup.ndjson
-          retention-days: 1
-
-  report-destroy:
-    name: Report OpenTofu Destroy
-    needs: cleanup
-    if: always() && needs.cleanup.outputs.logs != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-      - uses: actions/download-artifact@v8.0.2
-        with:
-          artifact-ids: ${{ needs.cleanup.outputs.logs }}
-          path: ${{ runner.temp }}/preview-cleanup
-      - name: Post Destroy Logs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/preview/report-cleanup.ts "$RUNNER_TEMP/preview-cleanup/preview-cleanup.ndjson"
-
-  report-apply:
-    name: Report OpenTofu Apply
-    needs: [request, apply]
-    if: always() && needs.apply.outputs.tofu_exit != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          ref: ${{ github.workflow_sha }}
-          persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: .bun-version
-      - name: Post Apply Log
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREVIEW_PR: ${{ needs.request.outputs.pr }}
-          TOFU_LOG: ${{ needs.apply.outputs.tofu_log }}
-          TOFU_EXIT: ${{ needs.apply.outputs.tofu_exit }}
-        run: bun .github/scripts/preview/report-operation.ts
 
   report:
     name: Report Preview Deployment
@@ -308,6 +301,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
+      - *install-preview-dependencies
       - name: Update Preview Comment
         env:
           GH_TOKEN: ${{ github.token }}

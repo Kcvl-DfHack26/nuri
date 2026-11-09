@@ -68,16 +68,22 @@ export function recipeRoutes(
           ),
         ),
     ).mapWith(Boolean);
-  const summaryFields = (viewerId: string | null) => ({
-    id: recipe.id,
-    title: recipe.title,
-    image: recipe.image,
-    tags: recipe.tags,
-    summary: recipe.summary,
-    likeCount: likeCountOf(db, recipe.id, recipe.likeCount),
-    favorited: favoritedBy(recipe.id, viewerId),
-    author: { id: user.id, name: user.name },
-  });
+  const recipeSummaries = (viewerId: string | null, offset: number) =>
+    db
+      .select({
+        id: recipe.id,
+        title: recipe.title,
+        image: recipe.image,
+        tags: recipe.tags,
+        summary: recipe.summary,
+        likeCount: likeCountOf(db, recipe.id, recipe.likeCount),
+        favorited: favoritedBy(recipe.id, viewerId),
+        author: { id: user.id, name: user.name },
+      })
+      .from(recipe)
+      .innerJoin(user, eq(recipe.authorId, user.id))
+      .limit(pageSize + 1)
+      .offset(offset);
   const viewerOf = async (headers: Headers) =>
     (await auth.api.getSession({ headers }))?.user.id ?? null;
 
@@ -100,14 +106,9 @@ export function recipeRoutes(
               )
             : undefined,
         );
-        const items = await db
-          .select(summaryFields(await viewerOf(c.req.raw.headers)))
-          .from(recipe)
-          .innerJoin(user, eq(recipe.authorId, user.id))
+        const items = await recipeSummaries(await viewerOf(c.req.raw.headers), offset)
           .where(where)
-          .orderBy(desc(recipe.createdAt), desc(recipe.id))
-          .limit(pageSize + 1)
-          .offset(offset);
+          .orderBy(desc(recipe.createdAt), desc(recipe.id));
         return c.json(page(items, offset));
       })
       // A whole-face recipe posted from ③. Only the texts, the steps and one JPEG frame arrive;
@@ -237,15 +238,11 @@ export function recipeRoutes(
         zValidator('query', feedQuerySchema.pick({ offset: true })),
         async (c) => {
           const { offset } = c.req.valid('query');
-          const items = await db
-            .select(summaryFields(c.get('currentUser').id))
-            .from(recipeFavorite)
-            .innerJoin(recipe, eq(recipeFavorite.recipeId, recipe.id))
-            .innerJoin(user, eq(recipe.authorId, user.id))
-            .where(eq(recipeFavorite.userId, c.get('currentUser').id))
-            .orderBy(desc(recipeFavorite.createdAt), desc(recipe.id))
-            .limit(pageSize + 1)
-            .offset(offset);
+          const viewerId = c.get('currentUser').id;
+          const items = await recipeSummaries(viewerId, offset)
+            .innerJoin(recipeFavorite, eq(recipeFavorite.recipeId, recipe.id))
+            .where(eq(recipeFavorite.userId, viewerId))
+            .orderBy(desc(recipeFavorite.createdAt), desc(recipe.id));
           return c.json(page(items, offset));
         },
       )

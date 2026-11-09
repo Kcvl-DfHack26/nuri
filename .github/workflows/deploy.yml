@@ -35,16 +35,19 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           ref: ${{ env.TARGET_SHA }}
-      - name: Check deployment configuration and current main
-        env:
-          GH_TOKEN: ${{ github.token }}
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Check deployment configuration
         run: |
           for name in PROJECT_ID REGION SERVICE REPOSITORY MIGRATION_JOB; do
             test -n "${!name}" || { echo "Missing $name"; exit 1; }
           done
-          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$TARGET_SHA"
-          passed=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$TARGET_SHA&status=success" --jq '[.workflow_runs[] | select(.event == "push")] | length')
-          test "$passed" -gt 0 || { echo 'This SHA has not passed the main CI workflow'; exit 1; }
+      - name: Verify Current Main and CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun .github/scripts/ci/verify-main.ts
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -92,10 +95,6 @@ jobs:
         if: vars.EXPO_UPDATE_ENABLED == 'true'
         with:
           node-version-file: .node-version
-      - uses: oven-sh/setup-bun@v2
-        if: vars.EXPO_UPDATE_ENABLED == 'true'
-        with:
-          bun-version-file: .bun-version
       - if: vars.EXPO_UPDATE_ENABLED == 'true'
         run: bun install --frozen-lockfile
       - name: Publish matching production update through Expo Workflows

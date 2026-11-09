@@ -4,13 +4,21 @@ import { and, eq, exists, sql, sum } from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
+import type { ImageStore } from '../../platform/images';
 import type { Auth, AuthenticatedEnv } from '../auth';
 
 import { likeCountOf } from '../../db/like-count';
 import { follow, recipe, user } from '../../db/schema';
+import { imagePath, saveImage } from '../../platform/images';
 import { requireSession } from '../auth';
+import { decodeProfilePhoto, profilePhotoFormSchema } from './profile-photo';
 
-export function socialRoutes(db: Database, auth: Auth) {
+function isHandleConflict(error: unknown) {
+  const cause = error instanceof Error && 'cause' in error ? error.cause : error;
+  return cause instanceof Error && 'code' in cause && cause.code === '23505';
+}
+
+export function socialRoutes(db: Database, auth: Auth, images: ImageStore | null) {
   return (
     new Hono<AuthenticatedEnv>()
       .get('/users/:id', zValidator('param', userParamsSchema), async (c) => {
@@ -82,12 +90,70 @@ export function socialRoutes(db: Database, auth: Auth) {
               .where(eq(user.id, c.get('currentUser').id));
             return c.json({ success: true });
           } catch (error) {
-            const cause = error instanceof Error && 'cause' in error ? error.cause : error;
-            if (cause instanceof Error && 'code' in cause && cause.code === '23505') {
+            if (isHandleConflict(error)) {
               return c.json({ error: 'handle_taken' as const }, 409);
             }
             throw error;
           }
+        },
+      )
+      .patch(
+        '/me/profile/photo',
+        requireSession(auth),
+        zValidator('form', profilePhotoFormSchema, (result, c) => {
+          if (!result.success) {
+            return c.json({ error: 'invalid_profile_photo' as const }, 400);
+          }
+        }),
+        async (c) => {
+          if (!images) {
+            return c.json({ error: 'storage_unavailable' as const }, 503);
+          }
+          const { changes, photo } = c.req.valid('form');
+          const bytes = await decodeProfilePhoto(photo);
+          if (!bytes) {
+            return c.json({ error: 'invalid_profile_photo' as const }, 400);
+          }
+          const owner = eq(user.id, c.get('currentUser').id);
+          const key = `profiles/${crypto.randomUUID()}.jpg`;
+          const image = imagePath(key);
+          try {
+            const previous = await db.transaction(async (tx) => {
+              const [current] = await tx
+                .select({ image: user.image })
+                .from(user)
+                .where(owner)
+                .for('update');
+              if (!current) {
+                return null;
+              }
+              // Check for handle conflicts before uploading. A failed upload rolls back the edit.
+              await tx
+                .update(user)
+                .set({ ...changes, image, updatedAt: new Date() })
+                .where(owner);
+              await saveImage(images, key, bytes);
+              return current;
+            });
+            if (!previous) {
+              return c.json({ error: 'not_found' as const }, 404);
+            }
+            const oldKey = previous.image?.match(/^\/media\/(profiles\/[a-f0-9-]{36}\.jpg)$/)?.[1];
+            if (oldKey) {
+              await images
+                .file(oldKey)
+                .delete({ ignoreNotFound: true })
+                .catch(() => {
+                  console.error('Could not delete superseded profile photo');
+                });
+            }
+          } catch (error) {
+            if (isHandleConflict(error)) {
+              return c.json({ error: 'handle_taken' as const }, 409);
+            }
+            throw error;
+          }
+          return c.json({ success: true });
         },
       )
       .get('/me', requireSession(auth), (c) => {

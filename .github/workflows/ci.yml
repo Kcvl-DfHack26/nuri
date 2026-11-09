@@ -31,8 +31,10 @@ jobs:
         run: |
           bun run --bun --cwd apps/mobile styles:generate
           git diff --exit-code -- apps/mobile/uniwind-types.d.ts
-      - name: Check Formatting, Lint, Types, and Dead Code
-        run: bun run --bun --parallel format:check lint typecheck deadcode
+      - name: Check Fallow Dead Code and Duplication
+        run: bun run --bun --parallel deadcode dupes
+      - name: Check Formatting, Lint, and Types
+        run: bun run --bun --parallel format:check lint typecheck
       - name: Check Commit Messages
         if: github.event_name == 'pull_request'
         env:
@@ -70,8 +72,12 @@ jobs:
         run: bun run --bun --cwd apps/mobile test --shard="$SHARD"
 
   api-integration:
-    name: API Integration Tests (PostgreSQL)
+    name: API Integration Tests (PostgreSQL and Floci)
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
+      GCS_BUCKET: nuri-ci
+      STORAGE_EMULATOR_HOST: http://127.0.0.1:4588
     services:
       postgres: &postgres
         image: postgres:17.7-bookworm
@@ -83,17 +89,18 @@ jobs:
         options: >-
           --health-cmd "pg_isready -h 127.0.0.1 -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter"
           --health-interval 5s --health-timeout 5s --health-retries 12
+      floci: &floci
+        image: floci/floci-gcp:0.12.0
+        ports: ['4588:4588']
     steps:
       - *checkout
       - *setup-bun
       - *install
-      - name: Migrate Test Database
-        env:
-          DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
-        run: bun run --cwd apps/api src/db/migrate.ts
+      - name: Prepare Integration Services
+        run: |
+          bun run --cwd apps/api src/db/migrate.ts
+          bun run --cwd apps/api storage:init
       - name: Run API Integration Tests
-        env:
-          DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@localhost:5432/expo-hono-opentofu-starter
         run: bun run --cwd apps/api test:integration
 
   web-e2e:
@@ -101,6 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres: *postgres
+      floci: *floci
     steps:
       - *checkout
       - *setup-bun
@@ -218,7 +226,12 @@ jobs:
           DEVICE_EXPO_ORIGIN: exps://metro.nuri.localhost
           DEVICE_GOOGLE_ORIGIN: https://google.nuri.localhost
           DEVICE_MAIL_ORIGIN: https://mail.nuri.localhost
-        run: bun .github/scripts/ci/check-compose.ts
+        run: |
+          sh scripts/worktree-init.sh
+          docker compose config --quiet
+          docker compose --profile editor --profile tunnel config --quiet
+          docker compose -f compose.yaml -f compose.go.yaml config --quiet
+          docker compose -f compose.yaml -f compose.devices.yaml config --quiet
       - run: docker build --tag expo-hono-opentofu-starter-api --file apps/api/Dockerfile .
       - name: Run Container Smoke Test
         run: bun .github/scripts/ci/check-container.ts

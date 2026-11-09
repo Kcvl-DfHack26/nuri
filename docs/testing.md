@@ -10,17 +10,17 @@ bun run doctor
 bun run export:mobile
 ```
 
-APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。
+APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。画像を扱う統合テストは、専用のFlociバケットを `GCS_BUCKET` と `STORAGE_EMULATOR_HOST` で指定する。Compose起動時にworktree専用バケットが作成される。
 
 GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、AndroidのMaestro、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
 
-| 検査                | 確認すること                                                  |
-| ------------------- | ------------------------------------------------------------- |
-| ESLint・型・Bun     | workspace間の依存方向、環境設定、HTTP契約、Gitと起動CLIの境界 |
-| Bunと実PostgreSQL   | migration、認証・認可、保存された状態                         |
-| Jest・jest-expo     | ネイティブ境界を差し替えた画面の状態と操作                    |
-| 実Compose・Portless | 各構成の解決、起動、HTTPS、worktree間の分離と永続化           |
-| 開発ビルド          | 仮想端末でのTLS、Metro、Fast Refresh、認証の戻り先            |
+| 検査                     | 確認すること                                                  |
+| ------------------------ | ------------------------------------------------------------- |
+| ESLint・型・Bun          | workspace間の依存方向、環境設定、HTTP契約、Gitと起動CLIの境界 |
+| Bun・実PostgreSQL・Floci | migration、認証・認可、保存された状態と画像配信               |
+| Jest・jest-expo          | ネイティブ境界を差し替えた画面の状態と操作                    |
+| 実Compose・Portless      | 各構成の解決、起動、HTTPS、worktree間の分離と永続化           |
+| 開発ビルド               | 仮想端末でのTLS、Metro、Fast Refresh、認証の戻り先            |
 
 `Native Bundle Build` はExpo DoctorとiOS／Androidのexportを実行し、`mobile-bundles` を保存する。
 
@@ -41,6 +41,14 @@ tflint --chdir=infra --config="$PWD/.tflint.hcl"
 tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 ```
 
+### Fallow
+
+`bun run deadcode` と `bun run dupes` は `bun run check` とCIの `Static Analysis` で共通して実行する。未使用コード・依存関係などの警告、パース失敗、理由のない抑制、不要になった抑制をエラーとして扱う。自動・手動のエントリも未使用exportを検査する。重複は40トークン以上かつ5行以上の断片が2か所以上にあれば失敗する。Fallow既定のテスト・生成ファイルの除外を使い、既存重複のベースラインは設けない。
+
+失敗したら同じコマンドをローカルで再実行し、出力されたパスと行番号を確認する。同じ規則を実装していれば共有し、独立に保つ必要がある場合は理由を添えて対象だけを抑制する。検出条件や抑制の変更はPRで根拠を示す。
+
+`.fallowrc.json` の手動エントリはコンテナ起動時の `scripts/preview-ready.ts` とActionsの候補検査で呼ぶ `.github/scripts/preview/check.ts`。依存の除外はExpoとBabelがビルド時またはネイティブ側で使うパッケージ、トンネル用の `@expo/ngrok`、ESLintの設定経由で使うresolverに限る。
+
 ## iOS / Android 共通の実機チェック
 
 1. `bun run db:seed` 後、メイクタブの①にレシピ6件が並び、狐メイクから⑤（タグ・取り込み元・使うメイク品）を開けることを確認する。再実行して件数が増えず、利用者が投稿したレシピが残ることも確認する。
@@ -53,13 +61,16 @@ tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 
 ## Expo WebのE2E
 
-Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgreSQLを経由してサンプルレシピを読む。Chromiumでスマートフォン・横向きタブレットの一覧、URL直アクセス、手順と完成、比較のドラッグを検査する。カメラ拒否後の見本と、仮想カメラの開始・停止も検査する。CIでは専用の使い捨てPostgreSQLを使い、失敗時にトレースを保存する。
+Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgreSQLを経由してサンプルレシピを読む。Chromiumでスマートフォン・横向きタブレットの一覧、URL直アクセス、手順と完成、比較のドラッグを検査する。カメラ拒否後の見本と、仮想カメラの開始・停止も検査する。CIでは専用の使い捨てPostgreSQLとFlociを使い、失敗時にトレースを保存する。
 
 ローカルでは次のように専用DBを起動する。停止するとこのコンテナのデータは消える。
 
 ```sh
 docker run --rm --publish 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data \
   -e POSTGRES_USER=nuri_e2e -e POSTGRES_PASSWORD=nuri_e2e postgres:17.7-bookworm
+
+# 別ターミナルでFlociを起動する。GCSのみなのでDocker socketは不要。
+docker run --rm --publish 127.0.0.1:4588:4588 floci/floci-gcp:0.12.0
 ```
 
 DBが起動したら別のターミナルで実行する。
@@ -69,7 +80,7 @@ bunx --bun playwright install --no-shell chromium
 bun run test:e2e
 ```
 
-テストはDBへmigrationとseedを実行し、Honoがエクスポート済みのExpo WebとAPIを49116で同一オリジン配信する。別の使い捨てローカルDBを使う場合は `NURI_E2E_DATABASE_URL` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
+テストはDBへmigrationとseedを実行し、Honoがエクスポート済みのExpo WebとAPIを49116で同一オリジン配信する。別の使い捨てローカル環境を使う場合は `NURI_E2E_DATABASE_URL` と `NURI_E2E_STORAGE_EMULATOR_HOST` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
 
 ## Maestro
 

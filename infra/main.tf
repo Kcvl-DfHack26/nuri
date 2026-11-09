@@ -6,6 +6,7 @@ locals {
   apis = toset([
     "artifactregistry.googleapis.com", "run.googleapis.com", "sqladmin.googleapis.com",
     "secretmanager.googleapis.com", "iam.googleapis.com", "iamcredentials.googleapis.com", "sts.googleapis.com",
+    "storage.googleapis.com",
     # Gemini on Vertex AI reads the ⑫-3 video (#142, #155).
     "aiplatform.googleapis.com"
   ])
@@ -29,6 +30,23 @@ resource "google_service_account" "runtime" {
   display_name = "nuri Cloud Run runtime"
   depends_on   = [google_project_service.enabled]
 }
+resource "google_storage_bucket" "images" {
+  name                        = "${var.project_id}-${local.identity_prefix}-images"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = false
+  depends_on                  = [google_project_service.enabled]
+
+  lifecycle { prevent_destroy = true }
+}
+
+resource "google_storage_bucket_iam_member" "runtime_images" {
+  bucket = google_storage_bucket.images.name
+  role   = "roles/storage.objectUser"
+  member = "serviceAccount:${google_service_account.runtime.email}"
+}
+
 resource "google_service_account" "migration" {
   account_id   = "${local.identity_prefix}-migrate"
   display_name = "nuri database migration"
@@ -195,6 +213,10 @@ resource "google_cloud_run_v2_service" "api" {
         name  = "TRUSTED_ORIGINS"
         value = join(",", var.trusted_origins)
       }
+      env {
+        name  = "GCS_BUCKET"
+        value = google_storage_bucket.images.name
+      }
       # Without it the analysis answers 503; VERTEX_LOCATION keeps its default, global (#155).
       env {
         name  = "VERTEX_PROJECT"
@@ -246,7 +268,7 @@ resource "google_cloud_run_v2_service" "api" {
       error_message = "email_from must be a configured Resend sender when email_login_enabled is true."
     }
   }
-  depends_on = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.runtime]
+  depends_on = [google_project_iam_member.sql_client, google_secret_manager_secret_iam_member.runtime, google_storage_bucket_iam_member.runtime_images]
 }
 resource "google_cloud_run_v2_service_iam_member" "public" {
   count    = var.deploy_application ? 1 : 0
