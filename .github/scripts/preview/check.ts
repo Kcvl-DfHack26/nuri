@@ -11,6 +11,7 @@ const seedRecipe = z.object({
   }),
 });
 const manifest = z.object({ launchAsset: z.object({ url: z.string() }) });
+const runOrigin = z.string().regex(/^https:\/\/[a-z0-9.-]+\.run\.app$/);
 
 async function retryProbe<T>(probe: () => Promise<T>): Promise<T> {
   for (let retries = 5; ; retries -= 1) {
@@ -25,7 +26,7 @@ async function retryProbe<T>(probe: () => Promise<T>): Promise<T> {
   }
 }
 
-export async function checkCloudPreview(endpoint: string, origin: string) {
+async function checkCloudPreview(endpoint: string, origin: string) {
   await retryProbe(async () => {
     await (await getProbe(`${endpoint}/ready`)).arrayBuffer();
   });
@@ -59,4 +60,9 @@ export async function checkCloudPreview(endpoint: string, origin: string) {
       throw new Error(`Expo Go ${platform} launch asset does not use the public preview origin`);
     }
   }
+}
+
+if (import.meta.main) {
+  const [endpoint, origin] = Bun.argv.slice(2);
+  await checkCloudPreview(runOrigin.parse(endpoint), runOrigin.parse(origin));
 }

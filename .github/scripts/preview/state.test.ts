@@ -3,11 +3,18 @@ import { expect, test } from 'bun:test';
 import { validatePreviewPlan } from './state';
 
 const project = 'kcvlb4';
-const pr = '226';
 const service = 'nuri-preview-pr-226';
 const bucket = 'kcvlb4-nuri-preview-pr-226-media';
 const role = 'roles/storage.objectUser';
 const member = 'serviceAccount:nuri-preview-runtime@kcvlb4.iam.gserviceaccount.com';
+const target = {
+  project,
+  region: 'asia-northeast1',
+  service,
+  image_bucket: bucket,
+  image_role: role,
+  runtime_member: member,
+};
 
 function managed(address: string, before: Record<string, string> | null) {
   return { mode: 'managed', address, change: { before } };
@@ -37,24 +44,10 @@ const iam = managed('google_storage_bucket_iam_member.runtime_images', {
 });
 
 test('accepts initial, legacy, partial and complete plans for the requested PR', () => {
-  expect(() =>
-    validatePreviewPlan({ format_version: '1.2', errored: false }, project, pr),
-  ).not.toThrow();
-  expect(() => validatePreviewPlan(plan([managed(run.address, null)]), project, pr)).not.toThrow();
-  expect(() => validatePreviewPlan(plan([run]), project, pr)).not.toThrow();
-  expect(() => validatePreviewPlan(plan([images, iam]), project, pr)).not.toThrow();
-  expect(() => validatePreviewPlan(plan([iam, images, run]), project, pr)).not.toThrow();
-});
-
-test('accepts the OpenTofu image output only for the requested PR', () => {
-  const withOutput = (value: string) => ({
-    ...plan([run, images, iam]),
-    planned_values: { outputs: { image_bucket: { sensitive: false, value } } },
-  });
-  expect(validatePreviewPlan(withOutput(bucket), project, pr)).toBe(bucket);
-  expect(
-    validatePreviewPlan(withOutput('kcvlb4-nuri-preview-pr-227-media'), project, pr),
-  ).toBeUndefined();
+  validatePreviewPlan(plan([managed(run.address, null)]), target);
+  validatePreviewPlan(plan([run]), target);
+  validatePreviewPlan(plan([images, iam]), target);
+  validatePreviewPlan(plan([iam, images, run]), target);
 });
 
 test('rejects other PR resources, shared data, unexpected IAM and duplicate addresses', () => {
@@ -67,18 +60,25 @@ test('rejects other PR resources, shared data, unexpected IAM and duplicate addr
     [run, images, managed(iam.address, { ...iam.change.before, member: 'allUsers' })],
   ];
   for (const resources of invalid) {
-    expect(() => validatePreviewPlan(plan(resources), project, pr)).toThrow();
+    expect(() => {
+      validatePreviewPlan(plan(resources), target);
+    }).toThrow();
   }
-  expect(() => validatePreviewPlan(plan([images, iam]), project, '227')).toThrow();
-  expect(() => validatePreviewPlan(plan([run]), project, '227')).toThrow();
+  expect(() => {
+    validatePreviewPlan(plan([images, iam]), {
+      ...target,
+      image_bucket: 'kcvlb4-nuri-preview-pr-227-media',
+    });
+  }).toThrow();
+  expect(() => {
+    validatePreviewPlan(plan([run]), { ...target, service: 'nuri-preview-pr-227' });
+  }).toThrow();
 });
 
 test('rejects wrong targets even if refresh removed them from the planned changes', () => {
   const otherBucket = managed(images.address, { id: 'kcvlb4-nuri-preview-pr-227-media' });
-  expect(() =>
-    validatePreviewPlan({ ...plan([]), resource_drift: [otherBucket] }, project, pr),
-  ).toThrow();
-  expect(() =>
-    validatePreviewPlan({ ...plan([]), resource_drift: [images] }, project, pr),
-  ).not.toThrow();
+  expect(() => {
+    validatePreviewPlan({ ...plan([]), resource_drift: [otherBucket] }, target);
+  }).toThrow();
+  validatePreviewPlan({ ...plan([]), resource_drift: [images] }, target);
 });

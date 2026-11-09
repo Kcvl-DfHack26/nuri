@@ -30,10 +30,12 @@ variable "project_id" {
 }
 
 locals {
-  project = var.project_id
-  region  = "asia-northeast1"
-  name    = "nuri-preview-pr-${var.pr_number}"
-  bucket  = "${local.project}-${local.name}-media"
+  project    = var.project_id
+  region     = "asia-northeast1"
+  name       = "nuri-preview-pr-${var.pr_number}"
+  bucket     = "${local.project}-${local.name}-media"
+  runtime    = "nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
+  image_role = "roles/storage.objectUser"
 }
 
 provider "google" {
@@ -53,7 +55,7 @@ resource "google_cloud_run_v2_service" "preview" {
     max_instance_count = 1
   }
   template {
-    service_account = "nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
+    service_account = local.runtime
     timeout         = "180s"
     scaling {
       min_instance_count = 0
@@ -99,11 +101,23 @@ resource "google_storage_bucket" "images" {
 
 resource "google_storage_bucket_iam_member" "runtime_images" {
   bucket = google_storage_bucket.images.name
-  role   = "roles/storage.objectUser"
-  member = "serviceAccount:nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
+  role   = local.image_role
+  member = "serviceAccount:${local.runtime}"
 }
 
-output "image_bucket" {
-  description = "Private image bucket passed to the preview revision."
-  value       = google_storage_bucket.images.name
+output "preview_target" {
+  description = "Configured target identities for the PR workflow."
+  value = {
+    project        = local.project
+    region         = local.region
+    service        = local.name
+    image_bucket   = local.bucket
+    image_role     = local.image_role
+    runtime_member = "serviceAccount:${local.runtime}"
+  }
+}
+
+output "preview_origin" {
+  description = "Canonical Cloud Run URL for the preview."
+  value       = google_cloud_run_v2_service.preview.uri
 }

@@ -3,7 +3,7 @@
   "minimumVersion": "3.39.0",
   "failOnParseError": true,
   "includeEntryExports": true,
-  "entry": ["scripts/preview-ready.ts"],
+  "entry": [".github/scripts/preview/check.ts", "scripts/preview-ready.ts"],
   "ignorePatterns": [".agents/**", "**/.expo/**", ".artifacts/**"],
   "duplicates": {
     "minTokens": 40,
