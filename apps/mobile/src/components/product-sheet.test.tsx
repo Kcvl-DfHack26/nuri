@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 import { ProductSheet } from './product-sheet';
 
@@ -60,4 +60,17 @@ test('shows a way back for a product without details', async () => {
   expect(screen.getByText('商品が見つかりません')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '閉じる' }));
   expect(router.back).toHaveBeenCalled();
+});
+
+test('says the shop is coming on the web, where Alert does nothing', async () => {
+  const os = jest.replaceProperty(Platform, 'OS', 'web');
+  // The native test environment has no window.alert, so the test provides one.
+  const original = window.alert;
+  const alert = jest.fn();
+  window.alert = alert;
+  await render(<ProductSheet id="celane-brow-pencil" />);
+  await fireEvent.press(screen.getByRole('button', { name: '購入先を見る（準備中）' }));
+  expect(alert).toHaveBeenCalledWith('準備中\n購入先の案内は、いま準備しています。');
+  window.alert = original;
+  os.restore();
 });

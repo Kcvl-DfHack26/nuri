@@ -1,6 +1,6 @@
 import { Alert, Platform } from 'react-native';
 
-/** Tells that a feature shown in Plan A is not built yet, e.g. `showComingSoon('購入先')`. */
+/** Tells people that a feature shown in Plan A is not built yet, e.g. `showComingSoon('購入先')`. */
 export function showComingSoon(feature: string) {
   const message = `${feature}は、いま準備しています。`;
   // react-native-web's Alert does nothing, and the review build also runs on the web.
