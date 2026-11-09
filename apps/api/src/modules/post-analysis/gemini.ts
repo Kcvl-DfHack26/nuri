@@ -21,6 +21,8 @@ const answerSchema = postAnalysisSchema.extend({
       postAnalysisSchema.shape.steps.element.extend({
         start: z.string().trim().max(12),
         end: z.string().trim().max(12),
+        // Checked after the answer, so a malformed color reads as unknown instead of failing.
+        color: z.string().trim().max(20).nullable(),
       }),
     )
     .max(recipeStepsMax),
@@ -71,12 +73,13 @@ const prompt = `あなたはメイクの手順書を作るアシスタントで�
 - steps: 手順ごとの区間（start・end は動画の先頭からの時刻を「分:秒」で書く．例：0:05，1:07．1分を過ぎた時刻は 107 ではなく 1:07 と書く），部位（part），利用者向けの短い説明（description，60字程度，「〜する」の形）．
   part は base=ベース，brow=眉，eye=アイシャドウ，lash=アイライン，cheek=チーク，shading=シェーディング，highlight=ハイライト，lip=リップ．
 - cosmetics: 動画に映っているコスメ．パッケージの文字が読めない場合は推測しすぎず confidence を low にし，存在が確かでない商品名を作らない．evidence に判断の根拠を書く．steps[].cosmetics には使ったコスメの番号を入れる．
-- 利用者が話した内容も，部位・説明・コスメ・塗った範囲の判断に使う．
+- 利用者が話した内容も，部位・説明・コスメ・色・塗った範囲の判断に使う．
+- steps[].color: その手順で塗った色を #RRGGBB で書く．同じ部位でも工程ごとに色が違えば別の色にする（例：黒のライン，オレンジのシャドウ）．決める手がかりは次の順に使う．1. 利用者が話した色名・商品名・色番，2. 映っているパッケージやパレットの色，3. 実際に塗った所の色（照明で変わるので最後に使う）．どれでも決められなければ null にする．部位から思いつく色で埋めない．
 
 steps[].regions には，その手順で実際に色を足した範囲を書く．もともと眉毛や唇の色があった所でも，色を足していない所は入れない．
 - detail: 範囲の詳しい説明．顔の目印を基準に，始まりと終わり，形，向きを書く．
 - side: screenLeft=画面の左，screenRight=画面の右，both=両方，center=中央．本人から見た左右ではなく，動画の画面で見た左右．
-- start・end: 範囲の始まりと終わりの目印．終わりがなければ end は none．
+- start・end: 範囲の始まりと終わりの目印．終わりがなければ end は none．まぶたの範囲は，上まぶたなら upperLidEdge，下まぶた（涙袋・粘膜・下まつげの辺りを含む）なら lowerLidEdge を start か end に使う．まぶたに沿う範囲は，沿っている部分の始まりと終わりを両方答える（例：まぶた全体なら eyeInner から eyeOuter，目尻側の半分なら irisCenter から eyeOuter）．end を none にするのは，目尻などから外へ伸ばす部分だけにする．
   browHead=眉頭，browPeak=眉山，browTail=眉尻，browTailLine=小鼻と目尻を結んだ延長線上の眉の高さ，
   eyeInner=目頭，eyeOuter=目尻，irisCenter=黒目の中央，irisOuter=黒目の外側，upperLidEdge=上まぶたの縁，lowerLidEdge=下まぶたの縁，
   noseWing=小鼻，mouthCorner=口角，cheekboneTop=頬骨の最も高い位置，cheekCenter=頬の中央，temple=こめかみ，jawAngle=エラ，
@@ -102,14 +105,20 @@ export function clockSeconds(text: string) {
   return match ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
 
-/** Gemini's steps with their "m:ss" times in seconds; a step whose time cannot be read is left out. */
-export function answerSteps<T extends { start: string; end: string }>(
+/**
+ * Gemini's steps with their "m:ss" times in seconds and their colors checked; a step whose time
+ * cannot be read is left out.
+ */
+export function answerSteps<T extends { start: string; end: string; color: string | null }>(
   steps: readonly T[],
-): (Omit<T, 'start' | 'end'> & { start: number; end: number })[] {
+): (Omit<T, 'start' | 'end' | 'color'> & { start: number; end: number; color: string | null })[] {
   return steps.flatMap((step) => {
     const start = clockSeconds(step.start);
     const end = clockSeconds(step.end);
-    return start === null || end === null ? [] : [{ ...step, start, end }];
+    // A color that is not #RRGGBB is unknown, not guessed (#203).
+    const color =
+      step.color && /^#[0-9A-Fa-f]{6}$/.test(step.color) ? step.color.toUpperCase() : null;
+    return start === null || end === null ? [] : [{ ...step, start, end, color }];
   });
 }
 

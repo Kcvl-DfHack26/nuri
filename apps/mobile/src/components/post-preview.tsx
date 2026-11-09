@@ -11,9 +11,9 @@ import type { RecipeDetail, RecipeInput } from '@/lib/recipes';
 
 import { AreaSummary } from '@/components/post-area-summary';
 import { usePostConfirm } from '@/components/post-confirm';
-import { stepTitle, usePostDraft } from '@/components/post-draft';
+import { stepColor, stepTitle, usePostDraft } from '@/components/post-draft';
 import { RecipeContent } from '@/components/recipe-detail';
-import { partColors, parts } from '@/components/recipes';
+import { parts } from '@/components/recipes';
 import { authClient } from '@/lib/api';
 import { recipeMinutes } from '@/lib/post-edit';
 import { postRecipe, recipeKeys } from '@/lib/recipes';
@@ -39,7 +39,7 @@ function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
         description: step.description,
         // ⑦ shows this as what the step uses; the part's name stands in when nothing is named.
         uses: names.join('、') || parts[step.part].label,
-        color: cosmetics[0]?.color ?? partColors[step.part],
+        color: stepColor(step, draft.publishCosmetics),
         ...(step.shape ? { shape: step.shape } : {}),
       };
     }),

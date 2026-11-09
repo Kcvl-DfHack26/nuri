@@ -13,7 +13,7 @@ import { useState } from 'react';
 
 import { useTokenColor } from '@/theme/tokens';
 
-import { postConfirmMessage, postConfirmTitle } from './post-confirm';
+import { postConfirmMessage, postConfirmTitle } from './post-confirm-text';
 
 const corner = 28;
 

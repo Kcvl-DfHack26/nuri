@@ -80,6 +80,9 @@ const lowerLip = [
 const mouthOpening = [
   78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95,
 ];
+// Gemini names the lower lid in many ways in its description (#203).
+const lowerLidWords =
+  /下まぶた|下瞼|涙袋|粘膜|下まつ|目の下|目尻の下|下側|下のライン|下ライン|アンダー/;
 const eyeAnchors = new Set<Region['start']>(['eyeInner', 'eyeOuter', 'irisCenter', 'irisOuter']);
 const browAnchors = new Set<Region['start']>(['browHead', 'browPeak', 'browTail']);
 const lipAreas = new Set<Region['end']>(['upperLip', 'lowerLip', 'lips']);
@@ -101,8 +104,21 @@ const lengths: Record<Region['length'], number> = {
   long: eyeWidth * 0.35,
 };
 const blur = 0.004;
+// How far the eye hole reaches from the upper lid toward the brow (#203).
+const eyeHoleShare = 0.55;
 // How many lid landmarks a line drawn inward from a corner covers, by length.
-const inwardSteps: Record<Region['length'], number> = { none: 2, short: 2, medium: 3, long: 5 };
+// Eyeshadow is cut out of a slightly larger eye opening, as a share of the eye's width, so a frame
+// whose eye landmarks sit a little inside the lids does not leave color on the whites (#203). Liner
+// keeps the opening itself to stay on the lash line.
+const shadowHoleMargin = 0.02;
+// A line from an eye corner without an end follows the whole lid unless Gemini says it is short
+// (#203: liner and shadow along the lid were cut to a few points).
+const inwardSteps: Record<Region['length'], number> = {
+  none: Infinity,
+  short: 2,
+  medium: 4,
+  long: Infinity,
+};
 
 const side = (right: boolean) => (right ? 0 : 1);
 const clampOffset = (value: number) => Math.max(-0.2, Math.min(0.2, value));
@@ -230,34 +246,88 @@ function browStroke(region: Region, right: boolean): Stroke {
   return { points, width: Math.min(widths[region.shape] || widths.line, thickness), blur };
 }
 
-/** A line along an eyelid between two eye landmarks, with a short wing past the outer corner. */
-function lidStroke(region: Region, lower: boolean, right: boolean): Stroke {
+/**
+ * A line along an eyelid. A lid edge without an end is the whole edge; a line from an eye landmark
+ * without an end follows part of the lid from it (#203). A band is wider and moved away from the
+ * eye, such as shadow under a lower line. An outward line from the outer corner gets a short wing.
+ */
+function lidStroke(region: Region, lower: boolean, right: boolean, whole: boolean): Stroke {
   const contour = (lower ? lowerLid : upperLid)[side(right)].map((index) => ({
     ...at(index),
     near: index,
   }));
+  const last = contour.length - 1;
   const start = anchor(region.start, right);
   const end = region.end === 'none' ? null : anchor(region.end, right);
   const from = start ? nearestIndex(contour, start.point) : 0;
-  let to = end ? nearestIndex(contour, end.point) : from;
-  if (!end && region.direction === 'inward') {
-    to = Math.min(contour.length - 1, from + inwardSteps[region.length]);
+  const reach = Math.min(last, Math.max(2, inwardSteps[region.length]));
+  const toward = from >= last / 2 ? Math.max(0, from - reach) : Math.min(last, from + reach);
+  const wholeEnd = from === 0 ? last : 0;
+  const to = end ? nearestIndex(contour, end.point) : whole ? wholeEnd : toward;
+  let [lo, hi] = from <= to ? [from, to] : [to, from];
+  // Both ends on one lid point would draw almost nothing; reach the next point (#203).
+  if (lo === hi) {
+    [lo, hi] = hi < last ? [lo, hi + 1] : [lo - 1, hi];
   }
-  const [lo, hi] = from <= to ? [from, to] : [to, from];
-  const points: ShapePoint[] = contour.slice(lo, hi + 1).map((point) => ({ at: point.near }));
-  const wing = lengths[region.length];
+  const band = region.shape === 'band';
+  const shift = band ? (lower ? 1 : -1) * widths.band * 0.6 : 0;
+  const points: ShapePoint[] = contour
+    .slice(lo, hi + 1)
+    .map((point) =>
+      shift === 0 ? { at: point.near } : pointAt({ x: point.x, y: point.y + shift }, point.near),
+    );
+  const outward = ['outward', 'upOutward', 'downOutward'].includes(region.direction);
+  const wing = lengths[region.length] || (outward ? lengths.short : 0);
   const corner = contour[0];
   if (lo === 0 && !lower && wing > 0 && corner && region.direction !== 'inward') {
     const way = direction(region.direction, right);
     points.unshift(
-      pointAt({ x: corner.x + way.x * wing, y: corner.y + way.y * wing }, corner.near),
+      pointAt({ x: corner.x + way.x * wing, y: corner.y + way.y * wing + shift }, corner.near),
     );
   }
-  if (points.length === 1 && points[0]) {
-    // A dot-like flick, e.g. at the inner corner: a very short line keeps a round cap.
-    points.push({ at: points[0].at, dx: 0.001 });
+  return { points, width: band ? widths.band : widths.line, blur };
+}
+
+/**
+ * The whole eye area (#203): the eye hole from the upper lid up to the brow's lower edge, or under
+ * the eye from the lower lid down. The eye opening is cut out afterwards.
+ */
+function eyeAreaStroke(lower: boolean, right: boolean, reach: number): Stroke {
+  const k = side(right);
+  // Shadow is often blended past the outer corner toward the temple (#203).
+  const corner = at(right ? 33 : 263);
+  const out = direction('outward', right);
+  const tip = pointAt(
+    { x: corner.x + out.x * reach, y: corner.y + (lower ? 0.25 : -0.35) * reach },
+    right ? 33 : 263,
+  );
+  if (!lower) {
+    // The eye hole reaches a little over halfway from the lid to the brow, not up to the brow.
+    const lid = upperLid[k].map((index) => ({ ...at(index), near: index }));
+    const brow = browLower[k].map((index) => at(index));
+    const top = [...lid].reverse().map((point) => {
+      const above = brow.reduce((best, candidate) =>
+        Math.abs(candidate.x - point.x) < Math.abs(best.x - point.x) ? candidate : best,
+      );
+      return pointAt({ x: point.x, y: point.y + (above.y - point.y) * eyeHoleShare }, point.near);
+    });
+    return {
+      points: [...lid.map((point) => ({ at: point.near })), ...top, tip],
+      fill: true,
+      blur,
+    };
   }
-  return { points, width: widths.line, blur };
+  const lid = lowerLid[k].map((index) => ({ ...at(index), near: index }));
+  const depth = eyeWidth * 0.35;
+  return {
+    points: [
+      ...lid.map((point) => ({ at: point.near })),
+      ...[...lid].reverse().map((point) => pointAt({ x: point.x, y: point.y + depth }, point.near)),
+      tip,
+    ],
+    fill: true,
+    blur,
+  };
 }
 
 function ellipseStroke(region: Region, right: boolean): Stroke | null {
@@ -312,10 +382,79 @@ function straightStroke(region: Region, right: boolean): Stroke | null {
 }
 
 /** The strokes of one area on the subject's right side, or with `right` false, the left side. */
+// How far eye shadow is blended past the outer corner, as a share of the way to the temple (#203).
+const templeShare = 0.5;
+
+/**
+ * How far an eye area reaches past the outer corner: halfway to the temple when Gemini says it goes
+ * outward or gives a length, a quarter of the way otherwise.
+ */
+function outwardReach(region: Region, right: boolean) {
+  const corner = at(right ? 33 : 263);
+  const temple = at(right ? 139 : 368);
+  const toTemple = Math.hypot(temple.x - corner.x, temple.y - corner.y);
+  const outward =
+    region.length !== 'none' || ['outward', 'upOutward', 'downOutward'].includes(region.direction);
+  return toTemple * templeShare * (outward ? 1 : 0.5);
+}
+
+/**
+ * An area around the eye (#203): the eye hole or under the eye for a whole area, a line toward a
+ * landmark off the lid (such as the temple), or a line along the lid. A lid edge without an end is
+ * the whole edge.
+ */
+function eyeStrokes(region: Region, right: boolean): Stroke[] {
+  const lower =
+    region.start === 'lowerLidEdge' ||
+    region.end === 'lowerLidEdge' ||
+    lowerLidWords.test(region.detail);
+  if (region.shape === 'area') {
+    return [eyeAreaStroke(lower, right, outwardReach(region, right))];
+  }
+  const fromEdge = region.start.endsWith('LidEdge');
+  const from: Region = fromEdge ? { ...region, start: 'eyeOuter' } : region;
+  const endsOnEye =
+    region.end === 'none' || eyeAnchors.has(region.end) || region.end.endsWith('LidEdge');
+  if (!endsOnEye) {
+    // Toward a landmark off the lid, such as the temple, the line stops halfway there.
+    const start = anchor(from.start, right);
+    const end = region.end === 'none' ? null : anchor(region.end, right);
+    if (!start || !end) {
+      return [];
+    }
+    const half = {
+      x: start.point.x + (end.point.x - start.point.x) * templeShare,
+      y: start.point.y + (end.point.y - start.point.y) * templeShare,
+    };
+    return [
+      {
+        points: [pointAt(start.point, start.near), pointAt(half, start.near)],
+        width: widths[region.shape] || widths.line,
+        blur,
+      },
+    ];
+  }
+  return [lidStroke(from, lower, right, fromEdge && region.end === 'none')];
+}
+
 function regionStrokes(region: Region, right: boolean): Stroke[] {
+  const eyeNamed = eyeAnchors.has(region.start) || region.start.endsWith('LidEdge');
+  if (eyeNamed && region.shape !== 'ellipse' && region.shape !== 'dot') {
+    return eyeStrokes(region, right);
+  }
   if (region.shape === 'area') {
     const area = areaStrokes(region.start, right);
-    return area.length > 0 ? area : areaStrokes(region.clip, right);
+    if (area.length > 0) {
+      return area;
+    }
+    const clipped = areaStrokes(region.clip, right);
+    if (clipped.length > 0) {
+      return clipped;
+    }
+    // A whole area named by one landmark, such as the cheek, is an ellipse around it, not
+    // dropped (#203).
+    const ellipse = ellipseStroke({ ...region, shape: 'ellipse' }, right);
+    return ellipse ? [ellipse] : [];
   }
   if (region.shape === 'ellipse' || region.shape === 'dot') {
     const ellipse = ellipseStroke(region, right);
@@ -324,15 +463,56 @@ function regionStrokes(region: Region, right: boolean): Stroke[] {
   if (browAnchors.has(region.start) || region.start === 'brow' || region.start === 'browTailLine') {
     return [browStroke(region, right)];
   }
-  if (region.start === 'upperLidEdge' || region.start === 'lowerLidEdge') {
-    return [lidStroke({ ...region, start: 'eyeOuter' }, region.start === 'lowerLidEdge', right)];
-  }
-  if (eyeAnchors.has(region.start)) {
-    // Gemini names the lid only in its description.
-    return [lidStroke(region, region.detail.includes('下まぶた'), right)];
-  }
   const straight = straightStroke(region, right);
   return straight ? [straight] : [];
+}
+
+const noseCenter = new Set<Region['end']>(['glabella', 'noseRoot', 'noseBridge', 'noseTip']);
+
+/**
+ * A nose shadow named only by the middle of the nose (#203): drawn along the side of the nose,
+ * a little toward the subject's right, and mirrored, since shading never sits on the bridge.
+ */
+function noseSideStrokes(region: Region): Stroke[] {
+  const start = anchor(region.start, true);
+  const end = region.end === 'none' ? null : anchor(region.end, true);
+  if (!start) {
+    return [];
+  }
+  const side = -eyeWidth * 0.3;
+  const from = { x: start.point.x + side, y: start.point.y };
+  const to = end ? { x: end.point.x + side, y: end.point.y } : { x: from.x, y: from.y + eyeWidth };
+  return [
+    {
+      points: [pointAt(from, start.near), pointAt(to, end?.near ?? start.near)],
+      width: widths.band,
+      blur: blur * 3,
+    },
+  ];
+}
+
+/** The subject's right eye opening; for eyeshadow, pushed out from the eye's center a little. */
+function eyeHole(widen: boolean): ShapePoint[] {
+  const ring = eyeOpening[0];
+  if (!widen) {
+    return ring.map((index) => ({ at: index }));
+  }
+  const center = {
+    x: ring.reduce((sum, index) => sum + at(index).x, 0) / ring.length,
+    y: ring.reduce((sum, index) => sum + at(index).y, 0) / ring.length,
+  };
+  return ring.map((index) => {
+    const point = at(index);
+    const distance = Math.hypot(point.x - center.x, point.y - center.y);
+    const push = (eyeWidth * shadowHoleMargin) / distance;
+    return pointAt(
+      {
+        x: point.x + (point.x - center.x) * push,
+        y: point.y + (point.y - center.y) * push,
+      },
+      index,
+    );
+  });
 }
 
 /**
@@ -341,15 +521,18 @@ function regionStrokes(region: Region, right: boolean): Stroke[] {
  * when Gemini saw only one side painted, so a guide never shows one brow; Gemini's left, right or
  * center is not used.
  */
-export function regionShape(regions: readonly Region[]): MakeupShape | null {
+export function regionShape(regions: readonly Region[], part?: PartId): MakeupShape | null {
   const paint: Stroke[] = [];
   const drawn = new Set<string>();
   let touchesEyes = false;
   let touchesLips = false;
   for (const region of regions) {
-    const paired = isPaired(region);
+    const noseShadow =
+      part === 'shading' && noseCenter.has(region.start) && noseCenter.has(region.end);
+    const paired = noseShadow || isPaired(region);
+    const strokes = noseShadow ? noseSideStrokes(region) : regionStrokes(region, true);
     // A paired area is drawn on the subject's right side and mirrored to the left.
-    for (const stroke of regionStrokes(region, true)) {
+    for (const stroke of strokes) {
       const painted = paired ? { ...stroke, mirror: true } : stroke;
       // The same area seen on the left and on the right is one mirrored stroke.
       const key = JSON.stringify(painted);
@@ -366,12 +549,7 @@ export function regionShape(regions: readonly Region[]): MakeupShape | null {
   // Never paint the eyes themselves or the open mouth.
   const cut: Stroke[] = [];
   if (touchesEyes) {
-    cut.push({
-      points: eyeOpening[0].map((index) => ({ at: index })),
-      fill: true,
-      erase: true,
-      mirror: true,
-    });
+    cut.push({ points: eyeHole(part === 'eye'), fill: true, erase: true, mirror: true });
   }
   if (touchesLips) {
     cut.push({ points: mouthOpening.map((index) => ({ at: index })), fill: true, erase: true });
@@ -417,5 +595,5 @@ const partRegions: Record<PartId, Region[] | null> = {
 /** A plain area for the part that the user then shapes on ⑫-5; null for the base. */
 export function defaultShape(part: PartId): MakeupShape | null {
   const regions = partRegions[part];
-  return regions ? regionShape(regions) : null;
+  return regions ? regionShape(regions, part) : null;
 }

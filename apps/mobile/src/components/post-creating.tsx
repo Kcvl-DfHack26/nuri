@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { Cosmetic, PostDraft } from '@/components/post-draft';
+import type { Cosmetic, PostDraft, PostStep } from '@/components/post-draft';
 import type { PlannedStep } from '@/lib/post-steps';
 
 import { FaceScene } from '@/components/face-scene';
@@ -45,6 +45,7 @@ type Planned = PlannedStep & {
   description: string;
   cosmetics: Cosmetic[];
   shape: MakeupShape | null;
+  color: PostStep['color'];
 };
 type Plan = { steps: Planned[]; analyzed: boolean };
 
@@ -55,6 +56,7 @@ function planFromMarks(video: NonNullable<PostDraft['video']>): Plan {
       description: '',
       cosmetics: [],
       shape: null,
+      color: null,
     })),
     analyzed: false,
   };
@@ -63,11 +65,8 @@ function planFromMarks(video: NonNullable<PostDraft['video']>): Plan {
 /** The steps Gemini found, in order, cut to the video and to the API's step limit. */
 function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Plan | null {
   const steps = analysis.steps
-    // A step that ends before it starts, or starts after the video ends, is a misreading; it would
-    // make a negative segment.
-    .filter(
-      (step) => step.end > step.start && (durationMs === null || step.start * 1000 < durationMs),
-    )
+    // A step that ends before it starts is a misreading; it would make a negative segment.
+    .filter((step) => step.end > step.start)
     .sort((a, b) => a.start - b.start)
     .slice(0, recipeStepsMax)
     .map((step) => {
@@ -77,7 +76,9 @@ function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Pl
         startMs: Math.round(step.start * 1000),
         endMs: durationMs === null ? endMs : Math.min(endMs, durationMs),
         description: step.description,
-        shape: regionShape(step.regions),
+        shape: regionShape(step.regions, step.part),
+        // The color read from the video is a guess the user checks on ⑫-5 (#203).
+        color: step.color ? { hex: step.color, picked: false } : null,
         // The cosmetics Gemini saw in the step start chosen; the user removes wrong ones on ⑫-5.
         cosmetics: step.cosmetics.flatMap((index) => {
           const found = analysis.cosmetics[index];
@@ -88,7 +89,7 @@ function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Pl
                   name: [found.brand, found.name].filter(Boolean).join(' '),
                   category: found.category,
                   shade: '',
-                  color: partColors[step.part],
+                  color: step.color ?? partColors[step.part],
                 },
               ]
             : [];
@@ -214,6 +215,7 @@ export function PostCreating() {
           segment: { startMs: step.startMs, endMs: step.endMs },
           image: images[index] ?? null,
           shape: step.shape,
+          color: step.color,
         })),
       }));
       router.replace('/post/review');

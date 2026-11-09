@@ -7,7 +7,7 @@ import { createContext, use, useCallback, useEffect, useRef, useState } from 're
 
 import type { PartId } from '@/components/recipes';
 
-import { parts } from '@/components/recipes';
+import { partColors, parts } from '@/components/recipes';
 import { deleteFile } from '@/lib/files';
 import { formatClock } from '@/lib/post-edit';
 
@@ -39,6 +39,11 @@ export type PostStep = {
   image: string | null;
   /** The painted area read from the video (#156); null when none was read or the part changed. */
   shape: MakeupShape | null;
+  /**
+   * The color painted in the step (#203): read from the video, or `picked` by the user on ⑫-5. Null
+   * when the analysis could not read it and the user has not picked one.
+   */
+  color: { hex: string; picked: boolean } | null;
 };
 
 type PostVideo = {
@@ -106,6 +111,18 @@ const emptyDraft: Omit<PostDraft, 'key'> = {
   publishCosmetics: true,
   postedId: null,
 };
+
+/**
+ * The color a step is painted in: its own color (#203), else its first cosmetic's when they are
+ * published, else the part's.
+ */
+export function stepColor(step: PostStep, publishCosmetics = true) {
+  return (
+    step.color?.hex ??
+    (publishCosmetics ? step.cosmetics[0]?.color : undefined) ??
+    partColors[step.part]
+  );
+}
 
 /** A step's title as shown in lists; an emptied title falls back to the part name. */
 export function stepTitle(step: PostStep) {

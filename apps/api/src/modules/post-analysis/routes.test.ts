@@ -21,6 +21,7 @@ const analysis: PostAnalysis = {
       end: 18,
       part: 'brow',
       description: '眉尻を描き足す',
+      color: '#5A3D2B',
       regions: [
         {
           detail: '眉山から眉尻',

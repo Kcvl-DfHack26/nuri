@@ -14,6 +14,7 @@ import type { Cosmetic } from '@/components/post-draft';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { AreaEditor } from '@/components/post-area';
 import { BottomCta, DashedButton, PostHeader, PrimaryButton } from '@/components/post-chrome';
+import { ColorField } from '@/components/post-color';
 import { cosmeticCandidates, usePostDraft } from '@/components/post-draft';
 import { StepSegment } from '@/components/post-segment';
 import { parts } from '@/components/recipes';
@@ -132,6 +133,7 @@ export function PostStepEdit({ index }: { index: string }) {
             className="rounded-2xl border border-ink-primary bg-bg-surface px-3.5 py-3.25 font-maru text-ui text-ink-primary"
           />
         </Field>
+        <ColorField step={step} position={position} />
         <AreaEditor step={step} position={position} />
         <View className="gap-2">
           <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">

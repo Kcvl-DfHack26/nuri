@@ -110,6 +110,7 @@ test('accepts an analysis only with fixed words for the painted areas', () => {
     end: 18,
     part: 'brow',
     description: '眉尻を描き足す',
+    color: '#5A3D2B',
     regions: [
       {
         detail: '眉山から眉尻',
@@ -130,6 +131,13 @@ test('accepts an analysis only with fixed words for the painted areas', () => {
   expect(postAnalysisSchema.safeParse({ ...analysis, steps: [numbered] }).success).toBe(false);
   const millimetres = { ...step, regions: [{ ...step.regions[0], length: 5 }] };
   expect(postAnalysisSchema.safeParse({ ...analysis, steps: [millimetres] }).success).toBe(false);
+  // A step's color is #RRGGBB or unknown (#203).
+  expect(
+    postAnalysisSchema.safeParse({ ...analysis, steps: [{ ...step, color: null }] }).success,
+  ).toBe(true);
+  expect(
+    postAnalysisSchema.safeParse({ ...analysis, steps: [{ ...step, color: 'black' }] }).success,
+  ).toBe(false);
   expect(postAnalysisVideoMaxBytes).toBeLessThan(32 * 1024 * 1024);
 });
 

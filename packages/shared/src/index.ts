@@ -210,6 +210,11 @@ export const postAnalysisSchema = z.object({
         end: z.number().min(0),
         part: z.enum(makeupParts),
         description: z.string().trim().max(200),
+        /**
+         * The color painted in the step, read from what the user says and what the video shows
+         * (#203); null when it could not be read. An approximation, not the product's exact shade.
+         */
+        color: hexColor.nullable(),
         regions: z.array(postRegionSchema).max(8),
         /** Indexes into `cosmetics`. */
         cosmetics: z.array(z.int().min(0)).max(10),
