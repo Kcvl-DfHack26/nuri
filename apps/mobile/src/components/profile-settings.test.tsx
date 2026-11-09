@@ -364,11 +364,14 @@ test.each([
     mockGetProfile.mockResolvedValueOnce(profileResponse('round'));
   }
   await renderWithClient(<ProfileSettings />);
-  const row = await screen.findByRole('button', {
-    name: clearing ? '顔タイプ 丸顔' : '顔タイプ 未設定',
+  // Compose's content-sized Host needs the measured width of the settings card.
+  await fireEvent(await screen.findByTestId('face-type-row'), 'layout', {
+    nativeEvent: { layout: { width: 380 } },
   });
   expect(screen.queryByText(/イエベ/)).toBeNull();
-  await fireEvent.press(row);
+  await fireEvent.press(
+    screen.getByRole('button', { name: clearing ? '顔タイプ 丸顔' : '顔タイプ 未設定' }),
+  );
   expect(screen.getAllByRole('menuitem')).toHaveLength(6);
   await fireEvent.press(screen.getByRole('menuitem', { name: label }));
   expect(screen.getByRole('button', { name: `顔タイプ ${label}` })).toBeOnTheScreen();

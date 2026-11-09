@@ -1,8 +1,8 @@
 import type { ReactElement } from 'react';
 
 import { type MenuComponentRef, MenuView } from '@expo/ui/community/menu';
-import { useRef } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { useRef, useState } from 'react';
+import { Pressable, View } from 'react-native';
 
 export type FaceTypeMenuProps = {
   value: string;
@@ -22,43 +22,49 @@ export function FaceTypeMenu({
   children,
 }: FaceTypeMenuProps) {
   const menu = useRef<MenuComponentRef>(null);
+  // The Compose menu sizes its trigger to its contents, so give it the card’s measured width.
+  const [width, setWidth] = useState(0);
+  const canOpen = !disabled && width > 0;
 
   const trigger = (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`顔タイプ ${valueLabel}`}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityState={{ disabled: !canOpen }}
+      disabled={!canOpen}
       onPress={() => {
         menu.current?.show();
       }}
-      style={styles.trigger}
+      style={{ width: width || undefined }}
     >
       {children}
     </Pressable>
   );
 
-  if (disabled) {
-    return trigger;
-  }
-
   return (
-    <MenuView
-      ref={menu}
-      colorScheme="light"
-      actions={options.map((option) => ({
-        ...option,
-        state: option.id === value ? 'on' : 'off',
-      }))}
-      onPressAction={({ nativeEvent }) => {
-        onSelect(nativeEvent.event);
+    <View
+      testID="face-type-row"
+      onLayout={({ nativeEvent }) => {
+        setWidth(nativeEvent.layout.width);
       }}
     >
-      {trigger}
-    </MenuView>
+      {canOpen ? (
+        <MenuView
+          ref={menu}
+          colorScheme="light"
+          actions={options.map((option) => ({
+            ...option,
+            state: option.id === value ? 'on' : 'off',
+          }))}
+          onPressAction={({ nativeEvent }) => {
+            onSelect(nativeEvent.event);
+          }}
+        >
+          {trigger}
+        </MenuView>
+      ) : (
+        trigger
+      )}
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  trigger: { width: '100%' },
-});
