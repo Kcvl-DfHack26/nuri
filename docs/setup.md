@@ -373,6 +373,12 @@ gh workflow run deploy.yml --ref main
 
 OpenTofuでサービス設定を変えて新しいrevisionができた場合も、トラフィックの切替はこの配信フローを使う。`EXPO_UPDATE_ENABLED=true` の場合、APIの確認後にGitHub ActionsがExpoの本番Updateを呼び出す。本番のOAuthやメール設定を変更するときは、[認証設定](auth.md#android仮想端末でgoogleとメールを試す51)を参照する。
 
+### 共有環境の画像ストレージ
+
+stagingはOpenTofuが作る環境専用の非公開バケットを使う。APIの実行用サービスアカウントにバケット内のオブジェクト権限を付与し、APIと同じCloud Runリビジョンに `GCS_BUCKET` を設定する。配信用のパスは `/media/**` になる。
+
+画像ストレージのPRをmainにマージし、mainのCIが成功した後、**Production Infrastructure** の `plan` でバケット・IAM・Cloud Run環境変数の差分を確認してから `apply` する。バケット名はOpenTofu出力の `image_bucket` で確認できる。反映後にmainの **Deploy API, Expo Web and mobile update** を実行し、候補の `/ready` と画像配信を確認する。デプロイは環境のDB migrationを実行する。見本データの投入と旧 `/sample-avatars/`・`/sample-recipes/` 参照の移行は、開発・プレビュー環境で [seedを再実行](auth.md) して行う。stagingに旧seed参照がある場合は、配信切替前に対象の行と画像を確認する。
+
 ### Webを開く
 
 ```sh

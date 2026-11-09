@@ -85,46 +85,80 @@ export async function hasPreviewService(project: string, pr: string) {
     throw new Error(`Could not read preview state: HTTP ${response.status}`);
   }
 
-  // 共有プロジェクトでは、state が指すサービスを操作前に照合する。
-  const state: unknown = await response.json();
+  return validatePreviewState(await response.json(), project, pr);
+}
+
+export function previewImageBucket(project: string, pr: string) {
+  return `${project}-nuri-preview-pr-${pr}-media`;
+}
+
+// 照合済みのリソースだけを操作する。旧 state や途中まで作成・削除された state も再実行できる。
+export function validatePreviewState(state: unknown, project: string, pr: string) {
   const resources: unknown = isRecord(state) ? state.resources : null;
   if (!Array.isArray(resources)) {
     throw new Error('Invalid OpenTofu preview state');
   }
-  if (resources.length === 0) {
-    return false;
-  }
+
+  const region = 'asia-northeast1';
+  const service = `nuri-preview-pr-${pr}`;
+  const bucket = previewImageBucket(project, pr);
+  const member = `serviceAccount:nuri-preview-runtime@${project}.iam.gserviceaccount.com`;
+  const role = 'roles/storage.objectUser';
+  const expected = new Map<string, Record<string, string>>([
+    [
+      'google_cloud_run_v2_service.preview',
+      {
+        id: `projects/${project}/locations/${region}/services/${service}`,
+        project,
+        location: region,
+        name: service,
+      },
+    ],
+    [
+      'google_storage_bucket.images',
+      { id: bucket, project, location: 'ASIA-NORTHEAST1', name: bucket },
+    ],
+    [
+      'google_storage_bucket_iam_member.runtime_images',
+      { id: `b/${bucket}/${role}/${member}`, bucket: `b/${bucket}`, role, member },
+    ],
+  ]);
 
   const entries: unknown[] = resources;
-  const [resource] = entries;
-  const service = `nuri-preview-pr-${pr}`;
-  const region = 'asia-northeast1';
-  if (
-    resources.length !== 1 ||
-    !isRecord(resource) ||
-    resource.module !== undefined ||
-    resource.mode !== 'managed' ||
-    resource.type !== 'google_cloud_run_v2_service' ||
-    resource.name !== 'preview' ||
-    !Array.isArray(resource.instances) ||
-    resource.instances.length !== 1
-  ) {
-    throw new Error('OpenTofu preview state contains an unexpected resource');
-  }
+  let hasService = false;
+  for (const entry of entries) {
+    if (
+      !isRecord(entry) ||
+      entry.module !== undefined ||
+      entry.mode !== 'managed' ||
+      typeof entry.type !== 'string' ||
+      typeof entry.name !== 'string' ||
+      !Array.isArray(entry.instances) ||
+      entry.instances.length !== 1
+    ) {
+      throw new Error('OpenTofu preview state contains an unexpected resource');
+    }
 
-  const instances: unknown[] = resource.instances;
-  const [instance] = instances;
-  const attributes = isRecord(instance) ? instance.attributes : null;
-  if (
-    !isRecord(attributes) ||
-    attributes.id !== `projects/${project}/locations/${region}/services/${service}` ||
-    attributes.project !== project ||
-    attributes.location !== region ||
-    attributes.name !== service
-  ) {
-    throw new Error('OpenTofu preview state points to an unexpected Cloud Run service');
+    const address = `${entry.type}.${entry.name}`;
+    const fields = expected.get(address);
+    const instances: unknown[] = entry.instances;
+    const [instance] = instances;
+    const attributes = isRecord(instance) ? instance.attributes : null;
+    if (
+      !fields ||
+      !isRecord(instance) ||
+      instance.index_key !== undefined ||
+      instance.deposed !== undefined ||
+      !isRecord(attributes) ||
+      Object.entries(fields).some(([key, value]) => attributes[key] !== value)
+    ) {
+      throw new Error(`OpenTofu preview state points to an unexpected resource at ${address}`);
+    }
+
+    expected.delete(address);
+    hasService ||= address === 'google_cloud_run_v2_service.preview';
   }
-  return true;
+  return hasService;
 }
 
 export async function removePreviewState(project: string, pr: string) {

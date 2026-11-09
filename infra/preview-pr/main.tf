@@ -33,6 +33,7 @@ locals {
   project = var.project_id
   region  = "asia-northeast1"
   name    = "nuri-preview-pr-${var.pr_number}"
+  bucket  = "${local.project}-${local.name}-media"
 }
 
 provider "google" {
@@ -68,6 +69,8 @@ resource "google_cloud_run_v2_service" "preview" {
     }
   }
 
+  depends_on = [google_storage_bucket_iam_member.runtime_images]
+
   # CI が検証済みのイメージ、リビジョンとトラフィックを管理する。
   lifecycle {
     ignore_changes = [
@@ -81,4 +84,21 @@ resource "google_cloud_run_v2_service" "preview" {
       tags,
     ]
   }
+}
+
+resource "google_storage_bucket" "images" {
+  project                     = local.project
+  name                        = local.bucket
+  location                    = local.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = true
+
+  soft_delete_policy { retention_duration_seconds = 0 }
+}
+
+resource "google_storage_bucket_iam_member" "runtime_images" {
+  bucket = google_storage_bucket.images.name
+  role   = "roles/storage.objectUser"
+  member = "serviceAccount:nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
 }

@@ -3,7 +3,13 @@ import { appendFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { checkCloudPreview } from './check';
-import { hasPreviewService, listPreviewStates, removePreviewState, runPreviewTofu } from './state';
+import {
+  hasPreviewService,
+  listPreviewStates,
+  previewImageBucket,
+  removePreviewState,
+  runPreviewTofu,
+} from './state';
 
 const region = 'asia-northeast1';
 const registryHost = `${region}-docker.pkg.dev`;
@@ -284,6 +290,10 @@ async function inspect(pr: string, sha: string, outputPath: string) {
 async function apply(pr: string, sha: string, outputPath: string) {
   await validateOpenPullRequest(pr, sha);
   const applyExit = await runPreviewTofu(project, pr, 'apply', {
+    beforeAttempt: async () => {
+      await validateOpenPullRequest(pr, sha);
+      return true;
+    },
     onAttempt: async ({ log, exitCode }) => {
       await appendFile(outputPath, `tofu_exit=${exitCode}\ntofu_log<<TOFU_LOG\n${log}\nTOFU_LOG\n`);
     },
@@ -333,7 +343,7 @@ async function publish(pr: string, sha: string, source: string, outputPath: stri
         .nothrow();
     if (existingRevision.exitCode !== 0) {
       const imageByDigest = `${registry}/${tag}@${digest}`;
-      const previewEnv = `PREVIEW_ORIGIN=${origin}`;
+      const previewEnv = `PREVIEW_ORIGIN=${origin},GCS_BUCKET=${previewImageBucket(project, pr)}`;
       await shell`gcloud run deploy ${service} \
         --image=${imageByDigest} --revision-suffix=${revisionSuffix} \
         --no-traffic --port=8080 --min-instances=0 --max-instances=1 \
