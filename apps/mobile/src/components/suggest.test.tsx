@@ -102,7 +102,7 @@ let mockSignedIn = false;
 let mockSavedFaceType: string | null = null;
 const mockPatchProfile = jest.fn(async ({ json }: { json: { faceType?: string | null } }) => {
   mockSavedFaceType = json.faceType ?? null;
-  return { status: 200 };
+  return new Response(null);
 });
 
 const landmarks = { points: [0.5, 0.5], width: 100, height: 100 };

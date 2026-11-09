@@ -146,6 +146,54 @@ resource "google_storage_bucket_iam_member" "automation" {
   member   = "serviceAccount:${each.value.email}"
 }
 
+# Bucket creation is checked against the project, where there is no bucket name yet.
+resource "google_project_iam_custom_role" "image_bucket_creator" {
+  project     = local.project
+  role_id     = "nuriPreviewImageBucketCreator"
+  title       = "nuri PR preview image bucket creator"
+  permissions = ["storage.buckets.create"]
+  depends_on  = [google_project_service.preview]
+}
+
+resource "google_project_iam_member" "image_bucket_creator" {
+  for_each = google_service_account.automation
+  project  = local.project
+  role     = google_project_iam_custom_role.image_bucket_creator.name
+  member   = "serviceAccount:${each.value.email}"
+}
+
+resource "google_project_iam_custom_role" "image_bucket_manager" {
+  project = local.project
+  role_id = "nuriPreviewImageBucketManager"
+  title   = "nuri PR preview image bucket manager"
+  permissions = [
+    "storage.buckets.delete",
+    "storage.buckets.get",
+    "storage.buckets.getIamPolicy",
+    "storage.buckets.setIamPolicy",
+    "storage.buckets.update",
+    "storage.objects.delete",
+    "storage.objects.list",
+  ]
+  depends_on = [google_project_service.preview]
+}
+
+resource "google_project_iam_member" "image_bucket_manager" {
+  for_each = google_service_account.automation
+  project  = local.project
+  role     = google_project_iam_custom_role.image_bucket_manager.name
+  member   = "serviceAccount:${each.value.email}"
+  condition {
+    title      = "nuri-preview-image-buckets"
+    expression = <<-CEL
+      resource.name.startsWith('projects/_/buckets/${local.project}-nuri-preview-pr-') &&
+      ((resource.type == 'storage.googleapis.com/Bucket' && resource.name.endsWith('-media')) ||
+       (resource.type == 'storage.googleapis.com/Object' &&
+        resource.name.extract('projects/_/buckets/{bucket}/objects/').endsWith('-media')))
+    CEL
+  }
+}
+
 data "google_project" "preview" {
   project_id = local.project
 }

@@ -38,3 +38,8 @@ output "expo_web_url" {
   description = "Public entry point of the Expo Web app on the Cloud Run service."
   value       = var.deploy_application ? "${google_cloud_run_v2_service.api[0].uri}/" : null
 }
+
+output "image_bucket" {
+  description = "Private Cloud Storage bucket for API images."
+  value       = google_storage_bucket.images.name
+}

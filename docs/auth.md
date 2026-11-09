@@ -12,7 +12,9 @@ bun run dev
 bun run db:seed
 ```
 
-seedは画像付きのサンプルユーザーと、実装planのレシピ6件・その作者3人・使うメイク品2点を固定IDで作る。`NODE_ENV=development` かつ `AUTH_EMULATE=true` に限定し、再実行しても重複せず、アプリから作ったユーザー・レシピは削除しない。サンプル画像はAPIに同梱し、外部の画像サーバーへ実行時に接続しない。写真の出典は `apps/api/assets/sample-avatars/README.md` と `apps/api/assets/sample-recipes/README.md`。サンプル著者とログインアカウントは別である。
+seedは画像付きのサンプルユーザーと、実装planの全体メイクレシピ6件・眉のレシピ6件・使うメイク品2点を固定IDで作る。`NODE_ENV=development` かつ `AUTH_EMULATE=true` に限定し、再実行しても重複せず、アプリから作ったユーザー・レシピは削除しない。サンプル画像はFlociのworktree専用バケットへ投入し、APIの `/media/` から配信する。PR previewでは同じ経路でPR専用の非公開Cloud Storageバケットを使う。写真の出典は `apps/api/assets/sample-avatars/README.md` と `apps/api/assets/sample-recipes/README.md`。サンプル著者とログインアカウントは別である。
+
+旧seedのDBを引き継ぐ場合も、開発API起動後に `bun run db:seed` を実行する。画像の投入がすべて成功してからDBを更新する。旧サンプル画像を参照するサンプルユーザー、レシピ、商品が `/media/` へ切り替わる。サンプルユーザー自身が変更した画像や名前は保持する。旧 `/sample-avatars/` と `/sample-recipes/` の静的URLは廃止したため、seed後にアプリを再読み込みする。失敗時はバケットと接続設定を確認して同じコマンドを再実行する。
 
 | サービス       | PortlessのURL                                   |
 | -------------- | ----------------------------------------------- |

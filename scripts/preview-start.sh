@@ -2,6 +2,7 @@
 set -euo pipefail
 
 : "${PREVIEW_ORIGIN:?Set the HTTPS origin of this preview}"
+: "${GCS_BUCKET:?Set the image bucket of this preview}"
 [[ "$PREVIEW_ORIGIN" =~ ^https://[a-zA-Z0-9.-]+(:[0-9]+)?$ ]]
 pgdata=$(mktemp -d)
 api_pid=''

@@ -30,9 +30,12 @@ variable "project_id" {
 }
 
 locals {
-  project = var.project_id
-  region  = "asia-northeast1"
-  name    = "nuri-preview-pr-${var.pr_number}"
+  project    = var.project_id
+  region     = "asia-northeast1"
+  name       = "nuri-preview-pr-${var.pr_number}"
+  bucket     = "${local.project}-${local.name}-media"
+  runtime    = "nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
+  image_role = "roles/storage.objectUser"
 }
 
 provider "google" {
@@ -52,7 +55,7 @@ resource "google_cloud_run_v2_service" "preview" {
     max_instance_count = 1
   }
   template {
-    service_account = "nuri-preview-runtime@${local.project}.iam.gserviceaccount.com"
+    service_account = local.runtime
     timeout         = "180s"
     scaling {
       min_instance_count = 0
@@ -68,6 +71,8 @@ resource "google_cloud_run_v2_service" "preview" {
     }
   }
 
+  depends_on = [google_storage_bucket_iam_member.runtime_images]
+
   # CI が検証済みのイメージ、リビジョンとトラフィックを管理する。
   lifecycle {
     ignore_changes = [
@@ -81,4 +86,38 @@ resource "google_cloud_run_v2_service" "preview" {
       tags,
     ]
   }
+}
+
+resource "google_storage_bucket" "images" {
+  project                     = local.project
+  name                        = local.bucket
+  location                    = local.region
+  uniform_bucket_level_access = true
+  public_access_prevention    = "enforced"
+  force_destroy               = true
+
+  soft_delete_policy { retention_duration_seconds = 0 }
+}
+
+resource "google_storage_bucket_iam_member" "runtime_images" {
+  bucket = google_storage_bucket.images.name
+  role   = local.image_role
+  member = "serviceAccount:${local.runtime}"
+}
+
+output "preview_target" {
+  description = "Configured target identities for the PR workflow."
+  value = {
+    project        = local.project
+    region         = local.region
+    service        = local.name
+    image_bucket   = local.bucket
+    image_role     = local.image_role
+    runtime_member = "serviceAccount:${local.runtime}"
+  }
+}
+
+output "preview_origin" {
+  description = "Canonical Cloud Run URL for the preview."
+  value       = google_cloud_run_v2_service.preview.uri
 }

@@ -10,7 +10,7 @@ Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel Emul
 
 コード・設定・文書の変更は、Issueの起票または既存Issueの確認と担当設定から始める。Issueに対応するブランチで実装・検証し、コミット・push・Draft PR作成まで進める。詳細は [AGENTS.md](../AGENTS.md#issue--branch--pr)、独自UIの追加は [UI開発手順](ui.md)を参照。
 
-ローカルのAPI・Metro・PostgreSQLはすべてDocker Composeで動かす。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。ホストのBunは任意。WindowsではWSL2のLinuxファイルシステムを使う。
+ローカルのAPI・Metro・FlociはDocker Composeで動かす。FlociはCloud SQL Admin APIとCloud Storageを提供し、PostgreSQL 17を起動する。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。ホストのBunは任意。WindowsではWSL2のLinuxファイルシステムを使う。
 
 ```sh
 npm install --global portless@0.16.0
@@ -33,7 +33,7 @@ portless trust
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-Composeが依存導入・未作成のアプリenv生成・PostgreSQLのhealthcheck・migrationを行う。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432。Google／メールのEmulateもAPIの依存として起動する。PostgreSQLはホストへ公開せず、PortlessがHTTPサービスにloopback上の空きポートを割り当てる。
+Composeが依存導入と未作成のアプリenv生成を行う。Flociの準備ができると、`migrate` がCloud SQL Admin APIでインスタンス・DB・アプリユーザーを作り、返された接続先でDrizzle migrationを実行してから、同じサービスが画像バケットを初期化する。APIはこの準備が完了してから起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432、Floci 4588。PostgreSQLとFlociはComposeネットワーク内で待ち受け、PortlessがAPI・Metro・Google／メールのEmulateにloopback上の空きポートを割り当てる。Docker socketはPostgreSQLを起動するFlociにだけ渡す。
 
 | サービス    | ホストからのURL                                |
 | ----------- | ---------------------------------------------- |
@@ -48,12 +48,12 @@ URL形式は `https://<service>.<project>.localhost`。ホストと、端末用�
 # バックグラウンド起動
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up -d --build api metro
 # 自worktreeだけを終了。DBや認証設定のvolumeは保持する。
-PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose --profile '*' down
+sh scripts/services-down.sh
 ```
 
-foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存サービスも終了するには `portless compose --profile '*' down` を使う。detachedのrouteは `portless compose --profile '*' down` まで残る。同一worktreeへの `up` はCompose標準の再利用・更新となるため、既存コンテナへ接続する。別のworktreeは別projectとして起動する。
+foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。FlociとPostgreSQLなどの依存サービスも終了するには `sh scripts/services-down.sh` を使う。detachedのrouteはこのスクリプトの実行まで残る。同一worktreeへの `up` はCompose標準の再利用・更新となるため、既存コンテナへ接続する。別のworktreeは別projectとして起動する。
 
-**API・Metroをplainな `docker compose up` で作り直すとPortlessのポート割当が失われるため、起動・再作成・終了は `portless compose` を使う。** `logs`、`exec`、`ps`、`restart` は通常のComposeでも使える。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。
+**API・Metroをplainな `docker compose up` で作り直すとPortlessのポート割当が失われるため、起動・再作成は `portless compose` を使う。** `logs`、`exec`、`ps`、`restart` は通常のComposeでも使える。終了スクリプトはFloci 0.12.0が停止時に残す場合があるPostgreSQLコンテナを、対象worktreeのラベルで照合して取り除く。その後、Portlessでrouteとネットワークを片付ける。共有proxyの `stop` / `clean` / `--force` をworktreeの後片付けに使わない。
 
 ### 開発用の環境変数
 
@@ -71,7 +71,7 @@ foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存�
 
 worktreeをエディタで開いて **Reopen in Container** を実行する。`initializeCommand` がホストのPOSIX初期化を行い、Composeの `workspace` サービスとそのsetup・DB依存を起動する。API・Metroの公開ポートをエディタが再作成しないよう、`runServices` は編集用 `workspace` だけに限定する。
 
-コンテナ内では `bun run check`、`bun run doctor`、`bun run export:mobile` 等を実行できる。Docker socketは渡していないため、Portlessの起動・停止コマンドはホストで実行する。エディタのport forwardは使わない。エディタを閉じてもサービスは停止しないので、作業終了時はホストで `portless compose --profile '*' down` を実行する。
+コンテナ内では `bun run check`、`bun run doctor`、`bun run export:mobile` 等を実行できる。DBを参照するコマンドは `sh scripts/with-local-database.sh <コマンド>` で実行する。Flociからその時点の接続先を取得し、コマンドの `DATABASE_URL` に渡す。Docker socketは渡していないため、Portlessの起動・停止コマンドはホストで実行する。エディタのport forwardは使わない。エディタを閉じてもサービスは停止しないので、作業終了時はホストで `sh scripts/services-down.sh` を実行する。
 
 自動依存導入は `--ignore-scripts` で共有Git hookを変更しない。Dev Containerの初回作成、またはホストの `bun install` / `bun run hooks:install` は同じGitリポジトリで順に行う。Lefthookが共有 `.git/hooks` を更新するためで、準備後のサーバーは並列起動できる。
 
@@ -90,12 +90,45 @@ bun run devices      # ホストのExpo Device Hub
 bun run dev:go       # API・DBとExpo Go用トンネル付きMetro
 bun run services:up  # API・DB・Metroをバックグラウンド起動
 bun run db:migrate
-bun run db:seed      # サンプルのユーザー・レシピ。既存の利用者データは保持
-bun run test:integration # 起動済みのDBを使用
+bun run db:seed      # サンプルのユーザー・レシピ・画像。既存の利用者データは保持
+bun run test:integration # 起動済みのDBとFlociを使用
 bun run services:down
 ```
 
 統合テストの前にAPIを起動する。テストコマンドは起動中のDBを使い、端末用構成で動いているAPIやEmulateを通常構成で作り直さない。
+
+### 旧PostgreSQLのデータを移す
+
+旧構成から更新する前に、対象worktreeで開発DBをダンプする。旧 `postgres-data` volumeは保持する。
+
+```sh
+umask 077
+backup="$(mktemp -d)/nuri-local-backup.sql"
+docker compose exec -T postgres pg_dump --no-owner --no-privileges \
+  -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter > "$backup"
+bun run services:down
+```
+
+新構成で初めてAPIを起動する前に、空のFloci DBへダンプを復元する。`migrate` のentrypointがAdmin APIから接続先を取得する。`nuri-local-backup.sql` はcheckout外に保存する。利用者データが含まれるため、不要になったら削除する。
+
+```sh
+bun run setup
+bun run compose up -d --wait floci
+bun run compose run --rm --build setup
+bun run compose run --rm --no-deps -T migrate \
+  sh -ec 'exec psql --dbname="$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1' < "$backup"
+bun run dev:api
+```
+
+通常の `bun run services:down` と再起動で、Flociのメタデータ・GCSオブジェクトとPostgreSQLのデータを保持する。終了スクリプトが対象のPostgreSQLを止め、次回起動時にFlociが再作成する。新しい接続先をAPIに反映するには、停止後に `bun run dev:api` または `bun run dev` で起動する。
+
+空のDBとGCSに初期化する場合は、対象worktreeを `bun run services:down` で止める。次の一覧から、そのworktreeのFlociメタデータとCloud SQL volumeを確認し、その2つの名前を指定して `docker volume rm` を実行する。旧 `postgres-data` と他worktreeのvolumeは移行用に保持する。
+
+```sh
+project='nuri-<issue>-<topic>'
+docker volume inspect "${project}_floci-data" --format '{{.Name}}'
+docker volume ls --filter "label=floci_namespace=$project" --format '{{.Name}}'
+```
 
 ### 旧ハッシュ名から移行する
 
@@ -339,6 +372,12 @@ gh workflow run deploy.yml --ref main
 ```
 
 OpenTofuでサービス設定を変えて新しいrevisionができた場合も、トラフィックの切替はこの配信フローを使う。`EXPO_UPDATE_ENABLED=true` の場合、APIの確認後にGitHub ActionsがExpoの本番Updateを呼び出す。本番のOAuthやメール設定を変更するときは、[認証設定](auth.md#android仮想端末でgoogleとメールを試す51)を参照する。
+
+### 共有環境の画像ストレージ
+
+stagingはOpenTofuが作る環境専用の非公開バケットを使う。APIの実行用サービスアカウントにバケット内のオブジェクト権限を付与し、APIと同じCloud Runリビジョンに `GCS_BUCKET` を設定する。配信用のパスは `/media/**` になる。
+
+画像ストレージのPRをmainにマージし、mainのCIが成功した後、**Production Infrastructure** の `plan` でバケット・IAM・Cloud Run環境変数の差分を確認してから `apply` する。バケット名はOpenTofu出力の `image_bucket` で確認できる。反映後にmainの **Deploy API, Expo Web and mobile update** を実行し、候補の `/ready` と画像配信を確認する。デプロイは環境のDB migrationを実行する。見本データの投入と旧 `/sample-avatars/`・`/sample-recipes/` 参照の移行は、開発・プレビュー環境で [seedを再実行](auth.md) して行う。stagingに旧seed参照がある場合は、配信切替前に対象の行と画像を確認する。
 
 ### Webを開く
 
