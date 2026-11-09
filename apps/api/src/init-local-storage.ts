@@ -1,13 +1,9 @@
 import { ApiError } from '@google-cloud/storage';
 
+import { storageEnvSchema } from './platform/env';
 import { createImageStore } from './platform/images';
 
-const { GCS_BUCKET, STORAGE_EMULATOR_HOST } = process.env;
-if (!STORAGE_EMULATOR_HOST) {
-  throw new Error('Set STORAGE_EMULATOR_HOST to initialize a local bucket');
-}
-
-const bucket = createImageStore({ GCS_BUCKET, STORAGE_EMULATOR_HOST });
+const bucket = createImageStore(storageEnvSchema.parse(process.env));
 try {
   await bucket.create();
 } catch (error) {

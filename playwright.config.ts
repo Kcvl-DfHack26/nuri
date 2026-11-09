@@ -1,17 +1,20 @@
 import { defineConfig } from '@playwright/test';
+import { z } from 'zod';
 
 const port = 49116;
 const origin = `http://127.0.0.1:${port}`;
-const database =
-  process.env.NURI_E2E_DATABASE_URL ?? 'postgresql://nuri_e2e:nuri_e2e@127.0.0.1:55432/nuri_e2e';
-
-const storage = process.env.NURI_E2E_STORAGE_EMULATOR_HOST ?? 'http://127.0.0.1:4588';
-
-for (const url of [database, storage]) {
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)) {
-    throw new Error('E2E PostgreSQL and Floci must point to disposable local services');
-  }
-}
+// E2E writes sample data to disposable services.
+const loopback = /^(?:127\.0\.0\.1|localhost|\[::1\])$/;
+const { NURI_E2E_DATABASE_URL: database, NURI_E2E_STORAGE_EMULATOR_HOST: storage } = z
+  .object({
+    NURI_E2E_DATABASE_URL: z
+      .url({ protocol: /^postgres(?:ql)?$/, hostname: loopback })
+      .default('postgresql://nuri_e2e:nuri_e2e@127.0.0.1:55432/nuri_e2e'),
+    NURI_E2E_STORAGE_EMULATOR_HOST: z
+      .url({ protocol: /^https?$/, hostname: loopback })
+      .default('http://127.0.0.1:4588'),
+  })
+  .parse(process.env);
 
 export default defineConfig({
   testDir: './e2e',

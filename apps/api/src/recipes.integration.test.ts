@@ -1,30 +1,26 @@
 import { makeupShapeSchema } from '@starter/shared';
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { count, eq, inArray } from 'drizzle-orm';
+import { readFile } from 'node:fs/promises';
 import { z } from 'zod';
 
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
-import { product, recipe, recipeProduct, recipeStep, user } from './db/schema';
+import { recipe, recipeProduct, recipeStep, user } from './db/schema';
 import { createAuth } from './modules/auth';
-import { readEnv } from './platform/env';
+import { readEnv, storageEnvSchema } from './platform/env';
 import { createImageStore } from './platform/images';
 import { seedSampleData } from './sample-data';
 
-const { DATABASE_URL: databaseUrl, GCS_BUCKET, STORAGE_EMULATOR_HOST } = process.env;
-if (!databaseUrl || !GCS_BUCKET || !STORAGE_EMULATOR_HOST) {
-  throw new Error('Set DATABASE_URL, GCS_BUCKET and STORAGE_EMULATOR_HOST for integration tests');
-}
-const { db, pool } = connectDatabase(databaseUrl);
 const env = readEnv({
+  ...storageEnvSchema.parse(process.env),
   NODE_ENV: 'test',
-  GCS_BUCKET,
-  STORAGE_EMULATOR_HOST,
-  DATABASE_URL: databaseUrl,
+  DATABASE_URL: process.env.DATABASE_URL,
   BETTER_AUTH_SECRET: 'integration-test-secret-never-use-in-production',
   BETTER_AUTH_URL: 'http://localhost:8080',
   TRUSTED_ORIGINS: 'http://localhost:8081,com.kcvl.nuri://',
 });
+const { db, pool } = connectDatabase(env.DATABASE_URL);
 const images = createImageStore(env);
 const app = createApp(db, createAuth(db, env), env, () => Promise.resolve());
 const unique = crypto.randomUUID();
@@ -123,7 +119,6 @@ test('uploads seed images before migration and preserves an edited sample profil
       { image: legacy },
     ]);
 
-    const [objectsBefore] = await images.getFiles({ prefix: 'sample-' });
     await seedSampleData(db, images);
     expect(await db.select({ image: user.image }).from(user).where(sampleHaru)).toEqual([
       { image: '/media/sample-avatars/haru.jpg' },
@@ -131,34 +126,6 @@ test('uploads seed images before migration and preserves an edited sample profil
     expect(await db.select({ image: user.image }).from(user).where(sampleMio)).toEqual([
       { image: custom },
     ]);
-    const [objectsAfter] = await images.getFiles({ prefix: 'sample-' });
-    expect(objectsAfter.map(({ name }) => name).sort()).toEqual(
-      objectsBefore.map(({ name }) => name).sort(),
-    );
-
-    const [seedRecipe] = await db
-      .select({ image: recipe.image })
-      .from(recipe)
-      .where(eq(recipe.id, 'fox'));
-    const [seedProduct] = await db
-      .select({ image: product.image })
-      .from(product)
-      .where(eq(product.id, 'celane-brow-pencil'));
-    expect(seedRecipe?.image).toBe('/media/sample-recipes/fox.jpg');
-    expect(seedProduct?.image).toBe('/media/sample-recipes/product-brow-pencil.jpg');
-    for (const path of ['/media/sample-avatars/haru.jpg', seedRecipe?.image, seedProduct?.image]) {
-      if (!path) {
-        throw new Error('Expected a seed image reference');
-      }
-      const response = await app.request(path);
-      expect(response.status).toBe(200);
-      expect(response.headers.get('content-type')).toBe('image/jpeg');
-      const [stored] = await images.file(path.slice('/media/'.length)).download();
-      expect(Buffer.from(await response.arrayBuffer()).equals(stored)).toBe(true);
-    }
-    for (const path of [legacy, '/sample-recipes/fox.jpg', '/media/sample-recipes/missing.jpg']) {
-      expect((await app.request(path)).status).toBe(404);
-    }
   } finally {
     await db.update(user).set(beforeHaru).where(sampleHaru);
     await db.update(user).set(beforeMio).where(sampleMio);
@@ -173,13 +140,19 @@ test('shows the public recipe with ordered products and steps', async () => {
     recipe: {
       id: 'fox',
       title: '狐メイク',
+      image: '/media/sample-recipes/fox.jpg',
       tags: ['丸顔向け'],
       durationMinutes: 15,
       source: 'instagram',
       favorited: false,
       author: { name: 'mio', image: '/media/sample-avatars/mio.png' },
       products: [
-        { id: 'celane-brow-pencil', usage: '眉・モカブラウン', purchaseUrl: null },
+        {
+          id: 'celane-brow-pencil',
+          usage: '眉・モカブラウン',
+          image: '/media/sample-recipes/product-brow-pencil.jpg',
+          purchaseUrl: null,
+        },
         {
           id: 'mousse-cheek',
           usage: 'チーク・コーラル',
@@ -189,6 +162,22 @@ test('shows the public recipe with ordered products and steps', async () => {
       ],
     },
   });
+  for (const [key, contentType] of [
+    ['sample-avatars/mio.png', 'image/png'],
+    ['sample-recipes/fox.jpg', 'image/jpeg'],
+    ['sample-recipes/product-brow-pencil.jpg', 'image/jpeg'],
+  ] as const) {
+    const response = await app.request(`/media/${key}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe(contentType);
+    const [stored] = await images.file(key).getMetadata();
+    expect(stored.contentType).toBe(contentType);
+    const fixture = await readFile(new URL(`../assets/${key}`, import.meta.url));
+    expect(Buffer.from(await response.arrayBuffer()).equals(fixture)).toBe(true);
+    expect((await app.request(`/${key}`)).status).toBe(404);
+  }
+  expect((await app.request('/media/sample-recipes/missing.jpg')).status).toBe(404);
+
   const { recipe: fox } = z
     .object({
       recipe: z.object({

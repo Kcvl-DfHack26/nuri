@@ -1,14 +1,18 @@
 import { z } from 'zod';
 
+export const storageEnvSchema = z.object({
+  GCS_BUCKET: z.string().trim().min(1),
+  STORAGE_EMULATOR_HOST: z.url({ protocol: /^https?$/ }),
+});
+
 const schema = z.object({
+  ...storageEnvSchema.partial().shape,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8080),
   DATABASE_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
   EXPO_WEB_ROOT: z.string().min(1).optional(),
-  GCS_BUCKET: z.string().trim().min(1).optional(),
-  STORAGE_EMULATOR_HOST: z.url({ protocol: /^https?$/ }).optional(),
   TRUSTED_ORIGINS: z.string().default('com.kcvl.nuri://'),
   AUTH_EMULATE: z
     .enum(['true', 'false'])

@@ -361,7 +361,7 @@ export async function seedSampleData(db: Database, images: ImageStore) {
     imageKeys.map(async (key) => {
       const bytes = await readFile(new URL(`../assets/${key}`, import.meta.url));
       try {
-        await saveImage(images, key, bytes, key.endsWith('.png') ? 'image/png' : 'image/jpeg');
+        await saveImage(images, key, bytes);
       } catch (error) {
         if (!(error instanceof ApiError && error.code === 412)) {
           throw error;
