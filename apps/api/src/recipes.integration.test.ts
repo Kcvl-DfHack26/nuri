@@ -99,7 +99,7 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
   ]);
   expect(
     await db.select({ value: count() }).from(recipeStep).where(eq(recipeStep.recipeId, 'fox')),
-  ).toEqual([{ value: 5 }]);
+  ).toEqual([{ value: 8 }]);
 });
 
 test('keeps seed image references on upload failure and preserves edited avatars on reseed', async () => {
@@ -188,10 +188,19 @@ test('shows the public recipe with ordered products and steps', async () => {
       }),
     })
     .parse(body);
-  expect(fox.steps.map((step) => step.part)).toEqual(['brow', 'eye', 'lash', 'shading', 'cheek']);
+  expect(fox.steps.map((step) => step.part)).toEqual([
+    'brow',
+    'eye',
+    'eye',
+    'highlight',
+    'lash',
+    'shading',
+    'cheek',
+    'lash',
+  ]);
   // Every seeded step says where it paints.
   expect(fox.steps.every((step) => step.shape !== null)).toBe(true);
-  expect(await (await app.request('/api/recipes/long')).json()).toMatchObject({
+  expect(await (await app.request('/api/recipes/office')).json()).toMatchObject({
     recipe: { products: [], steps: [] },
   });
   expect((await app.request('/api/recipes/missing-recipe')).status).toBe(404);

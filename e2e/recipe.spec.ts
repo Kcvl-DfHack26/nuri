@@ -42,19 +42,19 @@ for (const { name, viewport, firstRowCount } of [
 
     // A shared link or refresh must boot the exported SPA on the same step screen.
     await page.reload();
-    await expect(page.getByText('1/5', { exact: true })).toBeVisible();
+    await expect(page.getByText('1/8', { exact: true })).toBeVisible();
     const next = page.getByRole('button', { name: '次へ', exact: true });
     await expect(next).toBeInViewport();
     if (viewport === tablet) {
       expect((await next.boundingBox())?.x).toBeGreaterThan(tablet.width * 0.58);
     }
     await next.click();
-    await expect(page.getByText('2/5', { exact: true })).toBeVisible();
+    await expect(page.getByText('2/8', { exact: true })).toBeVisible();
     await page.setViewportSize(viewport === tablet ? phone : tablet);
-    await expect(page.getByText('2/5', { exact: true })).toBeVisible();
+    await expect(page.getByText('2/8', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: '5 チーク', exact: true }).click();
-    await expect(page.getByText('5/5', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: '8 ライン', exact: true }).click();
+    await expect(page.getByText('8/8', { exact: true })).toBeVisible();
     await next.click();
     await expect(page).toHaveURL('/recipes/fox/finish');
     await expect(page.getByRole('heading', { name: 'Finish!' })).toBeVisible();

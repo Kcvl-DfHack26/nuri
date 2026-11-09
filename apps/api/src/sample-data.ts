@@ -11,13 +11,22 @@ import {
   catEyeShape,
   catLinerShape,
   foxCheekShape,
+  foxEyeOuterShape,
   foxEyeShape,
+  foxHighlightShape,
+  foxInnerLinerShape,
   foxLinerShape,
   foxShadingShape,
   koreanBaseShape,
   koreanCheekShape,
   koreanHighlightShape,
   koreanLipShape,
+  longCheekShape,
+  longEyeShape,
+  longHighlightShape,
+  longLinerShadowShape,
+  longLinerShape,
+  longShadingShape,
 } from './db/sample-shapes';
 import { product, recipe, recipeProduct, recipeStep, user } from './db/schema';
 import { imagePath, saveImage } from './platform/images';
@@ -54,7 +63,8 @@ const products = [
 ];
 type SeedStep = Omit<typeof recipeStep.$inferInsert, 'recipeId' | 'position'>;
 
-// Plan A's ⑦ steps for fox, the only recipe Plan A details.
+// Plan A's ⑦ steps for fox, with the steps and areas the team made in the makeup area editor
+// (#260). The hints and products of the added steps are sample values.
 const foxSteps: SeedStep[] = [
   {
     part: 'brow',
@@ -68,11 +78,29 @@ const foxSteps: SeedStep[] = [
   {
     part: 'eye',
     label: 'シャドウ',
-    title: '目尻側から横長にぼかす',
-    hint: '中間・締め色は目頭側へ薄く',
-    product: 'アイシャドウ（ベース・中間・締め）',
-    colors: ['#E5B58A', '#C56D42', '#713E2C'],
+    title: 'ベース色を狭め横長で乗せる',
+    hint: '目頭側は薄く、目尻側へ横長にのばす',
+    product: 'アイシャドウ（ベース色）',
+    colors: ['#E5AC99'],
     shape: foxEyeShape,
+  },
+  {
+    part: 'eye',
+    label: 'シャドウ',
+    title: '上まぶた目尻側に重ねる',
+    hint: '締め色は黒目の外側から目尻までにとどめる',
+    product: 'アイシャドウ（締め色）',
+    colors: ['#B8704D'],
+    shape: foxEyeOuterShape,
+  },
+  {
+    part: 'highlight',
+    label: 'ハイライト',
+    title: '黒目のおわり〜目尻に塗る。目頭に点置き',
+    hint: '指先で軽くたたいてなじませる',
+    product: 'ハイライト',
+    colors: ['#F1E7D7'],
+    shape: foxHighlightShape,
   },
   {
     part: 'lash',
@@ -100,6 +128,83 @@ const foxSteps: SeedStep[] = [
     product: 'チーク',
     colors: ['#B8754F'],
     shape: foxCheekShape,
+  },
+  {
+    part: 'lash',
+    label: 'ライン',
+    title: '粘膜ラインを目の形が平行四辺形に見えるように',
+    hint: '目尻側の上下の粘膜だけを埋める',
+    product: 'アイライン（ペンシル）',
+    colors: ['#38251D'],
+    shape: foxInnerLinerShape,
+  },
+];
+
+// 面長メイク's steps and areas from the makeup area editor (#260). The brow keeps the existing
+// 平行眉 shape, which suits a long face (#47). The hints and products are sample values.
+const longSteps: SeedStep[] = [
+  {
+    part: 'highlight',
+    label: 'ハイライト',
+    title: '鼻根より少し下と鼻先より少し上において中顔面短縮',
+    hint: '縦に長くのばさず、短く置く',
+    product: 'ハイライト',
+    colors: ['#F3E3C8'],
+    shape: longHighlightShape,
+  },
+  {
+    part: 'shading',
+    label: 'シェード',
+    title: '顎先が尖って見えるように下から上に',
+    hint: 'あご先の下側から上へ短くぼかす',
+    product: 'シェーディング',
+    colors: ['#A17B60'],
+    shape: longShadingShape,
+  },
+  {
+    part: 'cheek',
+    label: 'チーク',
+    title: '目元において外側へ広げていく',
+    hint: '横長に入れて縦の長さを目立たせない',
+    product: 'チーク',
+    colors: ['#E8968A'],
+    shape: longCheekShape,
+  },
+  {
+    part: 'brow',
+    label: '眉',
+    title: '眉尻を濃く、眉頭は淡く',
+    hint: '眉山を作らず横のラインを意識する',
+    product: 'アイブロウ（平行眉）',
+    colors: ['#72533D'],
+    shape: browShapes.flat,
+  },
+  {
+    part: 'lash',
+    label: 'ライン',
+    title: '黒目より外側から傾きをかえずに延長するように',
+    hint: '目尻の延長線上へ真横に近くのばす',
+    product: 'アイライン',
+    colors: ['#38251D'],
+    shape: longLinerShape,
+  },
+  {
+    part: 'lash',
+    label: 'ライン',
+    title: '黒目の外側からアイラインの先へ向かうように',
+    hint: 'ブラウンで影をつけて目の横幅を出す',
+    product: 'アイライン（ブラウン）',
+    colors: ['#785255'],
+    shape: longLinerShadowShape,
+  },
+  {
+    part: 'eye',
+    label: 'シャドウ',
+    title: '下まぶたに色を置くことで面長解消',
+    hint: '目尻側から黒目の下まで細く入れる',
+    product: 'アイシャドウ',
+    colors: ['#B37D7D'],
+    shape: longEyeShape,
   },
 ];
 
@@ -234,7 +339,7 @@ const recipes = [
     likeCount: 1200,
     source: null,
     products: [],
-    steps: [],
+    steps: longSteps,
   },
   {
     id: 'office',
