@@ -1,4 +1,3 @@
-import type { SkImage } from '@shopify/react-native-skia';
 import type { ReactNode } from 'react';
 
 import { Canvas, useImage } from '@shopify/react-native-skia';
@@ -18,9 +17,11 @@ import type { PartId } from '@/components/recipes';
 import type { Point, Size } from '@/lib/face-landmarks';
 import type { MakeupLayer } from '@/lib/face-makeup';
 
+import { ArMetricsOverlay, arMetricsEnabled } from '@/components/ar-metrics';
 import { FaceTexture } from '@/components/face-texture';
 import { useShapeTexture } from '@/components/shape-texture';
 import { Text } from '@/components/ui/text';
+import { recordArRender, recordArResult, startArMetricsWindow } from '@/lib/ar-metrics';
 import { toViewPoints } from '@/lib/face-landmarks';
 import { canonicalVertexCount } from '@/lib/face-mesh';
 
@@ -56,6 +57,17 @@ const opacity: Record<PartId, number> = {
   lip: 0.85,
 };
 
+const standardTextures: Record<PartId, number> = {
+  base: baseTexture,
+  brow: browTexture,
+  eye: eyeTexture,
+  lash: lashTexture,
+  cheek: cheekTexture,
+  shading: shadingTexture,
+  highlight: highlightTexture,
+  lip: lipTexture,
+};
+
 // A MediaPipe landmark inside each part's painted area, for the annotation pin.
 const anchors: Record<PartId, number> = {
   base: 151,
@@ -85,16 +97,6 @@ export function FaceMakeupCamera({
   children?: ReactNode;
 }) {
   const focused = useIsFocused();
-  const textures: Record<PartId, SkImage | null> = {
-    base: useImage(baseTexture),
-    brow: useImage(browTexture),
-    eye: useImage(eyeTexture),
-    lash: useImage(lashTexture),
-    cheek: useImage(cheekTexture),
-    shading: useImage(shadingTexture),
-    highlight: useImage(highlightTexture),
-    lip: useImage(lipTexture),
-  };
   const [appActive, setAppActive] = useState(
     () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive',
   );
@@ -102,7 +104,18 @@ export function FaceMakeupCamera({
   const [status, setStatus] = useState<FaceTrackerStatusEvent>();
   const [view, setView] = useState<Size>({ width: 0, height: 0 });
   const [points, setPoints] = useState<Point[]>([]);
+  // Created once and changed in place, so measuring never re-renders the camera.
+  const [metrics] = useState(() => startArMetricsWindow(performance.now()));
   const active = permission === 'granted' && focused && appActive;
+  // Nothing to place on the face (⑩, or ⑦ with the guide hidden): stop the inference.
+  const tracksFace = layers.length > 0 || annotation !== undefined;
+
+  // Passive effects run after the commit, so this marks when the latest landmarks were rendered.
+  useEffect(() => {
+    if (arMetricsEnabled) {
+      recordArRender(metrics, performance.now());
+    }
+  }, [metrics, points]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -122,6 +135,16 @@ export function FaceMakeupCamera({
       };
     }
   }, [active]);
+
+  // Landmarks from before tracking stopped must not reappear when it resumes. The status is kept:
+  // native reports only changes, so it still tells whether a face was found when tracking resumes.
+  useEffect(() => {
+    if (tracksFace) {
+      return () => {
+        setPoints([]);
+      };
+    }
+  }, [tracksFace]);
 
   useEffect(() => {
     if (!FaceTracker) {
@@ -170,11 +193,11 @@ export function FaceMakeupCamera({
   }, [permission]);
 
   const cameraDenied = permission === 'denied' || status?.status === 'permissionDenied';
-  const tracking = active && status?.status === 'tracking' && points.length > 0;
-  const meshReady = tracking && points.length === canonicalVertexCount && layers.length > 0;
+  const tracking = active && tracksFace && status?.status === 'tracking' && points.length > 0;
+  const meshReady = tracking && points.length === canonicalVertexCount;
   const message = cameraDenied
     ? 'カメラを使う許可がありません'
-    : status?.status === 'noFace'
+    : tracksFace && status?.status === 'noFace'
       ? '顔をカメラに向けてください'
       : status?.status === 'error'
         ? (status.message ?? '顔追跡を始められませんでした')
@@ -194,9 +217,11 @@ export function FaceMakeupCamera({
     >
       <FaceTrackerView
         active={active}
+        trackLandmarks={tracksFace}
         style={StyleSheet.absoluteFill}
         onLandmarks={(event) => {
-          if (!active) {
+          // A result may still arrive just after tracking stops.
+          if (!active || !tracksFace) {
             return;
           }
           // A fresh result proves tracking resumed even if native skips a repeated status.
@@ -204,6 +229,12 @@ export function FaceMakeupCamera({
             setStatus({ status: 'tracking' });
           }
           const frame = event.nativeEvent;
+          if (arMetricsEnabled) {
+            recordArResult(metrics, {
+              latencyMs: frame.latencyMs,
+              nowMs: performance.now(),
+            });
+          }
           setPoints(toViewPoints(frame.points, frame, view, canonicalVertexCount));
         }}
         onStatus={(event) => {
@@ -216,15 +247,12 @@ export function FaceMakeupCamera({
           }
         }}
       />
-      {meshReady ? (
+      {/* The layers stay mounted while the face is lost, so their textures are not made again when
+          it returns; they draw nothing until the mesh is ready. */}
+      {layers.length > 0 ? (
         <Canvas pointerEvents="none" style={StyleSheet.absoluteFill}>
           {layers.map((layer) => (
-            <LayerTexture
-              key={layer.part}
-              layer={layer}
-              points={points}
-              standard={textures[layer.part]}
-            />
+            <LayerTexture key={layer.part} layer={layer} points={meshReady ? points : undefined} />
           ))}
         </Canvas>
       ) : null}
@@ -232,6 +260,7 @@ export function FaceMakeupCamera({
         <Pin point={pin} label={annotation.label} view={view} />
       ) : null}
       {children}
+      {arMetricsEnabled ? <ArMetricsOverlay metrics={metrics} /> : null}
       {message ? (
         <View className="absolute inset-x-8 top-1/2 items-center gap-3">
           <Text
@@ -258,17 +287,13 @@ export function FaceMakeupCamera({
 }
 
 // One layer on the face: its step's shape when it has one, otherwise the part's standard texture.
-function LayerTexture({
-  layer,
-  points,
-  standard,
-}: {
-  layer: MakeupLayer;
-  points: Point[];
-  standard: SkImage | null;
-}) {
-  const texture = useShapeTexture(layer.shape) ?? standard;
-  if (!texture) {
+// The standard texture is loaded only when it is used, since each is 1024×1024. Draws nothing
+// without points.
+function LayerTexture({ layer, points }: { layer: MakeupLayer; points: Point[] | undefined }) {
+  const shapeTexture = useShapeTexture(layer.shape);
+  const standardTexture = useImage(shapeTexture ? null : standardTextures[layer.part]);
+  const texture = shapeTexture ?? standardTexture;
+  if (!texture || !points) {
     return null;
   }
   return (

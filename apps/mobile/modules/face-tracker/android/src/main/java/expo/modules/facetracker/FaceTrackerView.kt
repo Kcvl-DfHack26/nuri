@@ -296,6 +296,14 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     // Monotonic, so it is both the LIVE_STREAM timestamp and the capture time for the delay.
     val timestamp = SystemClock.uptimeMillis()
+    // Without live tracking the frame is only kept for a snapshot, which does not need every frame.
+    val previous = latestFrame
+    val recentFrameKept = previous != null && previous.generation == generation &&
+      timestamp - previous.atMs < SNAPSHOT_ONLY_FRAME_INTERVAL_MS
+    if (!trackLandmarks && recentFrameKept) {
+      image.close()
+      return
+    }
     val rotation = image.imageInfo.rotationDegrees
     val bitmap = image.toBitmap()
     image.close()
@@ -371,5 +379,8 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     const val GPU_SILENT_FRAME_LIMIT = 150
     // Do not save a frozen preview after the camera stops delivering frames.
     const val SNAPSHOT_MAX_AGE_MS = 1500L
+    // How often a frame is converted while only snapshots need it: 4 a second instead of 30, so a
+    // snapshot is at most about this old, well within SNAPSHOT_MAX_AGE_MS.
+    const val SNAPSHOT_ONLY_FRAME_INTERVAL_MS = 250L
   }
 }

@@ -241,6 +241,15 @@ adb reverse tcp:8081 tcp:8081
 
 アプリを開いて開発サーバー `http://127.0.0.1:8081` を選び、レシピの⑤から「メイクをはじめる」で⑦を開く。この方式ではMediaPipeのGPU推論が毎フレーム失敗し、150フレーム後にCPUに切り替わる（エミュレーターのカメラでは約10秒）。GPUで動くことだけを確かめるときは `-feature GuestAngle` を足す（1回約400msかかる）。
 
+ARの処理時間を測るときは、計測用のリリースビルドを作る（#236）。`EXPO_PUBLIC_AR_METRICS=1` はバンドル時に埋め込まれ、⑦⑩のカメラの上に1秒ごとの推論結果・描画の数と遅延を出す。同じ値をlogcatにも書く。
+
+```sh
+cd apps/mobile/android
+EXPO_PUBLIC_AR_METRICS=1 EXPO_PUBLIC_API_URL=<APIのURL> ./gradlew :app:assembleRelease -PreactNativeArchitectures=x86_64
+adb install -r app/build/outputs/apk/release/app-release.apk
+adb logcat -s ReactNativeJS | grep ar-metrics
+```
+
 このリポジトリはEASに接続済みで、`build:configure` / `update:configure`も実行済み。設定はfingerprint runtime policy、development/preview/production channel。フォーク時は `eas init`、`eas build:configure`、`eas update:configure` で自分のプロジェクトへ再接続する。
 
 ## 3. GitHubとExpoの手動設定
