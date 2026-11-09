@@ -10,7 +10,7 @@ Google CloudのAPIキーはローカルSNS・認証開発に不要。Vercel Emul
 
 コード・設定・文書の変更は、Issueの起票または既存Issueの確認と担当設定から始める。Issueに対応するブランチで実装・検証し、コミット・push・Draft PR作成まで進める。詳細は [AGENTS.md](../AGENTS.md#issue--branch--pr)、独自UIの追加は [UI開発手順](ui.md)を参照。
 
-ローカルのAPI・Metro・PostgreSQLはすべてDocker Composeで動かす。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。ホストのBunは任意。WindowsではWSL2のLinuxファイルシステムを使う。
+ローカルのAPI・Metro・FlociはDocker Composeで動かす。FlociはCloud SQL Admin APIとCloud Storageを提供し、PostgreSQL 17を起動する。ホストにGit、Docker Engine + Compose v2、Node.js 24以降、Portless **0.16.0** を用意する。Compose連携は0.16.0で追加されたため、0.15系では起動できない。ホストのBunは任意。WindowsではWSL2のLinuxファイルシステムを使う。
 
 ```sh
 npm install --global portless@0.16.0
@@ -33,7 +33,7 @@ portless trust
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-Composeが依存導入・未作成のアプリenv生成・PostgreSQLのhealthcheck・migrationを行う。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432。Google／メールのEmulateもAPIの依存として起動する。PostgreSQLはホストへ公開せず、PortlessがHTTPサービスにloopback上の空きポートを割り当てる。
+Composeが依存導入と未作成のアプリenv生成を行う。Flociの準備ができると、`migrate` がCloud SQL Admin APIでインスタンス・DB・アプリユーザーを作り、返された接続先でDrizzle migrationを実行する。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432、Floci 4588。PostgreSQLとFlociはComposeネットワーク内で待ち受け、PortlessがAPI・Metro・Google／メールのEmulateにloopback上の空きポートを割り当てる。Docker socketはPostgreSQLを起動するFlociにだけ渡す。
 
 | サービス    | ホストからのURL                                |
 | ----------- | ---------------------------------------------- |
@@ -71,7 +71,7 @@ foregroundはCtrl+CでAPI・Metroとそのrouteを終了する。DB等の依存�
 
 worktreeをエディタで開いて **Reopen in Container** を実行する。`initializeCommand` がホストのPOSIX初期化を行い、Composeの `workspace` サービスとそのsetup・DB依存を起動する。API・Metroの公開ポートをエディタが再作成しないよう、`runServices` は編集用 `workspace` だけに限定する。
 
-コンテナ内では `bun run check`、`bun run doctor`、`bun run export:mobile` 等を実行できる。Docker socketは渡していないため、Portlessの起動・停止コマンドはホストで実行する。エディタのport forwardは使わない。エディタを閉じてもサービスは停止しないので、作業終了時はホストで `portless compose --profile '*' down` を実行する。
+コンテナ内では `bun run check`、`bun run doctor`、`bun run export:mobile` 等を実行できる。DBを参照するコマンドは `sh scripts/with-local-database.sh <コマンド>` で実行する。Flociからその時点の接続先を取得し、コマンドの `DATABASE_URL` に渡す。Docker socketは渡していないため、Portlessの起動・停止コマンドはホストで実行する。エディタのport forwardは使わない。エディタを閉じてもサービスは停止しないので、作業終了時はホストで `portless compose --profile '*' down` を実行する。
 
 自動依存導入は `--ignore-scripts` で共有Git hookを変更しない。Dev Containerの初回作成、またはホストの `bun install` / `bun run hooks:install` は同じGitリポジトリで順に行う。Lefthookが共有 `.git/hooks` を更新するためで、準備後のサーバーは並列起動できる。
 
@@ -96,6 +96,39 @@ bun run services:down
 ```
 
 統合テストの前にAPIを起動する。テストコマンドは起動中のDBを使い、端末用構成で動いているAPIやEmulateを通常構成で作り直さない。
+
+### 旧PostgreSQLのデータを移す
+
+旧構成から更新する前に、対象worktreeで開発DBをダンプする。旧 `postgres-data` volumeは保持する。
+
+```sh
+umask 077
+backup="$(mktemp -d)/nuri-local-backup.sql"
+docker compose exec -T postgres pg_dump --no-owner --no-privileges \
+  -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter > "$backup"
+bun run services:down
+```
+
+新構成で初めてAPIを起動する前に、空のFloci DBへダンプを復元する。`migrate` のentrypointがAdmin APIから接続先を取得する。`nuri-local-backup.sql` はcheckout外に保存する。利用者データが含まれるため、不要になったら削除する。
+
+```sh
+bun run setup
+bun run compose up -d --wait floci
+bun run compose run --rm --build setup
+bun run compose run --rm --no-deps -T migrate \
+  sh -ec 'exec psql --dbname="$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1' < "$backup"
+bun run dev:api
+```
+
+通常の `bun run services:down` と再起動で、Flociのメタデータ・GCSオブジェクトとPostgreSQLのデータを保持する。Flociの停止時にFlociがPostgreSQLを止め、起動時に再作成する。新しい接続先をAPIに反映するには、停止後に `bun run dev:api` または `bun run dev` で起動する。
+
+空のDBとGCSに初期化する場合は、対象worktreeを `bun run services:down` で止める。次の一覧から、そのworktreeのFlociメタデータとCloud SQL volumeを確認し、その2つの名前を指定して `docker volume rm` を実行する。旧 `postgres-data` と他worktreeのvolumeは移行用に保持する。
+
+```sh
+project='nuri-<issue>-<topic>'
+docker volume inspect "${project}_floci-data" --format '{{.Name}}'
+docker volume ls --filter "label=floci_namespace=$project" --format '{{.Name}}'
+```
 
 ### 旧ハッシュ名から移行する
 

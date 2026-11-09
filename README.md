@@ -100,7 +100,7 @@ portless proxy start --https --port 443
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-依存導入・未作成の環境ファイル生成・DB migrationが自動で行われます。API・MetroのURLとPostgreSQLのvolumeはworktreeごとに分離します。Dev Containerは編集・検査に使い、アプリの起動・停止はホストのPortlessで行います。
+依存導入・未作成の環境ファイル生成・FlociのPostgreSQL 17へのmigrationが自動で行われます。API・MetroのURLとFlociのDB・GCSはworktreeごとに分離します。旧ローカルDBのデータは[移行手順](docs/setup.md#旧postgresqlのデータを移す)で引き継げます。Dev Containerは編集・検査に使い、アプリの起動・停止はホストのPortlessで行います。
 
 顔追跡などのネイティブ機能には**Development Buildが必要**です。Expo Goは初期のUI確認に限り、ネイティブモジュールを使う機能の確認には使えません。端末接続・ビルド・API接続は[セットアップ手順](docs/setup.md)に従ってください。
 

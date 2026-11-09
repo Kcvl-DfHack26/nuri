@@ -8,7 +8,6 @@ x-runtime: &runtime
   working_dir: ${WORKTREE_ROOT:?Run sh scripts/worktree-init.sh first}
   environment: &environment
     NODE_ENV: development
-    DATABASE_URL: postgresql://expo-hono-opentofu-starter:starter@postgres:5432/expo-hono-opentofu-starter
     DEV_API_ORIGIN: https://api.${COMPOSE_PROJECT_NAME}.localhost
     DEV_METRO_ORIGIN: https://metro.${COMPOSE_PROJECT_NAME}.localhost
     BUN_INSTALL_CACHE_DIR: ${WORKTREE_ROOT}/node_modules/.cache/bun
@@ -27,6 +26,12 @@ x-runtime: &runtime
     - gcloud-config:/home/node/.config/gcloud
     - expo-config:/home/node/.expo
 
+x-local-gcp: &local-gcp
+  <<: *environment
+  FLOCI_GCP_URL: &floci-url http://floci:4588
+  STORAGE_EMULATOR_HOST: *floci-url
+  GOOGLE_CLOUD_PROJECT: ${COMPOSE_PROJECT_NAME}
+
 services:
   setup:
     <<: *runtime
@@ -39,16 +44,19 @@ services:
         exec sudo -u node -H sh -ec 'bun install --frozen-lockfile --ignore-scripts && bun run setup'
   migrate:
     <<: *runtime
+    environment: *local-gcp
+    entrypoint: [sh, scripts/with-local-database.sh, --init]
     command: bun run --cwd apps/api db:migrate
     depends_on:
       setup:
         condition: service_completed_successfully
-      postgres:
+      floci:
         condition: service_healthy
   api:
     <<: *runtime
+    entrypoint: [sh, scripts/with-local-database.sh]
     environment:
-      <<: *environment
+      <<: *local-gcp
       PORT: '8080'
       AUTH_EMULATE: 'true'
       GOOGLE_EMULATOR_URL: http://google:4002
@@ -123,6 +131,7 @@ services:
         condition: service_completed_successfully
   workspace:
     <<: *runtime
+    environment: *local-gcp
     image: ${COMPOSE_PROJECT_NAME}-workspace
     profiles: [editor]
     command: sleep infinity
@@ -136,23 +145,25 @@ services:
     depends_on:
       api:
         condition: service_healthy
-  postgres:
-    image: postgres:17.7-bookworm
+  floci:
+    image: floci/floci-gcp:0.12.0
     environment:
-      POSTGRES_USER: expo-hono-opentofu-starter
-      POSTGRES_PASSWORD: starter
-      POSTGRES_DB: expo-hono-opentofu-starter
+      FLOCI_GCP_HOSTNAME: floci
+      FLOCI_GCP_BASE_URL: *floci-url
+      FLOCI_GCP_DEFAULT_PROJECT_ID: ${COMPOSE_PROJECT_NAME}
+      FLOCI_GCP_DOCKER_RESOURCE_NAMESPACE: ${COMPOSE_PROJECT_NAME}
+      FLOCI_GCP_SERVICES_DOCKER_NETWORK: ${COMPOSE_PROJECT_NAME}_default
+      FLOCI_GCP_SERVICES_CLOUDSQL_POSTGRES17_IMAGE: postgres:17.7-bookworm
+      FLOCI_GCP_SERVICES_CLOUDRUN_MOCK: 'true'
+      FLOCI_GCP_SERVICES_GKE_ENABLED: 'false'
+      FLOCI_GCP_SERVICES_KAFKA_ENABLED: 'false'
+      FLOCI_GCP_SERVICES_BIGQUERY_MOCK: 'true'
+      FLOCI_GCP_SERVICES_COMPUTE_RECONCILE_CONTAINERS_ON_STARTUP: 'false'
+      FLOCI_GCP_STORAGE_MODE: persistent
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        [
-          'CMD-SHELL',
-          'pg_isready -h 127.0.0.1 -U expo-hono-opentofu-starter -d expo-hono-opentofu-starter',
-        ]
-      interval: 3s
-      timeout: 3s
-      retries: 20
+      - floci-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   root-modules:
   mobile-modules:
@@ -161,4 +172,4 @@ volumes:
   shared-modules:
   gcloud-config:
   expo-config:
-  postgres-data:
+  floci-data:
