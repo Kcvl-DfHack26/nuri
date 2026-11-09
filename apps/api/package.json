@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/index.ts",
-    "build": "bun build src/index.ts src/db/migrate.ts --target=node --outdir=dist --external=pg --external=better-auth --external=@better-auth/expo --external=@better-auth/passkey",
+    "build": "bun build src/index.ts src/db/migrate.ts --target=node --outdir=dist --external=pg --external=@google-cloud/storage --external=better-auth --external=@better-auth/expo --external=@better-auth/passkey",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "bun test --path-ignore-patterns='**/*.integration.test.ts' ./src",
@@ -22,6 +22,7 @@
   "dependencies": {
     "@better-auth/expo": "1.7.17",
     "@better-auth/passkey": "1.7.17",
+    "@google-cloud/storage": "8.4.0",
     "@google/genai": "3.0.0",
     "@hono/node-server": "2.1.6",
     "@hono/zod-validator": "0.9.1",

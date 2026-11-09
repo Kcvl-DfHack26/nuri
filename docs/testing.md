@@ -10,7 +10,7 @@ bun run doctor
 bun run export:mobile
 ```
 
-APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。
+APIのDB不要のBunテストは `apps/api/src` から自動検出し、`*.integration.test.ts` は実PostgreSQL用のコマンドに分ける。認証の統合テストは実行ごとに一意なメールアドレスと送信元IPv6を使い、終了時にその実行のユーザーとレート制限行を削除する。開発・CI用DBに対して実行する。画像を扱う統合テストは、専用のFlociバケットを `GCS_BUCKET` と `STORAGE_EMULATOR_HOST` で指定する。Compose起動時にworktree専用バケットが作成される。
 
 GitHub Actionsでは静的検査、Bunのユニットテスト、Jestの2 shard、HonoとPostgreSQLの統合テスト、ChromiumのWeb E2E、AndroidのMaestro、ネイティブバンドル、コンテナ、OpenTofu検査を並列で実行する。`All CI Checks` は各ジョブの成功を集約する。検査コマンドはBunで実行し、Honoの配信用コンテナは実際のNode.jsランタイムで疎通を確認する。
 
@@ -68,6 +68,9 @@ Playwrightでエクスポート済みのExpo Webを起動し、Hono APIとPostgr
 ```sh
 docker run --rm --publish 127.0.0.1:55432:5432 --tmpfs /var/lib/postgresql/data \
   -e POSTGRES_USER=nuri_e2e -e POSTGRES_PASSWORD=nuri_e2e postgres:17.7-bookworm
+
+# 別ターミナルでFlociを起動する。GCSのみなのでDocker socketは不要。
+docker run --rm --publish 127.0.0.1:4588:4588 floci/floci-gcp:0.12.0
 ```
 
 DBが起動したら別のターミナルで実行する。
@@ -77,7 +80,7 @@ bunx --bun playwright install --no-shell chromium
 bun run test:e2e
 ```
 
-テストはDBへmigrationとseedを実行し、Honoがエクスポート済みのExpo WebとAPIを49116で同一オリジン配信する。別の使い捨てローカルDBを使う場合は `NURI_E2E_DATABASE_URL` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
+テストはDBへmigrationとseedを実行し、Honoがエクスポート済みのExpo WebとAPIを49116で同一オリジン配信する。別の使い捨てローカル環境を使う場合は `NURI_E2E_DATABASE_URL` と `NURI_E2E_STORAGE_EMULATOR_HOST` を設定する。テスト失敗時のトレースは `.artifacts/playwright/` に残る。ネイティブの画面操作は以下のMaestro、実カメラと顔追跡は端末で検証する。
 
 ## Maestro
 

@@ -1,7 +1,10 @@
+import { ApiError } from '@google-cloud/storage';
 import { purchaseUrlSchema } from '@starter/shared';
 import { eq } from 'drizzle-orm';
+import { readFile } from 'node:fs/promises';
 
-import type { Database } from './client';
+import type { Database } from './db/client';
+import type { ImageStore } from './modules/images';
 
 import {
   browShapes,
@@ -15,18 +18,19 @@ import {
   koreanCheekShape,
   koreanHighlightShape,
   koreanLipShape,
-} from './sample-shapes';
-import { product, recipe, recipeProduct, recipeStep, user } from './schema';
+} from './db/sample-shapes';
+import { product, recipe, recipeProduct, recipeStep, user } from './db/schema';
+import { imagePath, saveImage } from './modules/images';
 
 // Development sample data. Every row has a stable ID and is upserted, so running the seed again
 // neither duplicates rows nor removes or rewrites data created through the app.
 // Image sources and licenses: apps/api/assets/*/README.md.
 const people = [
-  { id: 'sample-haru', name: 'はる', image: '/sample-avatars/haru.jpg' },
-  { id: 'sample-sora', name: 'そら', image: '/sample-avatars/sora.jpg' },
-  { id: 'sample-yui', name: 'ゆい', image: '/sample-avatars/yui.jpg' },
-  { id: 'sample-ren', name: 'れん', image: '/sample-avatars/ren.jpg' },
-  { id: 'sample-mio', name: 'mio', image: '/sample-avatars/mio.png' },
+  { id: 'sample-haru', name: 'はる', image: 'sample-avatars/haru.jpg' },
+  { id: 'sample-sora', name: 'そら', image: 'sample-avatars/sora.jpg' },
+  { id: 'sample-yui', name: 'ゆい', image: 'sample-avatars/yui.jpg' },
+  { id: 'sample-ren', name: 'れん', image: 'sample-avatars/ren.jpg' },
+  { id: 'sample-mio', name: 'mio', image: 'sample-avatars/mio.png' },
   { id: 'sample-kana', name: 'kana', image: null },
   { id: 'sample-yuna', name: 'yuna', image: null },
 ];
@@ -34,13 +38,13 @@ const products = [
   {
     id: 'celane-brow-pencil',
     name: 'CELANE 極細アイブロウペンシル',
-    image: '/sample-recipes/product-brow-pencil.jpg',
+    image: 'sample-recipes/product-brow-pencil.jpg',
     purchaseUrl: null,
   },
   {
     id: 'mousse-cheek',
     name: 'ムースチーク',
-    image: '/sample-recipes/product-cheek.jpg',
+    image: 'sample-recipes/product-cheek.jpg',
     // The products are fictional, so the link searches a real shop for the name instead of
     // pointing at a made-up product page. Plan A shows 買う only on this one.
     purchaseUrl: purchaseUrlSchema.parse(
@@ -344,22 +348,51 @@ const recipes = [
   },
 ];
 
-export async function seedSampleData(db: Database) {
+export async function seedSampleData(db: Database, images: ImageStore) {
+  const recipeImageKey = (id: string) => `sample-recipes/${id}.jpg`;
+  const imageKeys = [
+    ...people.flatMap((person) => (person.image ? [person.image] : [])),
+    ...products.map((item) => item.image),
+    ...recipes.map((item) => recipeImageKey(item.id)),
+  ];
+  // Finish uploading before changing any database reference. Fixed object names and the
+  // create-only precondition let concurrent seeds safely reuse an already uploaded fixture.
+  await Promise.all(
+    imageKeys.map(async (key) => {
+      const bytes = await readFile(new URL(`../assets/${key}`, import.meta.url));
+      try {
+        await saveImage(images, key, bytes, key.endsWith('.png') ? 'image/png' : 'image/jpeg');
+      } catch (error) {
+        if (!(error instanceof ApiError && error.code === 412)) {
+          throw error;
+        }
+      }
+    }),
+  );
   await db.transaction(async (tx) => {
-    for (const person of people) {
-      await tx
-        .insert(user)
-        .values({ ...person, email: `${person.id}@example.invalid` })
-        .onConflictDoUpdate({ target: user.id, set: { name: person.name, image: person.image } });
+    for (const { id, name, image: key } of people) {
+      const image = key ? imagePath(key) : null;
+      const insert = tx.insert(user).values({ id, name, image, email: `${id}@example.invalid` });
+      if (key) {
+        // Change only the previous bundled fixture reference for this user.
+        await insert.onConflictDoUpdate({
+          target: user.id,
+          set: { image },
+          setWhere: eq(user.image, `/${key}`),
+        });
+      } else {
+        await insert.onConflictDoNothing({ target: user.id });
+      }
     }
     for (const { id, ...item } of products) {
+      const values = { ...item, image: imagePath(item.image) };
       await tx
         .insert(product)
-        .values({ id, ...item })
-        .onConflictDoUpdate({ target: product.id, set: item });
+        .values({ id, ...values })
+        .onConflictDoUpdate({ target: product.id, set: values });
     }
     for (const [index, { products: used, steps, ...item }] of recipes.entries()) {
-      const values = { ...item, image: `/sample-recipes/${item.id}.jpg` };
+      const values = { ...item, image: imagePath(recipeImageKey(item.id)) };
       const seeded = await tx
         .insert(recipe)
         .values({ ...values, createdAt: new Date(Date.now() - (index + 1) * 60 * 60 * 1000) })

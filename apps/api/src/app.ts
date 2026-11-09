@@ -1,10 +1,8 @@
-import { serveStatic } from '@hono/node-server/serve-static';
 import { postAnalysisVideoMaxBytes } from '@starter/shared';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
-import { fileURLToPath } from 'node:url';
 
 import type { Database } from './db/client';
 import type { Auth } from './modules/auth';
@@ -12,6 +10,7 @@ import type { PostAnalyzer } from './modules/post-analysis';
 import type { Environment } from './platform/env';
 
 import { authCapabilities, authRoutes, requireSession } from './modules/auth';
+import { createImageStore, imageRoutes } from './modules/images';
 import { postAnalysisRoutes } from './modules/post-analysis';
 import { createPushSender, pushRoutes } from './modules/push';
 import { recipeRoutes } from './modules/recipes';
@@ -38,17 +37,11 @@ export function createApp(
   const postedRecipeBody = bodyLimit({ maxSize: 2.5 * 1024 * 1024, onError });
   // POST /api/post-analyses carries the video from ⑫-3 and its marks as multipart form data.
   const postVideoBody = bodyLimit({ maxSize: postAnalysisVideoMaxBytes + 64 * 1024, onError });
+  const images = env.GCS_BUCKET ? createImageStore(env) : null;
   return (
     new Hono()
+      .route('/', imageRoutes(images))
       .use('*', secureHeaders())
-      .get(
-        '/sample-avatars/*',
-        serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
-      )
-      .get(
-        '/sample-recipes/*',
-        serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
-      )
       // A posted recipe carries its thumbnail; every other API body stays small.
       .use('/api/*', (c, next) => {
         if (c.req.method === 'POST' && c.req.path === '/api/recipes') {

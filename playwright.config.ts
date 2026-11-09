@@ -5,8 +5,12 @@ const origin = `http://127.0.0.1:${port}`;
 const database =
   process.env.NURI_E2E_DATABASE_URL ?? 'postgresql://nuri_e2e:nuri_e2e@127.0.0.1:55432/nuri_e2e';
 
-if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(database).hostname)) {
-  throw new Error('NURI_E2E_DATABASE_URL must point to a disposable local PostgreSQL database');
+const storage = process.env.NURI_E2E_STORAGE_EMULATOR_HOST ?? 'http://127.0.0.1:4588';
+
+for (const url of [database, storage]) {
+  if (!['127.0.0.1', 'localhost', '[::1]'].includes(new URL(url).hostname)) {
+    throw new Error('E2E PostgreSQL and Floci must point to disposable local services');
+  }
 }
 
 export default defineConfig({
@@ -34,13 +38,15 @@ export default defineConfig({
     cwd: './apps/api',
     command:
       'NODE_ENV=production bun run --bun --cwd ../mobile expo export --platform web --output-dir .expo/e2e-web && ' +
-      'bun src/db/migrate.ts && bun src/seed.ts && exec bun src/index.ts',
+      'bun ../../scripts/init-local-storage.ts && bun src/db/migrate.ts && bun src/seed.ts && exec bun src/index.ts',
     url: `${origin}/ready`,
     timeout: 180_000,
     env: {
       NODE_ENV: 'development',
       PORT: String(port),
       DATABASE_URL: database,
+      GCS_BUCKET: 'nuri-e2e',
+      STORAGE_EMULATOR_HOST: storage,
       BETTER_AUTH_URL: origin,
       BETTER_AUTH_SECRET: 'local-e2e-only-not-for-real-deployments',
       EXPO_WEB_ROOT: '../mobile/.expo/e2e-web',

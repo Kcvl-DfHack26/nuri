@@ -7,6 +7,8 @@ const schema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
   EXPO_WEB_ROOT: z.string().min(1).optional(),
+  GCS_BUCKET: z.string().trim().min(1).optional(),
+  STORAGE_EMULATOR_HOST: z.url({ protocol: /^https?$/ }).optional(),
   TRUSTED_ORIGINS: z.string().default('com.kcvl.nuri://'),
   AUTH_EMULATE: z
     .enum(['true', 'false'])

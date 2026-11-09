@@ -32,7 +32,7 @@ FROM dependencies AS preview-dependencies
 RUN bun install --frozen-lockfile --production --filter @starter/api --filter @starter/mobile --ignore-scripts
 
 FROM build AS preview-build
-RUN bun build apps/api/src/seed.ts --target=node --outdir=apps/api/dist-preview --external=pg
+RUN bun build apps/api/src/seed.ts --target=node --outdir=apps/api/dist-preview --external=pg --external=@google-cloud/storage
 
 FROM postgres:17.7-bookworm AS preview
 RUN apt-get update && apt-get install -y --no-install-recommends nginx-light qrencode \
@@ -62,7 +62,6 @@ COPY --from=dependencies --chown=node:node /app/node_modules /app/node_modules
 COPY --from=dependencies --chown=node:node /app/apps /app/apps
 COPY --from=build --chown=node:node /app/apps/api/dist ./dist
 COPY --from=build --chown=node:node /app/apps/api/drizzle ./drizzle
-COPY --from=build --chown=node:node /app/apps/api/assets ./assets
 COPY --from=build --chown=node:node /app/apps/mobile/dist ./web
 COPY --from=build --chown=node:node /app/apps/api/package.json ./package.json
 USER node
