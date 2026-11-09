@@ -2,10 +2,11 @@
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/v3.39.0/schema.json",
   "minimumVersion": "3.39.0",
   "failOnParseError": true,
+  "includeEntryExports": true,
   "entry": ["scripts/preview-ready.ts"],
   "ignorePatterns": [".agents/**", "**/.expo/**", ".artifacts/**"],
   "duplicates": {
-    "minTokens": 50,
+    "minTokens": 40,
     "minLines": 5,
     "minOccurrences": 2
   },

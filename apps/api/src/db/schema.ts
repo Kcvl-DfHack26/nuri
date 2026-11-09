@@ -16,6 +16,14 @@ import {
   timestamp,
 } from 'drizzle-orm/pg-core';
 
+const authTimestamps = () => ({
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+const createdAtWithTimezone = () =>
+  timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
+
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -27,8 +35,7 @@ export const user = pgTable('user', {
   isPublic: boolean('is_public').default(true).notNull(),
   /** The face type chosen on ⑰-2 or saved from ⑭ (#194); only its owner reads it. */
   faceType: text('face_type', { enum: faceTypeIds }),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  ...authTimestamps(),
 });
 
 export const session = pgTable(
@@ -37,8 +44,7 @@ export const session = pgTable(
     id: text('id').primaryKey(),
     expiresAt: timestamp('expires_at').notNull(),
     token: text('token').notNull().unique(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    ...authTimestamps(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
     userId: text('user_id')
@@ -75,8 +81,7 @@ export const account = pgTable(
     refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
     scope: text('scope'),
     password: text('password'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    ...authTimestamps(),
   },
   (table) => [index('account_user_id_idx').on(table.userId)],
 );
@@ -88,8 +93,7 @@ export const verification = pgTable(
     identifier: text('identifier').notNull(),
     value: text('value').notNull(),
     expiresAt: timestamp('expires_at').notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    ...authTimestamps(),
   },
   (table) => [index('verification_identifier_idx').on(table.identifier)],
 );
@@ -131,7 +135,7 @@ export const follow = pgTable(
     followeeId: text('followee_id')
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: createdAtWithTimezone(),
   },
   (table) => [
     primaryKey({ columns: [table.followerId, table.followeeId] }),
@@ -162,7 +166,7 @@ export const recipe = pgTable(
     part: text('part', { enum: makeupParts }),
     /** A one-line description, e.g. ③'s caption under the style name. */
     summary: text('summary'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: createdAtWithTimezone(),
   },
   (table) => [
     index('recipe_created_at_idx').on(table.createdAt),
@@ -191,7 +195,7 @@ export const recipeImage = pgTable('recipe_image', {
     .references(() => recipe.id, { onDelete: 'cascade' }),
   contentType: text('content_type').notNull(),
   bytes: bytea('bytes').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: createdAtWithTimezone(),
 });
 
 /** The cosmetics a recipe uses, in the order ⑤ lists them. */
@@ -247,7 +251,7 @@ export const recipeFavorite = pgTable(
     recipeId: text('recipe_id')
       .notNull()
       .references(() => recipe.id, { onDelete: 'cascade' }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: createdAtWithTimezone(),
   },
   (table) => [
     primaryKey({ columns: [table.userId, table.recipeId] }),

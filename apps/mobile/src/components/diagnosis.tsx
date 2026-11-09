@@ -12,6 +12,7 @@ import type { RecipeSummary } from '@/lib/recipes';
 
 import { CardFavorite } from '@/components/card-favorite';
 import { Feedback } from '@/components/feedback';
+import { FloatingBackHeader } from '@/components/floating-back-header';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
 import { PrimaryButton } from '@/components/post-chrome';
@@ -21,7 +22,6 @@ import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiAssetUrl, apiUrl, authClient } from '@/lib/api';
 import { browShapes, eyeShapes, faceTypes, midfaces, readResultParams } from '@/lib/face-diagnosis';
-import { backOrHome } from '@/lib/navigation';
 import { formatCount, recipeListOptions } from '@/lib/recipes';
 import { changeProfile, myProfileKeys, myProfileOptions } from '@/lib/social';
 import { cn } from '@/lib/utils';
@@ -32,10 +32,6 @@ import contourDiagram from '../../assets/plan-a/diagnosis/contour.svg';
 import eyeTiltDiagram from '../../assets/plan-a/diagnosis/eye-tilt.svg';
 import sparkleRose from '../../assets/plan-a/icons/sparkle-rose.svg';
 
-const BACK = Icon.select({
-  ios: 'chevron.left',
-  android: import('@expo/material-symbols/arrow_back_ios_new.xml'),
-});
 const SHARE = Icon.select({
   ios: 'square.and.arrow.up',
   android: import('@expo/material-symbols/ios_share.xml'),
@@ -139,42 +135,17 @@ export function Diagnosis() {
           </View>
         )}
       </ScrollView>
-      <View
-        pointerEvents="none"
-        className="absolute inset-x-0 top-0"
-        style={{
-          height: insets.top + headerHeight + 20,
-          backgroundImage:
-            'linear-gradient(to bottom, #ffffff 0%, rgba(255,255,255,0.97) 82%, rgba(255,255,255,0) 100%)',
-        }}
-      />
-      <View
-        className="absolute inset-x-4 min-h-11 flex-row items-center gap-2"
-        style={{ top: insets.top }}
-        onLayout={(event) => {
-          setHeaderHeight(event.nativeEvent.layout.height);
-        }}
-      >
-        <GlassIconButton
-          icon={BACK}
-          label="戻る"
-          className="border-black/8 bg-white"
-          onPress={() => {
-            backOrHome();
-          }}
-        />
-        <Text
-          accessibilityRole="header"
-          className="flex-1 text-center font-maru-bold text-heading text-ink-primary"
-        >
-          診断結果
-        </Text>
-        <GlassIconButton
+      <FloatingBackHeader
+        title="診断結果"
+        insetTop={insets.top}
+        height={headerHeight}
+        onHeight={setHeaderHeight}
+        trailing=<GlassIconButton
           icon={SHARE}
           label="診断結果を共有（準備中）"
           className="border-black/8 bg-white"
         />
-      </View>
+      />
     </View>
   );
 }

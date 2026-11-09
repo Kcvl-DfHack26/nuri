@@ -160,6 +160,13 @@ function anchor(name: Region['start'], right: boolean): { point: Point; near: nu
   return null;
 }
 
+function strokeAnchors(region: Region, right: boolean) {
+  return {
+    start: anchor(region.start, right),
+    end: region.end === 'none' ? null : anchor(region.end, right),
+  };
+}
+
 /** Whether an area belongs to a paired part; the midline and the lips are not paired. */
 function isPaired(region: Region) {
   const central = (name: Region['end']) => name === 'none' || name in center || lipAreas.has(name);
@@ -227,8 +234,7 @@ function browStroke(region: Region, right: boolean): Stroke {
       const lower = browLower[k][index] ?? upper;
       return sum + Math.hypot(at(upper).x - at(lower).x, at(upper).y - at(lower).y);
     }, 0) / browUpper[k].length;
-  const start = anchor(region.start, right);
-  const end = region.end === 'none' ? null : anchor(region.end, right);
+  const { start, end } = strokeAnchors(region, right);
   const from = start ? nearestIndex(middles, start.point) : 0;
   const to = end ? nearestIndex(middles, end.point) : from;
   const [lo, hi] = from <= to ? [from, to] : [to, from];
@@ -257,8 +263,7 @@ function lidStroke(region: Region, lower: boolean, right: boolean, whole: boolea
     near: index,
   }));
   const last = contour.length - 1;
-  const start = anchor(region.start, right);
-  const end = region.end === 'none' ? null : anchor(region.end, right);
+  const { start, end } = strokeAnchors(region, right);
   const from = start ? nearestIndex(contour, start.point) : 0;
   const reach = Math.min(last, Math.max(2, inwardSteps[region.length]));
   const toward = from >= last / 2 ? Math.max(0, from - reach) : Math.min(last, from + reach);
@@ -330,21 +335,11 @@ function eyeAreaStroke(lower: boolean, right: boolean, reach: number): Stroke {
   };
 }
 
-function strokeAnchors(region: Region, right: boolean) {
-  const start = anchor(region.start, right);
+function ellipseStroke(region: Region, right: boolean): Stroke | null {
+  const { start, end } = strokeAnchors(region, right);
   if (!start) {
     return null;
   }
-  const end = region.end === 'none' ? null : anchor(region.end, right);
-  return { start, end };
-}
-
-function ellipseStroke(region: Region, right: boolean): Stroke | null {
-  const anchors = strokeAnchors(region, right);
-  if (!anchors) {
-    return null;
-  }
-  const { start, end } = anchors;
   const axis = end
     ? { x: end.point.x - start.point.x, y: end.point.y - start.point.y }
     : direction(region.direction, right);
@@ -373,11 +368,10 @@ function ellipseStroke(region: Region, right: boolean): Stroke | null {
 }
 
 function straightStroke(region: Region, right: boolean): Stroke | null {
-  const anchors = strokeAnchors(region, right);
-  if (!anchors) {
+  const { start, end } = strokeAnchors(region, right);
+  if (!start) {
     return null;
   }
-  const { start, end } = anchors;
   const way = direction(region.direction, right);
   const length = lengths[region.length] || widths.band;
   const to = end
@@ -426,11 +420,10 @@ function eyeStrokes(region: Region, right: boolean): Stroke[] {
     region.end === 'none' || eyeAnchors.has(region.end) || region.end.endsWith('LidEdge');
   if (!endsOnEye) {
     // Toward a landmark off the lid, such as the temple, the line stops halfway there.
-    const anchors = strokeAnchors(from, right);
-    if (!anchors?.end) {
+    const { start, end } = strokeAnchors(from, right);
+    if (!start || !end) {
       return [];
     }
-    const { start, end } = anchors;
     const half = {
       x: start.point.x + (end.point.x - start.point.x) * templeShare,
       y: start.point.y + (end.point.y - start.point.y) * templeShare,
@@ -483,11 +476,10 @@ const noseCenter = new Set<Region['end']>(['glabella', 'noseRoot', 'noseBridge',
  * a little toward the subject's right, and mirrored, since shading never sits on the bridge.
  */
 function noseSideStrokes(region: Region): Stroke[] {
-  const anchors = strokeAnchors(region, true);
-  if (!anchors) {
+  const { start, end } = strokeAnchors(region, true);
+  if (!start) {
     return [];
   }
-  const { start, end } = anchors;
   const side = -eyeWidth * 0.3;
   const from = { x: start.point.x + side, y: start.point.y };
   const to = end ? { x: end.point.x + side, y: end.point.y } : { x: from.x, y: from.y + eyeWidth };
