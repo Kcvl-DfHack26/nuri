@@ -131,7 +131,7 @@ export function StepSegment({ step, position }: { step: PostStep; position: numb
     // A step that starts elsewhere now shows the frame at its new start.
     after.forEach((moved, index) => {
       if (moved.startMs !== before[index]?.startMs) {
-        cutFrame(index, moved.startMs);
+        cutFrame(index, moved);
       }
     });
   };

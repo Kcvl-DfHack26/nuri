@@ -1,4 +1,9 @@
-import { recipeInputSchema, recipeThumbnailMaxBytes } from '@starter/shared';
+import {
+  productKindImage,
+  recipeInputSchema,
+  recipeProductsMax,
+  recipeThumbnailMaxBytes,
+} from '@starter/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
@@ -19,6 +24,36 @@ import { recipeMinutes } from '@/lib/post-edit';
 import { postRecipe, recipeKeys } from '@/lib/recipes';
 
 const fieldsSchema = recipeInputSchema.omit({ thumbnail: true });
+
+/**
+ * The cosmetics ⑤ lists for the post when the user publishes them (#224): each once, in step order,
+ * with how it is used (the part, and the shade when there is one).
+ */
+function publishedProducts(draft: PostDraft): NonNullable<RecipeInput['products']> {
+  if (!draft.publishCosmetics) {
+    return [];
+  }
+  const seen = new Set<string>();
+  return draft.steps
+    .flatMap((step) =>
+      step.cosmetics.map((cosmetic) => ({
+        name: cosmetic.name.trim().slice(0, 80),
+        part: step.part,
+        usage: [parts[step.part].label, cosmetic.shade.trim()]
+          .filter(Boolean)
+          .join('・')
+          .slice(0, 40),
+      })),
+    )
+    .filter((item) => {
+      if (!item.name || seen.has(item.name)) {
+        return false;
+      }
+      seen.add(item.name);
+      return true;
+    })
+    .slice(0, recipeProductsMax);
+}
 
 /** The draft's texts and steps as the API takes them; the thumbnail is read only when posting. */
 function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
@@ -43,6 +78,8 @@ function postFields(draft: PostDraft): Omit<RecipeInput, 'thumbnail'> {
         ...(step.shape ? { shape: step.shape } : {}),
       };
     }),
+    // Sent only when published, so an unpublished post keeps no cosmetics on the server.
+    ...(draft.publishCosmetics ? { products: publishedProducts(draft) } : {}),
   };
 }
 
@@ -135,7 +172,14 @@ export function PostPreview() {
       image: session?.user.image ?? null,
     },
     favorited: false,
-    products: [],
+    // ⑫-8 shows the published cosmetics as ⑤ will, with their kind's photo and no shop.
+    products: publishedProducts(draft).map((item, position) => ({
+      id: `preview-${position}`,
+      name: item.name,
+      usage: item.usage,
+      image: productKindImage(item.part),
+      purchaseUrl: null,
+    })),
     steps: [],
   };
   const onPost = () => {

@@ -23,14 +23,15 @@ import {
 } from '@/lib/area-edit';
 import { canonicalVertexCount } from '@/lib/face-mesh';
 import { defaultShape } from '@/lib/region-shape';
+import { nearestSteps } from '@/lib/step-frames';
 import { cn } from '@/lib/utils';
 
 import FaceTracker from '../../modules/face-tracker/src/FaceTrackerModule';
 
-/** The step's frame and the face found in it, normalized to the frame. */
+/** The frame the area is laid on and the face found in it, normalized to the frame. */
 type FrameFace =
   | { status: 'unavailable' | 'noFrame' | 'loading' | 'noFace' }
-  | { status: 'ready'; points: readonly number[]; width: number; height: number };
+  | { status: 'ready'; image: string; points: readonly number[]; width: number; height: number };
 
 // The preview shows the area like a thumbnail, both sides of a paired part included; editing zooms
 // in on the points of one side. Parts painted over much of the face are zoomed in less.
@@ -40,40 +41,65 @@ const views = {
 } as const;
 const wideParts = new Set<PostStep['part']>(['base', 'shading', 'highlight', 'cheek']);
 
-/** Finds the face in the step's frame on the device; Expo Go has no face tracker. */
-function useFrameFace(image: string | null): FrameFace {
-  const [found, setFound] = useState<{ image: string; face: FrameFace } | null>(null);
+/**
+ * Finds a face on the device in the first of `images` that shows one (#224): the step's own frame,
+ * then the other steps' frames nearest in time. Expo Go has no face tracker.
+ */
+function useFrameFace(images: readonly string[]): FrameFace {
+  const key = images.join('\n');
+  const [found, setFound] = useState<{ key: string; face: FrameFace } | null>(null);
   useEffect(() => {
-    if (!FaceTracker || !image) {
+    const tracker = FaceTracker;
+    if (!tracker || !key) {
       return;
     }
-    let active = true;
-    FaceTracker.detectFaceAsync(image).then(
-      (face) => {
-        if (active) {
-          setFound({
-            image,
-            face: face ? { status: 'ready', ...face } : { status: 'noFace' },
-          });
+    const search = new AbortController();
+    const find = async () => {
+      for (const image of key.split('\n')) {
+        const face = await tracker.detectFaceAsync(image).catch(() => null);
+        if (search.signal.aborted) {
+          return;
         }
-      },
-      () => {
-        if (active) {
-          setFound({ image, face: { status: 'noFace' } });
+        if (face) {
+          setFound({ key, face: { status: 'ready', image, ...face } });
+          return;
         }
-      },
-    );
-    return () => {
-      active = false;
+      }
+      setFound({ key, face: { status: 'noFace' } });
     };
-  }, [image]);
+    void find();
+    return () => {
+      search.abort();
+    };
+  }, [key]);
   if (!FaceTracker) {
     return { status: 'unavailable' };
   }
-  if (!image) {
+  if (!key) {
     return { status: 'noFrame' };
   }
-  return found?.image === image ? found.face : { status: 'loading' };
+  return found?.key === key ? found.face : { status: 'loading' };
+}
+
+/**
+ * The frame ⑫-5 lays the step's area on (#224): the step's own, or the frame of the step starting
+ * nearest in time when the step's own shows no face. `borrowed` names that other step.
+ */
+function useAreaFrame(step: PostStep, position: number) {
+  const { draft } = usePostDraft();
+  const others = nearestSteps(
+    draft.steps.map((item) => item.segment.startMs),
+    position,
+  ).flatMap((index) => {
+    const image = draft.steps[index]?.image;
+    return image ? [{ index, image }] : [];
+  });
+  const face = useFrameFace([...(step.image ? [step.image] : []), ...others.map((o) => o.image)]);
+  const borrowed =
+    face.status === 'ready' && face.image !== step.image
+      ? others.find((other) => other.image === face.image)
+      : undefined;
+  return { face, borrowed };
 }
 
 const messages: Record<Exclude<FrameFace['status'], 'ready'>, string> = {
@@ -92,7 +118,7 @@ const messages: Record<Exclude<FrameFace['status'], 'ready'>, string> = {
  */
 export function AreaEditor({ step, position }: { step: PostStep; position: number }) {
   const { updateStep } = usePostDraft();
-  const face = useFrameFace(step.image);
+  const { face, borrowed } = useAreaFrame(step, position);
   const shape = step.shape;
   const texture = useShapeTexture(shape);
   const [box, setBox] = useState(0);
@@ -104,14 +130,9 @@ export function AreaEditor({ step, position }: { step: PostStep; position: numbe
   const color = stepColor(step);
 
   const header = (
-    <View className="gap-0.5">
-      <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
-        塗る範囲
-      </Text>
-      <Text className="font-maru text-meta text-ink-secondary">
-        見る人の顔に合わせて重ねて表示されます
-      </Text>
-    </View>
+    <Text accessibilityRole="header" className="font-maru-bold text-label text-ink-primary">
+      塗る範囲
+    </Text>
   );
   if (!shape) {
     // A step the analysis found no area for, or one the user added, starts from a plain area.
@@ -135,12 +156,12 @@ export function AreaEditor({ step, position }: { step: PostStep; position: numbe
       </View>
     );
   }
-  if (face.status !== 'ready' || !step.image) {
+  if (face.status !== 'ready') {
     return (
       <View className="gap-2">
         {header}
         <Text accessibilityLiveRegion="polite" className="font-maru text-meta text-ink-secondary">
-          {messages[face.status === 'ready' ? 'noFrame' : face.status]}
+          {messages[face.status]}
         </Text>
       </View>
     );
@@ -184,6 +205,11 @@ export function AreaEditor({ step, position }: { step: PostStep; position: numbe
   return (
     <View className="gap-2">
       {header}
+      {borrowed ? (
+        <Text accessibilityLiveRegion="polite" className="font-maru text-meta text-ink-secondary">
+          {`この手順の場面に顔が写っていないため、手順${borrowed.index + 1}の場面で表示しています`}
+        </Text>
+      ) : null}
       <View
         onLayout={(event: LayoutChangeEvent) => {
           setBox(event.nativeEvent.layout.width);
@@ -195,7 +221,7 @@ export function AreaEditor({ step, position }: { step: PostStep; position: numbe
           <>
             <Image
               accessible={false}
-              source={{ uri: step.image }}
+              source={{ uri: face.image }}
               contentFit="fill"
               style={{
                 position: 'absolute',

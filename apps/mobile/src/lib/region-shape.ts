@@ -2,6 +2,7 @@ import type { MakeupShape, makeupParts, PostAnalysis } from '@starter/shared';
 
 import type { Point } from './face-landmarks';
 
+import { cheekShape, plainCheek } from './cheek-shape';
 import { canonicalFaceMesh } from './face-mesh';
 
 type Region = PostAnalysis['steps'][number]['regions'][number];
@@ -584,9 +585,8 @@ const partRegions: Record<PartId, Region[] | null> = {
       detail: '上まぶたのきわ',
     }),
   ],
-  cheek: [
-    region({ start: 'cheekCenter', shape: 'ellipse', length: 'medium', direction: 'upOutward' }),
-  ],
+  // Blush is drawn by type (#224), not from landmarks.
+  cheek: null,
   shading: [region({ start: 'browHead', end: 'noseWing', shape: 'line' })],
   highlight: [region({ side: 'center', start: 'noseRoot', end: 'noseTip', shape: 'line' })],
   lip: [region({ side: 'center', start: 'lips', shape: 'area' })],
@@ -594,6 +594,9 @@ const partRegions: Record<PartId, Region[] | null> = {
 
 /** A plain area for the part that the user then shapes on ⑫-5; null for the base. */
 export function defaultShape(part: PartId): MakeupShape | null {
+  if (part === 'cheek') {
+    return cheekShape(plainCheek);
+  }
   const regions = partRegions[part];
   return regions ? regionShape(regions, part) : null;
 }

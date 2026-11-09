@@ -91,7 +91,9 @@ test('moves through the API steps with next, previous and the step list', async 
   await render(<ArSteps id="fox" />, { wrapper: TestQueryProvider });
   expect(await screen.findByText('眉尻を濃く、眉頭は淡く')).toBeOnTheScreen();
   expect(screen.getByText('1/3')).toBeOnTheScreen();
-  expect(screen.getByText('おすすめ色 #79513A')).toBeOnTheScreen();
+  expect(screen.getByText('おすすめ色 ブラウン')).toBeOnTheScreen();
+  // Plan A's 再生 chip is gone: model videos are not built (#224).
+  expect(screen.queryByLabelText('お手本を再生（準備中）')).toBeNull();
   expect(screen.getByRole('button', { name: '前の手順' })).toBeDisabled();
 
   await fireEvent.press(screen.getByRole('button', { name: '次へ' }));

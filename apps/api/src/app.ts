@@ -49,6 +49,11 @@ export function createApp(
         '/sample-recipes/*',
         serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
       )
+      // ⑤'s photo for a posted cosmetic, one per kind (#224).
+      .get(
+        '/product-kinds/*',
+        serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
+      )
       // A posted recipe carries its thumbnail; every other API body stays small.
       .use('/api/*', (c, next) => {
         if (c.req.method === 'POST' && c.req.path === '/api/recipes') {

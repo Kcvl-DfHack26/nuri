@@ -40,6 +40,25 @@ export const makeupParts = [
   'highlight',
   'lip',
 ] as const;
+
+/**
+ * The photo ⑤ shows beside a posted cosmetic (#224): one generic photo per kind of cosmetic, served
+ * by the API, since the poster's product has no photo of its own. Base has none.
+ */
+export function productKindImage(part: (typeof makeupParts)[number]): string | null {
+  const kinds = {
+    base: null,
+    brow: 'brow',
+    eye: 'eye',
+    lash: 'lash',
+    cheek: 'cheek',
+    shading: 'highlight-shading',
+    highlight: 'highlight-shading',
+    lip: 'lip',
+  } as const;
+  const kind = kinds[part];
+  return kind ? `/product-kinds/${kind}.jpg` : null;
+}
 /**
  * Where a makeup step paints, drawn on device into MediaPipe's canonical face texture (UV, 0–1 across
  * the texture, y downward). Each point is a face landmark's UV moved by dx, dy, so the area follows
@@ -100,6 +119,8 @@ export const postedRecipeIdPrefix = 'p-';
 export const recipeStepsMax = 20;
 /** Most tags a posted recipe may have; ⑫-7 stops adding tags at this. */
 export const recipeTagsMax = 10;
+/** Most cosmetics a posted recipe may publish on ⑤ (#224). */
+export const recipeProductsMax = 30;
 /** Largest thumbnail a posted recipe may carry, in decoded bytes. */
 export const recipeThumbnailMaxBytes = 1_500_000;
 /** Base64 of a JPEG starts with its FF D8 FF marker, which encodes to `/9j/`. */
@@ -134,6 +155,22 @@ export const recipeInputSchema = z.object({
   tags: z.array(z.string().trim().min(1).max(30)).max(recipeTagsMax),
   durationMinutes: z.number().int().min(1).max(600),
   steps: z.array(recipeStepInputSchema).min(1).max(recipeStepsMax),
+  /**
+   * The cosmetics ⑤ lists as 使うメイク品, sent only when the user chose to publish them (#224).
+   * Optional, so posts from app builds without it are still accepted.
+   */
+  products: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(80),
+        /** The step's part, which picks the cosmetic's photo. */
+        part: z.enum(makeupParts),
+        /** How the recipe uses it, e.g. 眉・モカブラウン. */
+        usage: z.string().trim().min(1).max(40),
+      }),
+    )
+    .max(recipeProductsMax)
+    .optional(),
   thumbnail: z
     .base64()
     .max(Math.ceil(recipeThumbnailMaxBytes / 3) * 4)
@@ -198,6 +235,17 @@ const postRegionSchema = z.object({
   clip: z.enum([...postRegionAreas, 'none']),
 });
 
+/**
+ * How blush is put on, chosen from fixed types instead of landmarks (#224): blush is a soft area,
+ * and landmarks and an ellipse around one of them drew it small, hard-edged or on the eyelids.
+ */
+export const cheekStyles = ['round', 'high', 'diagonal', 'low', 'underEye', 'triangle'] as const;
+export const cheekSchema = z.object({
+  style: z.enum(cheekStyles),
+  size: z.enum(['small', 'medium', 'large']),
+});
+export type Cheek = z.infer<typeof cheekSchema>;
+
 /** What the API answers for a video posted from ⑫-3: the draft of the steps and the cosmetics. */
 export const postAnalysisSchema = z.object({
   title: z.string().trim().max(40),
@@ -216,6 +264,11 @@ export const postAnalysisSchema = z.object({
          */
         color: hexColor.nullable(),
         regions: z.array(postRegionSchema).max(8),
+        /**
+         * The blush type of a cheek step, null for other parts (#224). Optional, so answers from
+         * an API without it are still read.
+         */
+        cheek: cheekSchema.nullable().optional(),
         /** Indexes into `cosmetics`. */
         cosmetics: z.array(z.int().min(0)).max(10),
       }),

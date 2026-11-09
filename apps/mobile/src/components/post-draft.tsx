@@ -10,8 +10,10 @@ import type { PartId } from '@/components/recipes';
 import { partColors, parts } from '@/components/recipes';
 import { deleteFile } from '@/lib/files';
 import { formatClock } from '@/lib/post-edit';
+import { frameTimes } from '@/lib/step-frames';
 
 import detailProductBrowPencil from '../../assets/plan-a/detail/product-brow-pencil.jpg';
+import FaceTracker from '../../modules/face-tracker/src/FaceTrackerModule';
 
 // Plan A ⑫ 投稿: the post being prepared lives only on the device until ⑫-8 sends it. The video
 // leaves the device only when the user agrees on ⑫-3 to have it read by Gemini (#151), and the API
@@ -35,7 +37,10 @@ export type PostStep = {
   cosmetics: Cosmetic[];
   /** Where the step is in the video, in ms; `endMs` is null when the video's length is unknown. */
   segment: { startMs: number; endMs: number | null };
-  /** Frame cut from the video at the step's start; null when it could not be cut. */
+  /**
+   * Frame cut from the step's segment: its start, or its middle or end when only there a face was
+   * found (#224); null when it could not be cut.
+   */
   image: string | null;
   /** The painted area read from the video (#156); null when none was read or the part changed. */
   shape: MakeupShape | null;
@@ -228,34 +233,59 @@ export function usePostDraft() {
 }
 
 /**
- * Cuts the frame at a step's new start, after ⑫-4 added the step or ⑫-5 moved it. The frame is kept
- * only while the step still starts there; a frame that cannot be cut leaves the part's icon.
+ * The frame for a step's segment (#224): the first of its start, middle and end where a face is
+ * found, so ⑫-5 can lay the area on it; otherwise the first frame that could be cut. Without the
+ * face tracker (Expo Go) it is the start. Null when no frame could be cut.
+ */
+export async function cutStepFrame(
+  videoUri: string,
+  segment: PostStep['segment'],
+  quality: number,
+  trackFile: (uri: string) => void,
+): Promise<string | null> {
+  let first: string | null = null;
+  for (const time of frameTimes(segment)) {
+    const image = await getThumbnailAsync(videoUri, { time, quality }).then(
+      ({ uri }) => {
+        trackFile(uri);
+        return uri;
+      },
+      () => null,
+    );
+    if (image) {
+      first ??= image;
+      if (!FaceTracker) {
+        return image;
+      }
+      const face = await FaceTracker.detectFaceAsync(image).catch(() => null);
+      if (face) {
+        return image;
+      }
+    }
+  }
+  return first;
+}
+
+/**
+ * Cuts the frame for a step's new segment, after ⑫-4 added the step or ⑫-5 moved it. The frame is
+ * kept only while the step still starts there; a frame that cannot be cut leaves the part's icon.
  */
 export function useCutStepFrame() {
   const { draft, setDraft, trackFile } = usePostDraft();
   const videoUri = draft.video?.uri ?? null;
   return useCallback(
-    (index: number, startMs: number) => {
+    (index: number, segment: PostStep['segment']) => {
       if (!videoUri) {
         return;
       }
-      const update = (image: string | null) => {
+      void cutStepFrame(videoUri, segment, 0.7, trackFile).then((image) => {
         setDraft((current) => ({
           ...current,
           steps: current.steps.map((step, at) =>
-            at === index && step.segment.startMs === startMs ? { ...step, image } : step,
+            at === index && step.segment.startMs === segment.startMs ? { ...step, image } : step,
           ),
         }));
-      };
-      getThumbnailAsync(videoUri, { time: startMs, quality: 0.7 }).then(
-        ({ uri }) => {
-          trackFile(uri);
-          update(uri);
-        },
-        () => {
-          update(null);
-        },
-      );
+      });
     },
     [videoUri, setDraft, trackFile],
   );
