@@ -104,8 +104,8 @@ export function FaceMakeupCamera({
   const [status, setStatus] = useState<FaceTrackerStatusEvent>();
   const [view, setView] = useState<Size>({ width: 0, height: 0 });
   const [points, setPoints] = useState<Point[]>([]);
-  // A stable ref, created once: measuring must not allocate on every landmark render.
-  const [metrics] = useState(() => ({ current: startArMetricsWindow(performance.now()) }));
+  // Created once and changed in place, so measuring never re-renders the camera.
+  const [metrics] = useState(() => startArMetricsWindow(performance.now()));
   const active = permission === 'granted' && focused && appActive;
   // Nothing to place on the face (⑩, or ⑦ with the guide hidden): stop the inference.
   const tracksFace = layers.length > 0 || annotation !== undefined;
@@ -113,7 +113,7 @@ export function FaceMakeupCamera({
   // Passive effects run after the commit, so this marks when the latest landmarks were rendered.
   useEffect(() => {
     if (arMetricsEnabled) {
-      recordArRender(metrics.current, performance.now());
+      recordArRender(metrics, performance.now());
     }
   }, [metrics, points]);
 
@@ -230,7 +230,7 @@ export function FaceMakeupCamera({
           }
           const frame = event.nativeEvent;
           if (arMetricsEnabled) {
-            recordArResult(metrics.current, {
+            recordArResult(metrics, {
               latencyMs: frame.latencyMs,
               nowMs: performance.now(),
             });

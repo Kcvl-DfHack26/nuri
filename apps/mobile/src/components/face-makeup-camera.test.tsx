@@ -53,6 +53,8 @@ jest.mock('@/components/shape-texture', () => ({
 jest.mock('expo-router', () => ({ useIsFocused: () => true }));
 
 const brow: MakeupLayer = { part: 'brow', color: '#79513A' };
+// A brow line through landmarks 70, 63 and 105, valid under makeupShapeSchema.
+const browStroke = { strokes: [{ points: [{ at: 70 }, { at: 63 }, { at: 105 }], width: 0.02 }] };
 const viewSize = { width: 360, height: 640 };
 // MediaPipe's 478 landmarks, all at the middle of the frame.
 const landmarks: FaceLandmarksEvent = {
@@ -145,7 +147,7 @@ test('loads only the standard textures of the painted parts', async () => {
   const shaped: MakeupLayer = {
     part: 'cheek',
     color: '#B8754F',
-    shape: { strokes: [] },
+    shape: browStroke,
   };
   await renderCamera({ layers: [brow, { part: 'lip', color: '#C0392B' }, shaped] });
 
@@ -157,7 +159,7 @@ test('keeps the step shape texture when the face is lost and found again', async
   const shaped: MakeupLayer = {
     part: 'brow',
     color: '#79513A',
-    shape: { strokes: [] },
+    shape: browStroke,
   };
   await renderCamera({ layers: [shaped] });
   await sendLandmarks();
