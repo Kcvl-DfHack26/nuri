@@ -48,7 +48,8 @@ function Navigation() {
           options={{
             headerShown: false,
             presentation: 'formSheet',
-            sheetAllowedDetents: [0.65, 1],
+            // SnsImport sets its own height and the sheet follows it, as ⑥ does.
+            sheetAllowedDetents: 'fitToContents',
             sheetGrabberVisible: true,
             sheetCornerRadius: 28,
           }}
