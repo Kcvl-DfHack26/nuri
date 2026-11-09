@@ -8,7 +8,7 @@
 flowchart LR
   Phone[Expo SDK 58 / Expo UI] -->|Hono RPC / HTTPS|API[Cloud Run / Node.js / Hono]
   Phone -->|SecureStore|Session[Better Auth session]
-  Phone -->|SQLite KV|Local[外観・触覚設定]
+  Phone --> Local[端末内の顔追跡・AR表示・写真診断]
   API --> Auth[Better Auth]
   Auth --> Drizzle[Drizzle ORM]
   Drizzle --> DB[(Cloud SQL / PostgreSQL)]
@@ -22,7 +22,7 @@ flowchart LR
 - Expo Routerは画面ルーティング専用。Honoを別サーバーとしてCloud Runで動かす。
 - `@starter/api/contract` は `AppType` のtype-only公開入口。モバイルはHono RPCの型を再利用し、API実装をbundleへ混入させない。
 - Zodは入力検証と共有モデル、DrizzleはPostgreSQLスキーマとmigrationを所有する。Drizzle ORM / Kitは `1.0.0-rc.5` に固定する。
-- Better Auth 1.7.17 + Expo pluginでGoogle OAuth・email magic link・passkey。セッションはSecureStore。ローカルはVercel Emulateを使い、Google Cloudや実プロバイダのキーなしで認証する。
+- Better AuthとExpoプラグインでGoogleとパスキーのログインを扱う。セッションはSecureStoreに保存する。メールの一般提供とローカルのVercel Emulateについては[認証の設定](auth.md)を参照する。
 
 Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v1)に従って採用する。DB接続は `drizzle({ client: pool })` を使い、認証のschemaはBetter Authのadapterへ渡す。Kitで廃止された `strict` 設定は削除した。既存migrationは `drizzle-kit up` でSQLとsnapshotを同じディレクトリへ移し、snapshotをversion 9へ変換した。SQLの内容・ハッシュと適用順序は保持し、テーブルの作り直しは行わない。
 
@@ -109,7 +109,7 @@ PoC-1・PoC-2（#24）の⑦⑩への引き継ぎには、このExpo ModuleとSk
 
 独自UIはCSSのneutralテーマ、標準UIはOSセマンティックカラー。実装planに合わせて端末とWebの外観をライトに固定する。Portal・Reanimated等は追加しない。[UI開発手順](ui.md)を参照。
 
-プロフィール・認証の設定は⑰-2にまとめる。投稿といいねはPostgreSQLに保存し、ログインユーザーに紐付く。以前の習慣・お気に入り・完了・目標はSNSサンプルから除いた。API未設定時は接続案内を表示する。
+⑰-2の「アカウント」でGoogle連携を確認し、パスキーの一覧・追加・削除を操作する。公開レシピやお気に入りはPostgreSQLでログインユーザーに紐付ける。旧文章投稿とそのいいねは #214・#217 で削除した。API未設定時は接続案内を表示する。
 
 ## APIと認証の境界
 

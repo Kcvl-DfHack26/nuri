@@ -146,6 +146,14 @@ sh scripts/worktree-init.sh
 
 ### SimulatorとEmulatorで開発する
 
+ネイティブUIを確認するときは、Portlessで作業中のworktreeのAPIとMetroを公開し、ホストのExpo Device Hubで端末を開いて操作する。撮影時は対象の端末と操作結果が分かる状態を選ぶ。[PRへの記録方法](testing.md#prに残す検証結果)も参照する。
+
+| 確認したいこと                                           | クライアント                                                                                    |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Expo Goに含まれるUI・画面遷移・API連携                   | SDK 58対応のExpo Go。仮想端末から作業中のMetroへ接続する。                                      |
+| 顔追跡・写真診断・ネイティブのパスキー・プッシュ通知など | 対象のネイティブモジュール・設定を含む互換開発ビルド。依存や設定が変わったら作り直す。          |
+| 実機の署名・権限・配送                                   | 対象端末と、必要な署名・外部サービスを設定したビルド。[プッシュ通知](#プッシュ通知)を参照する。 |
+
 iOS Simulator用は `development-simulator`、Android Emulator用は `development` で開発ビルドを作る。クラウドビルドは手動で起動する。ローカルではSDKを準備し、`apps/mobile` で `bunx expo run:ios --no-bundler --device` または `bunx expo run:android --no-bundler --device SERIAL` を使える。previewはMetro接続用の開発ビルドと区別する。
 
 worktreeルートから実行する。
@@ -162,7 +170,7 @@ bun run devices
 - **Android Emulator:** `adb devices -l` で対象serialを確認し、`adb -s SERIAL push "${PORTLESS_STATE_DIR:-$HOME/.portless}/ca.pem" /sdcard/Download/portless-ca.crt` で公開CAを送る。Emulatorのセキュリティ設定からCA証明書として登録する。ユーザーCAを信頼するのはnuriのdebugビルドのlocalhostのみ。この設定を使うには開発ビルドを作り直す。
 - **Androidの名前解決:** AOSPまたはGoogle APIsの開発用AVDを `emulator -avd AVD_NAME -writable-system -no-snapshot` で起動する。対象serialだけで `adb -s SERIAL root` と `adb -s SERIAL remount` を行い、`adb -s SERIAL pull /system/etc/hosts .env.devices.android-hosts` で既存hostsを取得する。remountがverity解除と再起動を求める場合は、そのAVDに限り `adb -s SERIAL disable-verity` と `adb -s SERIAL reboot` の後でroot／remountをやり直す。既存行を残して `.env.devices.hosts` の自project分をマージし、`adb -s SERIAL push .env.devices.android-hosts /system/etc/hosts` で戻す。最後に `adb -s SERIAL reverse tcp:443 tcp:443` を実行する（標準以外はhelperが表示したポートを使う）。AVDを終了したらhosts、端末を再起動したら転送を再確認する。
 
-HubはXcode／Android SDKがあるOSで起動する。WindowsではComposeはWSL2、HubとADBはWindows側で使う。Dev ClientのEnter URLにはhelperが表示するMetroのHTTPS URLを入れる。MetroがFast Refreshを担当し、Hubは画面表示と操作を担当する。CAの秘密鍵は端末へコピーしない。
+HubはXcode／Android SDKがあるOSで起動する。WindowsではComposeはWSL2、HubとADBはWindows側で使う。Hubで対象端末を開き、選んだクライアントに `dev:devices` が表示したMetroのURLを渡す。開発ビルドでは「Enter URL」を使う。MetroがFast Refreshを担当し、Hubは画面表示と操作を担当する。CAの秘密鍵は端末へコピーしない。
 
 終了時はHubをCtrl+C、サービスは `bun run services:down` で自worktreeだけを止める。ADBの転送を共有する他のworktreeがないときだけ、対象serialの `adb -s SERIAL reverse --remove tcp:443` で転送を外す。通常構成に戻すには `bun run dev` を使う。端末用overrideは明示した起動時だけ読み込まれる。
 
@@ -179,7 +187,7 @@ PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose \
 
 標準構成のMetroは `--lan`、`apps/mobile` には `tunnel` / `go` コマンドも残す。コンテナのLANアドレスは実機から直接到達できないため、実機はトンネル構成を使う。ホストブラウザではPortlessのMetro URLを開く。端末に `.localhost` を設定しない。
 
-Composeでは空の `EXPO_PUBLIC_API_URL` を `app.config.ts` が開発API originで補う。Compose外でAPI未設定の場合、ホームには接続案内を表示する。レシピ・投稿・お気に入り・フォローにはAPIが必要で、外観・触覚だけが端末内設定。
+Composeでは空の `EXPO_PUBLIC_API_URL` を `app.config.ts` が開発API originで補う。Compose外でAPI未設定の場合、ホームには接続案内を表示する。レシピ・投稿・お気に入り・フォローにはAPIが必要。
 
 ### ローカルAPIも実機から使う
 
@@ -332,7 +340,13 @@ Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア
 - Expoの nuri プロジェクトにAPNsキーとFCM v1送信用の認証情報を登録する。AndroidのFirebaseアプリのパッケージ名は `com.kcvl.nuri`。EAS Environmentの `GOOGLE_SERVICES_JSON` をファイル型・Sensitiveで設定し、ビルドとEAS Updateの同じ環境で同一の `google-services.json` を使う。ローカルビルドでは同じ変数にファイルへの絶対パスを指定する。FCMのサービスアカウントキーはEASのCredentialsに登録し、アプリに含めない。[Expoの設定手順](https://docs.expo.dev/push-notifications/push-notifications-setup/)
 - 署名付きiOSビルドでは、EAS Environmentとローカルのビルド環境にApple Developerの `APPLE_TEAM_ID` を設定し、親アプリと `com.kcvl.nuri.notification-service` の署名を用意する。通知画像の取得を担当する拡張は、`@bacons/apple-targets` がiOSのprebuild時に組み込む。このプラグインはExpo CLIの設定読込時にも `@expo/plist` を使うため、production依存だけのPRプレビューでも解決できるようアプリの `dependencies` に明示する。Simulatorでは署名用のTeam IDを省略できる。
 - Expo Push Serviceの拡張セキュリティを有効にし、APIにだけ `EXPO_PUSH_ACCESS_TOKEN` を設定する。ローカルでは `apps/api/.env`、Cloud Runでは `<name>-expo-push-access-token` のSecret Managerにバージョンを追加し、`push_notifications_enabled = true` で参照する。アプリ環境変数やGitにトークンを置かない。[Expoの送信認証](https://docs.expo.dev/push-notifications/sending-notifications/#additional-security)
-- DB migrationを適用してAPIを起動し、通知プラグインを含むiOS・Androidの新しい開発ビルドを使う。ログイン後に「マイ → プロフィール設定 → 公開と通知 → プッシュ通知」を開き、「通知を有効にする」でOSの許可を与える。別アカウントでテスト投稿にいいねし、受信とタップ、再送・自己いいね・ログアウト後に新規送信されないことを確認する。通知の許可は端末の設定で変更できる。Androidでは「いいね」と「動画レシピの作成」を別々に管理できる。
+- DB migrationを適用してAPIを起動し、通知プラグインを含むiOS・Androidの新しい開発ビルドを使う。ログイン後に「マイ → プロフィール設定 → 公開と通知 → プッシュ通知」を開き、「通知を有効にする」でOSの許可を与える。別アカウントで公開テストレシピにいいねし、受信とタップ、再送・自己いいね・ログアウト後に新規送信されないことを確認する。通知の許可は端末の設定で変更できる。Androidでは「いいね」と「動画レシピの作成」を別々に管理できる。
+
+通知の検証は次のように分ける。
+
+- 仮想端末にテスト通知を注入した場合は、文面・表示・タップ後の遷移など、操作して確かめた範囲を記録する。
+- 実配送は、対象の開発ビルドで受信登録し、アプリの操作からExpo Push ServiceとAPNs／FCMを経由して届くことを確かめる。iOSの画像付き通知には、画像取得を担当する通知サービス拡張を含むビルド、APNsの認証情報、到達可能な画像が必要。iOS Simulatorで `simctl push` を使った表示確認は、拡張による画像取得の確認に含めない。[AppleのSimulatorに関する説明](https://developer.apple.com/documentation/xcode-release-notes/xcode-14-release-notes#Simulator)
+- 容量、署名、認証情報などの不足で指定された検証が止まったら、確認済みの範囲と再開条件を共有する。
 
 ## 4. Google CloudとOpenTofu
 
@@ -458,6 +472,6 @@ bun run doctor
 bun run export:mobile
 ```
 
-Codexはrootの `AGENTS.md` と `.agents/skills` を使う。Expo MCPは `.codex/config.toml` に設定済み。このホストでは `codex mcp login expo` のOAuthも完了済み。MCPのOAuth、Expo CLIのログイン、GitHubの接続はそれぞれ認証する。別のホストやDev Containerでは各自ログインし、認証データはリポジトリへコピーしない。
+Codexはrootの `AGENTS.md` と `.agents/skills` を使う。Expo MCPは `.codex/config.toml` に設定済み。MCPのOAuth、Expo CLIのログイン、GitHubの接続はそれぞれ認証する。ホストやDev Containerでは各自ログインし、認証データはリポジトリへコピーしない。
 
 詳細な実機手順とMaestroの有料プラン条件は [testing.md](testing.md)。インフラだけの `fmt` / `init -backend=false` / `validate` / TFLintはGCP認証なしで実行できる。

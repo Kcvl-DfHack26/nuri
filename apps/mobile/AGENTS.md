@@ -1,10 +1,8 @@
-# Mobile
+# モバイルの作業指示
 
-Follow the root AGENTS.md. Expo SDK 58 and React Native 0.88 are pinned in the lockfile.
-
-- iOS UX is the priority; **every feature must work on Android**. Use universal Expo UI and Native Tabs/Stack with SF Symbols and Material icons.
-- Fetch SDK 58 docs and inspect installed types before using Expo APIs. `src/app` is routes-only.
-- Use `bunx expo install` for native dependencies. Do not hand-edit generated `ios/` or `android/` folders.
-- `bun run typecheck`, `bun run test`, `bun run doctor`, `bun run export` run here. Root `bun run lint` owns lint configuration.
-- Prefer Expo Go for the first smoke test. EAS development builds are required for PR OTA previews and custom native configurations.
-- Never put a secret in `EXPO_PUBLIC_*`. See ../../docs/setup.md for device networking and EAS setup.
+- [リポジトリ全体の作業指示](../../AGENTS.md)に従う。Expo SDK 58とReact Native 0.88はロックファイルで管理する。
+- 対象のFigmaノードと既存ルートを確認し、[UIの規約](../../docs/ui.md)に沿ってiOS・Androidで実装する。設定などの標準操作には共通 `@expo/ui` を優先し、iOS固有の実装にはAndroidで動く代替を用意する。
+- ExpoのAPIを使う前にSDK 58の公式文書と導入済みの型を確認する。ネイティブ依存はこのディレクトリで `bunx expo install` を使い、生成された `ios/` と `android/` を手で編集しない。
+- `bun run typecheck`、`bun run test`、`bun run doctor`、`bun run export` はこのディレクトリで実行できる。lintはルートの `bun run lint` を使う。
+- 端末の接続・撮影には[PortlessとExpo Device Hubの手順](../../docs/setup.md#simulatorとemulatorで開発する)を使う。対象機能に合わせてExpo Goか互換開発ビルドを選ぶ。
+- `EXPO_PUBLIC_*` に秘密情報を入れない。

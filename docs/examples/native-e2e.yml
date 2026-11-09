@@ -1,4 +1,4 @@
-name: Native smoke tests
+name: ネイティブの基本動作確認
 on:
   workflow_dispatch: {}
 jobs:

@@ -2,9 +2,9 @@
 
 設定フォーム、Picker、Switch、Slider、Menu、BottomSheetは共通 `@expo/ui` を優先する。Native Tabs・Stack・戻る操作はExpo Routerが担当する。独自の配色や見た目が必要な部分は、React Native ReusablesのローカルコンポーネントとUniwindで実装する。
 
-操作のタップ領域は48pt/dp以上にする。未実装の操作を操作可能なボタンとして置かない。
+操作のタップ領域は48pt/dp以上にする。見出しは用途が伝わる日本語にし、句読点を付けない。有効な操作は表示どおりに動作させる。読み込み中・エラー・空の状態にもセーフエリアとキーボードの余白を保つ。iOS固有の実装はプラットフォーム別のファイルに置き、Androidで使うアイコンと操作を用意する。
 
-Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、Androidは実装planの `TabBar/Glass` を `expo-router/ui` で描く（[architecture](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigmaの実装planのFoundationsに従い、アプリ全体はライト配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
+Stack・戻る操作・共有シートはOS標準。下のタブはiOSがNative Tabs、Androidは実装planの `TabBar/Glass` を `expo-router/ui` で描く（[アーキテクチャ](architecture.md)）。設定はネイティブのForm／Picker／Switchを使う。商品詳細（⑥）は画面の50%の高さで固定し、文字を大きくしたときだけ最大90%まで高くする。見出しと購入ボタンを固定し、間の色・成分だけをスクロールする。iOSのreact-native-screensはシート内で見つけたScrollViewをシート全体の大きさに広げるため、ScrollViewは `collapsable={false}` のViewで包む。画面背景はOSセマンティックカラー、独自コンテンツはneutralテーマ。ただしメイクの流れ（①②③⑤⑥⑦⑩⑪）とマイページ（⑰⑰-2）はFigmaの実装planのFoundationsに従い、アプリ全体はライト配色と暗いステータスバーで表示する。アプリ独自のグリーンは使わない。
 
 Googleは公式の多色ロゴ付き白ボタンを使う。ログイン（⑱）は実装planに合わせてライト配色で表示し、Googleとパスキーを提供し、メールは送信ドメインとログイン完了を確認してから再開する（#177）。出典は `apps/mobile/assets/auth/README.md` にある。
 
@@ -46,12 +46,12 @@ export function CustomSection() {
   const [enabled, setEnabled] = useState(false);
   return (
     <View className="gap-4 rounded-lg bg-background p-4">
-      <Text variant="h3">Custom controls</Text>
+      <Text variant="h3">表示の設定</Text>
       <Button onPress={() => setEnabled((current) => !current)}>
-        <Text>{enabled ? 'Turn off' : 'Turn on'}</Text>
+        <Text>{enabled ? 'オフにする' : 'オンにする'}</Text>
       </Button>
       <NativeHost matchContents={{ vertical: true }}>
-        <Switch label="Native control" value={enabled} onValueChange={setEnabled} />
+        <Switch label="表示を有効にする" value={enabled} onValueChange={setEnabled} />
       </NativeHost>
     </View>
   );
@@ -93,7 +93,7 @@ bun run export:mobile
 
 お気に入りは `useFavorite` で対象レシピを楽観更新し、一覧・詳細・お気に入り一覧のTanStack Queryキャッシュに反映する。失敗時は変更したキャッシュだけを復元し、別レシピの並行操作を巻き戻さない。処理後は対象の詳細を、最後の操作が終わった時点でお気に入り一覧とユーザー情報を再取得する。プロフィール保存後は `recipeKeys.all` を無効化し、レシピの作者名も再取得する。FlatListの `refreshing` はpull-to-refresh専用状態とし、背景の再取得では立てない。
 
-JestはButtonの操作・disabled、Textのアクセシビリティ、プロフィール設定内のパスキー操作を検証する。MetroによるclassName変換とネイティブ描画はJestだけでは検証できないため、iOS／AndroidのExpo Goでライト配色、大きな文字、標準UIとの併用を確認する。bundle成功を端末確認の代わりにはしない。
+JestはButtonの操作・disabled、Textのアクセシビリティ、プロフィール設定内のパスキー操作を検証する。MetroによるclassName変換とネイティブ描画はJestだけでは検証できないため、iOS／Androidの[対象機能に合うクライアント](setup.md#simulatorとemulatorで開発する)でライト配色、大きな文字、標準UIとの併用を確認する。バンドルと端末操作の結果は[分けて記録する](testing.md#prに残す検証結果)。
 
 ## 参照
 
