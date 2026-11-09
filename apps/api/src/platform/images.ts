@@ -2,7 +2,7 @@ import { ApiError, Storage } from '@google-cloud/storage';
 import { Hono } from 'hono';
 import { secureHeaders } from 'hono/secure-headers';
 
-import type { Environment } from '../platform/env';
+import type { Environment } from './env';
 
 export function createImageStore(env: Pick<Environment, 'GCS_BUCKET' | 'STORAGE_EMULATOR_HOST'>) {
   if (!env.GCS_BUCKET) {

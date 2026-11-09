@@ -1,6 +1,6 @@
 import { ApiError } from '@google-cloud/storage';
 
-import { createImageStore } from '../apps/api/src/modules/images';
+import { createImageStore } from '../apps/api/src/platform/images';
 
 const { GCS_BUCKET, STORAGE_EMULATOR_HOST } = process.env;
 if (!STORAGE_EMULATOR_HOST) {

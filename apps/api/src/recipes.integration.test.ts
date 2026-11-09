@@ -7,8 +7,8 @@ import { createApp } from './app';
 import { connectDatabase } from './db/client';
 import { product, recipe, recipeProduct, recipeStep, user } from './db/schema';
 import { createAuth } from './modules/auth';
-import { createImageStore } from './modules/images';
 import { readEnv } from './platform/env';
+import { createImageStore } from './platform/images';
 import { seedSampleData } from './sample-data';
 
 const { DATABASE_URL: databaseUrl, GCS_BUCKET, STORAGE_EMULATOR_HOST } = process.env;

@@ -1,6 +1,6 @@
 import { connectDatabase } from './db/client';
-import { createImageStore } from './modules/images';
 import { readEnv } from './platform/env';
+import { createImageStore } from './platform/images';
 import { seedSampleData } from './sample-data';
 
 const env = readEnv();

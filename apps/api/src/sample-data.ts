@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { readFile } from 'node:fs/promises';
 
 import type { Database } from './db/client';
-import type { ImageStore } from './modules/images';
+import type { ImageStore } from './platform/images';
 
 import {
   browShapes,
@@ -20,7 +20,7 @@ import {
   koreanLipShape,
 } from './db/sample-shapes';
 import { product, recipe, recipeProduct, recipeStep, user } from './db/schema';
-import { imagePath, saveImage } from './modules/images';
+import { imagePath, saveImage } from './platform/images';
 
 // Development sample data. Every row has a stable ID and is upserted, so running the seed again
 // neither duplicates rows nor removes or rewrites data created through the app.

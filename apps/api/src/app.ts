@@ -10,12 +10,12 @@ import type { PostAnalyzer } from './modules/post-analysis';
 import type { Environment } from './platform/env';
 
 import { authCapabilities, authRoutes, requireSession } from './modules/auth';
-import { createImageStore, imageRoutes } from './modules/images';
 import { postAnalysisRoutes } from './modules/post-analysis';
 import { createPushSender, pushRoutes } from './modules/push';
 import { recipeRoutes } from './modules/recipes';
 import { socialRoutes } from './modules/social';
 import { expoWebRoutes } from './platform/expo-web';
+import { createImageStore, imageRoutes } from './platform/images';
 
 export function createApp(
   db: Database,
