@@ -38,7 +38,7 @@ export default defineConfig({
     cwd: './apps/api',
     command:
       'NODE_ENV=production bun run --bun --cwd ../mobile expo export --platform web --output-dir .expo/e2e-web && ' +
-      'bun ../../scripts/init-local-storage.ts && bun src/db/migrate.ts && bun src/seed.ts && exec bun src/index.ts',
+      'bun run storage:init && bun src/db/migrate.ts && bun src/seed.ts && exec bun src/index.ts',
     url: `${origin}/ready`,
     timeout: 180_000,
     env: {

@@ -56,7 +56,7 @@ services:
   storage-init:
     <<: *runtime
     environment: *local-gcp
-    command: bun scripts/init-local-storage.ts
+    command: bun run --cwd apps/api storage:init
     depends_on:
       setup:
         condition: service_completed_successfully

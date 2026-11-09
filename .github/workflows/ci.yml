@@ -99,7 +99,7 @@ jobs:
       - name: Migrate Test Database
         run: bun run --cwd apps/api src/db/migrate.ts
       - name: Initialize Test Storage
-        run: bun scripts/init-local-storage.ts
+        run: bun run --cwd apps/api storage:init
       - name: Run API Integration Tests
         run: bun run --cwd apps/api test:integration
 
