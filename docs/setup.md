@@ -33,7 +33,7 @@ portless trust
 PORTLESS_HTTPS=1 PORTLESS_PORT=443 portless compose up --build api metro
 ```
 
-Composeが依存導入と未作成のアプリenv生成を行う。Flociの準備ができると、`migrate` がCloud SQL Admin APIでインスタンス・DB・アプリユーザーを作り、返された接続先でDrizzle migrationを実行する。APIはmigration後に起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432、Floci 4588。PostgreSQLとFlociはComposeネットワーク内で待ち受け、PortlessがAPI・Metro・Google／メールのEmulateにloopback上の空きポートを割り当てる。Docker socketはPostgreSQLを起動するFlociにだけ渡す。
+Composeが依存導入と未作成のアプリenv生成を行う。Flociの準備ができると、`migrate` がCloud SQL Admin APIでインスタンス・DB・アプリユーザーを作り、返された接続先でDrizzle migrationを実行してから、同じサービスが画像バケットを初期化する。APIはこの準備が完了してから起動し、MetroはDBを待たず起動する。APIのみなら末尾を `api`、DBなしのMetroのみなら `metro` にする。内部ポートはAPI 8080、Metro 8081、DB 5432、Floci 4588。PostgreSQLとFlociはComposeネットワーク内で待ち受け、PortlessがAPI・Metro・Google／メールのEmulateにloopback上の空きポートを割り当てる。Docker socketはPostgreSQLを起動するFlociにだけ渡す。
 
 | サービス    | ホストからのURL                                |
 | ----------- | ---------------------------------------------- |
@@ -90,8 +90,8 @@ bun run devices      # ホストのExpo Device Hub
 bun run dev:go       # API・DBとExpo Go用トンネル付きMetro
 bun run services:up  # API・DB・Metroをバックグラウンド起動
 bun run db:migrate
-bun run db:seed      # サンプルのユーザー・レシピ。既存の利用者データは保持
-bun run test:integration # 起動済みのDBを使用
+bun run db:seed      # サンプルのユーザー・レシピ・画像。既存の利用者データは保持
+bun run test:integration # 起動済みのDBとFlociを使用
 bun run services:down
 ```
 
