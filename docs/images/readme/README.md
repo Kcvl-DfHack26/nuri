@@ -2,7 +2,7 @@
 
 ## Figmaのデザイン
 
-2026年11月9日に[Figma Plan A](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426)からPNGを取得した。Figmaファイルの編集は行っていない。
+2026年11月9日に[Figma Plan A](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426)（現在の名前は「実装plan」）からPNGを取得した。Figmaファイルの編集は行っていない。
 
 | ファイル                | 対象                   | 参照ノード                                                                        |
 | ----------------------- | ---------------------- | --------------------------------------------------------------------------------- |

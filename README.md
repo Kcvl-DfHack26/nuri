@@ -7,7 +7,7 @@
 
 お手本のメイクを見ても、自分の顔ではどこに、どんな形で塗ればよいか迷う。nuriは、メイクを手順ごとのレシピとして選び、インカメラに映る自分の顔へ塗る範囲と色を重ねながら再現するアプリです。写真から顔の特徴を知り、メイク動画から手順書を作って、編集・投稿できます。
 
-[🎨 Figma / Plan A](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426) · [📋 要件定義](docs/requirements.md) · [🛠️ セットアップ](docs/setup.md) · [🏗️ 構成仕様](docs/architecture.md)
+[🎨 Figma / 実装plan](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426) · [📋 要件定義](docs/requirements.md) · [🛠️ セットアップ](docs/setup.md) · [🏗️ 構成仕様](docs/architecture.md)
 
 <table>
   <tr>
