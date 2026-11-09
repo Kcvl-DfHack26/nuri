@@ -30,6 +30,7 @@ x-local-gcp: &local-gcp
   <<: *environment
   FLOCI_GCP_URL: &floci-url http://floci:4588
   STORAGE_EMULATOR_HOST: *floci-url
+  GCS_BUCKET: ${COMPOSE_PROJECT_NAME}
   GOOGLE_CLOUD_PROJECT: ${COMPOSE_PROJECT_NAME}
 
 services:
@@ -47,6 +48,15 @@ services:
     environment: *local-gcp
     entrypoint: [sh, scripts/with-local-database.sh, --init]
     command: bun run --cwd apps/api db:migrate
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      floci:
+        condition: service_healthy
+  storage-init:
+    <<: *runtime
+    environment: *local-gcp
+    command: bun scripts/init-local-storage.ts
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -76,6 +86,8 @@ services:
       retries: 40
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      storage-init:
         condition: service_completed_successfully
       google:
         condition: service_started
@@ -137,6 +149,8 @@ services:
     command: sleep infinity
     depends_on:
       migrate:
+        condition: service_completed_successfully
+      storage-init:
         condition: service_completed_successfully
   api-tunnel:
     profiles: [tunnel]
