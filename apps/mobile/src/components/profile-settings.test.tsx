@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { launchImageLibraryAsync } from 'expo-image-picker';
 import { router } from 'expo-router';
 
 import type { RecipeDetail } from '@/lib/recipes';
@@ -62,7 +63,22 @@ jest.mock('@expo/ui', () => ({
     );
   },
 }));
-jest.mock('@/components/avatar', () => ({ Avatar: () => null }));
+jest.mock('@/components/avatar', () => ({
+  Avatar: ({ image }: { image: string }) => {
+    const { Image } = jest.requireActual<typeof import('react-native')>('react-native');
+    return <Image accessibilityLabel="プロフィール写真" source={{ uri: image }} />;
+  },
+}));
+jest.mock('expo-file-system', () => ({
+  File: jest.fn((uri: string) => ({ uri, size: 1000 })),
+}));
+jest.mock('expo/fetch', () => ({
+  fetch: (url: string, init: RequestInit) => mockUploadPhoto(url, init),
+}));
+jest.mock('expo-image-picker', () => ({
+  launchImageLibraryAsync: jest.fn(),
+  UIImagePickerPreferredAssetRepresentationMode: { Compatible: 'compatible' },
+}));
 jest.mock('@/components/push-settings', () => ({
   PushSettings: ({ sessionId }: { sessionId: string }) => {
     const { Text } = jest.requireActual<typeof import('react-native')>('react-native');
@@ -101,6 +117,7 @@ jest.mock('@/lib/api', () => ({
         profile: {
           $get: () => mockGetProfile(),
           $patch: (input: { json: unknown }) => mockPutProfile(input),
+          photo: { $url: () => new URL('http://localhost:8080/api/me/profile/photo') },
         },
       },
     },
@@ -112,6 +129,7 @@ jest.mock('@/lib/api', () => ({
         mockNotify();
       },
     },
+    getCookie: () => 'session=local',
     signOut: () => mockSignOut(),
     listAccounts: () => mockAccounts(),
     passkey: {
@@ -126,11 +144,19 @@ jest.mock('@/lib/passkeys', () => ({
   passkeysAvailable: true,
 }));
 type Session = {
-  data: { user: { id: string; name: string; email: string }; session: { id: string } } | null;
+  data: {
+    user: { id: string; name: string; email: string; image: string };
+    session: { id: string };
+  } | null;
 };
 const viewer: Session = {
   data: {
-    user: { id: 'viewer', name: 'はなこ', email: 'hanako@example.com' },
+    user: {
+      id: 'viewer',
+      name: 'はなこ',
+      email: 'hanako@example.com',
+      image: '/media/sample-avatars/haru.jpg',
+    },
     session: { id: 'current-session' },
   },
 };
@@ -170,7 +196,10 @@ const mockGetProfile = jest.fn(async () => ({
     profile: { name: 'はなこ', handle: null, bio: '', isPublic: true, faceType: null },
   }),
 }));
-const mockPutProfile = jest.fn(async (_input: { json: unknown }) => ({ status: 200 }));
+const mockPutProfile = jest.fn(async (_input: { json: unknown }) => new Response(null));
+const mockUploadPhoto = jest.fn(async (_url: string, _init: RequestInit) => new Response(null));
+const mockImagePicker = jest.mocked(launchImageLibraryAsync);
+const selectedPhoto = { uri: 'file:///picked.jpg', width: 300, height: 300 };
 const mockAccounts = jest.fn(async () => ({
   data: [{ providerId: 'google' }],
   error: null,
@@ -202,7 +231,7 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
   await renderWithClient(<ProfileSettings />);
   await screen.findByLabelText('表示名');
   expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
-  expect(screen.getByRole('button', { name: '写真を変更（準備中）' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '写真を変更' })).toBeEnabled();
   expect(screen.getByText('プッシュ通知 current-session')).toBeOnTheScreen();
   expect(
     screen.getByRole('button', { name: 'メールアドレス hanako@example.com（準備中）' }),
@@ -217,6 +246,85 @@ test('saves profile fields and keeps unbuilt settings disabled', async () => {
     json: { name: 'はな', handle: 'hana_1', bio: 'よろしく', isPublic: false },
   });
   expect(mockNotify).toHaveBeenCalled();
+});
+
+test('previews the selected photo and cancels without uploading', async () => {
+  const settings = await renderWithClient(<ProfileSettings />);
+  const pick = await screen.findByRole('button', { name: '写真を変更' });
+  mockImagePicker.mockResolvedValueOnce({ canceled: true, assets: null });
+  await fireEvent.press(pick);
+  expect(screen.getByLabelText('プロフィール写真')).toHaveProp('source', {
+    uri: '/media/sample-avatars/haru.jpg',
+  });
+  expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
+
+  mockImagePicker.mockResolvedValueOnce({ canceled: false, assets: [selectedPhoto] });
+  await fireEvent.press(pick);
+  expect(screen.getByLabelText('プロフィール写真')).toHaveProp('source', {
+    uri: selectedPhoto.uri,
+  });
+  expect(screen.getByRole('button', { name: '保存する' })).toBeEnabled();
+  await fireEvent.press(screen.getByRole('button', { name: '選択を取り消す' }));
+  expect(screen.getByLabelText('プロフィール写真')).toHaveProp('source', {
+    uri: '/media/sample-avatars/haru.jpg',
+  });
+  expect(screen.getByRole('button', { name: '保存する' })).toBeDisabled();
+
+  mockImagePicker.mockResolvedValueOnce({ canceled: false, assets: [selectedPhoto] });
+  await fireEvent.press(pick);
+  await settings.unmount();
+  expect(mockUploadPhoto).not.toHaveBeenCalled();
+});
+
+test('keeps the selected photo on failure and refreshes photo readers after retry', async () => {
+  const client = createTestQueryClient();
+  const detail = recipeOptions('fox').queryKey;
+  const publicProfile = ['user', 'viewer'];
+  client.setQueryData(detail, cachedRecipe);
+  client.setQueryData(publicProfile, { image: null });
+  let finishUpload: (response: Response) => void = () => {};
+  mockUploadPhoto.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishUpload = resolve;
+      }),
+  );
+  mockImagePicker.mockResolvedValueOnce({ canceled: false, assets: [selectedPhoto] });
+  await renderWithClient(<ProfileSettings />, client);
+  await fireEvent.press(await screen.findByRole('button', { name: '写真を変更' }));
+  await fireEvent.changeText(screen.getByLabelText('表示名'), '変更した名前');
+  const save = screen.getByRole('button', { name: '保存する' });
+  await fireEvent.press(save);
+  const saving = await screen.findByRole('button', { name: '保存中' });
+  expect(saving).toBeDisabled();
+  await fireEvent.press(saving);
+  expect(mockUploadPhoto).toHaveBeenCalledTimes(1);
+  await act(() => {
+    finishUpload(new Response(null, { status: 500 }));
+  });
+
+  expect(
+    await screen.findByText('変更を保存できませんでした。もう一度お試しください。'),
+  ).toBeOnTheScreen();
+  expect(screen.getByLabelText('プロフィール写真')).toHaveProp('source', {
+    uri: selectedPhoto.uri,
+  });
+  expect(screen.getByLabelText('表示名')).toHaveProp('value', '変更した名前');
+  expect(mockNotify).not.toHaveBeenCalled();
+  expect(client.getQueryState(detail)?.isInvalidated).toBe(false);
+  await saveProfile();
+  expect(mockUploadPhoto).toHaveBeenCalledTimes(2);
+  const [url, request] = mockUploadPhoto.mock.lastCall ?? [];
+  expect(url).toBe('http://localhost:8080/api/me/profile/photo');
+  expect(request?.method).toBe('PATCH');
+  const body = request?.body;
+  expect(body instanceof FormData ? body.get('changes') : null).toBe(
+    JSON.stringify({ name: '変更した名前' }),
+  );
+  expect(mockPutProfile).not.toHaveBeenCalled();
+  expect(mockNotify).toHaveBeenCalled();
+  expect(client.getQueryState(detail)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(publicProfile)?.isInvalidated).toBe(true);
 });
 
 test('refreshes cached recipe authors after saving a profile', async () => {
@@ -379,7 +487,7 @@ test('keeps the edited name and shows why saving or logging out failed', async (
   const client = createTestQueryClient();
   const detail = recipeOptions('fox').queryKey;
   client.setQueryData(detail, cachedRecipe);
-  mockPutProfile.mockResolvedValueOnce({ status: 500 });
+  mockPutProfile.mockResolvedValueOnce(new Response(null, { status: 500 }));
   mockSignOut.mockResolvedValueOnce({ error: { message: 'failed' } });
   await renderWithClient(<ProfileSettings />, client);
   await screen.findByLabelText('表示名');

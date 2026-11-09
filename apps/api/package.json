@@ -10,7 +10,7 @@
   },
   "scripts": {
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/index.ts",
-    "build": "bun build src/index.ts src/db/migrate.ts --target=node --outdir=dist --external=pg --external=@google-cloud/storage --external=better-auth --external=@better-auth/expo --external=@better-auth/passkey",
+    "build": "bun build src/index.ts src/db/migrate.ts --target=node --outdir=dist --external=pg --external=@google-cloud/storage --external=better-auth --external=@better-auth/expo --external=@better-auth/passkey --external=sharp",
     "start": "node --env-file-if-exists=.env dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "bun test --path-ignore-patterns='**/*.integration.test.ts' ./src",
@@ -33,6 +33,7 @@
     "hono": "4.13.16",
     "jose": "6.2.3",
     "pg": "8.23.1",
+    "sharp": "0.35.5",
     "zod": "4.6.7"
   },
   "devDependencies": {

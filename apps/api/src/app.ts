@@ -1,4 +1,4 @@
-import { postAnalysisVideoMaxBytes } from '@starter/shared';
+import { postAnalysisVideoMaxBytes, profilePhotoMaxBytes } from '@starter/shared';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -37,6 +37,7 @@ export function createApp(
   const postedRecipeBody = bodyLimit({ maxSize: 2.5 * 1024 * 1024, onError });
   // POST /api/post-analyses carries the video from ⑫-3 and its marks as multipart form data.
   const postVideoBody = bodyLimit({ maxSize: postAnalysisVideoMaxBytes + 64 * 1024, onError });
+  const profilePhotoBody = bodyLimit({ maxSize: profilePhotoMaxBytes + 64 * 1024, onError });
   const images = env.GCS_BUCKET ? createImageStore(env) : null;
   return (
     new Hono()
@@ -49,6 +50,9 @@ export function createApp(
         }
         if (c.req.method === 'POST' && c.req.path === '/api/post-analyses') {
           return postVideoBody(c, next);
+        }
+        if (c.req.method === 'PATCH' && c.req.path === '/api/me/profile/photo') {
+          return profilePhotoBody(c, next);
         }
         return smallBody(c, next);
       })
@@ -104,7 +108,7 @@ export function createApp(
           createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN, env.BETTER_AUTH_URL),
         ),
       )
-      .route('/api', socialRoutes(db, auth))
+      .route('/api', socialRoutes(db, auth, images))
       .route('/api', postAnalysisRoutes(requireSession(auth), analyzePost))
       .route('/', expoWebRoutes(env.EXPO_WEB_ROOT))
       .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500))

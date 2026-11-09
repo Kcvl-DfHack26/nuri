@@ -1,6 +1,8 @@
+import { profilePhotoMaxBytes } from '@starter/shared';
 import { afterAll, expect, spyOn, test } from 'bun:test';
 import { eq, inArray, like, or } from 'drizzle-orm';
 import { createEmulator } from 'emulate';
+import sharp from 'sharp';
 import { z } from 'zod';
 
 import { createApp } from './app';
@@ -10,10 +12,11 @@ import { createAuth } from './modules/auth';
 import { createPushSender } from './modules/push';
 import { softwareAuthenticator } from './passkey-fixture';
 import { readEnv } from './platform/env';
+import { createImageStore } from './platform/images';
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) {
-  throw new Error('Set DATABASE_URL to a migrated test database');
+const { DATABASE_URL: databaseUrl, GCS_BUCKET, STORAGE_EMULATOR_HOST } = process.env;
+if (!databaseUrl || !GCS_BUCKET || !STORAGE_EMULATOR_HOST) {
+  throw new Error('Set DATABASE_URL, GCS_BUCKET and STORAGE_EMULATOR_HOST for integration tests');
 }
 const { db, pool } = connectDatabase(databaseUrl);
 const unique = crypto.randomUUID();
@@ -54,6 +57,8 @@ const mail = await createEmulator({
 const env = readEnv({
   NODE_ENV: 'test',
   DATABASE_URL: databaseUrl,
+  GCS_BUCKET,
+  STORAGE_EMULATOR_HOST,
   BETTER_AUTH_SECRET: 'integration-test-secret-never-use-in-production',
   BETTER_AUTH_URL: baseURL,
   TRUSTED_ORIGINS: `${origin},com.kcvl.nuri://`,
@@ -626,6 +631,99 @@ test('posting a recipe validates and stores the latest draft and serves its thum
   expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
   expect(Buffer.from(await image.arrayBuffer())).toEqual(jpeg);
   expect((await appRequest('/api/recipe-images/fox')).status).toBe(404);
+}, 20000);
+
+test('updates only the signed-in profile after the photo is saved', async () => {
+  const { cookie, me } = await signInRecipeUser();
+  const previousImage = 'https://example.com/old.jpg';
+  const ownerFilter = eq(user.id, me.id);
+  await db.update(user).set({ image: previousImage }).where(ownerFilter);
+  const recipeId = `p-${unique}`;
+  await db.insert(recipe).values({
+    id: recipeId,
+    authorId: me.id,
+    title: '作者の写真',
+    image: 'https://example.com/recipe.jpg',
+    durationMinutes: 3,
+  });
+  const getProfile = async () =>
+    z
+      .object({ user: z.object({ name: z.string(), image: z.string() }) })
+      .parse(await (await appRequest(`/api/users/${me.id}`)).json()).user;
+  const before = await getProfile();
+  const photo = new Blob(
+    [
+      new Uint8Array(
+        await sharp({ create: { width: 900, height: 600, channels: 3, background: '#FFC0CB' } })
+          .withExif({ IFD0: { Copyright: 'private camera metadata' } })
+          .jpeg()
+          .toBuffer(),
+      ),
+    ],
+    { type: 'image/jpeg' },
+  );
+  const upload = (asset: Blob, changes: unknown = {}, sessionCookie = cookie) => {
+    const body = new FormData();
+    body.set('photo', asset, 'profile.jpg');
+    body.set('changes', JSON.stringify(changes));
+    return { method: 'PATCH', body, headers: { origin, cookie: sessionCookie } };
+  };
+  const path = '/api/me/profile/photo';
+  expect((await appRequest(path, upload(photo, {}, ''))).status).toBe(401);
+  expect((await appRequest(path, upload(photo, { id: 'someone-else' }))).status).toBe(400);
+  expect(
+    (await appRequest(path, upload(photo, { image: 'https://example.com/spoof.jpg' }))).status,
+  ).toBe(400);
+  expect(
+    (await appRequest(path, upload(new Blob(['not a photo'], { type: 'image/jpeg' })))).status,
+  ).toBe(400);
+  expect(
+    (await appRequest(path, upload(new Blob([new Uint8Array(profilePhotoMaxBytes + 65536)]))))
+      .status,
+  ).toBe(413);
+  expect(await getProfile()).toEqual(before);
+
+  const images = createImageStore(env);
+  const uploaded: string[] = [];
+  try {
+    expect((await appRequest(path, upload(photo, { name: '更新した名前' }))).status).toBe(200);
+    const first = await getProfile();
+    expect(first.name).toBe('更新した名前');
+    expect(first.image).toMatch(/^\/media\/profiles\/[a-f0-9-]{36}\.jpg$/);
+    uploaded.push(first.image);
+    const served = await appRequest(first.image);
+    expect(served.status).toBe(200);
+    expect(served.headers.get('content-type')).toBe('image/jpeg');
+    const stored = await sharp(await served.arrayBuffer()).metadata();
+    expect(stored.width).toBe(512);
+    expect(stored.exif).toBeUndefined();
+    expect(await (await appRequest(`/api/recipes/${recipeId}`)).json()).toMatchObject({
+      recipe: { author: { image: first.image } },
+    });
+    expect(
+      await (await appRequest('/api/auth/get-session', { headers: { cookie } })).json(),
+    ).toMatchObject({ user: { image: first.image } });
+
+    const failing = createApp(db, auth, { ...env, GCS_BUCKET: `missing-${unique}` }, () =>
+      Promise.resolve(),
+    );
+    expect((await failing.request(path, upload(photo, { name: '失敗した変更' }))).status).toBe(500);
+    expect(await getProfile()).toEqual(first);
+    expect((await appRequest(first.image)).status).toBe(200);
+
+    expect((await appRequest(path, upload(photo))).status).toBe(200);
+    const second = await getProfile();
+    uploaded.push(second.image);
+    expect(second.image).not.toBe(first.image);
+    expect((await appRequest(first.image)).status).toBe(404);
+    expect((await appRequest(second.image)).status).toBe(200);
+  } finally {
+    await Promise.all(
+      uploaded.map((image) =>
+        images.file(image.slice('/media/'.length)).delete({ ignoreNotFound: true }),
+      ),
+    );
+  }
 }, 20000);
 
 test('only new likes notify the owner and push subscriptions follow the active session', async () => {

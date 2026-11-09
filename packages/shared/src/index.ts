@@ -7,6 +7,8 @@ export const feedQuerySchema = z.object({
 });
 /** The face types ⑭ diagnoses, in the order it tries them (#47, #194). */
 export const faceTypeIds = ['long', 'square', 'round', 'heart', 'oval'] as const;
+/** Largest source photo accepted by the profile editor and API. */
+export const profilePhotoMaxBytes = 5 * 1024 * 1024;
 export const profileInputSchema = z.object({
   name: z.string().trim().min(1).max(40),
   handle: z
