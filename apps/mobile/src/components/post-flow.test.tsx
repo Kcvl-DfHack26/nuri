@@ -87,6 +87,10 @@ jest.mock('../../modules/face-tracker/src/FaceTrackerModule', () => ({
 }));
 jest.mock('@shopify/react-native-skia', () => ({
   Canvas: jest.requireActual<typeof import('react-native')>('react-native').View,
+  Circle: () => null,
+  LinearGradient: () => null,
+  RoundedRect: () => null,
+  vec: (x: number, y: number) => ({ x, y }),
 }));
 jest.mock('@/components/shape-texture', () => ({ useShapeTexture: () => null }));
 jest.mock('expo-router', () => ({
@@ -879,13 +883,25 @@ test('shows the color read from the video on ⑫-5 and keeps the one picked', as
   );
   expect(screen.getByText(/動画から読み取った色です/)).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '色を選ぶ' }));
-  // The stand-in slider moves lightness to 50.
-  mockSlider.value = 50;
-  await fireEvent.press(screen.getByLabelText('明るさ'));
+  // A touch on the square's top right corner picks the hue at full saturation and brightness.
+  await fireEvent(screen.getByLabelText('鮮やかさと明るさ'), 'layout', {
+    nativeEvent: { layout: { width: 332, height: 300 } },
+  });
+  await fireEvent(screen.getByLabelText('鮮やかさと明るさ'), 'responderGrant', {
+    nativeEvent: { locationX: 320, locationY: 0 },
+  });
+  expect(screen.getByLabelText('鮮やかさと明るさ')).toHaveAccessibilityValue({
+    text: '鮮やかさ100、明るさ100',
+  });
+  // The screen reader's actions change it too.
+  await fireEvent(screen.getByLabelText('鮮やかさと明るさ'), 'accessibilityAction', {
+    nativeEvent: { actionName: 'decrement' },
+  });
   await fireEvent.press(screen.getByRole('button', { name: '決定' }));
   const first = () => (latest ?? null)?.steps[0];
   expect(first()?.color?.picked).toBe(true);
-  expect(first()?.color?.hex).not.toBe('#5A3D2B');
+  // #5A3D2B's hue (23) at full saturation and 95 brightness.
+  expect(first()?.color?.hex).toBe('#F25D00');
   expect(screen.getByText('選んだ色で塗ります')).toBeOnTheScreen();
 });
 
@@ -1031,6 +1047,28 @@ test('keeps the draft when posting fails and posts it on retry', async () => {
     expect(router.push).toHaveBeenCalledWith('/post/done');
   });
   expect(mockPost).toHaveBeenCalledTimes(2);
+});
+
+test('posts the color read from the video or picked on ⑫-5 over the cosmetic and part colors', async () => {
+  const [first, second] = readyDraft.steps ?? [];
+  if (!first || !second) {
+    throw new Error('readyDraft needs two steps');
+  }
+  await renderSeeded(<PostPreview />, {
+    ...readyDraft,
+    steps: [
+      { ...first, color: { hex: '#1A1A1A', picked: false } },
+      { ...second, color: { hex: '#C0392B', picked: true } },
+    ],
+  });
+  await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
+  await pressAlertButton('投稿する');
+  await waitFor(() => {
+    expect(mockPost).toHaveBeenCalled();
+  });
+  expect(mockPost.mock.calls[0]?.[0]).toMatchObject({
+    json: { steps: [{ color: '#1A1A1A' }, { color: '#C0392B' }] },
+  });
 });
 
 test('cuts a smaller thumbnail when the chosen frame is over the limit', async () => {

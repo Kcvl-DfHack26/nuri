@@ -79,7 +79,7 @@ const prompt = `あなたはメイクの手順書を作るアシスタントで�
 steps[].regions には，その手順で実際に色を足した範囲を書く．もともと眉毛や唇の色があった所でも，色を足していない所は入れない．
 - detail: 範囲の詳しい説明．顔の目印を基準に，始まりと終わり，形，向きを書く．
 - side: screenLeft=画面の左，screenRight=画面の右，both=両方，center=中央．本人から見た左右ではなく，動画の画面で見た左右．
-- start・end: 範囲の始まりと終わりの目印．終わりがなければ end は none．まぶたの範囲は，上まぶたなら upperLidEdge，下まぶた（涙袋・粘膜・下まつげの辺りを含む）なら lowerLidEdge を start か end に使う．
+- start・end: 範囲の始まりと終わりの目印．終わりがなければ end は none．まぶたの範囲は，上まぶたなら upperLidEdge，下まぶた（涙袋・粘膜・下まつげの辺りを含む）なら lowerLidEdge を start か end に使う．まぶたに沿う範囲は，沿っている部分の始まりと終わりを両方答える（例：まぶた全体なら eyeInner から eyeOuter，目尻側の半分なら irisCenter から eyeOuter）．end を none にするのは，目尻などから外へ伸ばす部分だけにする．
   browHead=眉頭，browPeak=眉山，browTail=眉尻，browTailLine=小鼻と目尻を結んだ延長線上の眉の高さ，
   eyeInner=目頭，eyeOuter=目尻，irisCenter=黒目の中央，irisOuter=黒目の外側，upperLidEdge=上まぶたの縁，lowerLidEdge=下まぶたの縁，
   noseWing=小鼻，mouthCorner=口角，cheekboneTop=頬骨の最も高い位置，cheekCenter=頬の中央，temple=こめかみ，jawAngle=エラ，

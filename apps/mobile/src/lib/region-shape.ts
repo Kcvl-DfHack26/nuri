@@ -107,7 +107,18 @@ const blur = 0.004;
 // How far the eye hole reaches from the upper lid toward the brow (#203).
 const eyeHoleShare = 0.55;
 // How many lid landmarks a line drawn inward from a corner covers, by length.
-const inwardSteps: Record<Region['length'], number> = { none: 2, short: 2, medium: 3, long: 5 };
+// Eyeshadow is cut out of a slightly larger eye opening, as a share of the eye's width, so a frame
+// whose eye landmarks sit a little inside the lids does not leave color on the whites (#203). Liner
+// keeps the opening itself to stay on the lash line.
+const shadowHoleMargin = 0.02;
+// A line from an eye corner without an end follows the whole lid unless Gemini says it is short
+// (#203: liner and shadow along the lid were cut to a few points).
+const inwardSteps: Record<Region['length'], number> = {
+  none: Infinity,
+  short: 2,
+  medium: 4,
+  long: Infinity,
+};
 
 const side = (right: boolean) => (right ? 0 : 1);
 const clampOffset = (value: number) => Math.max(-0.2, Math.min(0.2, value));
@@ -249,7 +260,7 @@ function lidStroke(region: Region, lower: boolean, right: boolean, whole: boolea
   const start = anchor(region.start, right);
   const end = region.end === 'none' ? null : anchor(region.end, right);
   const from = start ? nearestIndex(contour, start.point) : 0;
-  const reach = Math.max(2, inwardSteps[region.length]);
+  const reach = Math.min(last, Math.max(2, inwardSteps[region.length]));
   const toward = from >= last / 2 ? Math.max(0, from - reach) : Math.min(last, from + reach);
   const wholeEnd = from === 0 ? last : 0;
   const to = end ? nearestIndex(contour, end.point) : whole ? wholeEnd : toward;
@@ -480,6 +491,30 @@ function noseSideStrokes(region: Region): Stroke[] {
   ];
 }
 
+/** The subject's right eye opening; for eyeshadow, pushed out from the eye's center a little. */
+function eyeHole(widen: boolean): ShapePoint[] {
+  const ring = eyeOpening[0];
+  if (!widen) {
+    return ring.map((index) => ({ at: index }));
+  }
+  const center = {
+    x: ring.reduce((sum, index) => sum + at(index).x, 0) / ring.length,
+    y: ring.reduce((sum, index) => sum + at(index).y, 0) / ring.length,
+  };
+  return ring.map((index) => {
+    const point = at(index);
+    const distance = Math.hypot(point.x - center.x, point.y - center.y);
+    const push = (eyeWidth * shadowHoleMargin) / distance;
+    return pointAt(
+      {
+        x: point.x + (point.x - center.x) * push,
+        y: point.y + (point.y - center.y) * push,
+      },
+      index,
+    );
+  });
+}
+
 /**
  * ⑫-3 (#156): the areas Gemini found in one step as the shape ⑦⑩ paint (#138), or null when nothing
  * can be drawn. Brows, eyes, cheeks and other paired parts are always painted on both sides, even
@@ -514,12 +549,7 @@ export function regionShape(regions: readonly Region[], part?: PartId): MakeupSh
   // Never paint the eyes themselves or the open mouth.
   const cut: Stroke[] = [];
   if (touchesEyes) {
-    cut.push({
-      points: eyeOpening[0].map((index) => ({ at: index })),
-      fill: true,
-      erase: true,
-      mirror: true,
-    });
+    cut.push({ points: eyeHole(part === 'eye'), fill: true, erase: true, mirror: true });
   }
   if (touchesLips) {
     cut.push({ points: mouthOpening.map((index) => ({ at: index })), fill: true, erase: true });
