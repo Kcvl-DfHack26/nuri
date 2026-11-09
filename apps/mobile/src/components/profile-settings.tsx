@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Host, Icon, Picker, Switch as NativeSwitch } from '@expo/ui';
 import {
   faceTypeIds,
+  profileChangesSchema,
   profileInputSchema,
   profilePhotoMaxBytes,
   profilePatchSchema,
@@ -215,9 +216,7 @@ function Editor({
   const canSave =
     !busy &&
     !refreshError &&
-    (photo
-      ? profileInputSchema.partial().safeParse(changes).success
-      : profilePatchSchema.safeParse(changes).success);
+    (photo ? profileChangesSchema : profilePatchSchema).safeParse(changes).success;
   async function pickPhoto() {
     setPhotoError(undefined);
     setPickingPhoto(true);

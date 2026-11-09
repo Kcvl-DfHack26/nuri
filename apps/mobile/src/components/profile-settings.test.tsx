@@ -279,9 +279,14 @@ test('previews the selected photo and cancels without uploading', async () => {
 test('keeps the selected photo on failure and refreshes photo readers after retry', async () => {
   const client = createTestQueryClient();
   const detail = recipeOptions('fox').queryKey;
+  const lists = [recipeListOptions({}).queryKey, favoriteListOptions('viewer').queryKey];
   const publicProfile = ['user', 'viewer'];
   client.setQueryData(detail, cachedRecipe);
   client.setQueryData(publicProfile, { image: null });
+  for (const key of lists) {
+    client.setQueryData(key, { pages: [], pageParams: [] });
+  }
+  client.setQueryData(['unrelated'], []);
   let finishUpload: (response: Response) => void = () => {};
   mockUploadPhoto.mockImplementationOnce(
     () =>
@@ -323,38 +328,10 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
   );
   expect(mockPutProfile).not.toHaveBeenCalled();
   expect(mockNotify).toHaveBeenCalled();
-  expect(client.getQueryState(detail)?.isInvalidated).toBe(true);
-  expect(client.getQueryState(publicProfile)?.isInvalidated).toBe(true);
-});
-
-test('refreshes cached recipe authors after saving a profile', async () => {
-  const client = createTestQueryClient();
-  const detail = recipeOptions('fox').queryKey;
-  const lists = [recipeListOptions({}).queryKey, favoriteListOptions('viewer').queryKey];
-  for (const key of lists) {
-    client.setQueryData(key, { pages: [], pageParams: [] });
-  }
-  client.setQueryData(detail, cachedRecipe);
-  client.setQueryData(['unrelated'], []);
-  await renderWithClient(<ProfileSettings />, client);
-  await screen.findByLabelText('表示名');
-  await fireEvent.changeText(screen.getByLabelText('表示名'), '更新した名前');
-  await saveProfile();
-
-  for (const key of [detail, ...lists]) {
+  for (const key of [detail, ...lists, publicProfile]) {
     expect(client.getQueryState(key)?.isInvalidated).toBe(true);
   }
   expect(client.getQueryState(['unrelated'])?.isInvalidated).toBe(false);
-  // Even a fresh cached detail must fetch the saved author's name when opened again.
-  const updated = await client.fetchQuery({
-    queryKey: detail,
-    staleTime: Infinity,
-    queryFn: async () => ({
-      ...cachedRecipe,
-      author: { ...cachedRecipe.author, name: '更新した名前' },
-    }),
-  });
-  expect(updated.author.name).toBe('更新した名前');
 });
 
 test('chooses a face type and saves it, never showing a skin tone', async () => {

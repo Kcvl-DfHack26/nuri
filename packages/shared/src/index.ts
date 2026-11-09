@@ -21,9 +21,11 @@ export const profileInputSchema = z.object({
   /** Chosen on ⑰-2 or saved from ⑭; null until then. Skin tone is never stored (not diagnosed). */
   faceType: z.enum(faceTypeIds).nullable(),
 });
-export const profilePatchSchema = profileInputSchema
-  .partial()
-  .refine((fields) => Object.keys(fields).length > 0);
+// A photo-only update can leave all text and preference fields unchanged.
+export const profileChangesSchema = profileInputSchema.partial();
+export const profilePatchSchema = profileChangesSchema.refine(
+  (fields) => Object.keys(fields).length > 0,
+);
 
 // Recipe IDs are readable slugs (e.g. fox) so seeded recipes keep stable URLs.
 export const recipeParamsSchema = z.object({ id: z.string().regex(/^[a-z0-9-]{1,64}$/) });

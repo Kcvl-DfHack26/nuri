@@ -1,4 +1,4 @@
-import { profileInputSchema, profilePhotoMaxBytes } from '@starter/shared';
+import { profileChangesSchema, profilePhotoMaxBytes } from '@starter/shared';
 import sharp from 'sharp';
 import { z } from 'zod';
 
@@ -9,7 +9,7 @@ sharp.unblock({
 });
 
 export const profilePhotoFormSchema = z.strictObject({
-  photo: z.instanceof(Blob).refine(({ size }) => size > 0 && size <= profilePhotoMaxBytes),
+  photo: z.file().min(1).max(profilePhotoMaxBytes),
   changes: z
     .string()
     .transform((value, ctx): unknown => {
@@ -20,10 +20,10 @@ export const profilePhotoFormSchema = z.strictObject({
         return z.NEVER;
       }
     })
-    .pipe(profileInputSchema.partial().strict()),
+    .pipe(profileChangesSchema.strict()),
 });
 
-export async function decodeProfilePhoto(file: Blob) {
+export async function decodeProfilePhoto(file: File) {
   const bytes = await file.arrayBuffer();
   try {
     return await sharp(bytes, { autoOrient: true, failOn: 'warning', limitInputPixels: 32_000_000 })

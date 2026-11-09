@@ -114,47 +114,44 @@ export function socialRoutes(db: Database, auth: Auth, images: ImageStore | null
           if (!bytes) {
             return c.json({ error: 'invalid_profile_photo' as const }, 400);
           }
-          const id = c.get('currentUser').id;
+          const owner = eq(user.id, c.get('currentUser').id);
           const key = `profiles/${crypto.randomUUID()}.jpg`;
           const image = imagePath(key);
-          const previous = await db
-            .transaction(async (tx) => {
+          try {
+            const previous = await db.transaction(async (tx) => {
               const [current] = await tx
                 .select({ image: user.image })
                 .from(user)
-                .where(eq(user.id, id))
+                .where(owner)
                 .for('update');
               if (!current) {
                 return null;
               }
-              // Update first to detect conflicts before uploading. A failed upload rolls back the
-              // entire edit, and the row lock serializes replacements from different devices.
+              // Check for handle conflicts before uploading. A failed upload rolls back the edit.
               await tx
                 .update(user)
                 .set({ ...changes, image, updatedAt: new Date() })
-                .where(eq(user.id, id));
+                .where(owner);
               await saveImage(images, key, bytes, 'image/jpeg');
               return current;
-            })
-            .catch((error: unknown) => {
-              if (isHandleConflict(error)) {
-                return 'handle_taken' as const;
-              }
-              throw error;
             });
-          if (previous === 'handle_taken') {
-            return c.json({ error: 'handle_taken' as const }, 409);
-          }
-          if (!previous) {
-            return c.json({ error: 'not_found' as const }, 404);
-          }
-          const oldKey = previous.image?.match(/^\/media\/(profiles\/[a-f0-9-]{36}\.jpg)$/)?.[1];
-          if (oldKey) {
-            try {
-              await images.file(oldKey).delete({ ignoreNotFound: true });
-            } catch {
-              console.error('Could not delete superseded profile photo');
+            if (!previous) {
+              return c.json({ error: 'not_found' as const }, 404);
             }
+            const oldKey = previous.image?.match(/^\/media\/(profiles\/[a-f0-9-]{36}\.jpg)$/)?.[1];
+            if (oldKey) {
+              await images
+                .file(oldKey)
+                .delete({ ignoreNotFound: true })
+                .catch(() => {
+                  console.error('Could not delete superseded profile photo');
+                });
+            }
+          } catch (error) {
+            if (isHandleConflict(error)) {
+              return c.json({ error: 'handle_taken' as const }, 409);
+            }
+            throw error;
           }
           return c.json({ success: true });
         },
