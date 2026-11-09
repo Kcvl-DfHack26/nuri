@@ -515,10 +515,11 @@ function Field({
   );
 }
 
-const noFaceType = 'none';
+const faceTypeLabel = '顔タイプ';
+const unsetFaceType = { id: 'none', title: '未設定', faceType: null };
 const faceTypeOptions = [
-  ...faceTypeIds.map((id) => ({ id, title: faceTypes[id].label })),
-  { id: noFaceType, title: '未設定' },
+  ...faceTypeIds.map((faceType) => ({ id: faceType, title: faceTypes[faceType].label, faceType })),
+  unsetFaceType,
 ];
 
 function FaceTypeRow({
@@ -530,25 +531,18 @@ function FaceTypeRow({
   onChange: (faceType: FaceType | null) => void;
   disabled: boolean;
 }) {
-  const selected = value ?? noFaceType;
-  const select = (id: string) => {
-    if (id === noFaceType) {
-      onChange(null);
-      return;
-    }
-    const faceType = faceTypeIds.find((type) => type === id);
-    if (faceType) {
-      onChange(faceType);
-    }
-  };
-
-  const valueLabel = value ? faceTypes[value].label : '未設定';
+  const selection = faceTypeOptions.find(({ faceType }) => faceType === value) ?? unsetFaceType;
   return (
     <FaceTypeMenu
-      value={selected}
-      valueLabel={valueLabel}
+      label={faceTypeLabel}
+      selection={selection}
       options={faceTypeOptions}
-      onSelect={select}
+      onSelect={(id) => {
+        const option = faceTypeOptions.find((choice) => choice.id === id);
+        if (option) {
+          onChange(option.faceType);
+        }
+      }}
       disabled={disabled}
     >
       <View
@@ -557,7 +551,7 @@ function FaceTypeRow({
         className={rowClassName}
         pointerEvents="none"
       >
-        <RowContent label="顔タイプ" value={valueLabel} disclosure />
+        <RowContent label={faceTypeLabel} value={selection.title} disclosure />
       </View>
     </FaceTypeMenu>
   );

@@ -4,18 +4,20 @@ import { type MenuComponentRef, MenuView } from '@expo/ui/community/menu';
 import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+type MenuOption = { id: string; title: string };
+
 export type FaceTypeMenuProps = {
-  value: string;
-  valueLabel: string;
-  options: { id: string; title: string }[];
+  label: string;
+  selection: MenuOption;
+  options: readonly MenuOption[];
   onSelect: (id: string) => void;
   disabled: boolean;
   children: ReactElement;
 };
 
 export function FaceTypeMenu({
-  value,
-  valueLabel,
+  label,
+  selection,
   options,
   onSelect,
   disabled,
@@ -29,7 +31,7 @@ export function FaceTypeMenu({
   const trigger = (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`顔タイプ ${valueLabel}`}
+      accessibilityLabel={`${label} ${selection.title}`}
       accessibilityState={{ disabled: !canOpen }}
       disabled={!canOpen}
       onPress={() => {
@@ -52,9 +54,10 @@ export function FaceTypeMenu({
         <MenuView
           ref={menu}
           colorScheme="light"
-          actions={options.map((option) => ({
-            ...option,
-            state: option.id === value ? 'on' : 'off',
+          actions={options.map(({ id, title }) => ({
+            id,
+            title,
+            state: id === selection.id ? 'on' : 'off',
           }))}
           onPressAction={({ nativeEvent }) => {
             onSelect(nativeEvent.event);

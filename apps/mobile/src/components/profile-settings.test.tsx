@@ -244,6 +244,14 @@ async function saveProfile() {
   });
 }
 
+async function openFaceTypeMenu(currentLabel: string) {
+  // Compose's content-sized Host needs the measured width of the settings card.
+  await fireEvent(await screen.findByTestId('face-type-row'), 'layout', {
+    nativeEvent: { layout: { width: 380 } },
+  });
+  await fireEvent.press(screen.getByRole('button', { name: `顔タイプ ${currentLabel}` }));
+}
+
 test('saves profile fields and keeps unbuilt settings disabled', async () => {
   await renderWithClient(<ProfileSettings />);
   await screen.findByLabelText('表示名');
@@ -293,7 +301,7 @@ test('previews the selected photo and cancels without uploading', async () => {
   expect(mockUploadPhoto).not.toHaveBeenCalled();
 });
 
-test('keeps the selected photo on failure and refreshes photo readers after retry', async () => {
+test('keeps the photo and face type on failure and saves both on retry', async () => {
   const client = createTestQueryClient();
   const detail = recipeOptions('fox').queryKey;
   const lists = [recipeListOptions({}).queryKey, favoriteListOptions('viewer').queryKey];
@@ -315,10 +323,13 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
   await renderWithClient(<ProfileSettings />, client);
   await fireEvent.press(await screen.findByRole('button', { name: '写真を変更' }));
   await fireEvent.changeText(screen.getByLabelText('表示名'), '変更した名前');
+  await openFaceTypeMenu('未設定');
+  await fireEvent.press(screen.getByRole('menuitem', { name: '丸顔' }));
   const save = screen.getByRole('button', { name: '保存する' });
   await fireEvent.press(save);
   const saving = await screen.findByRole('button', { name: '保存中' });
   expect(saving).toBeDisabled();
+  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeDisabled();
   await fireEvent.press(saving);
   expect(mockUploadPhoto).toHaveBeenCalledTimes(1);
   await act(() => {
@@ -332,6 +343,7 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
     uri: selectedPhoto.uri,
   });
   expect(screen.getByLabelText('表示名')).toHaveProp('value', '変更した名前');
+  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeEnabled();
   expect(mockNotify).not.toHaveBeenCalled();
   expect(client.getQueryState(detail)?.isInvalidated).toBe(false);
   await saveProfile();
@@ -341,7 +353,7 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
   expect(request?.method).toBe('PATCH');
   const body = request?.body;
   expect(body instanceof FormData ? body.get('changes') : null).toBe(
-    JSON.stringify({ name: '変更した名前' }),
+    JSON.stringify({ name: '変更した名前', faceType: 'round' }),
   );
   expect(mockPutProfile).not.toHaveBeenCalled();
   expect(mockNotify).toHaveBeenCalled();
@@ -364,14 +376,8 @@ test.each([
     mockGetProfile.mockResolvedValueOnce(profileResponse('round'));
   }
   await renderWithClient(<ProfileSettings />);
-  // Compose's content-sized Host needs the measured width of the settings card.
-  await fireEvent(await screen.findByTestId('face-type-row'), 'layout', {
-    nativeEvent: { layout: { width: 380 } },
-  });
   expect(screen.queryByText(/イエベ/)).toBeNull();
-  await fireEvent.press(
-    screen.getByRole('button', { name: clearing ? '顔タイプ 丸顔' : '顔タイプ 未設定' }),
-  );
+  await openFaceTypeMenu(clearing ? '丸顔' : '未設定');
   expect(screen.getAllByRole('menuitem')).toHaveLength(6);
   await fireEvent.press(screen.getByRole('menuitem', { name: label }));
   expect(screen.getByRole('button', { name: `顔タイプ ${label}` })).toBeOnTheScreen();

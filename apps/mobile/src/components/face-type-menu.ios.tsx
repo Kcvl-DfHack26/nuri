@@ -14,8 +14,8 @@ import { StyleSheet, View } from 'react-native';
 import type { FaceTypeMenuProps } from './face-type-menu';
 
 export function FaceTypeMenu({
-  value,
-  valueLabel,
+  label,
+  selection,
   options,
   onSelect,
   disabled: isDisabled,
@@ -31,13 +31,13 @@ export function FaceTypeMenu({
         <Menu
           label={trigger}
           modifiers={[
-            accessibilityLabel('顔タイプ'),
-            accessibilityValue(valueLabel),
+            accessibilityLabel(label),
+            accessibilityValue(selection.title),
             disabled(isDisabled),
           ]}
         >
           <Picker
-            selection={value}
+            selection={selection.id}
             onSelectionChange={onSelect}
             modifiers={[pickerStyle('inline')]}
           >

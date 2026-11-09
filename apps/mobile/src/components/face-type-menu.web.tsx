@@ -1,12 +1,19 @@
 import type { FaceTypeMenuProps } from './face-type-menu';
 
-export function FaceTypeMenu({ value, options, onSelect, disabled, children }: FaceTypeMenuProps) {
+export function FaceTypeMenu({
+  label,
+  selection,
+  options,
+  onSelect,
+  disabled,
+  children,
+}: FaceTypeMenuProps) {
   return (
     <div className="relative focus-within:outline-2 focus-within:-outline-offset-2 focus-within:outline-ink-primary">
       {children}
       <select
-        aria-label="顔タイプ"
-        value={value}
+        aria-label={label}
+        value={selection.id}
         disabled={disabled}
         className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-default"
         onChange={(event) => {
