@@ -89,10 +89,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val generation: Int
   )
   @Volatile private var latestFrame: CameraFrame? = null
-  @Volatile private var frameWidth = 0
-  @Volatile private var frameHeight = 0
-  // Clockwise degrees that make the analyzed frames upright.
-  @Volatile private var frameRotation = 0
+  @Volatile private var frameGeometry: FrameGeometry? = null
 
   init {
     addView(previewView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -321,14 +318,7 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val rotation = image.imageInfo.rotationDegrees
     val bitmap = image.toBitmap()
     image.close()
-    if (previous == null || previous.generation != generation) {
-      Log.i(TAG, "Analysis frames are ${bitmap.width}x${bitmap.height}, rotated $rotation degrees")
-    }
-    // MediaPipe rotates the frame itself, so no rotated copy is made for each frame.
-    val sideways = rotation == 90 || rotation == 270
-    frameWidth = if (sideways) bitmap.height else bitmap.width
-    frameHeight = if (sideways) bitmap.width else bitmap.height
-    frameRotation = rotation
+    val geometry = geometryFor(bitmap.width, bitmap.height, rotation, timestamp)
     if (!active || generation != sessionGeneration) return
     latestFrame = CameraFrame(bitmap, rotation, timestamp, generation)
     if (!trackLandmarks) return
@@ -341,16 +331,30 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       return
     }
     try {
-      val options = ImageProcessingOptions.builder().setRotationDegrees(rotation).build()
-      current.detectAsync(BitmapImageBuilder(bitmap).build(), options, timestamp)
+      // MediaPipe rotates the frame itself, so no rotated copy is made for each frame.
+      current.detectAsync(BitmapImageBuilder(bitmap).build(), geometry.options, timestamp)
     } catch (error: MediaPipeException) {
       onLandmarkerError(current, error)
     }
   }
 
+  // Analysis thread. Replaced only when the frames change, so every result can be matched with
+  // the geometry of the frame it came from.
+  private fun geometryFor(sensorWidth: Int, sensorHeight: Int, rotation: Int, timestamp: Long): FrameGeometry {
+    val current = frameGeometry
+    if (current != null && current.matches(sensorWidth, sensorHeight, rotation)) {
+      return current
+    }
+    Log.i(TAG, "Analysis frames are ${sensorWidth}x$sensorHeight, rotated $rotation degrees")
+    return FrameGeometry(sensorWidth, sensorHeight, rotation, timestamp).also { frameGeometry = it }
+  }
+
   // MediaPipe's thread.
   private fun onResult(result: FaceLandmarkerResult) {
     if (result.timestampMs() <= discardResultsBeforeMs) return
+    // A result from before the frames changed size or rotation would be turned the wrong way.
+    val geometry = frameGeometry ?: return
+    if (result.timestampMs() < geometry.sinceMs) return
     framesWithoutResult.set(0)
     val face = result.faceLandmarks().firstOrNull()
     if (face.isNullOrEmpty()) {
@@ -360,15 +364,12 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       return
     }
     val points = ArrayList<Double>(face.size * 2)
-    val rotation = frameRotation
     for (landmark in face) {
-      val (uprightX, uprightY) = upright(landmark.x().toDouble(), landmark.y().toDouble(), rotation)
-      points.add(uprightX)
-      points.add(uprightY)
+      geometry.addUpright(points, landmark.x().toDouble(), landmark.y().toDouble())
     }
     val latencyMs = (SystemClock.uptimeMillis() - result.timestampMs()).toDouble()
-    val width = frameWidth.toDouble()
-    val height = frameHeight.toDouble()
+    val width = geometry.width.toDouble()
+    val height = geometry.height.toDouble()
     post {
       if (!active || !isAttachedToWindow || result.timestampMs() <= discardResultsBeforeMs) return@post
       setStatus("tracking")
@@ -385,19 +386,51 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     onStatus(if (message == null) mapOf("status" to status) else mapOf("status" to status, "message" to message))
   }
 
+  // The analyzed frames as the sensor delivers them, and the clockwise rotation (CameraX's
+  // rotationDegrees) that makes them upright.
+  private class FrameGeometry(
+    private val sensorWidth: Int,
+    private val sensorHeight: Int,
+    private val rotationDegrees: Int,
+    /** When frames with this geometry began; earlier results belong to the previous one. */
+    val sinceMs: Long
+  ) {
+    private val sideways = rotationDegrees == 90 || rotationDegrees == 270
+    val width = if (sideways) sensorHeight else sensorWidth
+    val height = if (sideways) sensorWidth else sensorHeight
+    val options: ImageProcessingOptions =
+      ImageProcessingOptions.builder().setRotationDegrees(rotationDegrees).build()
+
+    fun matches(otherWidth: Int, otherHeight: Int, otherRotation: Int) =
+      sensorWidth == otherWidth && sensorHeight == otherHeight && rotationDegrees == otherRotation
+
+    // MediaPipe finds the face in the frame rotated by `options`, but returns the landmarks
+    // normalized to the frame it was given. This turns them clockwise into the upright frame, as
+    // rotating the frame itself did.
+    fun addUpright(points: MutableList<Double>, x: Double, y: Double) {
+      when (rotationDegrees) {
+        90 -> {
+          points.add(1 - y)
+          points.add(x)
+        }
+        180 -> {
+          points.add(1 - x)
+          points.add(1 - y)
+        }
+        270 -> {
+          points.add(y)
+          points.add(1 - x)
+        }
+        else -> {
+          points.add(x)
+          points.add(y)
+        }
+      }
+    }
+  }
+
   private companion object {
     const val TAG = "FaceTracker"
-
-    // MediaPipe finds the face in the frame rotated by ImageProcessingOptions, but returns the
-    // landmarks normalized to the frame it was given. This turns them clockwise into the upright
-    // frame, as rotating the frame itself did.
-    fun upright(x: Double, y: Double, rotationDegrees: Int): Pair<Double, Double> =
-      when (rotationDegrees) {
-        90 -> Pair(1 - y, x)
-        180 -> Pair(1 - x, 1 - y)
-        270 -> Pair(y, 1 - x)
-        else -> Pair(x, y)
-      }
     // Whether the GPU works is a property of the device, so once it fails, every later
     // landmarker in the app uses the CPU instead of waiting for the GPU again.
     @Volatile var gpuFailed = false
