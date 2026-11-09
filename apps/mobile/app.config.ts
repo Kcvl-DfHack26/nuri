@@ -1,5 +1,7 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
+import { withBuildProperties } from 'expo-build-properties';
+
 import withLocalhostCA from './plugins/with-localhost-ca.ts';
 
 export default function configure({ config }: ConfigContext): ExpoConfig {
@@ -17,22 +19,8 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
       'react-native-nitro-google-signin',
       { iosUrlScheme: googleIosClientId.split('.').reverse().join('.') },
     ]);
-  } else {
-    // Autolinking installs Google Sign-In even when OAuth is unconfigured.
-    plugins.push([
-      'expo-build-properties',
-      {
-        ios: {
-          extraPods: [
-            { name: 'AppCheckCore', modular_headers: true },
-            { name: 'GoogleUtilities', modular_headers: true },
-            { name: 'RecaptchaInterop', modular_headers: true },
-          ],
-        },
-      },
-    ]);
   }
-  return withLocalhostCA({
+  const nativeConfig = withLocalhostCA({
     ...config,
     name: config.name ?? 'nuri',
     slug: config.slug ?? 'nuri',
@@ -45,6 +33,20 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
       ...config.ios,
       ...(appleTeamId ? { appleTeamId } : {}),
       ...(rpId ? { associatedDomains: [`webcredentials:${rpId}`] } : {}),
+    },
+  });
+  if (googleIosClientId) {
+    return nativeConfig;
+  }
+
+  // Autolinking installs Google Sign-In even when OAuth is unconfigured.
+  return withBuildProperties(nativeConfig, {
+    ios: {
+      extraPods: [
+        { name: 'AppCheckCore', modular_headers: true },
+        { name: 'GoogleUtilities', modular_headers: true },
+        { name: 'RecaptchaInterop', modular_headers: true },
+      ],
     },
   });
 }
