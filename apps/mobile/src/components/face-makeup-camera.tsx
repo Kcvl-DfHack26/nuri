@@ -18,9 +18,11 @@ import type { PartId } from '@/components/recipes';
 import type { Point, Size } from '@/lib/face-landmarks';
 import type { MakeupLayer } from '@/lib/face-makeup';
 
+import { ArMetricsOverlay, arMetricsEnabled } from '@/components/ar-metrics';
 import { FaceTexture } from '@/components/face-texture';
 import { useShapeTexture } from '@/components/shape-texture';
 import { Text } from '@/components/ui/text';
+import { recordArRender, recordArResult, startArMetricsWindow } from '@/lib/ar-metrics';
 import { toViewPoints } from '@/lib/face-landmarks';
 import { canonicalVertexCount } from '@/lib/face-mesh';
 
@@ -102,7 +104,16 @@ export function FaceMakeupCamera({
   const [status, setStatus] = useState<FaceTrackerStatusEvent>();
   const [view, setView] = useState<Size>({ width: 0, height: 0 });
   const [points, setPoints] = useState<Point[]>([]);
+  // A stable ref, created once: measuring must not allocate on every landmark render.
+  const [metrics] = useState(() => ({ current: startArMetricsWindow(performance.now()) }));
   const active = permission === 'granted' && focused && appActive;
+
+  // Passive effects run after the commit, so this marks when the latest landmarks were rendered.
+  useEffect(() => {
+    if (arMetricsEnabled) {
+      recordArRender(metrics.current, performance.now());
+    }
+  }, [points]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -204,6 +215,12 @@ export function FaceMakeupCamera({
             setStatus({ status: 'tracking' });
           }
           const frame = event.nativeEvent;
+          if (arMetricsEnabled) {
+            recordArResult(metrics.current, {
+              latencyMs: frame.latencyMs,
+              nowMs: performance.now(),
+            });
+          }
           setPoints(toViewPoints(frame.points, frame, view, canonicalVertexCount));
         }}
         onStatus={(event) => {
@@ -232,6 +249,7 @@ export function FaceMakeupCamera({
         <Pin point={pin} label={annotation.label} view={view} />
       ) : null}
       {children}
+      {arMetricsEnabled ? <ArMetricsOverlay metrics={metrics} /> : null}
       {message ? (
         <View className="absolute inset-x-8 top-1/2 items-center gap-3">
           <Text
