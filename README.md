@@ -69,7 +69,7 @@ TypeScriptを中心に、端末内の顔処理とGoogle Cloud上の動画解析�
 | 動画解析        | Vertex AI、Gemini 3.8 Flash、Google Gen AI SDK                        | 手順と塗布範囲の意味情報の抽出、コスメ候補の検索確認                 |
 | API・入力検証   | Hono、Hono Client、Zod、Node.js                                       | 型を共有するAPI、入力検証、認可                                      |
 | 認証・DB        | Better Auth、Drizzle ORM、Cloud SQL / PostgreSQL                      | ユーザー・セッション・レシピ・手順・投稿サムネイルの保存             |
-| 画像ストレージ  | Cloud Storage、Floci（ローカル）                                      | seed画像を非公開バケットに保存し、Hono APIで配信                     |
+| 画像ストレージ  | Cloud Storage、Floci（ローカル）                                      | seed画像とプロフィール写真を非公開バケットに保存し、Hono APIで配信   |
 | 実行・配信基盤  | Cloud Run、Artifact Registry、Secret Manager                          | APIとWebの実行、コンテナ配信、秘密情報の注入                         |
 | インフラ・CI/CD | OpenTofu、GitHub Actions、WIF、Expo EAS                               | リソース定義、検査、キーレス認証、ネイティブビルドとUpdateの配布設定 |
 | 開発・検証      | Bun workspaces、Turborepo、Docker Compose、Bun test、Jest、Playwright | 開発環境、依存管理、単体・統合・Webの検証                            |
