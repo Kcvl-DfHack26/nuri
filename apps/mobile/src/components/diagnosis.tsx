@@ -15,6 +15,7 @@ import { Feedback } from '@/components/feedback';
 import { GlassIconButton } from '@/components/glass-icon-button';
 import { ProfilePhoto } from '@/components/my-page';
 import { PrimaryButton } from '@/components/post-chrome';
+import { RecipeCardMetadata } from '@/components/recipe-card';
 import { parts } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
@@ -51,7 +52,6 @@ const NEXT = Icon.select({
   ios: 'chevron.right',
   android: import('@expo/material-symbols/chevron_right.xml'),
 });
-const HEART = Icon.select({ ios: 'heart', android: import('@expo/material-symbols/favorite.xml') });
 
 // Why the suited brow helps, shown on the brow row.
 const browAdvice: Record<BrowShape, string> = {
@@ -408,8 +408,6 @@ function RecommendationCard({
   recipe: RecipeSummary;
   matched: string | undefined;
 }) {
-  const secondary = useTokenColor('--color-ink-secondary');
-  const likes = formatCount(recipe.likeCount);
   return (
     <View className="w-43">
       <Pressable
@@ -437,16 +435,7 @@ function RecommendationCard({
             </View>
           ) : null}
         </View>
-        <View className="w-full gap-px px-1 pt-0.5">
-          <Text className="font-maru-bold text-label text-ink-primary">{recipe.title}</Text>
-          <View className="flex-row items-center gap-0.75">
-            <Text className="flex-1 font-maru text-meta text-ink-secondary">
-              {recipe.author.name}
-            </Text>
-            <SocialIcon name={HEART} size={13} color={secondary} />
-            <Text className="font-maru text-meta text-ink-secondary">{likes}</Text>
-          </View>
-        </View>
+        <RecipeCardMetadata recipe={recipe} likes={formatCount(recipe.likeCount)} />
       </Pressable>
       {/* Plan A puts the heart at the photo's bottom right: 180 - 8 - 30 from the top. */}
       <CardFavorite

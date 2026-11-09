@@ -2,7 +2,7 @@ import { Icon } from '@expo/ui';
 import { recipeSearchMaxLength } from '@starter/shared';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -47,7 +47,6 @@ export function RecipeSearch() {
     ...recipeListOptions({ q: term }),
     enabled: Boolean(apiUrl) && term !== '',
   });
-  const items = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
   const status = !apiUrl ? (
     <Feedback message="接続先が未設定です。セットアップ後にレシピを検索できます。" />
   ) : term === '' ? (
@@ -98,24 +97,13 @@ export function RecipeSearch() {
       </View>
       <RecipeList
         automaticallyAdjustKeyboardInsets
-        data={items}
+        query={list}
+        status={status}
+        emptyMessage={`「${term}」に合うレシピはありません`}
         contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 24, gap: 14 }}
         contentInsetAdjustmentBehavior="never"
         keyboardDismissMode="on-drag"
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={status ? <View className="px-4">{status}</View> : undefined}
-        ListEmptyComponent={
-          status ? undefined : (
-            <View className="px-4">
-              <Feedback message={`「${term}」に合うレシピはありません`} />
-            </View>
-          )
-        }
-        onEndReached={() => {
-          if (list.hasNextPage && !list.isFetchingNextPage && !list.isError) {
-            void list.fetchNextPage();
-          }
-        }}
       />
     </View>
   );

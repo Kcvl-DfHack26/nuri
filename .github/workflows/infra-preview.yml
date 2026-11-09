@@ -33,7 +33,7 @@ jobs:
       - name: Verify Current Main and CI
         env:
           GH_TOKEN: ${{ github.token }}
-        run: bun .github/scripts/preview/bootstrap.ts verify
+        run: bun .github/scripts/ci/verify-main.ts
       - uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.PREVIEW_INFRA_WIF_PROVIDER }}
@@ -46,4 +46,4 @@ jobs:
         env:
           OPERATION: ${{ inputs.operation }}
           PREVIEW_GCP_PROJECT_ID: ${{ vars.PREVIEW_GCP_PROJECT_ID }}
-        run: bun .github/scripts/preview/bootstrap.ts manage
+        run: bun .github/scripts/preview/bootstrap.ts

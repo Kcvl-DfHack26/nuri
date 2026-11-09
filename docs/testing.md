@@ -41,6 +41,14 @@ tflint --chdir=infra --config="$PWD/.tflint.hcl"
 tflint --chdir=infra/bootstrap --config="$PWD/.tflint.hcl"
 ```
 
+### Fallow
+
+`bun run deadcode` と `bun run dupes` は `bun run check` とCIの `Static Analysis` で共通して実行する。未使用コード・依存関係などの警告、パース失敗、理由のない抑制、不要になった抑制をエラーとして扱う。重複は50トークン以上かつ5行以上の断片が2か所以上にあれば失敗する。Fallow既定のテスト・生成ファイルの除外を使い、既存重複のベースラインは設けない。
+
+失敗したら同じコマンドをローカルで再実行し、出力されたパスと行番号を確認する。同じ規則を実装していれば共有し、独立に保つ必要がある場合は理由を添えて対象だけを抑制する。検出条件や抑制の変更はPRで根拠を示す。
+
+`.fallowrc.json` の手動エントリはプレビューコンテナの起動スクリプトが呼ぶ `scripts/preview-ready.ts`。依存の除外はExpoとBabelがビルド時またはネイティブ側で使うパッケージ、トンネル用の `@expo/ngrok`、ESLintの設定経由で使うresolverに限る。
+
 ## iOS / Android 共通の実機チェック
 
 1. `bun run db:seed` 後、メイクタブの①にレシピ6件が並び、狐メイクから⑤（タグ・取り込み元・使うメイク品）を開けることを確認する。再実行して件数が増えず、利用者が投稿したレシピが残ることも確認する。

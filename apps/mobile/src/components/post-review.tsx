@@ -18,15 +18,12 @@ import {
 } from '@/components/post-chrome';
 import { segmentLength, stepTitle, usePostDraft } from '@/components/post-draft';
 import { SocialIcon } from '@/components/social-icon';
+import { StepCardContent } from '@/components/step-card-content';
 import { Text } from '@/components/ui/text';
 import { useTokenColor } from '@/theme/tokens';
 
 import sparkleRose from '../../assets/plan-a/post/sparkle-rose.svg';
 
-const PLAY = Icon.select({
-  ios: 'play.fill',
-  android: import('@expo/material-symbols/play_arrow.xml'),
-});
 const MORE = Icon.select({
   ios: 'ellipsis',
   android: import('@expo/material-symbols/more_horiz.xml'),
@@ -119,20 +116,9 @@ function StepCard({ step, index }: { step: PostStep; index: number }) {
       }}
       className="flex-row items-center gap-3 rounded-card border-fine border-line-soft bg-bg-surface py-2.5 pl-2.5 pr-2 active:opacity-70"
     >
-      <View className="h-21 w-17 overflow-hidden rounded-thumbnail">
+      <StepCardContent number={index + 1} title={title} summary={summary} length={length}>
         <StepFrame step={step} />
-        <View className="absolute left-1.25 top-1.25 size-5.5 items-center justify-center rounded-full bg-accent-rose">
-          <Text className="font-maru-bold text-micro text-bg-surface">{index + 1}</Text>
-        </View>
-        <View className="absolute left-9.75 top-13.75 size-6 items-center justify-center rounded-full bg-bg-surface">
-          <SocialIcon name={PLAY} size={14} color={ink} />
-        </View>
-      </View>
-      <View className="flex-1 gap-0.75">
-        <Text className="font-maru-bold text-action text-ink-primary">{title}</Text>
-        {summary ? <Text className="font-maru text-meta text-ink-secondary">{summary}</Text> : null}
-        <Text className="font-maru text-meta text-accent-rose">区間 {length}</Text>
-      </View>
+      </StepCardContent>
       <SocialIcon name={MORE} size={22} color={ink} />
     </Pressable>
   );
