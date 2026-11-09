@@ -46,6 +46,22 @@
       "android": {
         "buildType": "apk"
       }
+    },
+    "staging-release": {
+      "extends": "simulator",
+      "env": {
+        "EXPO_NO_DOTENV": "1",
+        "EXPO_PUBLIC_API_URL": "https://nuri-staging-v3kjfarita-an.a.run.app",
+        "NURI_STAGING_RELEASE": "1"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
+      },
+      "android": {
+        "env": {
+          "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64"
+        }
+      }
     }
   },
   "submit": {

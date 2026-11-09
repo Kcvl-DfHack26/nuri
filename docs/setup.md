@@ -307,6 +307,17 @@ CLIが未認証なら `bunx eas login` を実行する。公開APIで実機を�
 
 Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア提出は自動実行しない。初期設定のビルド・端末確認記録は [検証](testing.md) を参照する。
 
+### GitHub Releasesからstagingビルドを入れる
+
+[GitHub Releases](https://github.com/Kcvl-DfHack26/nuri/releases) の `staging-<実行ID>` から、共有stagingにつながる配布ビルドを取得する。どちらもアプリを同梱しており、起動にExpo GoやMetroは不要。
+
+- Androidは `nuri-staging-android.apk` を対応端末で開くか、接続済みの端末に `adb install -r nuri-staging-android.apk` で入れる。
+- iOS SimulatorはMacで `nuri-staging-ios-simulator.app.zip` を展開し、XcodeのSimulatorを起動して `xcrun simctl install booted ./nuri.app` を実行する。
+
+配布するにはGitHub Actionsの **Publish staging mobile release** を `main` から手動実行する。mainのCIとstagingの `/ready` が成功し、同じSHAから作成した両ファイルが検査を通ると公開プレリリースが作られる。失敗時はActionsのログを確認し、原因を解消して **Run workflow** から新しい実行を開始する。
+
+初回設定ではGitHubの `mobile-release` 環境を `main` に制限し、[Expoのアクセストークン](https://docs.expo.dev/accounts/programmatic-access/)を環境Secret `EXPO_TOKEN` に登録する。トークンのアクセス先を `kcvlb4` に限定し、Expo Buildに必要な権限を与える。AndroidはEASの `com.kcvl.nuri` に登録した署名鍵を使う。鍵が未設定の場合は、Expoプロジェクトの管理者が `apps/mobile` で `bunx eas credentials --platform android` を実行して設定する。
+
 ### プッシュ通知
 
 - Expoの nuri プロジェクトにAPNsキーとFCM v1送信用の認証情報を登録する。AndroidのFirebaseアプリのパッケージ名は `com.kcvl.nuri`。EAS Environmentの `GOOGLE_SERVICES_JSON` をファイル型・Sensitiveで設定し、ビルドとEAS Updateの同じ環境で同一の `google-services.json` を使う。ローカルビルドでは同じ変数にファイルへの絶対パスを指定する。FCMのサービスアカウントキーはEASのCredentialsに登録し、アプリに含めない。[Expoの設定手順](https://docs.expo.dev/push-notifications/push-notifications-setup/)
