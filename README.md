@@ -7,7 +7,7 @@
 
 お手本のメイクを見ても、自分の顔ではどこに、どんな形で塗ればよいか迷う。nuriは、メイクを手順ごとのレシピとして選び、インカメラに映る自分の顔へ塗る範囲と色を重ねながら再現するアプリです。写真から顔の特徴を知り、メイク動画から手順書を作って、編集・投稿できます。
 
-[🎨 Figma / Plan A](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426) · [📋 要件定義](docs/requirements.md) · [🛠️ セットアップ](docs/setup.md) · [🏗️ 構成仕様](docs/architecture.md)
+[🎨 Figma / 実装plan](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426) · [📋 要件定義](docs/requirements.md) · [🛠️ セットアップ](docs/setup.md) · [🏗️ 構成仕様](docs/architecture.md)
 
 <table>
   <tr>
@@ -16,9 +16,9 @@
     <th>🎬 動画から作った手順を編集</th>
   </tr>
   <tr>
-    <td><img src="docs/images/readme/figma-home.png" alt="Figma Plan Aのホーム画面デザイン" width="250" /></td>
-    <td><img src="docs/images/readme/figma-ar.png" alt="Figma Plan AのAR手順ガイドの画面デザイン" width="250" /></td>
-    <td><img src="docs/images/readme/figma-step-editor.png" alt="Figma Plan Aの手順編集画面デザイン" width="250" /></td>
+    <td><img src="docs/images/readme/figma-home.png" alt="Figma 実装planのホーム画面デザイン" width="250" /></td>
+    <td><img src="docs/images/readme/figma-ar.png" alt="Figma 実装planのAR手順ガイドの画面デザイン" width="250" /></td>
+    <td><img src="docs/images/readme/figma-step-editor.png" alt="Figma 実装planの手順編集画面デザイン" width="250" /></td>
   </tr>
 </table>
 
