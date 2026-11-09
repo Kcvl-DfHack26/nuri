@@ -42,7 +42,7 @@ function Navigation() {
             sheetCornerRadius: 28,
           }}
         />
-        {/* Plan A ④ draws its own sheet header; ④-4 covers the sheet so back returns to it. */}
+        {/* Plan A ④ draws its own sheet header. */}
         <Stack.Screen
           name="import/index"
           options={{
@@ -52,10 +52,6 @@ function Navigation() {
             sheetGrabberVisible: true,
             sheetCornerRadius: 28,
           }}
-        />
-        <Stack.Screen
-          name="import/steps"
-          options={{ headerShown: false, presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="recipes/[id]/compare" options={{ headerShown: false }} />
         <Stack.Screen name="profile-settings" options={{ headerShown: false }} />

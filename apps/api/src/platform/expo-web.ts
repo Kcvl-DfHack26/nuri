@@ -9,7 +9,6 @@ const pages = [
   '/auth-callback',
   '/diagnosis',
   '/import',
-  '/import/steps',
   '/parts/:part',
   '/post/cosmetics/:index',
   '/post/creating',
