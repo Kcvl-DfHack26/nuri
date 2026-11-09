@@ -132,7 +132,7 @@ export function socialRoutes(db: Database, auth: Auth, images: ImageStore | null
                 .update(user)
                 .set({ ...changes, image, updatedAt: new Date() })
                 .where(owner);
-              await saveImage(images, key, bytes, 'image/jpeg');
+              await saveImage(images, key, bytes);
               return current;
             });
             if (!previous) {

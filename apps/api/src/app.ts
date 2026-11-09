@@ -2,6 +2,7 @@ import { postAnalysisVideoMaxBytes, profilePhotoMaxBytes } from '@starter/shared
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
+import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
 
 import type { Database } from './db/client';
@@ -29,21 +30,18 @@ export function createApp(
     new URL(env.BETTER_AUTH_URL).origin,
     ...origins.filter((origin) => origin.startsWith('http')),
   ];
-  // Answer 413 instead of letting the thrown HTTPException become a 500 in onError.
-  const onError: Parameters<typeof bodyLimit>[0]['onError'] = (c) =>
-    c.json({ error: 'payload_too_large' as const }, 413);
-  const smallBody = bodyLimit({ maxSize: 64 * 1024, onError });
+  const smallBody = bodyLimit({ maxSize: 64 * 1024 });
   // POST /api/recipes carries a base64 JPEG of up to 1.5 MB (2 MB as base64) plus the texts.
-  const postedRecipeBody = bodyLimit({ maxSize: 2.5 * 1024 * 1024, onError });
+  const postedRecipeBody = bodyLimit({ maxSize: 2.5 * 1024 * 1024 });
   // POST /api/post-analyses carries the video from ⑫-3 and its marks as multipart form data.
-  const postVideoBody = bodyLimit({ maxSize: postAnalysisVideoMaxBytes + 64 * 1024, onError });
-  const profilePhotoBody = bodyLimit({ maxSize: profilePhotoMaxBytes + 64 * 1024, onError });
+  const postVideoBody = bodyLimit({ maxSize: postAnalysisVideoMaxBytes + 64 * 1024 });
+  const profilePhotoBody = bodyLimit({ maxSize: profilePhotoMaxBytes + 64 * 1024 });
   const images = env.GCS_BUCKET ? createImageStore(env) : null;
   return (
     new Hono()
       .route('/', imageRoutes(images))
       .use('*', secureHeaders())
-      // A posted recipe carries its thumbnail; every other API body stays small.
+      // Only API routes carrying uploads allow larger bodies.
       .use('/api/*', (c, next) => {
         if (c.req.method === 'POST' && c.req.path === '/api/recipes') {
           return postedRecipeBody(c, next);
@@ -111,6 +109,16 @@ export function createApp(
       .route('/api', socialRoutes(db, auth, images))
       .route('/api', postAnalysisRoutes(requireSession(auth), analyzePost))
       .route('/', expoWebRoutes(env.EXPO_WEB_ROOT))
-      .onError((_error, c) => c.json({ error: 'internal_error' as const }, 500))
+      .onError((error, c) => {
+        // Keep parser details out of responses while preserving the status of bad requests.
+        switch (error instanceof HTTPException ? error.status : 500) {
+          case 400:
+            return c.json({ error: 'invalid_request' as const }, 400);
+          case 413:
+            return c.json({ error: 'payload_too_large' as const }, 413);
+          default:
+            return c.json({ error: 'internal_error' as const }, 500);
+        }
+      })
   );
 }

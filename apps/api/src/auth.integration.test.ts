@@ -670,6 +670,13 @@ test('updates only the signed-in profile after the photo is saved', async () => 
   };
   const path = '/api/me/profile/photo';
   expect((await appRequest(path, upload(photo, {}, ''))).status).toBe(401);
+  const malformed = await appRequest(path, {
+    method: 'PATCH',
+    body: 'invalid multipart data',
+    headers: { origin, cookie, 'content-type': 'multipart/form-data; boundary=missing' },
+  });
+  expect(malformed.status).toBe(400);
+  expect(await malformed.json()).toEqual({ error: 'invalid_request' });
   expect((await appRequest(path, upload(photo, { id: 'someone-else' }))).status).toBe(400);
   expect(
     (await appRequest(path, upload(photo, { image: 'https://example.com/spoof.jpg' }))).status,
