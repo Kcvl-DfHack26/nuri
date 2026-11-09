@@ -1,5 +1,6 @@
+import type { Video } from 'react-native-compressor';
+
 import { File } from 'expo-file-system';
-import { Video } from 'react-native-compressor';
 
 import { shrinkVideo } from './post-analysis';
 
@@ -18,13 +19,13 @@ const mockCompress = jest.fn<
   Parameters<typeof Video.compress>
 >();
 const mockCancel = jest.fn<void, [string]>();
-jest.mock('react-native-compressor', () => ({
-  Video: {
+jest.mock('./video-compressor', () => ({
+  loadVideoCompressor: async () => ({
     compress: (...args: Parameters<typeof mockCompress>) => mockCompress(...args),
     cancelCompression: (id: string) => {
       mockCancel(id);
     },
-  },
+  }),
 }));
 
 beforeEach(() => {

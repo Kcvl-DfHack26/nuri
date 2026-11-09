@@ -4,9 +4,10 @@ import { postAnalysisSchema, postAnalysisVideoMaxBytes } from '@starter/shared';
 import { File } from 'expo-file-system';
 import { fetch } from 'expo/fetch';
 import { Platform } from 'react-native';
-import { Video } from 'react-native-compressor';
 
 import { api, authClient } from '@/lib/api';
+
+import { loadVideoCompressor } from './video-compressor';
 
 const failures: Record<number, string> = {
   401: 'ログインし直してからお試しください。',
@@ -27,35 +28,41 @@ export async function shrinkVideo(
   if (new File(uri).size <= postAnalysisVideoMaxBytes) {
     return uri;
   }
-  let cancellationId: string | null = null;
-  const cancel = () => {
-    if (cancellationId) {
-      Video.cancelCompression(cancellationId);
-    }
-  };
-  signal.addEventListener('abort', cancel);
   try {
-    return await Video.compress(
-      uri,
-      {
-        compressionMethod: 'manual',
-        maxSize: 1280,
-        bitrate: 1_000_000,
-        // Keep no location or other metadata from the camera roll in the copy that is sent.
-        preserveMetadata: false,
-        getCancellationId: (id) => {
-          cancellationId = id;
+    const Video = await loadVideoCompressor();
+    if (signal.aborted) {
+      throw new Error('動画の圧縮を中止しました。');
+    }
+    let cancellationId: string | null = null;
+    const cancel = () => {
+      if (cancellationId) {
+        Video.cancelCompression(cancellationId);
+      }
+    };
+    signal.addEventListener('abort', cancel);
+    try {
+      return await Video.compress(
+        uri,
+        {
+          compressionMethod: 'manual',
+          maxSize: 1280,
+          bitrate: 1_000_000,
+          // Keep no location or other metadata from the camera roll in the copy that is sent.
+          preserveMetadata: false,
+          getCancellationId: (id) => {
+            cancellationId = id;
+          },
         },
-      },
-      onProgress,
-    );
+        onProgress,
+      );
+    } finally {
+      signal.removeEventListener('abort', cancel);
+    }
   } catch (error) {
     if (signal.aborted) {
       throw error;
     }
     throw new Error('動画を縮められませんでした。');
-  } finally {
-    signal.removeEventListener('abort', cancel);
   }
 }
 

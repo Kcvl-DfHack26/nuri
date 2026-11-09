@@ -1,7 +1,7 @@
 import type { ImagePickerAsset } from 'expo-image-picker';
 import type { ReactNode } from 'react';
 
-import { Host, Icon, Picker, Switch as NativeSwitch } from '@expo/ui';
+import { Host, Icon, Switch as NativeSwitch } from '@expo/ui';
 import {
   faceTypeIds,
   profileChangesSchema,
@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FaceType } from '@/lib/face-diagnosis';
 import type { MyProfile } from '@/lib/social';
 
+import { FaceTypeMenu } from '@/components/face-type-menu';
 import { Feedback } from '@/components/feedback';
 import { FloatingBackHeader } from '@/components/floating-back-header';
 import { ProfilePhoto } from '@/components/my-page';
@@ -514,12 +515,13 @@ function Field({
   );
 }
 
-const noFaceType = 'none';
+const faceTypeLabel = '顔タイプ';
+const unsetFaceType = { id: 'none', title: '未設定', faceType: null };
+const faceTypeOptions = [
+  ...faceTypeIds.map((faceType) => ({ id: faceType, title: faceTypes[faceType].label, faceType })),
+  unsetFaceType,
+];
 
-/**
- * ⑰-2's face type (#194): the saved one or 未設定, chosen from the five types in a native menu. ⑭ can
- * save the diagnosed one too. Skin tone is not diagnosed, so it is never shown.
- */
 function FaceTypeRow({
   value,
   onChange,
@@ -529,26 +531,29 @@ function FaceTypeRow({
   onChange: (faceType: FaceType | null) => void;
   disabled: boolean;
 }) {
+  const selection = faceTypeOptions.find(({ faceType }) => faceType === value) ?? unsetFaceType;
   return (
-    <View className={rowClassName}>
-      <Text className="flex-1 font-maru-bold text-label text-ink-primary">顔タイプ</Text>
-      <Host colorScheme="light" matchContents style={{ minHeight: 48 }}>
-        <Picker
-          testID="顔タイプ"
-          appearance="menu"
-          enabled={!disabled}
-          selectedValue={value ?? noFaceType}
-          onValueChange={(id) => {
-            onChange(faceTypeIds.find((faceType) => faceType === id) ?? null);
-          }}
-        >
-          {faceTypeIds.map((id) => (
-            <Picker.Item key={id} label={faceTypes[id].label} value={id} />
-          ))}
-          <Picker.Item label="未設定" value={noFaceType} />
-        </Picker>
-      </Host>
-    </View>
+    <FaceTypeMenu
+      label={faceTypeLabel}
+      selection={selection}
+      options={faceTypeOptions}
+      onSelect={(id) => {
+        const option = faceTypeOptions.find((choice) => choice.id === id);
+        if (option) {
+          onChange(option.faceType);
+        }
+      }}
+      disabled={disabled}
+    >
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        className={rowClassName}
+        pointerEvents="none"
+      >
+        <RowContent label={faceTypeLabel} value={selection.title} disclosure />
+      </View>
+    </FaceTypeMenu>
   );
 }
 
@@ -570,6 +575,34 @@ function Divider() {
 }
 
 const rowClassName = 'min-h-13 flex-row items-center gap-2 py-2 pl-3.5 pr-3';
+const rowLabelClassName = 'flex-1 font-maru-bold text-label text-ink-primary';
+
+function RowContent({
+  label,
+  value,
+  disclosure,
+  expanded,
+}: {
+  label: string;
+  value?: string | undefined;
+  disclosure?: boolean;
+  expanded?: boolean | undefined;
+}) {
+  const ink = useTokenColor('--color-ink-primary');
+  return (
+    <>
+      <Text className={rowLabelClassName}>{label}</Text>
+      {value ? (
+        <Text className="shrink font-maru text-meta text-ink-secondary">{value}</Text>
+      ) : null}
+      {disclosure ? (
+        <View className={expanded === undefined ? '' : expanded ? '-rotate-90' : 'rotate-90'}>
+          <SocialIcon name={NEXT} size={18} color={ink} webGlyph="›" />
+        </View>
+      ) : null}
+    </>
+  );
+}
 
 // A Plan A list row. A read-only value has no disclosure control.
 function Row({
@@ -585,17 +618,12 @@ function Row({
   expanded?: boolean;
   onPress?: () => void;
 }) {
-  const ink = useTokenColor('--color-ink-primary');
-  const content = (
-    <>
-      <Text className="flex-1 font-maru-bold text-label text-ink-primary">{label}</Text>
-      {value ? (
-        <Text className="shrink font-maru text-meta text-ink-secondary">{value}</Text>
-      ) : null}
-    </>
-  );
   if (readOnly) {
-    return <View className={rowClassName}>{content}</View>;
+    return (
+      <View className={rowClassName}>
+        <RowContent label={label} value={value} />
+      </View>
+    );
   }
 
   const disabled = !onPress;
@@ -609,10 +637,7 @@ function Row({
       onPress={onPress}
       className={`${rowClassName} active:opacity-70`}
     >
-      {content}
-      <View className={expanded === undefined ? '' : expanded ? '-rotate-90' : 'rotate-90'}>
-        <SocialIcon name={NEXT} size={18} color={ink} />
-      </View>
+      <RowContent label={label} value={value} disclosure expanded={expanded} />
     </Pressable>
   );
 }

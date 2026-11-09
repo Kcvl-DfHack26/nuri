@@ -12,33 +12,6 @@ import { ProfileSettings } from './profile-settings';
 
 jest.mock('@expo/ui', () => ({
   Icon: Object.assign(() => null, { select: () => 'icon' }),
-  // The stand-in shows the selected item's label; pressing it picks 丸顔.
-  Picker: Object.assign(
-    ({
-      testID,
-      selectedValue,
-      onValueChange,
-      children,
-    }: {
-      testID: string;
-      selectedValue: string;
-      onValueChange: (value: string) => void;
-      children: { props: { label: string; value: string } }[];
-    }) => {
-      const { Pressable } = jest.requireActual<typeof import('react-native')>('react-native');
-      const selected = children.flat().find((item) => item.props.value === selectedValue);
-      return (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${testID} ${selected?.props.label ?? ''}`}
-          onPress={() => {
-            onValueChange('round');
-          }}
-        />
-      );
-    },
-    { Item: () => null },
-  ),
   Host: jest.requireActual<typeof import('react-native')>('react-native').View,
   Switch: ({
     label,
@@ -60,6 +33,47 @@ jest.mock('@expo/ui', () => ({
         onValueChange={onValueChange}
         disabled={disabled}
       />
+    );
+  },
+}));
+jest.mock('@/components/face-type-menu', () =>
+  jest.requireActual<typeof import('./face-type-menu')>('./face-type-menu.tsx'),
+);
+jest.mock('@expo/ui/community/menu', () => ({
+  MenuView: ({
+    ref,
+    actions,
+    onPressAction,
+    children,
+  }: import('@expo/ui/community/menu').MenuComponentProps & {
+    ref?: React.Ref<import('@expo/ui/community/menu').MenuComponentRef>;
+  }) => {
+    const { useImperativeHandle, useState } = jest.requireActual<typeof import('react')>('react');
+    const { Pressable, Text } = jest.requireActual<typeof import('react-native')>('react-native');
+    const [open, setOpen] = useState(false);
+    useImperativeHandle(ref, () => ({
+      show: () => {
+        setOpen(true);
+      },
+    }));
+    return (
+      <>
+        {children}
+        {open
+          ? actions.map(({ id, title }) => (
+              <Pressable
+                key={id}
+                accessibilityRole="menuitem"
+                onPress={() => {
+                  onPressAction?.({ nativeEvent: { event: id ?? title } });
+                  setOpen(false);
+                }}
+              >
+                <Text>{title}</Text>
+              </Pressable>
+            ))
+          : null}
+      </>
     );
   },
 }));
@@ -190,12 +204,15 @@ afterEach(() => {
   jest.useRealTimers();
   mockUseSession.mockImplementation(() => ({ ...viewer, isPending: false }));
 });
-const mockGetProfile = jest.fn(async () => ({
-  status: 200,
-  json: async () => ({
-    profile: { name: 'はなこ', handle: null, bio: '', isPublic: true, faceType: null },
-  }),
-}));
+function profileResponse(faceType: 'round' | null = null) {
+  return {
+    status: 200,
+    json: async () => ({
+      profile: { name: 'はなこ', handle: null, bio: '', isPublic: true, faceType },
+    }),
+  };
+}
+const mockGetProfile = jest.fn(async () => profileResponse());
 const mockPutProfile = jest.fn(async (_input: { json: unknown }) => new Response(null));
 const mockUploadPhoto = jest.fn(async (_url: string, _init: RequestInit) => new Response(null));
 const mockImagePicker = jest.mocked(launchImageLibraryAsync);
@@ -225,6 +242,14 @@ async function saveProfile() {
     expect(router.back).toHaveBeenCalled();
     expect(screen.getByRole('button', { name: '保存する' })).toBeOnTheScreen();
   });
+}
+
+async function openFaceTypeMenu(currentLabel: string) {
+  // Compose's content-sized Host needs the measured width of the settings card.
+  await fireEvent(await screen.findByTestId('face-type-row'), 'layout', {
+    nativeEvent: { layout: { width: 380 } },
+  });
+  await fireEvent.press(screen.getByRole('button', { name: `顔タイプ ${currentLabel}` }));
 }
 
 test('saves profile fields and keeps unbuilt settings disabled', async () => {
@@ -276,7 +301,7 @@ test('previews the selected photo and cancels without uploading', async () => {
   expect(mockUploadPhoto).not.toHaveBeenCalled();
 });
 
-test('keeps the selected photo on failure and refreshes photo readers after retry', async () => {
+test('keeps the photo and face type on failure and saves both on retry', async () => {
   const client = createTestQueryClient();
   const detail = recipeOptions('fox').queryKey;
   const lists = [recipeListOptions({}).queryKey, favoriteListOptions('viewer').queryKey];
@@ -298,10 +323,13 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
   await renderWithClient(<ProfileSettings />, client);
   await fireEvent.press(await screen.findByRole('button', { name: '写真を変更' }));
   await fireEvent.changeText(screen.getByLabelText('表示名'), '変更した名前');
+  await openFaceTypeMenu('未設定');
+  await fireEvent.press(screen.getByRole('menuitem', { name: '丸顔' }));
   const save = screen.getByRole('button', { name: '保存する' });
   await fireEvent.press(save);
   const saving = await screen.findByRole('button', { name: '保存中' });
   expect(saving).toBeDisabled();
+  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeDisabled();
   await fireEvent.press(saving);
   expect(mockUploadPhoto).toHaveBeenCalledTimes(1);
   await act(() => {
@@ -315,6 +343,7 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
     uri: selectedPhoto.uri,
   });
   expect(screen.getByLabelText('表示名')).toHaveProp('value', '変更した名前');
+  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeEnabled();
   expect(mockNotify).not.toHaveBeenCalled();
   expect(client.getQueryState(detail)?.isInvalidated).toBe(false);
   await saveProfile();
@@ -324,7 +353,7 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
   expect(request?.method).toBe('PATCH');
   const body = request?.body;
   expect(body instanceof FormData ? body.get('changes') : null).toBe(
-    JSON.stringify({ name: '変更した名前' }),
+    JSON.stringify({ name: '変更した名前', faceType: 'round' }),
   );
   expect(mockPutProfile).not.toHaveBeenCalled();
   expect(mockNotify).toHaveBeenCalled();
@@ -334,14 +363,26 @@ test('keeps the selected photo on failure and refreshes photo readers after retr
   expect(client.getQueryState(['unrelated'])?.isInvalidated).toBe(false);
 });
 
-test('chooses a face type and saves it, never showing a skin tone', async () => {
+test.each([
+  ['面長', 'long'],
+  ['ベース型', 'square'],
+  ['丸顔', 'round'],
+  ['逆三角形', 'heart'],
+  ['卵型', 'oval'],
+  ['未設定', null],
+])('saves the selected face type %s', async (label, faceType) => {
+  const clearing = faceType === null;
+  if (clearing) {
+    mockGetProfile.mockResolvedValueOnce(profileResponse('round'));
+  }
   await renderWithClient(<ProfileSettings />);
-  const picker = await screen.findByRole('button', { name: '顔タイプ 未設定' });
   expect(screen.queryByText(/イエベ/)).toBeNull();
-  await fireEvent.press(picker);
-  expect(screen.getByRole('button', { name: '顔タイプ 丸顔' })).toBeOnTheScreen();
+  await openFaceTypeMenu(clearing ? '丸顔' : '未設定');
+  expect(screen.getAllByRole('menuitem')).toHaveLength(6);
+  await fireEvent.press(screen.getByRole('menuitem', { name: label }));
+  expect(screen.getByRole('button', { name: `顔タイプ ${label}` })).toBeOnTheScreen();
   await saveProfile();
-  expect(mockPutProfile).toHaveBeenCalledWith({ json: { faceType: 'round' } });
+  expect(mockPutProfile).toHaveBeenCalledWith({ json: { faceType } });
 });
 
 test('adds and removes passkeys inline in the account section', async () => {
