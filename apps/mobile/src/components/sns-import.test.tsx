@@ -19,7 +19,7 @@ jest.mock('react-native-safe-area-context', () => ({
 test('says importing from SNS is coming and points to posting a video', async () => {
   await render(<SnsImport />);
   expect(screen.getByRole('header', { name: '準備中' })).toBeOnTheScreen();
-  expect(screen.getByText(/下の「投稿」でレシピを作れます/)).toBeOnTheScreen();
+  expect(screen.getByText(/閉じて、「投稿」タブからレシピを作れます/)).toBeOnTheScreen();
   // The sample flow pretended to read a post and save a recipe; none of it remains.
   expect(screen.queryByLabelText('投稿のURL')).toBeNull();
   expect(screen.queryByRole('button', { name: '読み取る' })).toBeNull();

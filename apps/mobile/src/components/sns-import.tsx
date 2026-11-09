@@ -41,7 +41,7 @@ export function SnsImport() {
             SNSの動画からレシピを作る機能は、いま準備しています。
           </Text>
           <Text className="text-center font-maru text-meta text-ink-secondary">
-            自分で撮った動画や端末にある動画からは、下の「投稿」でレシピを作れます。
+            自分で撮った動画や端末にある動画からは、このシートを閉じて、「投稿」タブからレシピを作れます。
           </Text>
         </View>
       </ScrollView>
