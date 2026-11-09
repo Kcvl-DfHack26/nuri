@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.net.Uri
 import android.os.SystemClock
+import android.util.Log
 import android.util.Range
 import android.view.Surface
 import androidx.camera.core.CameraSelector
@@ -24,6 +25,7 @@ import com.google.mediapipe.framework.MediaPipeException
 import com.google.mediapipe.framework.image.BitmapImageBuilder
 import com.google.mediapipe.tasks.core.BaseOptions
 import com.google.mediapipe.tasks.core.Delegate
+import com.google.mediapipe.tasks.vision.core.ImageProcessingOptions
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarker
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
@@ -78,11 +80,16 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
   private var lastMessage: String? = null
 
   // The camera frame is independent of live tracking: a still-photo diagnosis can use it even
-  // when MediaPipe misses a frame. Replacing it keeps only one bitmap in memory.
-  private class CameraFrame(val bitmap: Bitmap, val atMs: Long, val generation: Int)
+  // when MediaPipe misses a frame. Replacing it keeps only one bitmap in memory. It is kept as the
+  // sensor delivered it; only a snapshot makes an upright copy.
+  private class CameraFrame(
+    val bitmap: Bitmap,
+    val rotationDegrees: Int,
+    val atMs: Long,
+    val generation: Int
+  )
   @Volatile private var latestFrame: CameraFrame? = null
-  @Volatile private var frameWidth = 0
-  @Volatile private var frameHeight = 0
+  @Volatile private var frameGeometry: FrameGeometry? = null
 
   init {
     addView(previewView, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
@@ -202,9 +209,13 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
           SystemClock.uptimeMillis() - it.atMs <= SNAPSHOT_MAX_AGE_MS
       }
       ?: return null
-    val upright = latest.bitmap
-    val mirror = Matrix().apply { preScale(-1f, 1f) }
-    val frame = Bitmap.createBitmap(upright, 0, 0, upright.width, upright.height, mirror, true)
+    val sensor = latest.bitmap
+    // Upright first, then mirrored like the preview.
+    val transform = Matrix().apply {
+      postRotate(latest.rotationDegrees.toFloat())
+      postScale(-1f, 1f)
+    }
+    val frame = Bitmap.createBitmap(sensor, 0, 0, sensor.width, sensor.height, transform, true)
     val folder = File(context.cacheDir, "face-tracker").apply { mkdirs() }
     val file = File(folder, "${UUID.randomUUID()}.jpg")
     file.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 85, it) }
@@ -307,16 +318,9 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     val rotation = image.imageInfo.rotationDegrees
     val bitmap = image.toBitmap()
     image.close()
-    val upright = if (rotation == 0) {
-      bitmap
-    } else {
-      val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
-      Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-    }
-    frameWidth = upright.width
-    frameHeight = upright.height
+    val geometry = geometryFor(bitmap.width, bitmap.height, rotation, timestamp)
     if (!active || generation != sessionGeneration) return
-    latestFrame = CameraFrame(upright, timestamp, generation)
+    latestFrame = CameraFrame(bitmap, rotation, timestamp, generation)
     if (!trackLandmarks) return
     val current = landmarker ?: openLandmarker() ?: return
     // MediaPipe only logs GPU graph errors that happen while frames are sent, so a GPU landmarker
@@ -327,15 +331,30 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
       return
     }
     try {
-      current.detectAsync(BitmapImageBuilder(upright).build(), timestamp)
+      // MediaPipe rotates the frame itself, so no rotated copy is made for each frame.
+      current.detectAsync(BitmapImageBuilder(bitmap).build(), geometry.options, timestamp)
     } catch (error: MediaPipeException) {
       onLandmarkerError(current, error)
     }
   }
 
+  // Analysis thread. Replaced only when the frames change, so every result can be matched with
+  // the geometry of the frame it came from.
+  private fun geometryFor(sensorWidth: Int, sensorHeight: Int, rotation: Int, timestamp: Long): FrameGeometry {
+    val current = frameGeometry
+    if (current != null && current.matches(sensorWidth, sensorHeight, rotation)) {
+      return current
+    }
+    Log.i(TAG, "Analysis frames are ${sensorWidth}x$sensorHeight, rotated $rotation degrees")
+    return FrameGeometry(sensorWidth, sensorHeight, rotation, timestamp).also { frameGeometry = it }
+  }
+
   // MediaPipe's thread.
   private fun onResult(result: FaceLandmarkerResult) {
     if (result.timestampMs() <= discardResultsBeforeMs) return
+    // A result from before the frames changed size or rotation would be turned the wrong way.
+    val geometry = frameGeometry ?: return
+    if (result.timestampMs() < geometry.sinceMs) return
     framesWithoutResult.set(0)
     val face = result.faceLandmarks().firstOrNull()
     if (face.isNullOrEmpty()) {
@@ -346,12 +365,11 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     }
     val points = ArrayList<Double>(face.size * 2)
     for (landmark in face) {
-      points.add(landmark.x().toDouble())
-      points.add(landmark.y().toDouble())
+      geometry.addUpright(points, landmark.x().toDouble(), landmark.y().toDouble())
     }
     val latencyMs = (SystemClock.uptimeMillis() - result.timestampMs()).toDouble()
-    val width = frameWidth.toDouble()
-    val height = frameHeight.toDouble()
+    val width = geometry.width.toDouble()
+    val height = geometry.height.toDouble()
     post {
       if (!active || !isAttachedToWindow || result.timestampMs() <= discardResultsBeforeMs) return@post
       setStatus("tracking")
@@ -368,7 +386,51 @@ class FaceTrackerView(context: Context, appContext: AppContext) : ExpoView(conte
     onStatus(if (message == null) mapOf("status" to status) else mapOf("status" to status, "message" to message))
   }
 
+  // The analyzed frames as the sensor delivers them, and the clockwise rotation (CameraX's
+  // rotationDegrees) that makes them upright.
+  private class FrameGeometry(
+    private val sensorWidth: Int,
+    private val sensorHeight: Int,
+    private val rotationDegrees: Int,
+    /** When frames with this geometry began; earlier results belong to the previous one. */
+    val sinceMs: Long
+  ) {
+    private val sideways = rotationDegrees == 90 || rotationDegrees == 270
+    val width = if (sideways) sensorHeight else sensorWidth
+    val height = if (sideways) sensorWidth else sensorHeight
+    val options: ImageProcessingOptions =
+      ImageProcessingOptions.builder().setRotationDegrees(rotationDegrees).build()
+
+    fun matches(otherWidth: Int, otherHeight: Int, otherRotation: Int) =
+      sensorWidth == otherWidth && sensorHeight == otherHeight && rotationDegrees == otherRotation
+
+    // MediaPipe finds the face in the frame rotated by `options`, but returns the landmarks
+    // normalized to the frame it was given. This turns them clockwise into the upright frame, as
+    // rotating the frame itself did.
+    fun addUpright(points: MutableList<Double>, x: Double, y: Double) {
+      when (rotationDegrees) {
+        90 -> {
+          points.add(1 - y)
+          points.add(x)
+        }
+        180 -> {
+          points.add(1 - x)
+          points.add(1 - y)
+        }
+        270 -> {
+          points.add(y)
+          points.add(1 - x)
+        }
+        else -> {
+          points.add(x)
+          points.add(y)
+        }
+      }
+    }
+  }
+
   private companion object {
+    const val TAG = "FaceTracker"
     // Whether the GPU works is a property of the device, so once it fails, every later
     // landmarker in the app uses the CPU instead of waiting for the GPU again.
     @Volatile var gpuFailed = false
