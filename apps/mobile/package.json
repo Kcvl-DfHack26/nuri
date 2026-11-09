@@ -24,6 +24,7 @@
     "@better-auth/passkey": "1.7.17",
     "@expo-google-fonts/zen-maru-gothic": "0.4.2",
     "@expo/material-symbols": "0.1.1",
+    "@expo/plist": "0.5.4",
     "@expo/ui": "~58.0.27",
     "@rn-primitives/slot": "1.5.2",
     "@shopify/react-native-skia": "2.14.0",
