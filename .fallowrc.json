@@ -14,8 +14,10 @@
     "unresolved-imports": "error"
   },
   "ignoreDependencies": [
+    "@bacons/apple-targets",
     "@babel/runtime",
     "@expo/ngrok",
+    "@expo/plist",
     "expo-dev-client",
     "expo-system-ui",
     "expo-updates",

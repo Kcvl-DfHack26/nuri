@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { Uniwind } from 'uniwind';
 
 import { Launch } from '@/components/launch';
+import { PushNotifications } from '@/components/push-notifications';
 import { stackOptions } from '@/theme/navigation';
 
 Uniwind.setTheme('light');
@@ -60,6 +61,7 @@ function Navigation() {
         <Stack.Screen name="profile-settings" options={{ headerShown: false }} />
         <Stack.Screen name="auth-callback" options={{ title: 'ログイン' }} />
       </Stack>
+      <PushNotifications />
       <StatusBar style="dark" />
     </ThemeProvider>
   );

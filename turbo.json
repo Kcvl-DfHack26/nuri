@@ -39,6 +39,9 @@
   "globalPassThroughEnv": ["NURI_E2E_DATABASE_URL"],
   "globalEnv": [
     "AUTH_EMULATE",
+    "EXPO_PUSH_ACCESS_TOKEN",
+    "GOOGLE_SERVICES_JSON",
+    "APPLE_TEAM_ID",
     "GOOGLE_EMULATOR_URL",
     "GOOGLE_EMULATOR_PUBLIC_URL",
     "RESEND_API_URL",

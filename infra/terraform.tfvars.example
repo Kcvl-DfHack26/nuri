@@ -12,3 +12,4 @@ deploy_application   = false
 # After adding a Resend key version and verifying a sender:
 # email_login_enabled = true
 # email_from = "nuri <login@your-verified-domain.example>"
+# push_notifications_enabled = true

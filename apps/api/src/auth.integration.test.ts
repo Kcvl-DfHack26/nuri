@@ -1,12 +1,13 @@
-import { afterAll, expect, test } from 'bun:test';
-import { inArray, like, or } from 'drizzle-orm';
+import { afterAll, expect, spyOn, test } from 'bun:test';
+import { eq, inArray, like, or } from 'drizzle-orm';
 import { createEmulator } from 'emulate';
 import { z } from 'zod';
 
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
-import { rateLimit, recipe, user } from './db/schema';
+import { pushSubscription, rateLimit, recipe, session, user } from './db/schema';
 import { createAuth } from './modules/auth';
+import { createPushSender } from './modules/push';
 import { softwareAuthenticator } from './passkey-fixture';
 import { readEnv } from './platform/env';
 
@@ -61,6 +62,7 @@ const env = readEnv({
   RESEND_API_URL: mail.url,
   PASSKEY_ORIGINS: origin,
   PASSKEY_RP_ID: 'localhost',
+  EXPO_PUSH_ACCESS_TOKEN: 'test-push-access-token',
 });
 const auth = createAuth(db, env);
 const app = createApp(db, auth, env, async () => {
@@ -624,4 +626,166 @@ test('posting a recipe validates and stores the latest draft and serves its thum
   expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
   expect(Buffer.from(await image.arrayBuffer())).toEqual(jpeg);
   expect((await appRequest('/api/recipe-images/fox')).status).toBe(404);
+}, 20000);
+
+test('only new likes notify the owner and push subscriptions follow the active session', async () => {
+  const { cookie: ownerCookie } = await signInRecipeUser();
+  const actorCookie = await googleLogin();
+  const owner = await auth.api.getSession({ headers: new Headers({ cookie: ownerCookie }) });
+  const actor = await auth.api.getSession({ headers: new Headers({ cookie: actorCookie }) });
+  if (!owner || !actor) {
+    throw new Error('Push test users did not sign in');
+  }
+  const token = 'ExpoPushToken[owner-device]';
+  const route = '/api/me/push-subscription';
+  const subscription = { token, sessionId: owner.session.id };
+  expect((await request(route, subscription, '', 'PUT')).status).toBe(401);
+  expect((await request(route, subscription, actorCookie, 'PUT')).status).toBe(409);
+  expect(
+    (await request(route, { ...subscription, token: 'invalid' }, ownerCookie, 'PUT')).status,
+  ).toBe(400);
+  expect((await request(route, subscription, ownerCookie, 'PUT')).status).toBe(200);
+
+  await db
+    .update(user)
+    .set({ name: 'みお', image: 'https://assets.example.com/mio.png', isPublic: true })
+    .where(eq(user.id, actor.user.id));
+  const recipeId = `push-${unique}`;
+  await db.insert(recipe).values({
+    id: recipeId,
+    authorId: owner.user.id,
+    title: '春のピンクメイク',
+    image: 'https://assets.example.com/recipe.jpg',
+    durationMinutes: 5,
+  });
+  const likePath = `/api/recipes/${recipeId}/favorite`;
+  const sendPush = createPushSender(db, env.EXPO_PUSH_ACCESS_TOKEN, 'https://api.example.com');
+  const requests: unknown[] = [];
+  const fakeFetch = async (...[url, init]: Parameters<typeof fetch>) => {
+    expect(url).toBe('https://exp.host/--/api/v2/push/send');
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer test-push-access-token');
+    if (typeof init?.body !== 'string') {
+      throw new Error('Expected a JSON push request');
+    }
+    requests.push(JSON.parse(init.body));
+    return Response.json({ data: [{ status: 'ok' }] });
+  };
+  const expo = spyOn(globalThis, 'fetch').mockImplementation(
+    Object.assign(fakeFetch, { preconnect: fetch.preconnect }),
+  );
+
+  try {
+    expect((await request(likePath, {}, ownerCookie, 'PUT')).status).toBe(200);
+    expect(expo).not.toHaveBeenCalled();
+
+    const likes = await Promise.all([
+      request(likePath, {}, actorCookie, 'PUT'),
+      request(likePath, {}, actorCookie, 'PUT'),
+    ]);
+    expect(likes.map(({ status }) => status)).toEqual([200, 200]);
+    expect(requests).toEqual([
+      [
+        expect.objectContaining({
+          to: token,
+          title: '❤️ みおさんがいいねしました',
+          body: 'レシピ「春のピンクメイク」',
+          channelId: 'likes',
+          richContent: { image: 'https://assets.example.com/recipe.jpg' },
+          mutableContent: true,
+          data: { kind: 'recipe-liked', recipientId: owner.user.id, recipeId },
+        }),
+      ],
+    ]);
+
+    await request(likePath, {}, actorCookie, 'DELETE');
+    expect(expo).toHaveBeenCalledTimes(1);
+    expo.mockResolvedValueOnce(new Response(null, { status: 503 }));
+    expect((await request(likePath, {}, actorCookie, 'PUT')).status).toBe(200);
+    expect((await request(likePath, {}, actorCookie, 'PUT')).status).toBe(200);
+    expect(expo).toHaveBeenCalledTimes(2);
+
+    await db.update(user).set({ isPublic: false }).where(eq(user.id, actor.user.id));
+    await request(likePath, {}, actorCookie, 'DELETE');
+    expect((await request(likePath, {}, actorCookie, 'PUT')).status).toBe(200);
+    expect(requests.at(-1)).toEqual([
+      {
+        to: token,
+        title: '❤️ みおさんがいいねしました',
+        body: 'レシピ「春のピンクメイク」',
+        channelId: 'likes',
+        data: { kind: 'recipe-liked', recipientId: owner.user.id, recipeId },
+        richContent: { image: 'https://assets.example.com/recipe.jpg' },
+        mutableContent: true,
+        ttl: 3600,
+      },
+    ]);
+
+    expect((await request('/api/recipes/missing/favorite', {}, actorCookie, 'PUT')).status).toBe(
+      404,
+    );
+    expect(expo).toHaveBeenCalledTimes(3);
+    await db
+      .update(recipe)
+      .set({ image: '/api/recipe-images/preview' })
+      .where(eq(recipe.id, recipeId));
+    await sendPush({
+      kind: 'recipe-ready',
+      recipientId: owner.user.id,
+      recipeId,
+    });
+    expect(requests.at(-1)).toEqual([
+      expect.objectContaining({
+        to: token,
+        title: '✨ 「春のピンクメイク」ができました',
+        channelId: 'recipe-import',
+        data: { kind: 'recipe-ready', recipientId: owner.user.id, recipeId },
+        richContent: { image: 'https://api.example.com/api/recipe-images/preview' },
+        mutableContent: true,
+      }),
+    ]);
+
+    expo.mockResolvedValueOnce(
+      Response.json({ data: [{ status: 'error', details: { error: 'DeviceNotRegistered' } }] }),
+    );
+    await sendPush({ kind: 'recipe-failed', recipientId: owner.user.id });
+    expect(
+      await db.select().from(pushSubscription).where(eq(pushSubscription.token, token)),
+    ).toEqual([]);
+    expect((await request(route, subscription, ownerCookie, 'PUT')).status).toBe(200);
+
+    // Logging in on the same installation can move the token, including after reinstall.
+    expect(
+      (await request(route, { token, sessionId: actor.session.id }, actorCookie, 'PUT')).status,
+    ).toBe(200);
+    expo.mockClear();
+    await sendPush({ kind: 'recipe-started', recipientId: owner.user.id });
+    expect(expo).not.toHaveBeenCalled();
+    await sendPush({
+      kind: 'recipe-started',
+      recipientId: actor.user.id,
+      recipeTitle: '春のピンクメイク',
+    });
+    expect(requests.at(-1)).toEqual([
+      expect.objectContaining({
+        to: token,
+        title: '🎬 「春のピンクメイク」を作成しています',
+        data: { kind: 'recipe-started', recipientId: actor.user.id },
+      }),
+    ]);
+
+    expect((await request('/api/auth/sign-out', {}, actorCookie)).status).toBe(200);
+    expect(
+      await db.select().from(pushSubscription).where(eq(pushSubscription.token, token)),
+    ).toEqual([]);
+    expect((await request(route, subscription, ownerCookie, 'PUT')).status).toBe(200);
+    await db
+      .update(session)
+      .set({ expiresAt: new Date(0) })
+      .where(eq(session.id, owner.session.id));
+    expo.mockClear();
+    await sendPush({ kind: 'recipe-failed', recipientId: owner.user.id });
+    expect(expo).not.toHaveBeenCalled();
+  } finally {
+    expo.mockRestore();
+  }
 }, 20000);

@@ -1,0 +1,173 @@
+{
+  "type": "diff",
+  "version": "9",
+  "dialect": "postgres",
+  "id": "08f533e1-9b1e-4992-8ee9-7422a8eacba8",
+  "prevIds": [
+    "685aa338-ed84-4ace-ab3a-70c33df40a07"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "push_subscription"
+      ],
+      "writes": [
+        "s|tbl|public.push_subscription",
+        "n|tbl|public.push_subscription",
+        "e|tbl|public.push_subscription",
+        "n|rel|public.push_subscription",
+        "n|type|public.push_subscription",
+        "n|rel|public.push_subscription_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "push_subscription",
+        "push_subscription_session_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.push_subscription_session_id_idx",
+        "n|idx|public.push_subscription_session_id_idx",
+        "e|idx|public.push_subscription_session_id_idx",
+        "n|rel|public.push_subscription_session_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.push_subscription",
+        "n|sch|public",
+        "n|col|public.push_subscription.session_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "push_subscription"
+      ],
+      "writes": [
+        "s|fk|public.push_subscription.push_subscription_session_id_session_id_fkey",
+        "n|fk|public.push_subscription.push_subscription_session_id_session_id_fkey",
+        "e|fk|public.push_subscription.push_subscription_session_id_session_id_fkey",
+        "n|con|public.push_subscription.push_subscription_session_id_session_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.push_subscription",
+        "n|sch|public",
+        "n|tbl|public.session",
+        "n|sch|public",
+        "n|col|public.push_subscription.session_id",
+        "n|col|public.session.id",
+        "e|uniqueness|public.session.id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "push_subscription",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "push_subscription",
+        "name": "token",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "push_subscription",
+        "name": "session_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "push_subscription",
+        "name": "push_subscription_session_id_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "session_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "concurrently": false,
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "push_subscription",
+        "name": "push_subscription_session_id_session_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "session_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "session",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "push_subscription",
+        "name": "push_subscription_pkey",
+        "columns": [
+          "token"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    }
+  ]
+}

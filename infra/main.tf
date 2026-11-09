@@ -138,7 +138,7 @@ resource "google_sql_user" "app" {
   deletion_policy     = "ABANDON"
 }
 resource "google_secret_manager_secret" "app" {
-  for_each  = toset(["database-url", "auth-secret", "google-client-id", "google-client-secret", "resend-api-key"])
+  for_each  = toset(["database-url", "auth-secret", "google-client-id", "google-client-secret", "resend-api-key", "expo-push-access-token"])
   secret_id = "${var.name}-${each.key}"
   replication {
     auto {}
@@ -149,7 +149,8 @@ resource "google_secret_manager_secret_iam_member" "runtime" {
   for_each = toset(concat(
     ["database-url", "auth-secret"],
     var.google_oauth_enabled ? ["google-client-id", "google-client-secret"] : [],
-    var.email_login_enabled ? ["resend-api-key"] : []
+    var.email_login_enabled ? ["resend-api-key"] : [],
+    var.push_notifications_enabled ? ["expo-push-access-token"] : []
   ))
   secret_id = google_secret_manager_secret.app[each.key].id
   role      = "roles/secretmanager.secretAccessor"
@@ -210,7 +211,8 @@ resource "google_cloud_run_v2_service" "api" {
         for_each = merge(
           { DATABASE_URL = "database-url", BETTER_AUTH_SECRET = "auth-secret" },
           var.google_oauth_enabled ? { GOOGLE_CLIENT_ID = "google-client-id", GOOGLE_CLIENT_SECRET = "google-client-secret" } : {},
-          var.email_login_enabled ? { RESEND_API_KEY = "resend-api-key" } : {}
+          var.email_login_enabled ? { RESEND_API_KEY = "resend-api-key" } : {},
+          var.push_notifications_enabled ? { EXPO_PUSH_ACCESS_TOKEN = "expo-push-access-token" } : {}
         )
         content {
           name = env.key

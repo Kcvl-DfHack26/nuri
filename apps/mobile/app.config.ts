@@ -7,6 +7,8 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
   if (!process.env.EXPO_PUBLIC_API_URL?.trim() && process.env.DEV_API_ORIGIN) {
     process.env.EXPO_PUBLIC_API_URL = process.env.DEV_API_ORIGIN;
   }
+  const appleTeamId = process.env.APPLE_TEAM_ID;
+  const googleServicesFile = process.env.GOOGLE_SERVICES_JSON;
   const rpId = process.env.EXPO_PUBLIC_PASSKEY_RP_ID;
   const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim();
   const plugins = [...(config.plugins ?? [])];
@@ -21,6 +23,11 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
     name: config.name ?? 'nuri',
     slug: config.slug ?? 'nuri',
     plugins,
-    ios: { ...config.ios, ...(rpId ? { associatedDomains: [`webcredentials:${rpId}`] } : {}) },
+    android: { ...config.android, ...(googleServicesFile ? { googleServicesFile } : {}) },
+    ios: {
+      ...config.ios,
+      ...(appleTeamId ? { appleTeamId } : {}),
+      ...(rpId ? { associatedDomains: [`webcredentials:${rpId}`] } : {}),
+    },
   });
 }

@@ -3,7 +3,10 @@ import { createMiddleware } from 'hono/factory';
 import type { Auth } from './service';
 
 export type AuthenticatedEnv = {
-  Variables: { currentUser: NonNullable<Awaited<ReturnType<Auth['api']['getSession']>>>['user'] };
+  Variables: {
+    currentUser: NonNullable<Awaited<ReturnType<Auth['api']['getSession']>>>['user'];
+    sessionId: string;
+  };
 };
 
 export function requireSession(auth: Auth) {
@@ -13,6 +16,7 @@ export function requireSession(auth: Auth) {
       return c.json({ error: 'unauthorized' as const }, 401);
     }
     c.set('currentUser', current.user);
+    c.set('sessionId', current.session.id);
     await next();
   });
 }
