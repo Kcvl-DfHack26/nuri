@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
-const instance = 'nuri';
-const database = 'nuri';
-const user = 'nuri';
+const appName = 'nuri';
 const password = 'nuri-local';
+const environment = z.object({
+  FLOCI_GCP_URL: z.url({ protocol: /^https?$/ }),
+  GOOGLE_CLOUD_PROJECT: z.string().min(1),
+});
 const connectSettings = z.object({
   ipAddresses: z
     .tuple([z.object({ ipAddress: z.ipv4(), port: z.number().int().min(1).max(65535) })])
@@ -23,13 +25,14 @@ async function create(url: string, data: Record<string, string>) {
   }
 }
 
-export async function localDatabaseUrl(origin: string, project: string, initialize: boolean) {
+export async function localDatabaseUrl(env: NodeJS.ProcessEnv, initialize: boolean) {
+  const { FLOCI_GCP_URL: origin, GOOGLE_CLOUD_PROJECT: project } = environment.parse(env);
   const instances = `${origin}/v1/projects/${encodeURIComponent(project)}/instances`;
-  const endpoint = `${instances}/${instance}`;
+  const endpoint = `${instances}/${appName}`;
   if (initialize) {
-    await create(instances, { name: instance, databaseVersion: 'POSTGRES_17' });
-    await create(`${endpoint}/databases`, { name: database });
-    await create(`${endpoint}/users`, { name: user, password });
+    await create(instances, { name: appName, databaseVersion: 'POSTGRES_17' });
+    await create(`${endpoint}/databases`, { name: appName });
+    await create(`${endpoint}/users`, { name: appName, password });
   }
 
   const response = await fetch(`${endpoint}/connectSettings`, {
@@ -41,15 +44,9 @@ export async function localDatabaseUrl(origin: string, project: string, initiali
   const {
     ipAddresses: [{ ipAddress, port }],
   } = connectSettings.parse(await response.json());
-  return `postgresql://${user}:${password}@${ipAddress}:${port}/${database}`;
+  return `postgresql://${appName}:${password}@${ipAddress}:${port}/${appName}`;
 }
 
 if (import.meta.main) {
-  const { FLOCI_GCP_URL, GOOGLE_CLOUD_PROJECT } = process.env;
-  if (!FLOCI_GCP_URL || !GOOGLE_CLOUD_PROJECT) {
-    throw new Error('Run this script in the local Compose environment');
-  }
-  console.log(
-    await localDatabaseUrl(FLOCI_GCP_URL, GOOGLE_CLOUD_PROJECT, process.argv.includes('--init')),
-  );
+  console.log(await localDatabaseUrl(process.env, process.argv[2] === '--init'));
 }

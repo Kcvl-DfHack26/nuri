@@ -8,15 +8,12 @@ compose() {
   portless compose --profile '*' "$@"
 }
 
-config=$(compose config --format json)
-project=$(printf '%s\n' "$config" | node --input-type=module --eval '
-  import { readFileSync } from "node:fs";
-  const { name } = JSON.parse(readFileSync(0, "utf8"));
-  if (typeof name !== "string" || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(name)) {
-    throw new Error("Invalid Compose project name");
-  }
-  console.log(name);
-')
+compose_environment=$(compose config --environment)
+project=$(printf '%s\n' "$compose_environment" | sed -n 's/^COMPOSE_PROJECT_NAME=//p')
+if [ -z "$project" ]; then
+  echo 'Compose did not report its project name' >&2
+  exit 1
+fi
 
 compose stop
 
