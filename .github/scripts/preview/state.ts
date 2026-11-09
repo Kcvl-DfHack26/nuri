@@ -160,7 +160,20 @@ export async function runPreviewTofu(
       return;
     }
 
-    await tofu`tofu -chdir=${directory} apply ${options} ${plan}`;
+    try {
+      await tofu`tofu -chdir=${directory} apply ${options} ${plan}`;
+    } catch (error) {
+      if (
+        operation === 'apply' &&
+        error instanceof $.ShellError &&
+        error.stderr.includes("Permission 'storage.buckets.create' denied")
+      ) {
+        console.error(
+          '::error title=Preview bucket creation denied::Apply the shared preview IAM with Preview Infrastructure on main, then rerun PR Preview. See docs/preview.md#画像バケットを有効にする順序.',
+        );
+      }
+      throw error;
+    }
     if (operation === 'destroy') {
       return { target: expected };
     }
