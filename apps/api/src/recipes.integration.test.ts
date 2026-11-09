@@ -32,10 +32,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Deleting the test user also deletes its recipes, including the borrowed slug; reseed it.
-  await db.delete(user).where(eq(user.id, ownUserId));
-  await seedSampleData(db, images);
-  await pool.end();
+  try {
+    // Deleting the test user also deletes its recipes, including the borrowed slug; reseed it.
+    await db.delete(user).where(eq(user.id, ownUserId));
+    await seedSampleData(db, images);
+  } finally {
+    await pool.end();
+  }
 });
 
 test('the seed is idempotent and keeps recipes created outside it', async () => {
@@ -99,7 +102,7 @@ test('the seed is idempotent and keeps recipes created outside it', async () => 
   ).toEqual([{ value: 5 }]);
 });
 
-test('uploads seed images before migration and preserves an edited sample profile on reseed', async () => {
+test('keeps seed image references on upload failure and preserves edited avatars on reseed', async () => {
   const legacy = '/sample-avatars/haru.jpg';
   const custom = '/media/profiles/changed.jpg';
   const sampleHaru = eq(user.id, 'sample-haru');
@@ -109,9 +112,9 @@ test('uploads seed images before migration and preserves an edited sample profil
   if (!beforeHaru || !beforeMio) {
     throw new Error('Expected both sample users to exist');
   }
-  await db.update(user).set({ image: legacy }).where(sampleHaru);
-  await db.update(user).set({ image: custom }).where(sampleMio);
   try {
+    await db.update(user).set({ image: legacy }).where(sampleHaru);
+    await db.update(user).set({ image: custom }).where(sampleMio);
     const missingBucket = createImageStore({ ...env, GCS_BUCKET: `missing-${unique}` });
     const failure = await seedSampleData(db, missingBucket).catch((error: unknown) => error);
     expect(failure).toMatchObject({ code: 404 });
