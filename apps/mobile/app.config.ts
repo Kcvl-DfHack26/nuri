@@ -23,6 +23,9 @@ export default function configure({ config }: ConfigContext): ExpoConfig {
     name: config.name ?? 'nuri',
     slug: config.slug ?? 'nuri',
     plugins,
+    ...(process.env.NURI_STAGING_RELEASE === '1'
+      ? { updates: { ...config.updates, enabled: false } }
+      : {}),
     android: { ...config.android, ...(googleServicesFile ? { googleServicesFile } : {}) },
     ios: {
       ...config.ios,

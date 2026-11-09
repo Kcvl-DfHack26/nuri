@@ -1,0 +1,140 @@
+name: Publish staging mobile release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+concurrency:
+  group: staging-mobile-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: mobile-release
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+      - name: Verify current main and staging readiness
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bun .github/scripts/ci/verify-main.ts
+          origin=$(jq -er '.build["staging-release"].env.EXPO_PUBLIC_API_URL' apps/mobile/eas.json)
+          curl --fail --silent --show-error --retry 3 --max-time 20 "$origin/ready" |
+            jq -e '.status == "ready"'
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: bun install --frozen-lockfile
+      - name: Build and download both native artifacts
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [[ -z "$EXPO_TOKEN" ]]; then
+            echo "::error::Set EXPO_TOKEN in the mobile-release environment."
+            exit 1
+          fi
+
+          result="$RUNNER_TEMP/staging-builds.json"
+          ../../node_modules/.bin/eas build --platform all --profile staging-release \
+            --non-interactive --freeze-credentials --wait --json > "$result"
+
+          assets="$RUNNER_TEMP/staging-mobile"
+          mkdir -p "$assets"
+          for platform in ANDROID IOS; do
+            url=$(jq -er --arg platform "$platform" --arg sha "$GITHUB_SHA" '
+              .[] | select(.platform == $platform and .status == "FINISHED"
+                and .gitCommitHash == $sha and .buildProfile == "staging-release")
+              | .artifacts.applicationArchiveUrl | select(startswith("https://"))
+            ' "$result")
+            case "$platform" in
+              ANDROID) filename=nuri-staging-android.apk ;;
+              IOS) filename=ios-simulator.tar.gz ;;
+            esac
+            curl --fail --silent --show-error --location --retry 3 \
+              --proto '=https' --proto-redir '=https' --output "$assets/$filename" "$url"
+          done
+      - name: Verify APK signature and native architectures
+        run: |
+          apk="$RUNNER_TEMP/staging-mobile/nuri-staging-android.apk"
+          tools="$ANDROID_HOME/build-tools/36.0.0"
+          "$tools/apksigner" verify --verbose "$apk"
+          badging=$("$tools/aapt" dump badging "$apk")
+          grep -Fq "package: name='com.kcvl.nuri'" <<< "$badging"
+          native_code=$(grep '^native-code:' <<< "$badging")
+          for abi in arm64-v8a x86_64; do
+            grep -Fq "'$abi'" <<< "$native_code"
+          done
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: staging-mobile
+          path: ${{ runner.temp }}/staging-mobile
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          name: staging-mobile
+          path: ${{ runner.temp }}/staging-mobile
+      - name: Verify and package the iOS Simulator app
+        run: |
+          assets="$RUNNER_TEMP/staging-mobile"
+          unpacked=$(mktemp -d)
+          tar -xzf "$assets/ios-simulator.tar.gz" -C "$unpacked"
+          app=$(find "$unpacked" -type d -name '*.app' -prune -print)
+          test -d "$app"
+          plist="$app/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = com.kcvl.nuri
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")
+          build_info=$(xcrun vtool -arch arm64 -show-build "$app/$executable")
+          grep -Eq '^[[:space:]]*platform[[:space:]]+IOSSIMULATOR$' <<< "$build_info"
+          if [[ "$app" != "$unpacked/nuri.app" ]]; then
+            mv "$app" "$unpacked/nuri.app"
+          fi
+          zip="$assets/nuri-staging-ios-simulator.app.zip"
+          ditto -c -k --keepParent "$unpacked/nuri.app" "$zip"
+          unzip -tq "$zip"
+      - name: Publish both assets as a prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="staging-$GITHUB_RUN_ID"
+          assets="$RUNNER_TEMP/staging-mobile"
+          notes="$RUNNER_TEMP/staging-release-notes.md"
+          cat > "$notes" <<EOF
+          Source commit: \`$GITHUB_SHA\`
+          Build: [GitHub Actions run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
+
+          このビルドは共有 staging API に接続します。Expo Go や Metro は不要です。
+
+          - Android — APK を端末で開くか、\`adb install -r nuri-staging-android.apk\` を実行します。
+          - iOS Simulator — Mac で ZIP を展開し、起動済みの Simulator に \`xcrun simctl install booted ./nuri.app\` でインストールします。
+          EOF
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" --jq .ref
+          gh release create "$tag" \
+            "$assets/nuri-staging-android.apk" "$assets/nuri-staging-ios-simulator.app.zip" \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --title "nuri $tag" \
+            --notes-file "$notes" --prerelease --latest=false

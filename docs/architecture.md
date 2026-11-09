@@ -161,6 +161,8 @@ WIFはGitHubの不変repository ID、リポジトリ名、main、`deploy.yml`に
 
 PRのExpo Updateは、tablecast-pocの手動カタログ配備と同じコメント内チェックボックス、またはGitHub Actionsの手動実行で公開する。PR更新時はコメントだけを更新する。Expo Workflowsの無料実行時間を消費しないよう、bundle生成と公開はGitHub ActionsとExpo公式preview actionが担当する。配信先はPRごとのbranchで、共有staging APIを使う。PR単位のDB/API環境は初期構成に含めない。OTAの互換性境界はfingerprint。ネイティブ依存・設定が変わると新しいビルドが必要になる。
 
+審査・デモ用のネイティブ配布は、CIが成功したmainからGitHub Actionsを手動実行する。EAS Buildで作るAndroid APKとiOS Simulatorの `.app` は同じSHAを使い、共有stagingのURLとJavaScriptを同梱する。配布用の `staging-release` ではOTAを無効にし、プレリリースに記載したSHAと実行するコードを揃える。
+
 ## 参照
 
 - [Expo SDK 58](https://docs.expo.dev/versions/v58.0.0/)
