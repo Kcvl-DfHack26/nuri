@@ -16,9 +16,9 @@
     <th>🎬 動画から作った手順を編集</th>
   </tr>
   <tr>
-    <td><img src="docs/images/readme/figma-home.png" alt="Figma 実装planのホーム画面デザイン" width="250" /></td>
-    <td><img src="docs/images/readme/figma-ar.png" alt="Figma 実装planのAR手順ガイドの画面デザイン" width="250" /></td>
-    <td><img src="docs/images/readme/figma-step-editor.png" alt="Figma 実装planの手順編集画面デザイン" width="250" /></td>
+    <td><img src="docs/images/readme/figma-home.png" alt="Figma Plan Aのホーム画面デザイン" width="250" /></td>
+    <td><img src="docs/images/readme/figma-ar.png" alt="Figma Plan AのAR手順ガイドの画面デザイン" width="250" /></td>
+    <td><img src="docs/images/readme/figma-step-editor.png" alt="Figma Plan Aの手順編集画面デザイン" width="250" /></td>
   </tr>
 </table>
 
