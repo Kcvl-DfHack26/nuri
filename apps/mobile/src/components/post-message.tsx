@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { PhotoCrop } from '@/components/recipes';
@@ -424,6 +424,9 @@ function PublishOption({
   onChange: (value: boolean) => void;
 }) {
   const rose = useTokenColor('--color-accent-rose');
+  const pink = useTokenColor('--color-accent-pink');
+  const off = useTokenColor('--color-neutral-soft');
+  const thumbOff = useTokenColor('--color-bg-surface');
   return (
     <View className="min-h-12 flex-row items-center gap-3 px-3.5 py-3">
       <View className="flex-1 gap-px">
@@ -437,7 +440,11 @@ function PublishOption({
         accessibilityHint={detail}
         value={value}
         onValueChange={onChange}
-        trackColor={{ true: rose }}
+        // The panel's pastel pinks (#224): a light pink track under a rose thumb when on, a soft
+        // grey track when off. iOS keeps its white thumb.
+        trackColor={{ true: pink, false: off }}
+        ios_backgroundColor={off}
+        thumbColor={Platform.OS === 'android' ? (value ? rose : thumbOff) : undefined}
       />
     </View>
   );

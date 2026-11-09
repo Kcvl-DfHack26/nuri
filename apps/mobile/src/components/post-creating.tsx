@@ -4,7 +4,6 @@ import { Icon } from '@expo/ui';
 import { recipeStepsMax } from '@starter/shared';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,11 +13,12 @@ import type { PlannedStep } from '@/lib/post-steps';
 
 import { FaceScene } from '@/components/face-scene';
 import { GlassIconButton } from '@/components/glass-icon-button';
-import { usePostDraft } from '@/components/post-draft';
+import { cutStepFrame, usePostDraft } from '@/components/post-draft';
 import { arPhotos, partColors } from '@/components/recipes';
 import { SocialIcon } from '@/components/social-icon';
 import { Text } from '@/components/ui/text';
 import { apiUrl } from '@/lib/api';
+import { cheekShape, plainCheek } from '@/lib/cheek-shape';
 import { backOrHome } from '@/lib/navigation';
 import { analyzePostVideo, shrinkVideo } from '@/lib/post-analysis';
 import { planSteps } from '@/lib/post-steps';
@@ -76,7 +76,12 @@ function planFromAnalysis(analysis: PostAnalysis, durationMs: number | null): Pl
         startMs: Math.round(step.start * 1000),
         endMs: durationMs === null ? endMs : Math.min(endMs, durationMs),
         description: step.description,
-        shape: regionShape(step.regions, step.part),
+        // Blush is drawn from the type Gemini chose, a soft area; landmarks drew it small,
+        // hard-edged or on the eyelids (#224).
+        shape:
+          step.part === 'cheek'
+            ? cheekShape(step.cheek ?? plainCheek)
+            : regionShape(step.regions, step.part),
         // The color read from the video is a guess the user checks on ⑫-5 (#203).
         color: step.color ? { hex: step.color, picked: false } : null,
         // The cosmetics Gemini saw in the step start chosen; the user removes wrong ones on ⑫-5.
@@ -192,12 +197,11 @@ export function PostCreating() {
       const images: (string | null)[] = [];
       for (const step of plan.steps) {
         // A frame that cannot be cut leaves the step without a photo instead of stopping the post.
-        const image = await getThumbnailAsync(video.uri, { time: step.startMs, quality: 0.5 }).then(
-          ({ uri }) => {
-            trackFile(uri);
-            return uri;
-          },
-          () => null,
+        const image = await cutStepFrame(
+          video.uri,
+          { startMs: step.startMs, endMs: step.endMs },
+          0.5,
+          trackFile,
         );
         if (!active) {
           return;

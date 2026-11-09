@@ -1,9 +1,11 @@
+import { serveStatic } from '@hono/node-server/serve-static';
 import { postAnalysisVideoMaxBytes, profilePhotoMaxBytes } from '@starter/shared';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { secureHeaders } from 'hono/secure-headers';
+import { fileURLToPath } from 'node:url';
 
 import type { Database } from './db/client';
 import type { Auth } from './modules/auth';
@@ -41,6 +43,12 @@ export function createApp(
     new Hono()
       .route('/', imageRoutes(images))
       .use('*', secureHeaders())
+      // ⑤'s photo for a posted cosmetic, one per kind (#224). It ships in the image and is served
+      // from there, so posts show it in every environment, also where no seed filled the bucket.
+      .get(
+        '/product-kinds/*',
+        serveStatic({ root: fileURLToPath(new URL('../assets', import.meta.url)) }),
+      )
       // Only API routes carrying uploads allow larger bodies.
       .use('/api/*', (c, next) => {
         if (c.req.method === 'POST' && c.req.path === '/api/recipes') {

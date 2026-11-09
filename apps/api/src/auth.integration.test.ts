@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 import { createApp } from './app';
 import { connectDatabase } from './db/client';
-import { pushSubscription, rateLimit, recipe, session, user } from './db/schema';
+import { product, pushSubscription, rateLimit, recipe, session, user } from './db/schema';
 import { createAuth } from './modules/auth';
 import { createPushSender } from './modules/push';
 import { softwareAuthenticator } from './passkey-fixture';
@@ -557,6 +557,7 @@ test('posting a recipe validates and stores the latest draft and serves its thum
     tags: ['時短'],
     durationMinutes: 3,
     steps: [step, { ...step, part: 'lip', label: 'リップ', description: '' }],
+    products: [{ name: 'ふんわりチーク', part: 'cheek', usage: 'チーク・コーラル' }],
     thumbnail: jpeg.toString('base64'),
   };
   expect((await request('/api/recipes', { ...valid, title: ' ' }, cookie)).status).toBe(400);
@@ -569,13 +570,36 @@ test('posting a recipe validates and stores the latest draft and serves its thum
   const shape = { strokes: [{ fill: true, points: [{ at: 50 }, { at: 117 }, { at: 123 }] }] };
   const resent = await request(
     '/api/recipes',
-    { ...valid, title: '二度目', steps: [{ ...step, shape }] },
+    {
+      ...valid,
+      title: '二度目',
+      steps: [{ ...step, shape }],
+      products: [
+        { name: '二度目のリップ', part: 'lip', usage: 'リップ・ローズ' },
+        { name: '二度目の下地', part: 'base', usage: 'ベース' },
+      ],
+    },
     cookie,
   );
   expect(resent.status).toBe(201);
   expect(await resent.json()).toEqual({ id });
   expect(await (await appRequest(`/api/recipes/${id}`)).json()).toMatchObject({
-    recipe: { title: '二度目', steps: [{ part: 'cheek', shape }] },
+    recipe: {
+      title: '二度目',
+      steps: [{ part: 'cheek', shape }],
+      products: [
+        { id: `${id}-0`, name: '二度目のリップ', image: '/product-kinds/lip.jpg' },
+        // Base has no kind photo.
+        { id: `${id}-1`, name: '二度目の下地', usage: 'ベース', image: null },
+      ],
+    },
+  });
+  // Unpublished cosmetics leave ⑤'s list empty.
+  expect((await request('/api/recipes', { ...valid, products: undefined }, cookie)).status).toBe(
+    201,
+  );
+  expect(await (await appRequest(`/api/recipes/${id}`)).json()).toMatchObject({
+    recipe: { products: [] },
   });
   expect((await request('/api/recipes', valid, cookie)).status).toBe(201);
   const otherKey = crypto.randomUUID();
@@ -612,8 +636,24 @@ test('posting a recipe validates and stores the latest draft and serves its thum
         },
         { part: 'lip', label: 'リップ', hint: '' },
       ],
+      // The published cosmetics, the poster's own words without a photo or a shop (#224).
+      products: [
+        {
+          id: `${id}-0`,
+          name: 'ふんわりチーク',
+          usage: 'チーク・コーラル',
+          image: '/product-kinds/cheek.jpg',
+          purchaseUrl: null,
+        },
+      ],
     },
   });
+  expect(
+    await db
+      .select({ id: product.id })
+      .from(product)
+      .where(like(product.id, `${id}-%`)),
+  ).toEqual([{ id: `${id}-0` }]);
   const list = z.object({ items: z.array(z.object({ id: z.string() })) });
   expect(
     list.parse(await (await appRequest('/api/recipes')).json()).items.map((item) => item.id),
@@ -631,6 +671,9 @@ test('posting a recipe validates and stores the latest draft and serves its thum
   expect(image.headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
   expect(Buffer.from(await image.arrayBuffer())).toEqual(jpeg);
   expect((await appRequest('/api/recipe-images/fox')).status).toBe(404);
+  const kindPhoto = await appRequest('/product-kinds/cheek.jpg');
+  expect(kindPhoto.status).toBe(200);
+  expect(kindPhoto.headers.get('content-type')).toBe('image/jpeg');
 }, 20000);
 
 test('updates only the signed-in profile after the photo is saved', async () => {

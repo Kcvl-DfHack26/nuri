@@ -83,12 +83,12 @@ export function AddStepPanel({ onClose }: { onClose: () => void }) {
         ],
       };
     });
-    cutFrame(index, range.startMs);
+    cutFrame(index, segments[index] ?? range);
     // A step cut back at its front now starts later, so its frame is cut again.
     before.forEach((segment, at) => {
       const after = moved(at);
       if (after && after.startMs !== segment.startMs) {
-        cutFrame(at < index ? at : at + 1, after.startMs);
+        cutFrame(at < index ? at : at + 1, after);
       }
     });
     onClose();

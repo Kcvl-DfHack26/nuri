@@ -4,11 +4,24 @@ import { zValidator } from '@hono/zod-validator';
 import {
   feedQuerySchema,
   postedRecipeIdPrefix,
+  productKindImage,
   recipeInputSchema,
   recipeListQuerySchema,
   recipeParamsSchema,
 } from '@starter/shared';
-import { and, count, desc, eq, exists, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  exists,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { Hono } from 'hono';
 
 import type { Database } from '../../db/client';
@@ -16,7 +29,15 @@ import type { Auth, AuthenticatedEnv } from '../auth';
 import type { createPushSender } from '../push';
 
 import { likeCountOf } from '../../db/like-count';
-import { recipe, recipeFavorite, recipeImage, recipeStep, user } from '../../db/schema';
+import {
+  product,
+  recipe,
+  recipeFavorite,
+  recipeImage,
+  recipeProduct,
+  recipeStep,
+  user,
+} from '../../db/schema';
 import { requireSession } from '../auth';
 
 const pageSize = 20;
@@ -124,6 +145,15 @@ export function recipeRoutes(
               return false;
             }
             await tx.delete(recipeStep).where(eq(recipeStep.recipeId, id));
+            // A resent post replaces its published cosmetics, which belong to this recipe only.
+            const old = await tx
+              .delete(recipeProduct)
+              .where(eq(recipeProduct.recipeId, id))
+              .returning({ productId: recipeProduct.productId });
+            const own = old.map((row) => row.productId).filter((key) => key.startsWith(`${id}-`));
+            if (own.length > 0) {
+              await tx.delete(product).where(inArray(product.id, own));
+            }
           }
           await tx.insert(recipeStep).values(
             input.steps.map((step, position) => ({
@@ -138,6 +168,35 @@ export function recipeRoutes(
               shape: step.shape ?? null,
             })),
           );
+          // ⑤ lists the cosmetics the user chose to publish (#224). They are the poster's own
+          // words, so each is a product of this recipe only, shown with its kind's photo and no shop.
+          const products = (input.products ?? []).map((item, position) => ({
+            id: `${id}-${position}`,
+            name: item.name,
+            image: productKindImage(item.part),
+            usage: item.usage,
+            position,
+          }));
+          if (products.length > 0) {
+            await tx
+              .insert(product)
+              .values(
+                products.map(({ id: productId, name, image }) => ({ id: productId, name, image })),
+              )
+              // A product left by a deleted post with the same key is reused.
+              .onConflictDoUpdate({
+                target: product.id,
+                set: { name: sql`excluded.name`, image: sql`excluded.image` },
+              });
+            await tx.insert(recipeProduct).values(
+              products.map(({ id: productId, usage, position }) => ({
+                recipeId: id,
+                productId,
+                position,
+                usage,
+              })),
+            );
+          }
           await tx
             .insert(recipeImage)
             .values({ recipeId: id, contentType: 'image/jpeg', bytes })

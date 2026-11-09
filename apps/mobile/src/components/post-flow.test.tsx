@@ -9,6 +9,7 @@ import { getThumbnailAsync } from 'expo-video-thumbnails';
 import { useEffect } from 'react';
 import { Alert } from 'react-native';
 
+import { cheekShape, plainCheek } from '@/lib/cheek-shape';
 import { createTestQueryClient } from '@/lib/test/query-client';
 
 import type { PostDraft } from './post-draft';
@@ -467,6 +468,52 @@ function DraftProbe({ onDraft }: { onDraft: (draft: PostDraft) => void }) {
   return null;
 }
 
+/** A face tracker that finds the canonical face only in `faces`, as one hidden elsewhere would. */
+function trackFacesIn(faces: readonly string[]) {
+  mockTracker.value = {
+    detectFaceAsync: jest.fn((uri: string) => {
+      const { canonicalFaceMesh } =
+        jest.requireActual<typeof import('@/lib/face-mesh')>('@/lib/face-mesh');
+      return Promise.resolve(
+        faces.includes(uri)
+          ? {
+              points: canonicalFaceMesh.textureCoordinates.flatMap((point) => [point.x, point.y]),
+              width: 1000,
+              height: 1000,
+            }
+          : null,
+      );
+    }),
+  };
+}
+
+test('uses the middle or end of a segment when its start hides the face', async () => {
+  trackFacesIn(['file:///frame-750.jpg', 'file:///frame-8700.jpg']);
+  let latest: PostDraft | null = null;
+  await renderSeeded(
+    <>
+      <PostCreating />
+      <DraftProbe
+        onDraft={(draft) => {
+          latest = draft;
+        }}
+      />
+    </>,
+    { video: { uri: 'file:///video.mov', marks: [1500, 4000], durationMs: 9000 } },
+  );
+  await waitFor(() => {
+    expect(router.replace).toHaveBeenCalledWith('/post/review');
+  });
+  // 0:00–0:01.5 finds the face in its middle and 0:04–0:09 just before its end; 0:01.5–0:04 shows
+  // none, so it keeps its start.
+  const images = () => (latest ?? null)?.steps.map((step) => step.image);
+  expect(images()).toEqual([
+    'file:///frame-750.jpg',
+    'file:///frame-1500.jpg',
+    'file:///frame-8700.jpg',
+  ]);
+});
+
 const analysis: PostAnalysis = {
   title: 'ナチュラルメイク',
   summary: '',
@@ -572,6 +619,42 @@ test('asks before sending the video and fills the steps with what Gemini found',
   expect(jest.mocked(getThumbnailAsync).mock.calls.map(([, options]) => options?.time)).toEqual([
     0, 26_000,
   ]);
+});
+
+test('draws blush from the type Gemini chose, never from eye landmarks', async () => {
+  const eyeRegion = {
+    detail: '目の下に',
+    side: 'both' as const,
+    start: 'lowerLidEdge' as const,
+    end: 'none' as const,
+    shape: 'band' as const,
+    length: 'medium' as const,
+    direction: 'outward' as const,
+    clip: 'none' as const,
+  };
+  const cheekStep = {
+    part: 'cheek' as const,
+    description: 'チークを入れる',
+    color: '#E8968A',
+    regions: [eyeRegion],
+    cosmetics: [],
+  };
+  mockAnalyze.mockResolvedValue({
+    ...analysis,
+    steps: [
+      { ...cheekStep, start: 0, end: 20, cheek: { style: 'triangle', size: 'large' } },
+      // An answer without a type gets the plain round blush.
+      { ...cheekStep, start: 20, end: 40 },
+    ],
+  });
+  const draft = await renderCreating();
+  await pressAlertButton('送る');
+  await waitFor(() => {
+    expect(router.replace).toHaveBeenCalledWith('/post/review');
+  });
+  const steps = draft()?.steps ?? [];
+  expect(steps[0]?.shape).toEqual(cheekShape({ style: 'triangle', size: 'large' }));
+  expect(steps[1]?.shape).toEqual(cheekShape(plainCheek));
 });
 
 test('shrinks a video over the limit, sends the copy and deletes it with the draft', async () => {
@@ -856,6 +939,36 @@ test('adds a plain area to a step without one and opens it for editing', async (
   expect(screen.getByRole('button', { name: '点1', selected: true })).toBeOnTheScreen();
 });
 
+test('shows the area on the nearest step’s frame when this step’s shows no face', async () => {
+  trackFacesIn(['file:///face.jpg']);
+  const steps = readyDraft.steps ?? [];
+  await renderSeeded(<PostStepEdit index="0" />, {
+    ...readyDraft,
+    steps: steps.map((step, index) => ({
+      ...step,
+      image: index === 0 ? 'file:///hidden.jpg' : 'file:///face.jpg',
+    })),
+  });
+  expect(
+    await screen.findByText('この手順の場面に顔が写っていないため、手順2の場面で表示しています'),
+  ).toBeOnTheScreen();
+  const frame = await screen.findByTestId('塗る範囲の場面');
+  await fireEvent(frame, 'layout', { nativeEvent: { layout: { width: 300, height: 300 } } });
+  await fireEvent.press(screen.getByRole('button', { name: '編集する' }));
+  expect(screen.getByRole('button', { name: '点1', selected: true })).toBeOnTheScreen();
+});
+
+test('says so when no step’s frame shows a face', async () => {
+  trackFacesIn([]);
+  await renderSeeded(<PostStepEdit index="0" />, {
+    ...readyDraft,
+    steps: (readyDraft.steps ?? []).map((step) => ({ ...step, image: 'file:///hidden.jpg' })),
+  });
+  expect(
+    await screen.findByText('手順の場面から顔を見つけられなかったため、塗る範囲を表示できません'),
+  ).toBeOnTheScreen();
+});
+
 test('says why the area cannot be shown', async () => {
   mockTracker.value = null;
   await renderSeeded(<PostStepEdit index="0" />);
@@ -958,6 +1071,9 @@ test('shows every step’s area on the sample face on ⑫-8, and nothing without
 test('asks before posting and sends the steps and thumbnail, never the video', async () => {
   const { invalidate } = await renderSeeded(<PostPreview />);
   expect(screen.getByText('狐メイク')).toBeOnTheScreen();
+  // ⑫-8 lists the published cosmetics as ⑤ will (#224).
+  expect(screen.getByText('ふんわりチーク')).toBeOnTheScreen();
+  expect(screen.getByText('チーク・01')).toBeOnTheScreen();
   expect(screen.getByText('プレビュー')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
   expect(alert).toHaveBeenCalledWith(
@@ -1000,6 +1116,8 @@ test('asks before posting and sends the steps and thumbnail, never the video', a
           color: '#E0A0A0',
         },
       ],
+      // The published cosmetics ⑤ lists (#224).
+      products: [{ name: 'ふんわりチーク', part: 'cheek', usage: 'チーク・01' }],
       thumbnail: '/9j/file:///thumb.jpg',
     },
   });
@@ -1009,6 +1127,17 @@ test('asks before posting and sends the steps and thumbnail, never the video', a
   // Coming back to ⑫-8 after posting does not post again.
   await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
   expect(mockPost).toHaveBeenCalledTimes(1);
+});
+
+test('keeps unpublished cosmetics off ⑫-8 and out of the post', async () => {
+  await renderSeeded(<PostPreview />, { ...readyDraft, publishCosmetics: false });
+  expect(screen.queryByText('チーク・01')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: '投稿' }));
+  await pressAlertButton('投稿する');
+  await waitFor(() => {
+    expect(mockPost).toHaveBeenCalledTimes(1);
+  });
+  expect(JSON.stringify(mockPost.mock.calls)).not.toContain('products');
 });
 
 test('keeps the draft when posting fails and posts it on retry', async () => {
