@@ -76,11 +76,11 @@ TypeScriptを中心に、端末内の顔処理とGoogle Cloud上の動画解析�
 
 ## 🏗️ アーキテクチャ
 
-![nuriの実行構成。端末内の顔処理、Cloud RunのAPIとWeb、Cloud SQL、Cloud Storage、Geminiの関係](docs/images/readme/architecture-runtime.png)
+![nuriの実行構成。端末内の顔処理、Cloud Run内のHono・Better Auth・Drizzle・Expo Webと、Google Cloudの各サービスの関係](docs/images/readme/architecture-runtime.png)
 
 ライブ顔追跡・AR描画・写真診断は端末内で処理します。録画から手順を作る場合は、同意後にAPIを経由してGeminiへ送り、端末で手順・色・塗る範囲を編集します。Cloud SQLはレシピや投稿のサムネイルを、非公開のCloud Storageは見本画像とプロフィール写真を保存します。画像はHono APIを経由して配信します。
 
-![nuriの開発と配信。共有stagingへの配信、Flociを使うローカル開発、PRプレビュー、ネイティブ版配布の経路](docs/images/readme/architecture-delivery.png)
+![nuriの開発と配信。GitHub Actionsから共有stagingまでの配信順、OpenTofuの管理範囲、ローカル開発・PRプレビュー・ネイティブ版の経路](docs/images/readme/architecture-delivery.png)
 
 共有stagingでは、Actionsが検証済みのコミットからイメージを作り、DBマイグレーションと候補リビジョンの確認を終えてから公開先を切り替えます。PRプレビューはPRごとに分離します。検証用のAndroid APKとiOS SimulatorアプリはGitHub Releasesから配布します。
 

@@ -26,7 +26,7 @@ bunx skills add cathrynlavery/diagram-design --agent codex --skill diagram-desig
 
 ## 構成図
 
-2026年11月10日に [main の `d6a8884`](https://github.com/Kcvl-DfHack26/nuri/tree/d6a888426ac812717a2924e340bb12fd445cf5f3) を参照し、`diagram-design` で作成した。配色とZen Maru Gothicは[nuriのFoundations](../../../apps/mobile/global.css)に合わせた。各HTMLのインラインSVGが編集元で、READMEには同じ図のPNG（2560×1440）を掲載する。
+2026年11月10日に [main の `d6a8884`](https://github.com/Kcvl-DfHack26/nuri/tree/d6a888426ac812717a2924e340bb12fd445cf5f3) を参照し、`diagram-design` で作成した。配色とZen Maru Gothicは[nuriのFoundations](../../../apps/mobile/global.css)に合わせた。各HTMLのインラインSVGが編集元で、READMEには同じ図のPNGを掲載する（実行構成は2880×1952、開発と配信は2880×1720）。
 
 | 図         | 編集元                                                   | 照合先                                                                                                                                                                      |
 | ---------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -35,7 +35,13 @@ bunx skills add cathrynlavery/diagram-design --agent codex --skill diagram-desig
 
 - 共有stagingは同じSHAの[配信実行](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42624368331)でDBマイグレーション・候補検証・公開切替が成功した。本番EAS Updateの工程はスキップされた。公開APIの `/ready` と `/media/` の見本画像応答を確認した。
 - ネイティブ版の[プレリリース](https://github.com/Kcvl-DfHack26/nuri/releases/tag/staging-42600942374)には、`c883922` から作ったAndroid APKとiOS Simulator用アプリがある。アプリのインストールや通知の実配送は確認範囲に含まない。
-- 実行構成図の破線は、認証情報を設定した環境で使う通知経路を表す。図では、権限の詳細とログイン方法ごとの戻り先を省略した。[通知の設定](../../setup.md#プッシュ通知)・[認証](../../auth.md)
+- 実行構成図は、端末・Cloud Run・各保存先を分け、Google SDKのIDトークンとOAuthの経路を示す。実行構成図の破線は、認証情報を設定した環境で使う通知経路を表す。開発と配信の図の破線はOpenTofuがリソースを管理する関係を示す。[通知の設定](../../setup.md#プッシュ通知)・[認証](../../auth.md)
+
+### 構成図のロゴとアイコン
+
+Expo・Hono・Drizzle ORM・React・OpenTofu・Vertex AIは下記の既存SVGを再利用した。Googleは[アプリ同梱の公式素材](../../../apps/mobile/assets/auth/README.md)を使った。Cloud Run、Cloud SQL、Cloud Storage、Secret Manager、Artifact Registryは[Google Cloudの公式アイコン集](https://cloud.google.com/icons)の旧コンソール版を使った。
+
+Better AuthとGoogle Cloudのロゴは[SVGL](https://github.com/pheralb/svgl)、GitHub Actionsは[Simple Icons](https://github.com/simple-icons/simple-icons)、顔・ブラシ・ブラウザーの記号は[Lucide](https://github.com/lucide-icons/lucide)の素材を使った。各ロゴは各権利者に帰属する。
 
 ## 紹介用ロゴ
 
