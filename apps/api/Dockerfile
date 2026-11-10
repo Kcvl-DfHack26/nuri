@@ -62,6 +62,7 @@ COPY --from=dependencies --chown=node:node /app/node_modules /app/node_modules
 COPY --from=dependencies --chown=node:node /app/apps /app/apps
 COPY --from=build --chown=node:node /app/apps/api/dist ./dist
 COPY --from=build --chown=node:node /app/apps/api/drizzle ./drizzle
+COPY --from=build --chown=node:node /app/apps/api/assets/product-kinds ./assets/product-kinds
 COPY --from=build --chown=node:node /app/apps/mobile/dist ./web
 COPY --from=build --chown=node:node /app/apps/api/package.json ./package.json
 USER node

@@ -16,6 +16,20 @@ const container = (
 try {
   await $`curl --fail --silent --show-error --retry 20 --retry-all-errors --retry-delay 1 --max-time 5 ${origin}/health`;
   await $`bash scripts/check-expo-web.sh ${origin}`;
+  const photos = [...new Bun.Glob('*.jpg').scanSync('apps/api/assets/product-kinds')];
+  if (photos.length === 0) {
+    throw new Error('No product kind photos found in the source tree');
+  }
+  for (const photo of photos) {
+    const response = await fetch(`${origin}/product-kinds/${photo}`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    const contentType = response.headers.get('content-type');
+    await response.body?.cancel();
+    if (response.status !== 200 || contentType !== 'image/jpeg') {
+      throw new Error(`Expected a JPEG for ${photo}, got HTTP ${response.status} (${contentType})`);
+    }
+  }
 } catch (error) {
   await $`docker logs ${container}`.nothrow();
   throw error;
