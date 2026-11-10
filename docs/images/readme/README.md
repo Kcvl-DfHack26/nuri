@@ -24,31 +24,24 @@ bunx skills add cathrynlavery/diagram-design --agent codex --skill diagram-desig
 
 これらはデザインの紹介であり、実アプリのスクリーンショットや動作確認の証拠ではない。デザイン中の投稿・件数・ガイド等は見本で、現在の実装と異なる場合がある。エミュレーターの撮影画像は含めていない。
 
-## 白背景の構成図
+## 構成図
 
-- `architecture-runtime.png`: 実行構成。端末の顔処理、Cloud Run、Cloud SQL、Vertex AI、認証の主要経路。
-- `architecture-delivery.png`: 開発・配信構成。Actionsによる処理順、EASとOpenTofuの関係。
+2026年11月10日に [main の `d6a8884`](https://github.com/Kcvl-DfHack26/nuri/tree/d6a888426ac812717a2924e340bb12fd445cf5f3) を参照し、`diagram-design` で作成した。配色とZen Maru Gothicは[nuriのFoundations](../../../apps/mobile/global.css)に合わせた。各HTMLのインラインSVGが編集元で、READMEには同じ図のPNG（2560×1440）を掲載する。
 
-[caru-ini/stack-diagram](https://github.com/caru-ini/stack-diagram/tree/1ed53e3e9525364ae5d82e0430f2bb3f7ef4c838)のテンプレートで作成したHTMLから、白背景のPNGを書き出した。技術ロゴはsvgl、gilbarbara/logos、Google Cloud product icons、OpenTofu、抽象的な端末機能の記号はLucideを使用。各商標は各権利者に帰属する。
+| 図         | 編集元                                                   | 照合先                                                                                                                                                                      |
+| ---------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 実行構成   | [architecture-runtime.html](architecture-runtime.html)   | [Hono API](../../../apps/api/src/app.ts)・[プライバシー要件](../../requirements.md#5-非機能要件)・[画像ストレージ](../../setup.md#共有環境の画像ストレージ)                 |
+| 開発と配信 | [architecture-delivery.html](architecture-delivery.html) | [共有stagingへの配信](../../../.github/workflows/deploy.yml)・[PRプレビュー](../../preview.md)・[ネイティブ版の配布](../../../.github/workflows/staging-mobile-release.yml) |
 
-図は[nuri main f0d41fe](https://github.com/Kcvl-DfHack26/nuri/tree/f0d41fe4b3dcee12d559cd52bfd8c6408ad497bb)と2026年11月9日の稼働環境を照合したスナップショット。このREADMEの基準である`6c2fdce`ではお気に入り機能が追加されているが、図の構成は変わらない。
-
-- 顔追跡は端末のMediaPipe、診断は特徴点に基づくルール、ARはSkiaのUV描画。
-- 動画解析はVertex AI上の`gemini-3.8-flash`、locationは`global`。動画はAPIのメモリ上で解析に渡し、APIで永続保存しない。
-- 動画の意味情報を端末でUV形状へ変換する。動画画素から塗布輪郭を抽出する方式ではなく、生成時の色も現在は部位の既定値。[#203](https://github.com/Kcvl-DfHack26/nuri/issues/203)は改善予定。
-- Webは同一originのAPIを利用する。全ネイティブ機能がWebでも動くという意味ではない。
-- ネイティブのGoogle SDKでID tokenを取得してBetter Authへ渡す経路と、OAuthリダイレクトの経路がある。
-- Secret Managerの値はCloud Runが環境変数として注入する。
-- [Deploy run 42515520832](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42515520832)でmigration・候補検証・公開切替が成功。EAS Update工程はskippedだった。
-- 確認時点でProduction Infrastructureに必要な`TOFU_*`変数と`EXPO_UPDATE_ENABLED`は未登録。配備設定の将来の変更は図へ自動反映されない。
-
-図の破線は配信の処理順または構成管理の関係で、migration Jobがサービスを直接デプロイする意味ではない。PRプレビュー・ローカル開発・全認証方式・全DBテーブルなどは省略している。詳細は[アーキテクチャ](../../architecture.md)と[セットアップ](../../setup.md)を参照。
+- 共有stagingは同じSHAの[配信実行](https://github.com/Kcvl-DfHack26/nuri/actions/runs/42624368331)でDBマイグレーション・候補検証・公開切替が成功した。本番EAS Updateの工程はスキップされた。公開APIの `/ready` と `/media/` の見本画像応答を確認した。
+- ネイティブ版の[プレリリース](https://github.com/Kcvl-DfHack26/nuri/releases/tag/staging-42600942374)には、`c883922` から作ったAndroid APKとiOS Simulator用アプリがある。アプリのインストールや通知の実配送は確認範囲に含まない。
+- 実行構成図の破線は、認証情報を設定した環境で使う通知経路を表す。図では、権限の詳細とログイン方法ごとの戻り先を省略した。[通知の設定](../../setup.md#プッシュ通知)・[認証](../../auth.md)
 
 ## 紹介用ロゴ
 
 冒頭はアプリに同梱済みの`apps/mobile/assets/images/icon.png`を使用。nuriの新しいロゴは作成していない。
 
-技術ロゴは構成図と同じ取得済みSVGを使用し、明暗のテーマで見えるよう白い台座を付けた。元のロゴの形・色は変更していない。
+技術スタック表には取得済みSVGを使い、明暗のテーマで見えるよう白い台座を付けた。元のロゴの形・色は変更していない。
 
 | ファイル           | ロゴ         | 元データ                                                                                                                          |
 | ------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |

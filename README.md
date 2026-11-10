@@ -76,17 +76,15 @@ TypeScriptを中心に、端末内の顔処理とGoogle Cloud上の動画解析�
 
 ## 🏗️ アーキテクチャ
 
-![nuriの実行構成。端末内の顔処理、Cloud RunのAPIとWeb、Cloud SQL、Vertex AIの関係](docs/images/readme/architecture-runtime.png)
+![nuriの実行構成。端末内の顔処理、Cloud RunのAPIとWeb、Cloud SQL、Cloud Storage、Geminiの関係](docs/images/readme/architecture-runtime.png)
 
-ライブ顔追跡・AR描画・写真診断は端末内で処理します。動画から手順を作るときは利用者の同意後にAPIへ送信し、Geminiの結果を端末で編集できる形に変換します。APIは解析用の動画を永続保存せず、投稿時にレシピと手順・画像をDBへ保存します。
+ライブ顔追跡・AR描画・写真診断は端末内で処理します。録画から手順を作る場合は、同意後にAPIを経由してGeminiへ送り、端末で手順・色・塗る範囲を編集します。Cloud SQLはレシピや投稿のサムネイルを、非公開のCloud Storageは見本画像とプロフィール写真を保存します。画像はHono APIを経由して配信します。
 
-構成図は2026年11月9日の確認時点のスナップショットです。図中の追加予定は現在の実装と区別しています。[画像の出所と確認範囲](docs/images/readme/README.md)・[🏗️ 構成仕様](docs/architecture.md)
+![nuriの開発と配信。共有stagingへの配信、Flociを使うローカル開発、PRプレビュー、ネイティブ版配布の経路](docs/images/readme/architecture-delivery.png)
 
-![nuriの開発・配信構成。GitHub Actionsからコンテナ配信、DB migration、Cloud Runへの配備を行う](docs/images/readme/architecture-delivery.png)
+共有stagingでは、Actionsが検証済みのコミットからイメージを作り、DBマイグレーションと候補リビジョンの確認を終えてから公開先を切り替えます。PRプレビューはPRごとに分離します。検証用のAndroid APKとiOS SimulatorアプリはGitHub Releasesから配布します。
 
-mainのCI成功後、Actionsが同じコンテナイメージでDB migrationを実行し、候補revisionのAPI・Webを確認してから公開先を切り替えます。OpenTofuはリソース、DrizzleはDBスキーマ、Actionsはアプリの配信を担当します。
-
-確認時点では、ActionsからのEAS Update自動配布とProduction Infrastructure用の認証変数は未設定です。Cloud Runへの配信成功と、端末に入っているアプリの更新は別に確認します。
+図の根拠と確認した稼働範囲は[構成図の出典](docs/images/readme/README.md#構成図)を参照してください。実行・配信の詳細は[アーキテクチャ](docs/architecture.md)にまとめています。
 
 ## 🚀 開発を始める
 

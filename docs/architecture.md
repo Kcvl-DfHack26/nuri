@@ -168,9 +168,9 @@ GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする
 
 Cloud Runのstartup probeは `/ready`、liveness probeは `/health` を使う。DBへ接続できないrevisionはトラフィックを受けず、DBの一時的な停止でインスタンスを再起動しない。最初の適用だけはmigrationのjobを `-target` で先に作って実行し、それからサービスを作る。初回はCloud Runの実URLが未確定なので `api_origin` は暫定値になる。サービス作成後、`service_uri` を `api_origin` に設定して再適用し、Better Authの公開URLを合わせる。Cloud SQL・Cloud Runのサービス・migrationのjobの削除防止は `deletion_protection` 変数にまとめる。Cloud SQLではGCP側の `deletion_protection_enabled` も同じ変数で設定し、止めるときは先に解除してからdestroyする。DBとDBユーザーはインスタンスと一緒に消えるため、`deletion_policy = "ABANDON"` でdestroyの失敗を避ける。
 
-WIFはGitHubの不変repository ID、リポジトリ名、main、`deploy.yml`に制限する。CIのサービスアカウントはインフラ管理者ではない。インフラ変更はADCでplanを確認して適用する。
+WIFはGitHubの不変repository ID、リポジトリ名、main、`deploy.yml`に制限する。CIのサービスアカウントはインフラ管理者ではない。共有環境のインフラは専用のGitHub Actionsでplanを確認して適用する。
 
-PRのExpo Updateは、tablecast-pocの手動カタログ配備と同じコメント内チェックボックス、またはGitHub Actionsの手動実行で公開する。PR更新時はコメントだけを更新する。Expo Workflowsの無料実行時間を消費しないよう、bundle生成と公開はGitHub ActionsとExpo公式preview actionが担当する。配信先はPRごとのbranchで、共有staging APIを使う。PR単位のDB/API環境は初期構成に含めない。OTAの互換性境界はfingerprint。ネイティブ依存・設定が変わると新しいビルドが必要になる。
+main宛ての同一リポジトリのPRには、GitHub ActionsがPR専用のCloud Runプレビューを配信する。Expo Web・Hono API・Expo GoのMetroを同じホストから提供し、コンテナ内の使い捨てPostgreSQLとPR専用の非公開画像バケットを使う。PR終了時に専用リソースを回収する。対象イベントと運用手順は[PRプレビュー](preview.md)を参照する。
 
 審査・デモ用のネイティブ配布は、CIが成功したmainからGitHub Actionsを手動実行する。EAS Buildで作るAndroid APKとiOS Simulatorの `.app` は同じSHAを使い、共有stagingのURLとJavaScriptを同梱する。配布用の `staging-release` ではOTAを無効にし、プレリリースに記載したSHAと実行するコードを揃える。
 

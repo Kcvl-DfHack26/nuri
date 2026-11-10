@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>nuriの開発と配信</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&amp;display=swap"
+    />
+    <style>
+      :root {
+        --paper: #fffbfd;
+        --ink: #43304b;
+        --muted: #6f5d76;
+        --rule: #e4cdd9;
+        --rose: #b52f63;
+        --pink: #ffe6ee;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+      }
+      .diagram-container {
+        overflow-x: auto;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        min-width: 1280px;
+      }
+      text {
+        fill: var(--ink);
+        font-family: 'Zen Maru Gothic', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+      }
+      .heading {
+        font-size: 50px;
+        font-weight: 900;
+      }
+      .lede,
+      .detail {
+        font-size: 23px;
+        font-weight: 500;
+        fill: var(--muted);
+      }
+      .name {
+        font-size: 30px;
+        font-weight: 700;
+      }
+      .eyebrow {
+        font-size: 20px;
+        font-weight: 700;
+        fill: var(--muted);
+      }
+      .accent {
+        fill: var(--rose);
+      }
+      .rule {
+        stroke: var(--rule);
+        stroke-width: 2;
+      }
+      .card {
+        fill: #ffffff;
+        stroke: var(--rule);
+        stroke-width: 2;
+      }
+      .external {
+        fill: #eee6ff;
+        stroke: #d9caef;
+      }
+      .storage {
+        fill: #e2efff;
+        stroke: #cadced;
+      }
+      .focal {
+        fill: var(--pink);
+        stroke: var(--rose);
+      }
+      .optional {
+        fill: #ffffff;
+        stroke-dasharray: 6 5;
+      }
+      .edge {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 2.5;
+      }
+      .conditional {
+        stroke-dasharray: 7 5;
+      }
+      .edge-label {
+        font-size: 20px;
+        font-weight: 700;
+        fill: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="diagram-container">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 1280 720"
+        width="1280"
+        height="720"
+        role="img"
+        aria-labelledby="architecture-delivery-title architecture-delivery-desc"
+      >
+        <title id="architecture-delivery-title">nuriの開発と配信</title>
+        <desc id="architecture-delivery-desc">
+          共有stagingはmainのCI成功後に配信し、ローカル開発、PRプレビュー、ネイティブ版は別の経路で扱う。
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#6f5d76" />
+          </marker>
+        </defs>
+        <rect width="1280" height="720" fill="#fffbfd" />
+        <text x="56" y="53" class="eyebrow accent">02 開発と配信</text>
+        <text x="56" y="110" class="heading">変更を検証して公開する</text>
+        <text x="56" y="151" class="lede">
+          GitHub Actionsは検証済みのコミットを配信し、OpenTofuはリソースを管理する。
+        </text>
+        <text x="56" y="202" class="eyebrow">共有stagingへのアプリ配信</text>
+        <path d="M 308 278 H 360" class="edge" marker-end="url(#arrow)" />
+        <path d="M 612 278 H 664" class="edge" marker-end="url(#arrow)" />
+        <path d="M 916 278 H 968" class="edge" marker-end="url(#arrow)" />
+        <rect x="56" y="220" width="252" height="132" rx="8" class="card" />
+        <text x="80" y="263" class="name">CIで検査</text>
+        <text x="80" y="294" class="detail">最新のmain</text>
+        <text x="80" y="325" class="detail">対象SHAを確認</text>
+        <rect x="360" y="220" width="252" height="132" rx="8" class="card" />
+        <text x="384" y="263" class="name">イメージを保存</text>
+        <text x="384" y="294" class="detail">APIとWebを同梱</text>
+        <text x="384" y="325" class="detail">Artifact Registry</text>
+        <rect x="664" y="220" width="252" height="132" rx="8" class="card" />
+        <text x="688" y="263" class="name">移行と候補検証</text>
+        <text x="688" y="294" class="detail">DB更新を先に実行</text>
+        <text x="688" y="325" class="detail">API・Webを確認</text>
+        <rect x="968" y="220" width="256" height="132" rx="8" class="card focal" />
+        <text x="992" y="263" class="name">共有staging</text>
+        <text x="992" y="294" class="detail">Cloud Run</text>
+        <text x="992" y="325" class="detail">検証済みの版へ切替</text>
+        <text x="56" y="391" class="detail">
+          本番のEAS Updateは有効時に実行する。直近の配信ではスキップされた。
+        </text>
+        <path d="M 56 420 H 1224" class="rule" />
+        <text x="56" y="459" class="eyebrow">独立した開発・検証・配布の経路</text>
+        <rect x="56" y="484" width="360" height="144" rx="8" class="card" />
+        <text x="80" y="527" class="name">ローカル開発</text>
+        <text x="80" y="558" class="detail">Compose・Portless</text>
+        <text x="80" y="589" class="detail">FlociでDBと画像を分離</text>
+        <rect x="440" y="484" width="376" height="144" rx="8" class="card" />
+        <text x="464" y="527" class="name">PRプレビュー</text>
+        <text x="464" y="558" class="detail">PRごとにCloud Run・GCS</text>
+        <text x="464" y="589" class="detail">Web・API・Expo Goを確認</text>
+        <rect x="840" y="484" width="384" height="144" rx="8" class="card" />
+        <text x="864" y="527" class="name">ネイティブ版</text>
+        <text x="864" y="558" class="detail">EAS Buildを手動で起動</text>
+        <text x="864" y="589" class="detail">GitHub Releasesで検証版を配布</text>
+        <text x="56" y="682" class="detail">
+          PR終了時にプレビューを回収する。配布用APKとiOS Simulatorアプリには同じSHAを使う。
+        </text>
+      </svg>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>nuriの実行構成</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&amp;display=swap"
+    />
+    <style>
+      :root {
+        --paper: #fffbfd;
+        --ink: #43304b;
+        --muted: #6f5d76;
+        --rule: #e4cdd9;
+        --rose: #b52f63;
+        --pink: #ffe6ee;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+      }
+      .diagram-container {
+        overflow-x: auto;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        min-width: 1280px;
+      }
+      text {
+        fill: var(--ink);
+        font-family: 'Zen Maru Gothic', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+      }
+      .heading {
+        font-size: 50px;
+        font-weight: 900;
+      }
+      .lede,
+      .detail {
+        font-size: 23px;
+        font-weight: 500;
+        fill: var(--muted);
+      }
+      .name {
+        font-size: 30px;
+        font-weight: 700;
+      }
+      .eyebrow {
+        font-size: 20px;
+        font-weight: 700;
+        fill: var(--muted);
+      }
+      .accent {
+        fill: var(--rose);
+      }
+      .rule {
+        stroke: var(--rule);
+        stroke-width: 2;
+      }
+      .card {
+        fill: #ffffff;
+        stroke: var(--rule);
+        stroke-width: 2;
+      }
+      .external {
+        fill: #eee6ff;
+        stroke: #d9caef;
+      }
+      .storage {
+        fill: #e2efff;
+        stroke: #cadced;
+      }
+      .focal {
+        fill: var(--pink);
+        stroke: var(--rose);
+      }
+      .optional {
+        fill: #ffffff;
+        stroke-dasharray: 6 5;
+      }
+      .edge {
+        fill: none;
+        stroke: var(--muted);
+        stroke-width: 2.5;
+      }
+      .conditional {
+        stroke-dasharray: 7 5;
+      }
+      .edge-label {
+        font-size: 20px;
+        font-weight: 700;
+        fill: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="diagram-container">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 1280 720"
+        width="1280"
+        height="720"
+        role="img"
+        aria-labelledby="architecture-runtime-title architecture-runtime-desc"
+      >
+        <title id="architecture-runtime-title">nuriの実行構成</title>
+        <desc id="architecture-runtime-desc">
+          顔追跡と診断は端末で行い、Cloud RunのHono
+          APIが認証、データ保存、画像配信、同意後の動画解析を仲介する。
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#6f5d76" />
+          </marker>
+        </defs>
+        <rect width="1280" height="720" fill="#fffbfd" />
+        <text x="56" y="53" class="eyebrow accent">01 実行構成</text>
+        <text x="56" y="110" class="heading">端末からレシピが届くまで</text>
+        <text x="56" y="151" class="lede">
+          ライブの顔処理は端末で行い、公開レシピや動画解析にはAPIを使う。
+        </text>
+        <text x="56" y="198" class="eyebrow">利用者の端末</text>
+        <text x="452" y="248" class="eyebrow">共有staging</text>
+        <text x="908" y="198" class="eyebrow">データと外部サービス</text>
+        <path
+          d="M 332 284 H 388 Q 396 284 396 292 V 304 Q 396 312 404 312 H 452"
+          class="edge"
+          marker-end="url(#arrow)"
+        />
+        <path
+          d="M 332 454 H 388 Q 396 454 396 446 V 408 Q 396 400 404 400 H 452"
+          class="edge"
+          marker-end="url(#arrow)"
+        />
+        <path
+          d="M 752 298 H 820 Q 828 298 828 290 V 263 Q 828 255 836 255 H 908"
+          class="edge"
+          marker-end="url(#arrow)"
+        />
+        <path
+          d="M 752 336 H 844 Q 852 336 852 344 V 351 Q 852 359 860 359 H 908"
+          class="edge"
+          marker-end="url(#arrow)"
+        />
+        <path
+          d="M 752 376 H 820 Q 828 376 828 384 V 455 Q 828 463 836 463 H 908"
+          class="edge"
+          marker-end="url(#arrow)"
+        />
+        <path
+          d="M 752 415 H 792 Q 800 415 800 423 V 559 Q 800 567 808 567 H 908"
+          class="edge conditional"
+          marker-end="url(#arrow)"
+        />
+        <rect x="332" y="246" width="88" height="28" rx="4" fill="#fffbfd" />
+        <text x="376" y="268" class="edge-label" text-anchor="middle">HTTPS</text>
+        <rect x="335" y="462" width="130" height="28" rx="4" fill="#fffbfd" />
+        <text x="400" y="484" class="edge-label" text-anchor="middle">同一オリジン</text>
+        <rect x="56" y="216" width="276" height="148" rx="8" class="card" />
+        <text x="80" y="259" class="name">iOS・Android</text>
+        <text x="80" y="290" class="detail">Expo / React Native</text>
+        <text x="80" y="321" class="detail">MediaPipe・Skia</text>
+        <rect x="56" y="408" width="276" height="96" rx="8" class="card" />
+        <text x="80" y="447" class="name">ブラウザー</text>
+        <text x="80" y="478" class="detail">Expo Web</text>
+        <rect x="452" y="268" width="300" height="172" rx="8" class="card focal" />
+        <text x="476" y="310" class="name">Cloud Run</text>
+        <text x="476" y="341" class="detail">Hono API・Expo Web</text>
+        <text x="476" y="372" class="detail">Better Authで認証</text>
+        <text x="476" y="403" class="detail">画像をAPI経由で配信</text>
+        <rect x="908" y="212" width="316" height="88" rx="8" class="card external" />
+        <text x="932" y="247" class="name">Vertex AI / Gemini</text>
+        <text x="932" y="279" class="detail">動画から手順・色を推定</text>
+        <rect x="908" y="316" width="316" height="88" rx="8" class="card storage" />
+        <text x="932" y="351" class="name">Cloud SQL</text>
+        <text x="932" y="383" class="detail">レシピ・認証・投稿画像</text>
+        <rect x="908" y="420" width="316" height="88" rx="8" class="card storage" />
+        <text x="932" y="455" class="name">Cloud Storage</text>
+        <text x="932" y="487" class="detail">見本・プロフィール写真</text>
+        <rect x="908" y="524" width="316" height="88" rx="8" class="card optional" />
+        <text x="932" y="559" class="name">Expo Push Service</text>
+        <text x="932" y="591" class="detail">設定時にAPNs・FCMへ</text>
+        <path d="M 56 640 H 1224" class="rule" />
+        <text x="56" y="682" class="detail">
+          録画は利用者が同意してから送信する。APIは解析用の動画を永続保存しない。
+        </text>
+      </svg>
+    </div>
+  </body>
+</html>
