@@ -27,9 +27,7 @@ export function createAuth(db: Database, env: Environment) {
     database: drizzleAdapter(db, { provider: 'pg', schema }),
     baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
-    trustedOrigins: env.TRUSTED_ORIGINS.split(',')
-      .map((origin) => origin.trim())
-      .filter(Boolean),
+    trustedOrigins: env.TRUSTED_ORIGINS,
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === '/update-user') {

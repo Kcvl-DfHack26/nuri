@@ -27,10 +27,9 @@ export function createApp(
   ready: () => Promise<void>,
   analyzePost: PostAnalyzer | null = null,
 ) {
-  const origins = env.TRUSTED_ORIGINS.split(',').map((value) => value.trim());
   const browserOrigins = [
     new URL(env.BETTER_AUTH_URL).origin,
-    ...origins.filter((origin) => origin.startsWith('http')),
+    ...env.TRUSTED_ORIGINS.filter((origin) => origin.startsWith('http')),
   ];
   const smallBody = bodyLimit({ maxSize: 64 * 1024 });
   // POST /api/recipes carries a base64 JPEG of up to 1.5 MB (2 MB as base64) plus the texts.
