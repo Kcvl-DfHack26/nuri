@@ -9,4 +9,4 @@ Photos ⑤ shows beside a cosmetic published with a posted recipe (#224), one pe
 - `highlight-shading.jpg`: highlight and shading palette (`highlight_and_shading.png`)
 - `lip.jpg`: lipstick (`rip.png`)
 
-Provided by the team (kiyo-cmvs, 2026-11-09) as generic photos without brands, cropped to a square and resized to 256 px. Source and license: not yet recorded. Record them here before submission (著作物利用シート).
+Provided by the team (kiyo-cmvs, 2026-11-09) as generic images without brands, cropped to a square and resized to 256 px. The images came from team-provided material or image generation. See the [source and terms for the sample recipe assets](../sample-recipes/README.md).

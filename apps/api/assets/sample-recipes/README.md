@@ -7,4 +7,4 @@ Photos for the development sample recipes (①⑤) and their cosmetics. They are
 - `product-brow-pencil.jpg`, `product-cheek.jpg`: ⑤ レシピ詳細 使うメイク品
 - `../sample-avatars/mio.png`: ⑤ author avatar
 
-License: not yet confirmed. Ask the designer of the Figma file where each photo came from and its license, and record it here before submission (著作物利用シート).
+The team supplied these design assets or generated them with OpenAI or Google Gemini. This is the source recorded for the collection. The generation service was not recorded for each file. The [OpenAI terms](https://openai.com/policies/terms-of-use/) and [Google terms](https://policies.google.com/terms?hl=ja&gl=JP) describe their treatment of generated output.
