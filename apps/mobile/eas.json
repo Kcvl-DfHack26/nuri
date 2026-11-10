@@ -70,6 +70,7 @@
         "simulator": false,
         "withoutCredentials": true,
         "config": "staging-ios-personal-team.yml",
+        "applicationArchivePath": "ios/build/Build/Products/Release-iphoneos/nuri.app",
         "env": {
           "NURI_IOS_PERSONAL_TEAM_RELEASE": "1"
         }

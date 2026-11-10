@@ -70,7 +70,7 @@ jobs:
           }
           download ANDROID staging-release "$result" nuri-staging-android.apk
           download IOS staging-release "$result" ios-simulator.tar.gz
-          download IOS staging-ios-personal-team "$device_result" nuri-staging-ios-device-unsigned.app.zip
+          download IOS staging-ios-personal-team "$device_result" ios-device.tar.gz
       - name: Verify APK signature and native architectures
         run: |
           apk="$RUNNER_TEMP/staging-mobile/nuri-staging-android.apk"
@@ -120,13 +120,13 @@ jobs:
           zip="$assets/nuri-staging-ios-simulator.app.zip"
           ditto -c -k --keepParent "$unpacked/nuri.app" "$zip"
           unzip -tq "$zip"
-      - name: Verify the unsigned iPhone app
+      - name: Verify and package the unsigned iPhone app
         run: |
-          zip="$RUNNER_TEMP/staging-mobile/nuri-staging-ios-device-unsigned.app.zip"
+          assets="$RUNNER_TEMP/staging-mobile"
           unpacked=$(mktemp -d)
-          unzip -tq "$zip"
-          ditto -x -k "$zip" "$unpacked"
-          app="$unpacked/nuri.app"
+          tar -xzf "$assets/ios-device.tar.gz" -C "$unpacked"
+          app=$(find "$unpacked" -type d -name nuri.app -prune -print)
+          test -d "$app"
           plist="$app/Info.plist"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = dev.reohakase.nuri.staging
           executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")
@@ -139,6 +139,9 @@ jobs:
             echo '::error::Expected an iPhone app without an Apple signing identity.'
             exit 1
           fi
+          zip="$assets/nuri-staging-ios-device-unsigned.app.zip"
+          ditto -c -k --keepParent "$app" "$zip"
+          unzip -tq "$zip"
       - name: Publish staging assets as a prerelease
         env:
           GH_TOKEN: ${{ github.token }}

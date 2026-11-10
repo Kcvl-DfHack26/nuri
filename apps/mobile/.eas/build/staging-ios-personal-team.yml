@@ -11,15 +11,10 @@ build:
         working_directory: ios
         command: pod install
     - run:
-        name: Build and package the unsigned iPhone app
+        name: Build the unsigned iPhone app
         command: |
           set -euo pipefail
           xcodebuild -workspace ios/nuri.xcworkspace -scheme nuri \
             -configuration Release -destination 'generic/platform=iOS' \
             -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
-          ditto -c -k --keepParent ios/build/Build/Products/Release-iphoneos/nuri.app \
-            nuri-staging-ios-device-unsigned.app.zip
-    - eas/upload_artifact:
-        inputs:
-          type: application-archive
-          path: nuri-staging-ios-device-unsigned.app.zip
+    - eas/find_and_upload_build_artifacts
