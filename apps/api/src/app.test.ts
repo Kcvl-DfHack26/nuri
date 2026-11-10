@@ -69,6 +69,16 @@ describe('HTTP contract', () => {
       emulated: false,
     });
   });
+  test('allows the API origin in CORS and excludes the native login scheme', async () => {
+    const sameOrigin = await app.request('/api/auth-capabilities', {
+      headers: { origin: 'http://localhost:8080' },
+    });
+    expect(sameOrigin.headers.get('access-control-allow-origin')).toBe('http://localhost:8080');
+    const nativeOrigin = await app.request('/api/auth-capabilities', {
+      headers: { origin: 'com.kcvl.nuri://' },
+    });
+    expect(nativeOrigin.headers.get('access-control-allow-origin')).toBeNull();
+  });
   test('opens a native login link from a tappable HTTPS page', async () => {
     const response = await app.request('/api/auth/open-mobile-link');
     expect(response.status).toBe(200);

@@ -33,13 +33,15 @@ APIの環境変数は `apps/api/.env.example` と `src/platform/env.ts`。Compos
 
 | 変数                                        | 用途                                                         |
 | ------------------------------------------- | ------------------------------------------------------------ |
-| `BETTER_AUTH_URL` / `TRUSTED_ORIGINS`       | APIのHTTPS URLと許可するアプリ・Web origin                   |
+| `BETTER_AUTH_URL` / `TRUSTED_ORIGINS`       | APIのHTTPS URLと許可するアプリ・Web origin（カンマ区切り）   |
 | `AUTH_EMULATE`                              | ローカル限定。本番でtrueなら起動を拒否                       |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 実Google OAuthクライアント                                   |
 | `RESEND_API_KEY` / `EMAIL_FROM`             | 実メール送信キーと送信元。一般配信には検証済みドメインが必要 |
 | `PASSKEY_RP_ID` / `PASSKEY_ORIGINS`         | パスキーのRPドメインと許可origin（カンマ区切り）             |
 | `APPLE_APP_ID`                              | `TEAM_ID.com.kcvl.nuri`                                      |
 | `ANDROID_SHA256_CERT_FINGERPRINTS`          | Android署名証明書のSHA-256（カンマ区切り）                   |
+
+`TRUSTED_ORIGINS` は前後の空白と空要素を除いて読み込む。Better AuthはアプリとWebの値を使う。APIのCORSと書き込み時のOrigin確認には、設定されたWeb originとAPI自身のoriginを使う。
 
 実OAuthのcallbackは `<BETTER_AUTH_URL>/api/auth/callback/google`。ローカルは別provider IDの `/emulate-google` で、実プロバイダのidentityと混在させない。キー未設定のログイン方法はcapabilitiesに従って利用不可にする。認証バイパス・organization・パスワードログインは設けない。
 
