@@ -63,6 +63,17 @@
           "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a,x86_64"
         }
       }
+    },
+    "staging-ios-personal-team": {
+      "extends": "staging-release",
+      "ios": {
+        "simulator": false,
+        "withoutCredentials": true,
+        "config": "staging-ios-personal-team.yml",
+        "env": {
+          "NURI_IOS_PERSONAL_TEAM_RELEASE": "1"
+        }
+      }
     }
   },
   "submit": {

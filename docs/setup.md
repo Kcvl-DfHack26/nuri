@@ -318,14 +318,35 @@ Apple/Googleストアの契約・署名は別途必要で、TestFlight/ストア
 
 ### GitHub Releasesからstagingビルドを入れる
 
-[GitHub Releases](https://github.com/Kcvl-DfHack26/nuri/releases) の `staging-<実行ID>` から、共有stagingにつながる配布ビルドを取得する。どちらもアプリを同梱しており、起動にExpo GoやMetroは不要。
+[GitHub Releases](https://github.com/Kcvl-DfHack26/nuri/releases) の `staging-<実行ID>` から、共有stagingにつながる配布ビルドを取得する。各ビルドはJavaScriptを同梱しており、起動にExpo GoやMetroは不要。
 
 - Androidは `nuri-staging-android.apk` を対応端末で開くか、接続済みの端末に `adb install -r nuri-staging-android.apk` で入れる。
 - iOS SimulatorはMacで `nuri-staging-ios-simulator.app.zip` を展開し、XcodeのSimulatorを起動して `xcrun simctl install booted ./nuri.app` を実行する。
+- iPhone実機は `nuri-staging-ios-device-unsigned.app.zip` を取得し、[Personal Teamで署名](#iphone実機にpersonal-teamで入れる)してから入れる。
 
-配布するにはGitHub Actionsの **Publish staging mobile release** を `main` から手動実行する。mainのCIとstagingの `/ready` が成功し、同じSHAから作成した両ファイルが検査を通ると公開プレリリースが作られる。失敗時はActionsのログを確認し、原因を解消して **Run workflow** から新しい実行を開始する。
+配布するにはGitHub Actionsの **Publish staging mobile release** を `main` から手動実行する。mainのCIとstagingの `/ready` が成功し、同じSHAから作成した3ファイルが検査を通ると公開プレリリースが作られる。失敗時はActionsのログを確認し、原因を解消して **Run workflow** から新しい実行を開始する。
 
 初回設定ではGitHubの `mobile-release` 環境を `main` に制限し、[Expoのアクセストークン](https://docs.expo.dev/accounts/programmatic-access/)を環境Secret `EXPO_TOKEN` に登録する。トークンのアクセス先を `kcvlb4` に限定し、Expo Buildに必要な権限を与える。AndroidはEASの `com.kcvl.nuri` に登録した署名鍵を使う。鍵が未設定の場合は、Expoプロジェクトの管理者が `apps/mobile` で `bunx eas credentials --platform android` を実行して設定する。
+
+#### iPhone実機にPersonal Teamで入れる
+
+ReoHakaseの個人Apple Accountで `dev.reohakase.nuri.staging` に開発署名する手順。EASは実機用ZIPのビルドを担当し、署名はMac上で行う。このstaging版ではAPNsのリモート通知とパスキーのAssociated Domainsを無効にしている。
+
+1. Xcodeの **Settings → Apple Accounts** で個人Apple Accountにサインインする。iPhoneをMacに接続してペアリングし、iPhoneの **設定 → プライバシーとセキュリティ → デベロッパモード** を有効にする。 [Appleのデベロッパモード手順](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device)
+2. Xcodeの **File → New → Project → iOS → App** から空のiOSアプリを作成する。ターゲットの **Signing & Capabilities** で **Automatically manage signing** をオンにし、**Team** に **Personal Team**、**Bundle Identifier** に `dev.reohakase.nuri.staging` を設定する。
+3. Xcodeの実行先に接続したiPhoneを選び、**Product → Build** を実行する。ビルドフォルダの `Products/Debug-iphoneos/` に生成された `.app` のパスを控える。続いて `xcrun devicectl list devices` で対象iPhoneの識別子を確認する。 [Appleの実機ビルド手順](https://developer.apple.com/documentation/xcode/running-your-app-on-simulated-or-physical-devices)
+4. リリースのSource commitと同じcheckoutのルートで以下を実行する。スクリプトはZIPを一時フォルダに展開し、Xcodeで作ったアプリと同じ開発署名を使ってiPhoneにインストールする。
+
+   ```sh
+   bash scripts/install-ios-personal-team.sh \
+     ~/Downloads/nuri-staging-ios-device-unsigned.app.zip \
+     '/path/to/Debug-iphoneos/SigningApp.app' \
+     '<iPhoneの識別子>'
+   ```
+
+5. iPhoneのホーム画面からnuriを開き、stagingのレシピ一覧と詳細を確認する。「メイクをはじめる」でカメラを許可し、顔を動かしたときに重ね表示が追従することを確認する。
+
+Personal Teamのプロビジョニングプロファイルは発行から7日で失効する。期限後は手順3でXcodeの開発プロファイルを更新し、同じZIPで手順4を実行する。 [AppleのPersonal Teamの説明](https://developer.apple.com/help/account/basics/about-your-developer-account/)
 
 ### プッシュ通知
 

@@ -38,7 +38,7 @@ jobs:
         with:
           node-version-file: .node-version
       - run: bun install --frozen-lockfile
-      - name: Build and download both native artifacts
+      - name: Build and download native artifacts
         working-directory: apps/mobile
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -51,22 +51,26 @@ jobs:
           result="$RUNNER_TEMP/staging-builds.json"
           ../../node_modules/.bin/eas build --platform all --profile staging-release \
             --non-interactive --freeze-credentials --wait --json > "$result"
+          device_result="$RUNNER_TEMP/staging-ios-device-build.json"
+          ../../node_modules/.bin/eas build --platform ios --profile staging-ios-personal-team \
+            --non-interactive --freeze-credentials --wait --json > "$device_result"
 
           assets="$RUNNER_TEMP/staging-mobile"
           mkdir -p "$assets"
-          for platform in ANDROID IOS; do
-            url=$(jq -er --arg platform "$platform" --arg sha "$GITHUB_SHA" '
-              .[] | select(.platform == $platform and .status == "FINISHED"
-                and .gitCommitHash == $sha and .buildProfile == "staging-release")
-              | .artifacts.applicationArchiveUrl | select(startswith("https://"))
-            ' "$result")
-            case "$platform" in
-              ANDROID) filename=nuri-staging-android.apk ;;
-              IOS) filename=ios-simulator.tar.gz ;;
-            esac
+          download() {
+            local platform="$1" profile="$2" response="$3" filename="$4" url
+            url=$(jq -er --arg platform "$platform" --arg profile "$profile" --arg sha "$GITHUB_SHA" '
+              [.[] | select(.platform == $platform and .status == "FINISHED"
+                and .gitCommitHash == $sha and .buildProfile == $profile)]
+              | select(length == 1) | .[0].artifacts.applicationArchiveUrl
+              | strings | select(startswith("https://"))
+            ' "$response")
             curl --fail --silent --show-error --location --retry 3 \
               --proto '=https' --proto-redir '=https' --output "$assets/$filename" "$url"
-          done
+          }
+          download ANDROID staging-release "$result" nuri-staging-android.apk
+          download IOS staging-release "$result" ios-simulator.tar.gz
+          download IOS staging-ios-personal-team "$device_result" nuri-staging-ios-device-unsigned.app.zip
       - name: Verify APK signature and native architectures
         run: |
           apk="$RUNNER_TEMP/staging-mobile/nuri-staging-android.apk"
@@ -116,7 +120,26 @@ jobs:
           zip="$assets/nuri-staging-ios-simulator.app.zip"
           ditto -c -k --keepParent "$unpacked/nuri.app" "$zip"
           unzip -tq "$zip"
-      - name: Publish both assets as a prerelease
+      - name: Verify the unsigned iPhone app
+        run: |
+          zip="$RUNNER_TEMP/staging-mobile/nuri-staging-ios-device-unsigned.app.zip"
+          unpacked=$(mktemp -d)
+          unzip -tq "$zip"
+          ditto -x -k "$zip" "$unpacked"
+          app="$unpacked/nuri.app"
+          plist="$app/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = dev.reohakase.nuri.staging
+          executable=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")
+          build_info=$(xcrun vtool -arch arm64 -show-build "$app/$executable")
+          grep -Eq '^[[:space:]]*platform[[:space:]]+IOS$' <<< "$build_info"
+          test -s "$app/main.jsbundle"
+          test -z "$(find "$app" \( -name '*.appex' -o -name embedded.mobileprovision \) -print)"
+          signature=$(codesign --display --verbose=2 "$app" 2>&1 || true)
+          if grep -q '^Authority=' <<< "$signature"; then
+            echo '::error::Expected an iPhone app without an Apple signing identity.'
+            exit 1
+          fi
+      - name: Publish staging assets as a prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -131,10 +154,12 @@ jobs:
 
           - Android — APK を端末で開くか、\`adb install -r nuri-staging-android.apk\` を実行します。
           - iOS Simulator — Mac で ZIP を展開し、起動済みの Simulator に \`xcrun simctl install booted ./nuri.app\` でインストールします。
+          - iPhone実機 — 未署名ZIPをダウンロードし、MacのXcodeと個人のApple Accountで署名してから入れます。署名は7日間有効です。[署名とインストール手順]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_SHA/docs/setup.md#iphone実機にpersonal-teamで入れる)
           EOF
           gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
             -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" --jq .ref
           gh release create "$tag" \
             "$assets/nuri-staging-android.apk" "$assets/nuri-staging-ios-simulator.app.zip" \
+            "$assets/nuri-staging-ios-device-unsigned.app.zip" \
             --repo "$GITHUB_REPOSITORY" --verify-tag --title "nuri $tag" \
             --notes-file "$notes" --prerelease --latest=false
