@@ -8,7 +8,7 @@
 flowchart LR
   Phone[Expo SDK 58 / Expo UI] -->|Hono RPC / HTTPS|API[Cloud Run / Node.js / Hono]
   Phone -->|SecureStore|Session[Better Auth session]
-  Phone -->|SQLite KV|Local[外観・触覚設定]
+  Phone --> Local[端末内の顔追跡・AR表示・写真診断]
   API --> Auth[Better Auth]
   Auth --> Drizzle[Drizzle ORM]
   Drizzle --> DB[(Cloud SQL / PostgreSQL)]
@@ -22,7 +22,7 @@ flowchart LR
 - Expo Routerは画面ルーティング専用。Honoを別サーバーとしてCloud Runで動かす。
 - `@starter/api/contract` は `AppType` のtype-only公開入口。モバイルはHono RPCの型を再利用し、API実装をbundleへ混入させない。
 - Zodは入力検証と共有モデル、DrizzleはPostgreSQLスキーマとmigrationを所有する。Drizzle ORM / Kitは `1.0.0-rc.5` に固定する。
-- Better Auth 1.7.17 + Expo pluginでGoogle OAuth・email magic link・passkey。セッションはSecureStore。ローカルはVercel Emulateを使い、Google Cloudや実プロバイダのキーなしで認証する。
+- Better AuthとExpoプラグインでGoogleとパスキーのログインを扱う。セッションはSecureStoreに保存する。メールの一般提供とローカルのVercel Emulateについては[認証の設定](auth.md)を参照する。
 
 Drizzle 1.0 RCは[公式の移行手順](https://orm.drizzle.team/docs/upgrade-v1)に従って採用する。DB接続は `drizzle({ client: pool })` を使い、認証のschemaはBetter Authのadapterへ渡す。Kitで廃止された `strict` 設定は削除した。既存migrationは `drizzle-kit up` でSQLとsnapshotを同じディレクトリへ移し、snapshotをversion 9へ変換した。SQLの内容・ハッシュと適用順序は保持し、テーブルの作り直しは行わない。
 
@@ -109,7 +109,7 @@ PoC-1・PoC-2（#24）の⑦⑩への引き継ぎには、このExpo ModuleとSk
 
 独自UIはCSSのneutralテーマ、標準UIはOSセマンティックカラー。実装planに合わせて端末とWebの外観をライトに固定する。Portal・Reanimated等は追加しない。[UI開発手順](ui.md)を参照。
 
-プロフィール・認証の設定は⑰-2にまとめる。投稿といいねはPostgreSQLに保存し、ログインユーザーに紐付く。以前の習慣・お気に入り・完了・目標はSNSサンプルから除いた。API未設定時は接続案内を表示する。
+⑰-2の「アカウント」でGoogle連携を確認し、パスキーの一覧・追加・削除を操作する。公開レシピやお気に入りはPostgreSQLでログインユーザーに紐付ける。旧文章投稿とそのいいねは #214・#217 で削除した。API未設定時は接続案内を表示する。
 
 ## APIと認証の境界
 
@@ -168,9 +168,9 @@ GitHub Actionsはmainの成功したCIに紐づくSHAだけをデプロイする
 
 Cloud Runのstartup probeは `/ready`、liveness probeは `/health` を使う。DBへ接続できないrevisionはトラフィックを受けず、DBの一時的な停止でインスタンスを再起動しない。最初の適用だけはmigrationのjobを `-target` で先に作って実行し、それからサービスを作る。初回はCloud Runの実URLが未確定なので `api_origin` は暫定値になる。サービス作成後、`service_uri` を `api_origin` に設定して再適用し、Better Authの公開URLを合わせる。Cloud SQL・Cloud Runのサービス・migrationのjobの削除防止は `deletion_protection` 変数にまとめる。Cloud SQLではGCP側の `deletion_protection_enabled` も同じ変数で設定し、止めるときは先に解除してからdestroyする。DBとDBユーザーはインスタンスと一緒に消えるため、`deletion_policy = "ABANDON"` でdestroyの失敗を避ける。
 
-WIFはGitHubの不変repository ID、リポジトリ名、main、`deploy.yml`に制限する。CIのサービスアカウントはインフラ管理者ではない。インフラ変更はADCでplanを確認して適用する。
+WIFはGitHubの不変repository ID、リポジトリ名、main、`deploy.yml`に制限する。CIのサービスアカウントはインフラ管理者ではない。共有環境のインフラは専用のGitHub Actionsでplanを確認して適用する。
 
-PRのExpo Updateは、tablecast-pocの手動カタログ配備と同じコメント内チェックボックス、またはGitHub Actionsの手動実行で公開する。PR更新時はコメントだけを更新する。Expo Workflowsの無料実行時間を消費しないよう、bundle生成と公開はGitHub ActionsとExpo公式preview actionが担当する。配信先はPRごとのbranchで、共有staging APIを使う。PR単位のDB/API環境は初期構成に含めない。OTAの互換性境界はfingerprint。ネイティブ依存・設定が変わると新しいビルドが必要になる。
+main宛ての同一リポジトリのPRには、GitHub ActionsがPR専用のCloud Runプレビューを配信する。Expo Web・Hono API・Expo GoのMetroを同じホストから提供し、コンテナ内の使い捨てPostgreSQLとPR専用の非公開画像バケットを使う。PR終了時に専用リソースを回収する。対象イベントと運用手順は[PRプレビュー](preview.md)を参照する。
 
 審査・デモ用のネイティブ配布は、CIが成功したmainからGitHub Actionsを手動実行する。EAS Buildで作るAndroid APK、iOS Simulatorの `.app`、iPhone実機用の `.app` は同じSHAを使い、共有stagingのURLとJavaScriptを同梱する。配布用の `staging-release` ではOTAを無効にし、プレリリースに記載したSHAと実行するコードを揃える。
 

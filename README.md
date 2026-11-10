@@ -42,7 +42,7 @@
 - 🔐 **Googleでログインする** — Better Authで認証とセッションを管理し、投稿やお気に入りなどをアカウントに紐付けます。
 - 👤 **プロフィール写真を変更する** — 写真を選んで端末上で確認し、「保存する」を押したときにだけ送信します。
 
-動画から手順ごとの色を推定し、編集画面のパレットで調整できます。塗る範囲の初期形状は、解析が返した部位と範囲を基に端末で作ります。SNSのURL取り込み画面は固定サンプルで、実際の投稿を取得する処理は未実装です。メールログインは[送信ドメインを用意してから提供](https://github.com/Kcvl-DfHack26/nuri/issues/177)する予定です。
+動画から手順ごとの色を推定し、編集画面のパレットで調整できます。塗る範囲の初期形状は、解析が返した部位と範囲を基に端末で作ります。SNSのURL取り込みは準備中です。外部の投稿は取得しません。メールログインは[送信ドメインを用意してから提供](https://github.com/Kcvl-DfHack26/nuri/issues/177)する予定です。
 
 📱 **主要機能の確認はiOS・AndroidのDevelopment Buildで。** WebにもAPIと連動したレシピ閲覧などはありますが、顔追跡AR・写真診断を含む一連の体験はネイティブ版で確認します。[端末で動かす手順](docs/setup.md)
 
@@ -76,17 +76,15 @@ TypeScriptを中心に、端末内の顔処理とGoogle Cloud上の動画解析�
 
 ## 🏗️ アーキテクチャ
 
-![nuriの実行構成。端末内の顔処理、Cloud RunのAPIとWeb、Cloud SQL、Vertex AIの関係](docs/images/readme/architecture-runtime.png)
+![nuriの実行構成。端末内の顔処理、Cloud Run内のHono・Better Auth・Drizzle・Expo Webと、Google Cloudの各サービスの関係](docs/images/readme/architecture-runtime.png)
 
-ライブ顔追跡・AR描画・写真診断は端末内で処理します。動画から手順を作るときは利用者の同意後にAPIへ送信し、Geminiの結果を端末で編集できる形に変換します。APIは解析用の動画を永続保存せず、投稿時にレシピと手順・画像をDBへ保存します。
+ライブ顔追跡・AR描画・写真診断は端末内で処理します。録画から手順を作る場合は、同意後にAPIを経由してGeminiへ送り、端末で手順・色・塗る範囲を編集します。Cloud SQLはレシピや投稿のサムネイルを、非公開のCloud Storageは見本画像とプロフィール写真を保存します。画像はHono APIを経由して配信します。
 
-構成図は2026年11月9日の確認時点のスナップショットです。図中の追加予定は現在の実装と区別しています。[画像の出所と確認範囲](docs/images/readme/README.md)・[🏗️ 構成仕様](docs/architecture.md)
+![nuriの開発と配信。GitHub Actionsから共有stagingまでの配信順、OpenTofuの管理範囲、ローカル開発・PRプレビュー・ネイティブ版の経路](docs/images/readme/architecture-delivery.png)
 
-![nuriの開発・配信構成。GitHub Actionsからコンテナ配信、DB migration、Cloud Runへの配備を行う](docs/images/readme/architecture-delivery.png)
+共有stagingでは、Actionsが検証済みのコミットからイメージを作り、DBマイグレーションと候補リビジョンの確認を終えてから公開先を切り替えます。PRプレビューはPRごとに分離します。検証用のAndroid APKとiOS SimulatorアプリはGitHub Releasesから配布します。
 
-mainのCI成功後、Actionsが同じコンテナイメージでDB migrationを実行し、候補revisionのAPI・Webを確認してから公開先を切り替えます。OpenTofuはリソース、DrizzleはDBスキーマ、Actionsはアプリの配信を担当します。
-
-確認時点では、ActionsからのEAS Update自動配布とProduction Infrastructure用の認証変数は未設定です。Cloud Runへの配信成功と、端末に入っているアプリの更新は別に確認します。
+図の根拠と確認した稼働範囲は[構成図の出典](docs/images/readme/README.md#構成図)を参照してください。実行・配信の詳細は[アーキテクチャ](docs/architecture.md)にまとめています。
 
 ## 🚀 開発を始める
 

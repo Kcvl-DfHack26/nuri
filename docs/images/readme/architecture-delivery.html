@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>nuriの開発と配信</title>
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&amp;display=swap"
+    />
+    <style>
+      :root {
+        --paper: #fffbfd;
+        --ink: #43304b;
+        --muted: #6f5d76;
+        --rule: #e4cdd9;
+        --rose: #b52f63;
+        --pink: #ffe6ee;
+        --data: #e2efff;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+      }
+      .diagram-container {
+        overflow-x: auto;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        min-width: 1440px;
+      }
+      text {
+        fill: var(--ink);
+        font-family: 'Zen Maru Gothic', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+      }
+      .heading {
+        font-size: 52px;
+        font-weight: 900;
+      }
+      .lede {
+        font-size: 26px;
+        font-weight: 500;
+        fill: var(--muted);
+      }
+      .name {
+        font-size: 25px;
+        font-weight: 700;
+      }
+      .compact {
+        font-size: 21px;
+        font-weight: 700;
+      }
+      .detail {
+        font-size: 21px;
+        font-weight: 500;
+        fill: var(--muted);
+      }
+      .micro {
+        font-size: 19px;
+        font-weight: 500;
+        fill: var(--muted);
+      }
+      .eyebrow {
+        font-size: 23px;
+        font-weight: 700;
+      }
+      .accent {
+        fill: var(--rose);
+      }
+      .rule {
+        stroke: var(--rule);
+        stroke-width: 2;
+      }
+      .card {
+        fill: #fff;
+        stroke: var(--rule);
+        stroke-width: 2;
+      }
+      .zone {
+        fill: #fff6fa;
+        stroke: var(--rule);
+        stroke-width: 2;
+      }
+      .zone-cloud {
+        fill: #f7f9fe;
+        stroke: #cbd8ea;
+      }
+      .zone-inner {
+        fill: var(--paper);
+        stroke: #cbd8ea;
+        stroke-dasharray: 7 5;
+      }
+      .external {
+        fill: #f3edff;
+        stroke: #ded2f0;
+      }
+      .storage {
+        fill: var(--data);
+        stroke: #c8dceb;
+      }
+      .focal {
+        fill: var(--pink);
+        stroke: var(--rose);
+      }
+      .conditional-card {
+        stroke-dasharray: 6 5;
+      }
+      .edge {
+        fill: none;
+        stroke: var(--rose);
+        stroke-width: 2.6;
+      }
+      .internal {
+        stroke: var(--muted);
+      }
+      .conditional {
+        stroke: var(--muted);
+        stroke-dasharray: 7 5;
+      }
+      .bridge {
+        fill: none;
+        stroke: var(--paper);
+        stroke-width: 9;
+      }
+      .edge-label {
+        font-size: 19px;
+        font-weight: 700;
+        fill: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="diagram-container">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 1440 860"
+        width="1440"
+        height="860"
+        role="img"
+        aria-labelledby="architecture-delivery-title architecture-delivery-desc"
+      >
+        <title id="architecture-delivery-title">nuriの開発と配信</title>
+        <desc id="architecture-delivery-desc">
+          GitHub
+          Actionsから共有stagingまでの配信順、OpenTofuによる構成管理、PRプレビューとネイティブ検証版の配布を示す。
+        </desc>
+        <defs>
+          <marker
+            id="arrow"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#b52f63" />
+          </marker>
+          <marker
+            id="arrow-muted"
+            viewBox="0 0 10 10"
+            refX="9"
+            refY="5"
+            markerWidth="5"
+            markerHeight="5"
+            orient="auto"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill="#6f5d76" />
+          </marker>
+        </defs>
+        <rect width="1440" height="860" fill="#fffbfd" />
+        <text x="48" y="52" class="eyebrow accent">02 開発と配信</text>
+        <text x="48" y="112" class="heading">検証済みの変更を公開する</text>
+        <text x="48" y="154" class="lede">
+          GitHub Actionsが配信し、OpenTofuが共有リソースと権限を管理する。
+        </text>
+        <text x="48" y="208" class="eyebrow">GitHub・main</text>
+        <rect x="364" y="176" width="1028" height="268" rx="8" class="zone zone-cloud" />
+        <image
+          aria-hidden="true"
+          x="386"
+          y="189"
+          width="32"
+          height="32"
+          href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MDAiIGhlaWdodD0iODAwIiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCIgdmlld0JveD0iMCAtMjUgMjU2IDI1NiI+PHBhdGggZmlsbD0iI0VBNDMzNSIgZD0ibTE3MC4yNTIgNTYuODE5IDIyLjI1My0yMi4yNTMgMS40ODMtOS4zN0MxNTMuNDM3LTExLjY3NyA4OC45NzYtNy40OTYgNTIuNDIgMzMuOTIgNDIuMjY3IDQ1LjQyMyAzNC43MzQgNTkuNzY0IDMwLjcxNyA3NC41NzNsNy45Ny0xLjEyMyA0NC41MDUtNy4zNCAzLjQzNi0zLjUxM2MxOS43OTctMjEuNzQyIDUzLjI3LTI0LjY2NyA3Ni4xMjgtNi4xNjhsNy40OTYuMzlaIi8+PHBhdGggZmlsbD0iIzQyODVGNCIgZD0iTTIyNC4yMDUgNzMuOTE4YTEwMC4yNDkgMTAwLjI0OSAwIDAgMC0zMC4yMTctNDguNzIybC0zMS4yMzIgMzEuMjMyYTU1LjUxNSA1NS41MTUgMCAwIDEgMjAuMzc5IDQ0LjAzN3Y1LjU0NGMxNS4zNSAwIDI3Ljc5NyAxMi40NDUgMjcuNzk3IDI3Ljc5NiAwIDE1LjM1Mi0xMi40NDYgMjcuNDg1LTI3Ljc5NyAyNy40ODVoLTU1LjY3MWwtNS40NjYgNS45MzR2MzMuMzRsNS40NjYgNS4yMzFoNTUuNjdjMzkuOTMuMzExIDcyLjU1My0zMS40OTQgNzIuODY0LTcxLjQyNGE3Mi4zMDMgNzIuMzAzIDAgMCAwLTMxLjc5My02MC40NTMiLz48cGF0aCBmaWxsPSIjMzRBODUzIiBkPSJNNzEuODcgMjA1Ljc5Nmg1NS41OTNWMTYxLjI5SDcxLjg3YTI3LjI3NSAyNy4yNzUgMCAwIDEtMTEuMzk5LTIuNDk4bC03Ljg4NyAyLjQyLTIyLjQwOSAyMi4yNTMtMS45NTIgNy41NzRjMTIuNTY3IDkuNDg5IDI3LjkgMTQuODI1IDQzLjY0NyAxNC43NTciLz48cGF0aCBmaWxsPSIjRkJCQzA1IiBkPSJNNzEuODcgNjEuNDI1QzMxLjk0IDYxLjY2NC0uMjM3IDk0LjIyOC4wMDEgMTM0LjE1OWE3Mi4zMDEgNzIuMzAxIDAgMCAwIDI4LjIyMiA1Ni44OGwzMi4yNDgtMzIuMjQ2Yy0xMy45OS02LjMyMi0yMC4yMDgtMjIuNzg2LTEzLjg4Ny0zNi43NzYgNi4zMi0xMy45OSAyMi43ODYtMjAuMjA4IDM2Ljc3NS0xMy44ODhhMjcuNzk2IDI3Ljc5NiAwIDAgMSAxMy44ODcgMTMuODg4bDMyLjI0OC0zMi4yNDhBNzIuMjI0IDcyLjIyNCAwIDAgMCA3MS44NyA2MS40MjUiLz48L3N2Zz4="
+        />
+        <text x="431" y="213" class="eyebrow">Google Cloud・共有stagingへの配信</text>
+        <path d="M 336 304 H 388" class="edge" marker-end="url(#arrow)" />
+        <path d="M 676 304 H 724" class="edge" marker-end="url(#arrow)" />
+        <path d="M 1012 304 H 1060" class="edge" marker-end="url(#arrow)" />
+        <path
+          d="M 1012 504 H 1200 Q 1208 504 1208 496 V 386"
+          class="edge conditional"
+          marker-end="url(#arrow-muted)"
+        />
+        <rect x="1035" y="470" width="150" height="24" rx="4" fill="#fffbfd" />
+        <text x="1110" y="490" class="edge-label" text-anchor="middle">リソースを管理</text>
+        <g class="node">
+          <rect x="48" y="236" width="288" height="150" rx="8" class="card" />
+          <image
+            aria-hidden="true"
+            x="62"
+            y="248"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMjA4OGZmIiByb2xlPSJpbWciIHZpZXdCb3g9IjAgMCAyNCAyNCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48dGl0bGU+R2l0SHViIEFjdGlvbnM8L3RpdGxlPjxwYXRoIGQ9Ik0xMC45ODQgMTMuODM2YS41LjUgMCAwIDEtLjM1My0uMTQ2bC0uNzQ1LS43NDNhLjUuNSAwIDEgMSAuNzA2LS43MDhsLjM5Mi4zOTEgMS4xODEtMS4xOGEuNS41IDAgMCAxIC43MDguNzA3bC0xLjUzNSAxLjUzM2EuNTA0LjUwNCAwIDAgMS0uMzU0LjE0NnptOS4zNTMtLjE0N2wxLjUzNC0xLjUzMmEuNS41IDAgMCAwLS43MDctLjcwN2wtMS4xODEgMS4xOC0uMzkyLS4zOTFhLjUuNSAwIDEgMC0uNzA2LjcwOGwuNzQ2Ljc0M2EuNDk3LjQ5NyAwIDAgMCAuNzA2LS4wMDF6TTQuNTI3IDcuNDUybDIuNTU3LTEuNTg1QTEgMSAwIDAgMCA3LjA5IDQuMTdMNC41MzMgMi41NkExIDEgMCAwIDAgMyAzLjQwNnYzLjE5NmExLjAwMSAxLjAwMSAwIDAgMCAxLjUyNy44NXptMi4wMy0yLjQzNkw0IDYuNjAyVjMuNDA2bDIuNTU3IDEuNjF6TTI0IDEyLjVjMCAxLjkzLTEuNTcgMy41LTMuNSAzLjVhMy41MDMgMy41MDMgMCAwIDEtMy40Ni0zaC0yLjA4YTMuNTAzIDMuNTAzIDAgMCAxLTMuNDYgMyAzLjUwMiAzLjUwMiAwIDAgMS0zLjQ2LTNoLS41NThjLS45NzIgMC0xLjg1LS4zOTktMi40ODItMS4wNDJWMTdjMCAxLjY1NCAxLjM0NiAzIDMgM2guMDRjLjI0NC0xLjY5MyAxLjctMyAzLjQ2LTMgMS45MyAwIDMuNSAxLjU3IDMuNSAzLjVTMTMuNDMgMjQgMTEuNSAyNGEzLjUwMiAzLjUwMiAwIDAgMS0zLjQ2LTNIOGMtMi4yMDYgMC00LTEuNzk0LTQtNFY5Ljg5OUE1LjAwOCA1LjAwOCAwIDAgMSAwIDVjMC0yLjc1NyAyLjI0My01IDUtNXM1IDIuMjQzIDUgNWE1LjAwNSA1LjAwNSAwIDAgMS00Ljk1MiA0Ljk5OEEyLjQ4MiAyLjQ4MiAwIDAgMCA3LjQ4MiAxMmguNTU4Yy4yNDQtMS42OTMgMS43LTMgMy40Ni0zYTMuNTAyIDMuNTAyIDAgMCAxIDMuNDYgM2gyLjA4YTMuNTAzIDMuNTAzIDAgMCAxIDMuNDYtM2MxLjkzIDAgMy41IDEuNTcgMy41IDMuNXptLTE1IDhjMCAxLjM3OCAxLjEyMiAyLjUgMi41IDIuNXMyLjUtMS4xMjIgMi41LTIuNS0xLjEyMi0yLjUtMi41LTIuNVM5IDE5LjEyMiA5IDIwLjV6TTUgOWMyLjIwNiAwIDQtMS43OTQgNC00UzcuMjA2IDEgNSAxIDEgMi43OTQgMSA1czEuNzk0IDQgNCA0em05IDMuNWMwLTEuMzc4LTEuMTIyLTIuNS0yLjUtMi41UzkgMTEuMTIyIDkgMTIuNXMxLjEyMiAyLjUgMi41IDIuNSAyLjUtMS4xMjIgMi41LTIuNXptOSAwYzAtMS4zNzgtMS4xMjItMi41LTIuNS0yLjVTMTggMTEuMTIyIDE4IDEyLjVzMS4xMjIgMi41IDIuNSAyLjUgMi41LTEuMTIyIDIuNS0yLjV6bS0xMyA4YS41LjUgMCAxIDAgMSAwIC41LjUgMCAwIDAtMSAwem0yIDBhLjUuNSAwIDEgMCAxIDAgLjUuNSAwIDAgMC0xIDB6bTEyIDBjMCAxLjkzLTEuNTcgMy41LTMuNSAzLjVhMy41MDMgMy41MDMgMCAwIDEtMy40Ni0zLjAwMmMtLjAwNy4wMDEtLjAxMy4wMDUtLjAyMS4wMDVsLS41MDYuMDE3aC0uMDE3YS41LjUgMCAwIDEtLjAxNi0uOTk5bC41MDYtLjAxN2MuMDE4LS4wMDIuMDM1LjAwNi4wNTIuMDA3QTMuNTAzIDMuNTAzIDAgMCAxIDIwLjUgMTdjMS45MyAwIDMuNSAxLjU3IDMuNSAzLjV6bS0xIDBjMC0xLjM3OC0xLjEyMi0yLjUtMi41LTIuNVMxOCAxOS4xMjIgMTggMjAuNXMxLjEyMiAyLjUgMi41IDIuNSAyLjUtMS4xMjIgMi41LTIuNXoiLz48L3N2Zz4="
+          />
+          <text x="108" y="274" class="compact">GitHub Actions</text>
+          <text x="62" y="301" class="micro">mainのCI成功を確認</text>
+          <text x="62" y="326" class="micro">Bun／Turborepoで検査</text>
+          <text x="62" y="351" class="micro">lint・型・Bun／Jest</text>
+          <text x="62" y="376" class="micro">WIFでGoogle Cloudへ認証</text>
+        </g>
+        <g class="node">
+          <rect x="388" y="236" width="288" height="150" rx="8" class="card" />
+          <image
+            aria-hidden="true"
+            x="402"
+            y="248"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyB2ZXJzaW9uPSIxLjEiIGJhc2VQcm9maWxlPSJ0aW55IiBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIKCSB4PSIwcHgiIHk9IjBweCIgd2lkdGg9IjI0cHgiIGhlaWdodD0iMjRweCIgdmlld0JveD0iMCAwIDI0IDI0IiBvdmVyZmxvdz0idmlzaWJsZSIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+CjxnID4KCTxyZWN0IHk9IjAiIGZpbGw9Im5vbmUiIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIvPgoJPHBvbHlnb24gZmlsbC1ydWxlPSJldmVub2RkIiBmaWxsPSIjNUM4NURFIiBwb2ludHM9IjYsMi40IDAuOCw1LjQgMC44LDE5LjEgNiwyMi4xIDYsMTkuNSAzLDE3LjggMyw2LjcgNiw1IAkiLz4KCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSIwLjgsOCAwLjgsMTYuNSAzLDE3LjggMyw2LjcgCSIvPgoJPHBvbHlnb24gZmlsbC1ydWxlPSJldmVub2RkIiBmaWxsPSIjMzM2N0Q2IiBwb2ludHM9IjAuOCw4IDMsNy41IDMsNi43IAkiLz4KCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzVDODVERSIgcG9pbnRzPSIxOCwyLjQgMTgsNSAyMSw2LjcgMjEsMTcuOCAxOCwxOS41IDE4LDIyLjEgMjMuMiwxOS4xIDIzLjIsNS40IAkiLz4KCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSIyMSwxNy44IDIzLjIsMTYuNSAyMy4yLDggMjEsNi43IAkiLz4KCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSIyMSw3LjUgMjMuMiw4IDIxLDYuNyAJIi8+Cgk8cG9seWdvbiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGZpbGw9IiMzMzY3RDYiIHBvaW50cz0iMjEsMTcuMSAyMSwxNy44IDIzLjIsMTYuNSAJIi8+Cgk8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg2Ljg2MDAwMCwgNi41MDAwMDApIj4KCQk8ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg0LjU0MDAwMCwgMC4wMDAwMDApIj4KCQkJPHBvbHlnb24gZmlsbC1ydWxlPSJldmVub2RkIiBmaWxsPSIjNUM4NURFIiBwb2ludHM9IjAuNiwtMSAtMi40LDAuNiAwLjYsMi4yIDMuNiwwLjYgCQkJIi8+CgkJCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSIxLDUuOSAzLjksNC4zIDMuOSwxLjIgMSwyLjggCQkJIi8+CgkJCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSIwLjMsMi44IC0yLjcsMS4yIC0yLjcsNC4zIDAuMyw1LjkgCQkJIi8+CgkJPC9nPgoJCTxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDAuMDAwMDAwLCA3Ljk3NjE5MCkiPgoJCQk8cG9seWdvbiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGZpbGw9IiM1Qzg1REUiIHBvaW50cz0iMS43LC0zLjEgLTEuMiwtMS41IDEuNywwLjEgNC41LC0xLjUgCQkJIi8+CgkJCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSIxLjksMy44IDQuOCwyLjIgNC44LC0xIDEuOSwwLjYgCQkJIi8+CgkJCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSIxLjQsMC42IC0xLjUsLTEgLTEuNSwyLjIgMS40LDMuOCAJCQkiLz4KCQk8L2c+CgkJPGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoOS4zNjAwMDAsIDcuOTc2MTkwKSI+CgkJCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzVDODVERSIgcG9pbnRzPSItMC43LC0zLjEgLTMuNiwtMS41IC0wLjcsMC4xIDIuMiwtMS41IAkJCSIvPgoJCQk8cG9seWdvbiBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGZpbGw9IiMzMzY3RDYiIHBvaW50cz0iLTAuNCwzLjggMi41LDIuMiAyLjUsLTEgLTAuNCwwLjYgCQkJIi8+CgkJCTxwb2x5Z29uIGZpbGwtcnVsZT0iZXZlbm9kZCIgZmlsbD0iIzMzNjdENiIgcG9pbnRzPSItMSwwLjYgLTMuOSwtMSAtMy45LDIuMiAtMSwzLjggCQkJIi8+CgkJPC9nPgoJPC9nPgo8L2c+Cjwvc3ZnPgo="
+          />
+          <text x="448" y="274" class="compact">Artifact Registry</text>
+          <text x="402" y="301" class="micro">API・Expo Webを同梱</text>
+          <text x="402" y="326" class="micro">イメージをビルドして保存</text>
+          <text x="402" y="351" class="micro">digestで配信対象を固定</text>
+        </g>
+        <g class="node">
+          <rect x="724" y="236" width="288" height="150" rx="8" class="card" />
+          <image
+            aria-hidden="true"
+            x="738"
+            y="248"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGRlZnM+PHN0eWxlPi5jbHMtMXtmaWxsOiNhZWNiZmE7fS5jbHMtMSwuY2xzLTJ7ZmlsbC1ydWxlOmV2ZW5vZGQ7fS5jbHMtMntmaWxsOiM0Mjg1ZjQ7fTwvc3R5bGU+PC9kZWZzPjx0aXRsZT5JY29uXzI0cHhfQ2xvdWRSdW5fQ29sb3I8L3RpdGxlPjxnIGRhdGEtbmFtZT0iUHJvZHVjdCBJY29ucyI+PGcgPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI4LjkgMi42MyAxMi4wMiAxMiAyMS4zOCAxMiA4LjkgMi42MyIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMiIgcG9pbnRzPSIyMS4zOCAxMiAxMi4wMiAxMiA4LjkgMjEuMzggMjEuMzggMTIiLz48cG9seWdvbiBjbGFzcz0iY2xzLTIiIHBvaW50cz0iMy40NCAyMS4zOCA2LjU3IDE5LjgxIDguOSAxMiA1Ljc4IDEyIDMuNDQgMjEuMzgiLz48cG9seWdvbiBjbGFzcz0iY2xzLTEiIHBvaW50cz0iMy40NCAyLjYzIDUuNzggMTIgOC45IDEyIDYuNTcgNC4xOSAzLjQ0IDIuNjMiLz48L2c+PC9nPjwvc3ZnPg=="
+          />
+          <text x="784" y="274" class="compact">Cloud Run Job</text>
+          <text x="738" y="301" class="micro">同じイメージでDB更新</text>
+          <text x="738" y="326" class="micro">Drizzleのマイグレーション</text>
+          <text x="738" y="351" class="micro">成功後に候補を配信</text>
+        </g>
+        <g class="node">
+          <rect x="1060" y="236" width="308" height="150" rx="8" class="card focal" />
+          <image
+            aria-hidden="true"
+            x="1074"
+            y="248"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGRlZnM+PHN0eWxlPi5jbHMtMXtmaWxsOiNhZWNiZmE7fS5jbHMtMSwuY2xzLTJ7ZmlsbC1ydWxlOmV2ZW5vZGQ7fS5jbHMtMntmaWxsOiM0Mjg1ZjQ7fTwvc3R5bGU+PC9kZWZzPjx0aXRsZT5JY29uXzI0cHhfQ2xvdWRSdW5fQ29sb3I8L3RpdGxlPjxnIGRhdGEtbmFtZT0iUHJvZHVjdCBJY29ucyI+PGcgPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI4LjkgMi42MyAxMi4wMiAxMiAyMS4zOCAxMiA4LjkgMi42MyIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMiIgcG9pbnRzPSIyMS4zOCAxMiAxMi4wMiAxMiA4LjkgMjEuMzggMjEuMzggMTIiLz48cG9seWdvbiBjbGFzcz0iY2xzLTIiIHBvaW50cz0iMy40NCAyMS4zOCA2LjU3IDE5LjgxIDguOSAxMiA1Ljc4IDEyIDMuNDQgMjEuMzgiLz48cG9seWdvbiBjbGFzcz0iY2xzLTEiIHBvaW50cz0iMy40NCAyLjYzIDUuNzggMTIgOC45IDEyIDYuNTcgNC4xOSAzLjQ0IDIuNjMiLz48L2c+PC9nPjwvc3ZnPg=="
+          />
+          <text x="1120" y="274" class="compact">Cloud Run</text>
+          <text x="1074" y="301" class="micro">トラフィックなしで候補を起動</text>
+          <text x="1074" y="326" class="micro">APIの /ready とWebを確認</text>
+          <text x="1074" y="351" class="micro">成功後にトラフィックを切替</text>
+        </g>
+        <text x="388" y="416" class="micro">
+          Actionsが各段階を実行し、更新済みのDBで候補リビジョンを検証する。
+        </text>
+        <g class="node">
+          <rect x="48" y="466" width="964" height="104" rx="8" class="card" />
+          <image
+            aria-hidden="true"
+            x="66"
+            y="478"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjcyIiBoZWlnaHQ9IjcyIj48cmVjdCB4PSIwLjUiIHk9IjAuNSIgd2lkdGg9IjcxIiBoZWlnaHQ9IjcxIiByeD0iMTQiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2QxZDllMCIgLz48c3ZnIGlkPSJMYXllcl8xIiBkYXRhLW5hbWU9IkxheWVyIDEiIHZpZXdCb3g9IjAgMCAzNy45NiA0MS4wMSIgeD0iMTIiIHk9IjEyIiB3aWR0aD0iNDgiIGhlaWdodD0iNDgiIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaWRZTWlkIG1lZXQiPgogIDxkZWZzPgogICAgPHN0eWxlPgogICAgICAuY2xzLTEgewogICAgICAgIGZpbGw6ICNmZmY7CiAgICAgIH0KCiAgICAgIC5jbHMtMiB7CiAgICAgICAgZmlsbDogI2ZlZGExNTsKICAgICAgfQoKICAgICAgLmNscy0zIHsKICAgICAgICBmaWxsOiAjZTZjMjIwOwogICAgICB9CgogICAgICAuY2xzLTQsIC5jbHMtNSB7CiAgICAgICAgZmlsbDogIzBkMWEyYTsKICAgICAgfQoKICAgICAgLmNscy01IHsKICAgICAgICBmaWxsLXJ1bGU6IGV2ZW5vZGQ7CiAgICAgIH0KICAgIDwvc3R5bGU+CiAgPC9kZWZzPgogIDxwYXRoIGNsYXNzPSJjbHMtNSIgZD0iTTIwLjM3LC4zNmMtLjg2LS40Ny0xLjkxLS40Ny0yLjc3LDBMMy40LDguMTZzLS4wMiwuMDEtLjAzLC4wMmwtMS44NywxLjAzQy41Nyw5LjcxLDAsMTAuNjgsMCwxMS43M1YyOS4yOEMwLDMwLjMzLC41NywzMS4zLDEuNDksMzEuODFsMTQuMzQsNy44OHMuMDQsLjAyLC4wNiwuMDNsMS43MSwuOTRjLjg2LC40NywxLjkxLC40NywyLjc3LDBsMS43Mi0uOTRzLjAzLS4wMiwuMDUtLjAzbDE0LjM0LTcuODhjLjkyLS41MSwxLjQ5LTEuNDcsMS40OS0yLjUyVjExLjczYzAtMS4wNS0uNTctMi4wMi0xLjQ5LTIuNTJsLTEuODYtMS4wMnMtLjAzLS4wMi0uMDQtLjAyTDIwLjM3LC4zNlptLjkxLDIwLjE1bDEzLjI5LTcuM3MuMDMtLjAyLC4wNC0uMDJsLjE2LS4wOWMuNDQtLjI0LC45OCwuMDgsLjk4LC41OHYxMy42NmMwLC41LS41NCwuODItLjk4LC41OGwtLjEyLS4wN3MtLjA1LS4wMy0uMDgtLjA0bC0xMy4yOS03LjNaTTMuMzYsMTMuMThzLjAyLC4wMSwuMDMsLjAybDEzLjI5LDcuM0wzLjQsMjcuODFzLS4wNSwuMDMtLjA3LC4wNGwtLjEzLC4wN2MtLjQ0LC4yNC0uOTgtLjA4LS45OC0uNThWMTMuNjdjMC0uNSwuNTQtLjgyLC45OC0uNThsLjE3LC4wOVptMzAuMTYtMy4wN0wyMS4wNywzLjI3Yy0uNDQtLjI0LS45NywuMDctLjk4LC41NnYxNC44MWwxMy40My03LjM4Yy40My0uMjYsLjQzLS44OCwwLTEuMTRabS0yOS4wOCwxLjE0bDEzLjQzLDcuMzhWMy44M2MtLjAxLS40OS0uNTUtLjgtLjk4LS41Nkw0LjQ0LDEwLjExYy0uNDQsLjI2LS40NCwuODksMCwxLjE0Wm0uMDIsMTkuNjZjLS40NS0uMjUtLjQ2LS44OC0uMDMtMS4xNGwxMy40NS03LjM5djE0LjgxYy0uMDEsLjQ4LS41MywuNzktLjk2LC41OGwtMTIuNDYtNi44NVptMTUuNjMsNi4yNXYtMTQuNzlsMTMuNDUsNy4zOWMuNDIsLjI3LC40MSwuOS0uMDQsMS4xNGwtMTIuNDUsNi44NWMtLjQzLC4yMi0uOTQtLjA5LS45Ni0uNTdoMHYtLjAyWiIgLz4KICA8cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik0xOC42NiwyLjI5Yy4yLS4xMSwuNDQtLjExLC42NCwwbDE0LjIsNy44MWMuNDYsLjI1LC40NiwuOTEsMCwxLjE2bC0xNC4yLDcuODFjLS4yLC4xMS0uNDQsLjExLS42NCwwTDQuNDYsMTEuMjZjLS40Ni0uMjUtLjQ2LS45MSwwLTEuMTZMMTguNjYsMi4yOVoiIC8+CiAgPHBhdGggY2xhc3M9ImNscy0yIiBkPSJNMi4yMSwxMy42N2MwLS41LC41NC0uODIsLjk4LS41OGwxNC4zNCw3Ljg4Yy4yMSwuMTIsLjM0LC4zNCwuMzQsLjU4djE1LjYxYzAsLjUtLjU0LC44Mi0uOTgsLjU4TDIuNTYsMjkuODdjLS4yMS0uMTItLjM0LS4zNC0uMzQtLjU4VjEzLjY3WiIgLz4KICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik0zNC43NywxMy4wOWMuNDQtLjI0LC45OCwuMDgsLjk4LC41OHYxNS42MWMwLC4yNC0uMTMsLjQ3LS4zNCwuNThsLTE0LjM0LDcuODhjLS40NCwuMjQtLjk4LS4wOC0uOTgtLjU4di0xNS42MWMwLS4yNCwuMTMtLjQ3LC4zNC0uNThsMTQuMzQtNy44OFoiIC8+CiAgPHBhdGggY2xhc3M9ImNscy00IiBkPSJNOC4yMywyNS45MnMwLC4wMSwwLC4wMmwtMy4zNi0xLjc3czAtLjAxLDAtLjAyYy4wOC0xLjA1LC44OS0xLjUsMS44Mi0xLjAxLC45MywuNDksMS42MiwxLjczLDEuNTQsMi43OFoiIC8+CiAgPHBhdGggY2xhc3M9ImNscy00IiBkPSJNMTMuNTIsMjguOTdzMCwuMDEsMCwuMDJsLTMuMzYtMS43N3MwLS4wMSwwLS4wMmMuMDgtMS4wNSwuODktMS41LDEuODItMS4wMSwuOTMsLjQ5LDEuNjIsMS43MywxLjU0LDIuNzhaIiAvPgo8L3N2Zz48L3N2Zz4="
+          />
+          <text x="112" y="504" class="name">OpenTofu</text>
+          <text x="66" y="531" class="detail">
+            専用のActionsで計画・適用する。Cloud Run・Cloud SQL・GCS・IAM・WIFを管理する。
+          </text>
+        </g>
+        <text x="48" y="608" class="detail">
+          本番EAS Updateは有効時に実行する。直近の共有staging配信ではスキップされた。
+        </text>
+        <path d="M 48 632 H 1392" class="rule" />
+        <text x="48" y="668" class="eyebrow">ローカル開発・PRの検証・ネイティブ版の配布</text>
+        <g class="node">
+          <rect x="48" y="688" width="416" height="136" rx="8" class="card" />
+          <text x="62" y="726" class="compact">ローカル開発</text>
+          <text x="62" y="753" class="micro">Compose・Portlessでworktreeを分離</text>
+          <text x="62" y="778" class="micro">FlociでCloud SQL・GCS互換</text>
+          <text x="62" y="803" class="micro">PostgreSQLと見本画像を用意</text>
+        </g>
+        <g class="node">
+          <rect x="488" y="688" width="416" height="136" rx="8" class="card" />
+          <image
+            aria-hidden="true"
+            x="502"
+            y="700"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNHB4IiBoZWlnaHQ9IjI0cHgiIHZpZXdCb3g9IjAgMCAyNCAyNCI+PGRlZnM+PHN0eWxlPi5jbHMtMXtmaWxsOiNhZWNiZmE7fS5jbHMtMSwuY2xzLTJ7ZmlsbC1ydWxlOmV2ZW5vZGQ7fS5jbHMtMntmaWxsOiM0Mjg1ZjQ7fTwvc3R5bGU+PC9kZWZzPjx0aXRsZT5JY29uXzI0cHhfQ2xvdWRSdW5fQ29sb3I8L3RpdGxlPjxnIGRhdGEtbmFtZT0iUHJvZHVjdCBJY29ucyI+PGcgPjxwb2x5Z29uIGNsYXNzPSJjbHMtMSIgcG9pbnRzPSI4LjkgMi42MyAxMi4wMiAxMiAyMS4zOCAxMiA4LjkgMi42MyIvPjxwb2x5Z29uIGNsYXNzPSJjbHMtMiIgcG9pbnRzPSIyMS4zOCAxMiAxMi4wMiAxMiA4LjkgMjEuMzggMjEuMzggMTIiLz48cG9seWdvbiBjbGFzcz0iY2xzLTIiIHBvaW50cz0iMy40NCAyMS4zOCA2LjU3IDE5LjgxIDguOSAxMiA1Ljc4IDEyIDMuNDQgMjEuMzgiLz48cG9seWdvbiBjbGFzcz0iY2xzLTEiIHBvaW50cz0iMy40NCAyLjYzIDUuNzggMTIgOC45IDEyIDYuNTcgNC4xOSAzLjQ0IDIuNjMiLz48L2c+PC9nPjwvc3ZnPg=="
+          />
+          <text x="548" y="726" class="compact">PRプレビュー</text>
+          <text x="502" y="753" class="micro">PR専用のCloud Runと非公開GCS</text>
+          <text x="502" y="778" class="micro">使い捨てPostgreSQL／Web・API・Expo Go</text>
+          <text x="502" y="803" class="micro">PR終了時に専用リソースを回収</text>
+        </g>
+        <g class="node">
+          <rect x="928" y="688" width="464" height="136" rx="8" class="card" />
+          <image
+            aria-hidden="true"
+            x="942"
+            y="700"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjcyIiBoZWlnaHQ9IjcyIj48cmVjdCB4PSIwLjUiIHk9IjAuNSIgd2lkdGg9IjcxIiBoZWlnaHQ9IjcxIiByeD0iMTQiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2QxZDllMCIgLz48c3ZnIHByZXNlcnZlQXNwZWN0UmF0aW89InhNaWRZTWlkIG1lZXQiIHZpZXdCb3g9IjAgMCAyNTYgMjMxIiB4PSIxMiIgeT0iMTIiIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCI+CiAgPHBhdGggZD0iTTEyMSA4NWMyLTMgNS00IDctNCAxIDAgNSAxIDcgNCAxNiAyMiA0MyA2NyA2MyAxMDFsMjYgNDBjNyA4IDE4IDMgMjQtNnM4LTE1IDgtMjJjMC00LTg4LTE2OC05Ny0xODItOS0xMy0xMS0xNi0yNi0xNmgtMTFjLTE0IDAtMTYgMy0yNSAxNkM4OCAzMCAwIDE5NCAwIDE5OGMwIDcgMiAxMyA4IDIyczE3IDE0IDI0IDZsMjYtNDBjMjAtMzQgNDctNzkgNjMtMTAxWiIgZmlsbD0iIzAwMDAyMCIgLz4KPC9zdmc+PC9zdmc+"
+          />
+          <text x="988" y="726" class="compact">ネイティブ版</text>
+          <text x="942" y="753" class="micro">手動のActionsからEAS Build</text>
+          <text x="942" y="778" class="micro">同じSHAのAPK・iOS Simulatorアプリ</text>
+          <text x="942" y="803" class="micro">GitHub Releasesで配布／検証版はOTA無効</text>
+          <image
+            aria-hidden="true"
+            x="1338"
+            y="700"
+            width="34"
+            height="34"
+            href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA3MiA3MiIgd2lkdGg9IjcyIiBoZWlnaHQ9IjcyIj48cmVjdCB4PSIwLjUiIHk9IjAuNSIgd2lkdGg9IjcxIiBoZWlnaHQ9IjcxIiByeD0iMTQiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2QxZDllMCIgLz48c3ZnIHdpZHRoPSI0OCIgaGVpZ2h0PSI0OCIgdmlld0JveD0iMCAwIDU2OSA1MTIiIHZlcnNpb249IjEuMSIgeD0iMTIiIHk9IjEyIiBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJ4TWlkWU1pZCBtZWV0Ij4KICAgIDxnIGZpbGw9Im5vbmUiIGZpbGwtcnVsZT0iZXZlbm9kZCI+CiAgICAgICAgPGcgZmlsbD0iIzA4N0VBNCIgZmlsbC1ydWxlPSJub256ZXJvIj4KICAgICAgICAgICAgPHBhdGggZD0iTTI4NS41LDIwMSBDMjU1LjQwMDQ4MSwyMDEgMjMxLDIyNS40MDA0ODEgMjMxLDI1NS41IEMyMzEsMjg1LjU5OTUxOSAyNTUuNDAwNDgxLDMxMCAyODUuNSwzMTAgQzMxNS41OTk1MTksMzEwIDM0MCwyODUuNTk5NTE5IDM0MCwyNTUuNSBDMzQwLDIyNS40MDA0ODEgMzE1LjU5OTUxOSwyMDEgMjg1LjUsMjAxIiBpZD0iUGF0aCIgLz4KICAgICAgICAgICAgPHBhdGggZD0iTTU2OC45NTk4NTYsMjU1Ljk5NDM3IEM1NjguOTU5ODU2LDIxMy4yMDc2NTYgNTI5LjMzNzgwMiwxNzUuNjgxNDQgNDY2LjI1MTYyMywxNTAuOTg1MjE0IEM0NjcuMDk0NjQ1LDE0NS40MjM1NDMgNDY3Ljg1NzM4LDEzOS45MjIxMDcgNDY4LjM5OTMyMywxMzQuNTIxMDYzIEM0NzQuNjIxNjMxLDczLjA0MTUxNDUgNDU5LjgwODUyMywyOC42Njg2MjA0IDQyNi43MDk4NTYsOS41NTQxNDI5IEMzODkuNjc3MDg1LC0xMS44MjkxNzQ4IDMzNy4zNjk1NSwzLjY5MTI5ODk4IDI4NC40Nzk5MjgsNDYuMDE2MjEzNCBDMjMxLjU5MDMwNiwzLjY5MTI5ODk4IDE3OS4yODI3NzEsLTExLjgyOTE3NDggMTQyLjI1LDkuNTU0MTQyOSBDMTA5LjE1MTMzMywyOC42Njg2MjA0IDk0LjMzODIyNDksNzMuMDQxNTE0NSAxMDAuNTYwNTMzLDEzNC41MjEwNjMgQzEwMS4xMDI0NzYsMTM5LjkyMjEwNyAxMDEuODQ1MTM5LDE0NS40NDM2MjEgMTAyLjcwODIzMywxNTEuMDI1MzcgQzk3LjQ0OTM3OTEsMTUzLjAzMzE5MyA5Mi4yOTA4ODQ3LDE1NS4xNjE0ODYgODcuMzMzMTA5OSwxNTcuMzkwMTcgQzMxLjAxMTE4MjQsMTgyLjcwODgyMSAwLDIxNy43NjU0MTUgMCwyNTUuOTk0MzcgQzAsMjk4Ljc4MTA4NCAzOS42MjIwNTQ1LDMzNi4zMDczMDEgMTAyLjcwODIzMywzNjEuMDAzNTI3IEMxMDEuODQ1MTM5LDM2Ni41NjUxOTcgMTAxLjEwMjQ3NiwzNzIuMDY2NjMzIDEwMC41NjA1MzMsMzc3LjQ2NzY3OCBDOTQuMzM4MjI0OSw0MzguOTQ3MjI2IDEwOS4xNTEzMzMsNDgzLjMyMDEyIDE0Mi4yNSw1MDIuNDM0NTk3IEMxNTMuNjI5NjgzLDUwOC44ODc1NzggMTY2LjUyNDM5LDUxMi4xODY3NzEgMTc5LjYwMzkyMyw1MTEuOTkxODM2IEMyMTAuOTU2MzI4LDUxMS45OTE4MzYgMjQ3LjU2NzU4OSw0OTUuNDg3NTI5IDI4NC40Nzk5MjgsNDY1Ljk3MjUyNyBDMzIxLjM3MjE5Niw0OTUuNDg3NTI5IDM1OC4wMDM1MjgsNTExLjk5MTgzNiAzODkuMzk2MDc3LDUxMS45OTE4MzYgQzQwMi40NzUyNjUsNTEyLjE4Mzg1NiA0MTUuMzY5MjIsNTA4Ljg4NDg1NiA0MjYuNzUsNTAyLjQzNDU5NyBDNDU5Ljg0ODY2Nyw0ODMuMzIwMTIgNDc0LjY2MTc3NSw0MzguOTQ3MjI2IDQ2OC40Mzk0NjcsMzc3LjQ2NzY3OCBDNDY3Ljg5NzUyNCwzNzIuMDY2NjMzIDQ2Ny4xMzQ3ODksMzY2LjU2NTE5NyA0NjYuMjkxNzY3LDM2MS4wMDM1MjcgQzUyOS4zNzc5NDYsMzM2LjM0NzQ1NyA1NjksMjk4Ljc2MTAwNiA1NjksMjU1Ljk5NDM3IE0zODkuMTU1MjE0LDI3LjEwMjUxODIgQzM5Ny41NjUxNTQsMjYuODk5NjA2IDQwNS44Nzc4MzksMjguOTM2ODUwMiA0MTMuMjQxNTY5LDMzLjAwNTUxODYgQzQzNi4yMjM5NjYsNDYuMjc3MjMwNCA0NDYuNTQwOTU1LDgyLjI3NzUwMTUgNDQxLjUyMjk2NSwxMzEuNzcwMzQ1IEM0NDEuMTgxNzQxLDEzNS4xNDM0ODggNDQwLjc4MDMwMiwxMzguNTU2Nzg4IDQ0MC4yOTg1NzUsMTQxLjk5MDE2NSBDNDE0LjA2NjkyMiwxMzQuMDg4MDQgMzg3LjIwNTc3MSwxMjguNDUyMTU0IDM2MC4wMTA3MjQsMTI1LjE0NDUyOCBDMzQzLjUyNTAyMSwxMDMuMjI0MDU1IDMyNS4xOTI1MjQsODIuNzU2NDQ3NSAzMDUuMjE0MjY2LDYzLjk2NjE1MzMgQzMzNi41ODY3NDMsMzkuNzExNjQ4MyAzNjYuMDMyMzEzLDI3LjEwMjUxODIgMzg5LjEzNTE0MiwyNy4xMDI1MTgyIE0zNzguMzU2NDk4LDMxMC4yMDU1OTggQzM2OC4yMDQ5MTIsMzI3LjgzMDczMyAzNTcuMTUwNjI2LDM0NC45MTk5NjUgMzQ1LjIzNzc1OSwzNjEuNDA1MDkxIEMzMjUuMDQ1MDQ5LDM2My40Nzk5OTcgMzA0Ljc1ODgxOCwzNjQuNTEyMDUgMjg0LjQ1OTg1NiwzNjQuNDk3Mjk5IEMyNjQuMTY3NTg5LDM2NC41MTEzNiAyNDMuODg4MDc1LDM2My40NzkzMDggMjIzLjcwMjAyNSwzNjEuNDA1MDkxIEMyMTEuODIwOTE0LDM0NC45MTkzODEgMjAwLjgwMDA3LDMyNy44MzAwNiAxOTAuNjgzNjQ2LDMxMC4yMDU1OTggQzE4MC41MzI1OTMsMjkyLjYyOTI4NSAxNzEuMzA2OTc0LDI3NC41MzQxODcgMTYzLjA0NDU1MywyNTUuOTk0MzcgQzE3MS4zMDY5NzQsMjM3LjQ1NDU1NCAxODAuNTMyNTkzLDIxOS4zNTk0NTUgMTkwLjY4MzY0NiwyMDEuNzgzMTQyIEMyMDAuNzg0MTIxLDE4NC4yMjkzNjcgMjExLjc3MDk5OSwxNjcuMjAxMDg3IDIyMy42MDE2NjUsMTUwLjc2NDM1MyBDMjQzLjgyNDYzNiwxNDguNjM4MDkgMjY0LjE0NTU1OSwxNDcuNTc5MTY4IDI4NC40Nzk5MjgsMTQ3LjU5MTg3NyBDMzA0Ljc3MjE0NiwxNDcuNTc5NzI1IDMyNS4wNTE1NTksMTQ4LjYxMTc3MiAzNDUuMjM3NzU5LDE1MC42ODQwNCBDMzU3LjEwOTA0OCwxNjcuMTQ2MDcgMzY4LjEzNjA5NCwxODQuMjAxMTEyIDM3OC4yNzYyMSwyMDEuNzgzMTQyIEMzODguNDE5NDE4LDIxOS4zNjM3MTggMzk3LjY0NDgyNSwyMzcuNDU4NDAzIDQwNS45MTUzMDMsMjU1Ljk5NDM3IEMzOTcuNjQ0ODI1LDI3NC41MzAzMzcgMzg4LjQxOTQxOCwyOTIuNjI1MDIyIDM3OC4yNzYyMSwzMTAuMjA1NTk4IE00MTkuNzI0ODEzLDI5MC4xMjczNjYgQzQyNi4wOTUxNiwzMDcuNTAzNTM2IDQzMS4zMjQ5ODUsMzI1LjI3NzA4MyA0MzUuMzgwOTQ0LDM0My4zMzQ2ODIgQzQxNy43Nzk2MzMsMzQ4LjgyMzYzNSAzOTkuODM2NzkzLDM1My4xNDk3NzQgMzgxLjY2ODM3MiwzNTYuMjg1MTQyIEMzODguNTczMTI3LDM0NS44NzEyMzIgMzk1LjI2Mzc4MSwzMzUuMDM1Njc5IDQwMS43NDAzMzQsMzIzLjc3ODQ4MyBDNDA4LjE0MzI5MSwzMTIuNjU1MTQzIDQxNC4xNDQ4MDcsMzAxLjQzMTQxMSA0MTkuODA1MTAxLDI5MC4yMDc2NzkgTTI0Ni4zNjMyNzEsMzkwLjM3Nzk4MSBDMjU4Ljg0ODAzMiwzOTEuMTQwOTU0IDI3MS41OTM3MjgsMzkxLjU4MjY3NSAyODQuNSwzOTEuNTgyNjc1IEMyOTcuNDA2MjcyLDM5MS41ODI2NzUgMzEwLjIzMjI1NiwzOTEuMTQwOTU0IDMyMi43MzcwODksMzkwLjM3Nzk4MSBDMzEwLjg4MDY0Myw0MDQuNTgzNDE4IDI5OC4xMDc2Niw0MTcuOTk3NTYzIDI4NC41LDQzMC41MzQ0NDYgQzI3MC45MjE2NDMsNDE3Ljk5OTU0OCAyNTguMTgxOTIsNDA0LjU4NTEyNSAyNDYuMzYzMjcxLDM5MC4zNzc5ODEgWiBNMTg3LjMxMTU1NiwzNTYuMjQ0OTg2IEMxNjkuMTM3Mjg2LDM1My4xMjM2NDYgMTUxLjE4NzcyNiwzNDguODEwOTE4IDEzMy41Nzg5MTIsMzQzLjMzNDY4MiBDMTM3LjYxODU0OSwzMjUuMzA1NjQ5IDE0Mi44MjgyMjIsMzA3LjU1OTA1OCAxNDkuMTc0ODI3LDI5MC4yMDc2NzkgQzE1NC43NTQ4MzMsMzAxLjQzMTQxMSAxNjAuNzM2Mjc4LDMxMi42NTUxNDMgMTY3LjIzOTU5NCwzMjMuNzc4NDgzIEMxNzMuNzQyOTEsMzM0LjkwMTgyNCAxODAuNDY3MDE3LDM0NS44NjQ1MzkgMTg3LjMxMTU1NiwzNTYuMjg1MTQyIE0xNDkuMTc0ODI3LDIyMS43NjA5ODQgQzE0Mi44NTA5NTQsMjA0LjQ3MzkzOCAxMzcuNjU0Nzg3LDE4Ni43OTQ3NDUgMTMzLjYxOTA1NiwxNjguODM0NzYyIEMxNTEuMTg0MTgsMTYzLjM1MjM3OCAxNjkuMDg1NjUzLDE1OS4wMTMxMDEgMTg3LjIxMTE5NywxNTUuODQ0MTQ2IEMxODAuMzQ2NTg1LDE2Ni4yMjQ1OTIgMTczLjYyMjQ3OCwxNzYuOTg2NTI1IDE2Ny4xMzkyMzQsMTg4LjIxMDI1NyBDMTYwLjY1NTk5LDE5OS40MzM5ODkgMTU0LjczNDc2MSwyMTAuNTE3MTczIDE0OS4wNzQ0NjcsMjIxLjc2MDk4NCBNMzIyLjYxNjY1NywxMjEuNTkwNjgxIEMzMTAuMTMxODk2LDEyMC44Mjc3MDggMjk3LjM4NjIsMTIwLjM4NTk4NyAyODQuMzc5NTY4LDEyMC4zODU5ODcgQzI3MS40Nzk5ODcsMTIwLjM4NTk4NyAyNTguNzY3NzQ0LDEyMC43ODc1NTIgMjQ2LjI0MjgzOSwxMjEuNTkwNjgxIEMyNTguMDYxNDg4LDEwNy4zODM1MzcgMjcwLjgwMTIxMSw5My45NjkxMTM3IDI4NC4zNzk1NjgsODEuNDM0MjE1NyBDMjk3Ljk5MjQxLDkzLjk2NTgyNzcgMzEwLjc2NTcyNywxMDcuMzgwMzI0IDMyMi42MTY2NTcsMTIxLjU5MDY4MSBaIE00MDEuNzAwMTksMTg4LjIxMDI1NyBDMzk1LjE5Njg3NSwxNzYuOTM5Njc2IDM4OC40NzI3NjcsMTY2LjA5NzQzIDM4MS41Mjc4NjgsMTU1LjY4MzUyIEMzOTkuNzQ0MjI0LDE1OC44MTkwNDkgNDE3LjczNDIyNCwxNjMuMTUxOTQ5IDQzNS4zODA5NDQsMTY4LjY1NDA1OCBDNDMxLjMzMTk2MywxODYuNjgwNjczIDQyNi4xMjI0NjYsMjA0LjQyNjY2NCA0MTkuNzg1MDI5LDIyMS43ODEwNjIgQzQxNC4yMDUwMjMsMjEwLjU1NzMzIDQwOC4yMDM1MDYsMTk5LjMzMzU5OCA0MDEuNzIwMjYyLDE4OC4yMzAzMzUgTTEyNy41MTcxNzksMTMxLjc5MDQyMyBDMTIyLjQzODk3Myw4Mi4zMTc2NTc5IDEzMi44MTYxNzgsNDYuMjk3MzA4NiAxNTUuNzc4NTAzLDMzLjAyNTU5NjggQzE2My4xNDQ2OTksMjguOTYzMjQ3NCAxNzEuNDU1NjUxLDI2LjkyNjQyODIgMTc5Ljg2NDg1OCwyNy4xMjI1OTY0IEMyMDIuOTY3Njg3LDI3LjEyMjU5NjQgMjMyLjQxMzI1NywzOS43MzE3MjY1IDI2My43ODU3MzQsNjMuOTg2MjMxNiBDMjQzLjc5NDEzMyw4Mi43ODk4NzM0IDIyNS40NDgyOTgsMTAzLjI3MDgxMiAyMDguOTQ5MTMyLDEyNS4yMDQ3NjMgQzE4MS43NjE2OTEsMTI4LjUyODAyNSAxNTQuOTAzNTUsMTM0LjE0MzEzIDEyOC42NjEyODEsMTQxLjk5MDE2NSBDMTI4LjE5OTYyNiwxMzguNTU2Nzg4IDEyNy43NzgxMTUsMTM1LjE2MzU2NiAxMjcuNDU2OTYzLDEzMS43OTA0MjMgTTk4LjQ1Mjk3NzMsMTgyLjEwNjQ3NCBDMTAxLjU0NDA2LDE4MC43Njc5MjUgMTA0LjY5NTM1OCwxNzkuNDI5Mzc2IDEwNy45MDY4NzIsMTc4LjA5MDgyOCBDMTE0LjIyMDUzMiwyMDQuNzM1NjY4IDEyMi43ODE3OTMsMjMwLjc5NjkgMTMzLjQ5ODYyNCwyNTUuOTk0MzcgQzEyMi43NjE1MjksMjgxLjI0MTMxNiAxMTQuMTkzMjk2LDMwNy4zNTcwNjMgMTA3Ljg4NjgsMzM0LjA1ODUzOSBDNTYuNzQzNDM4NywzMTMuMDc2Nzg2IDI3LjA5NzE0OTcsMjg0LjAwMzUwNSAyNy4wOTcxNDk3LDI1NS45OTQzNyBDMjcuMDk3MTQ5NywyMjkuNDUwOTQ3IDUzLjE5MDcwMTMsMjAyLjUyNjAzNyA5OC40NTI5NzczLDE4Mi4xMDY0NzQgWiBNMTU1Ljc3ODUwMyw0NzguOTYzMTQzIEMxMzIuODE2MTc4LDQ2NS42OTE0MzIgMTIyLjQzODk3Myw0MjkuNjcxMDgyIDEyNy41MTcxNzksMzgwLjE5ODMxNyBDMTI3LjgzODMzMSwzNzYuODI1MTc0IDEyOC4yNTk4NDIsMzczLjQzMTk1MyAxMjguNzIxNDk3LDM2OS45Nzg0OTcgQzE1NC45NTM2ODYsMzc3Ljg3ODUxNyAxODEuODE0NjU1LDM4My41MTQzNjUgMjA5LjAwOTM0OCwzODYuODI0MTM0IEMyMjUuNTAwMjk1LDQwOC43NTI3MTkgMjQzLjgzMjMyMSw0MjkuMjMzMjM0IDI2My44MDU4MDYsNDQ4LjA0MjY2NSBDMjIwLjA2OSw0ODEuODM0MzMxIDE4MC4xMDU3MjIsNDkyLjk3Nzc1IDE1NS44Mzg3MTksNDc4Ljk2MzE0MyBNNDQxLjUwMjg5MywzODAuMTk4MzE3IEM0NDYuNTIwODgzLDQyOS42OTExNjEgNDM2LjIwMzg5NCw0NjUuNjkxNDMyIDQxMy4yMjE0OTcsNDc4Ljk2MzE0MyBDMzg4Ljk3NDU2Niw0OTMuMDE3OTA2IDM0OC45OTEyMTYsNDgxLjgzNDMzMSAzMDUuMjc0NDgxLDQ0OC4wNDI2NjUgQzMyNS4yNDEzNjQsNDI5LjIzMjczNyAzNDMuNTY2NjgxLDQwOC43NTIyMTUgMzYwLjA1MDg2OCwzODYuODI0MTM0IEMzODcuMjQ1OTE1LDM4My41MTY1MDggNDE0LjEwNzA2NiwzNzcuODgwNjIyIDQ0MC4zMzg3MTksMzY5Ljk3ODQ5NyBDNDQwLjgyMDQ0NiwzNzMuNDMxOTUzIDQ0MS4yMjE4ODUsMzc2LjgyNTE3NCA0NDEuNTYzMTA5LDM4MC4xOTgzMTcgTTQ2MS4xOTM0ODgsMzM0LjAxODM4MiBDNDU0Ljg2OTE2NiwzMDcuMzMyNTIzIDQ0Ni4yOTQ0OTQsMjgxLjIzMTA0OSA0MzUuNTYxNTkyLDI1NS45OTQzNyBDNDQ2LjI4OTc5NywyMzAuNzQ0MDgxIDQ1NC44NTc3NzgsMjA0LjYyOTEwMSA0NjEuMTczNDE2LDE3Ny45MzAyMDIgQzUxMi4yMTY0MTcsMTk4LjkxMTk1NSA1NDEuOTQyOTk0LDIyNy45ODUyMzYgNTQxLjk0Mjk5NCwyNTUuOTk0MzcgQzU0MS45NDI5OTQsMjg0LjAwMzUwNSA1MTIuMjk2NzA1LDMxMy4wNzY3ODYgNDYxLjE1MzM0NCwzMzQuMDU4NTM5IiBpZD0iU2hhcGUiIC8+CiAgICAgICAgPC9nPgogICAgPC9nPgo8L3N2Zz48L3N2Zz4="
+          />
+        </g>
+      </svg>
+    </div>
+  </body>
+</html>

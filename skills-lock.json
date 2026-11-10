@@ -7,6 +7,13 @@
       "skillPath": "conventional-commit/SKILL.md",
       "computedHash": "c85c35cf401d800a232fa4da422e5acb56547ac617976cd73d52bf725265861c"
     },
+    "diagram-design": {
+      "source": "cathrynlavery/diagram-design",
+      "sourceType": "github",
+      "skillPath": "skills/diagram-design/SKILL.md",
+      "computedHash": "e3f7133da564a2954b99e7d98e37cd52ed5abad0854e67e194d0e84decbe7dd3",
+      "installMode": "copy"
+    },
     "eas-app-stores": {
       "source": "expo/skills",
       "sourceType": "github",

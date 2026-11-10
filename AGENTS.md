@@ -1,73 +1,44 @@
 # nuri 作業の入口
 
-- 最初に[アプリ概要](docs/overview.md)を読み、技術候補と検証済みの事実を区別する。
-- このリポジトリは[Expo + Hono + OpenTofu starter](https://github.com/ReoHakase/expo-hono-opentofu-starter)を取り込んだもの。アプリのコードはまだスターターのSNSサンプルで、nuriの画面へ順に置き換える。
-- 画面のデザインはFigmaの「実装plan」（旧称「Plan A」、Screensページのnode `21:11426`）を正とする。色・文字はFigmaのFoundationsに従う。
-- 最初の技術検証はP1（端末上の顔追跡）とP2（顔に合う範囲の重ね表示）を優先する。
-- 顔の映像をサーバーへ送らない。写真の送信は利用者が保存・投稿を明示的に選んだ場合に限る。
-- SNS取り込みの取得方法と権利条件を未決事項として扱い、確認前に自動取得を完成扱いにしない。
-- 変更後は関連する検査を実行し、実測結果・未検証項目・残るリスクを分けて報告する。
-- 以下のスターター由来の規約とnuriの方針が食い違うとき（製品の説明、ブランド色など）は、nuriの方針を優先する。
+- 最初に[アプリ概要](docs/overview.md)を読み、現行の機能、未決事項、検証の範囲を区別する。
+- 画面変更の前に[Figma「実装plan」](https://www.figma.com/design/dwoWsLmVBU5c0Hx0vlVWua/?node-id=21-11426)の対象ノードと既存の画面・導線を照合する。色と文字はFoundationsに従い、設計との差が必要ならIssueに理由を記録する。[UIの規約](docs/ui.md)と[画面番号・機能要件](docs/requirements.md)を参照する。
+- iOSの操作感を優先し、Androidでも同じ機能を提供する。Webの対応範囲は[配信設計](docs/architecture.md#審査向けwebの配信設計)と対象Issueで確認する。
+- ライブ顔追跡と写真診断は端末内で処理する。⑫-3の録画は解析への明示同意後、プロフィール写真や公開用サムネイルは利用者が保存・投稿を選んだ時点で送る。SNSのURL取り込みは準備中で、取得方法と権利条件は未決。[プライバシー要件](docs/requirements.md#5-非機能要件)を参照する。
+- 作業指示・文書・図の説明は日本語で書く。コマンド、識別子、引用元の正式名称は保つ。
 
-# スターター由来の規約
+## 実装の境界
 
-## Product and platform contract
+- `apps/mobile/src/app` はExpo Routerのルートとレイアウト専用。画面の部品やフックは外に置く。APIは `apps/api` のHonoが担当し、Node.jsで配信する。依存導入と検査にはBunを使う。
+- `packages/shared` はZodのスキーマと純粋関数を置く。端末固有のモジュール、DB接続、秘密情報、サーバーの環境変数に依存させない。
+- モバイルが `@starter/api/contract` から読み込めるのは `AppType` の型だけ。Hono RPCの型を再利用し、APIの実装やレスポンス型の複製を持ち込まない。
+- 外部入力はZodで検証する。Better Authが認証し、保護されたHonoルートが認可する。モバイルのセッションは `@better-auth/expo` を通して `expo-secure-store` に保持する。
+- TypeScriptは厳格に扱い、`any`、安全でない型アサーション、未処理のPromiseを避ける。ライブラリの標準機能と既存の実装を再利用する。
+- ローカルではGCPの認証情報なしで開発できるようにする。開発用seedは冪等とし、利用者が作成・変更したデータを保つ。構成の詳細と実装上の判断は[アーキテクチャ](docs/architecture.md)を更新する。
 
-- This is a Japanese consumer SNS sample named expo-hono-opentofu-starter, backed by an independently deployed Hono API. There is no organization feature.
-- **主にiOS向けにUXを最適化するが、Androidでも全機能が動作する必要がある。** iOSの典型的なアプリとして、Native Tabs、Stack、標準の戻る操作、シート、設定フォーム、Dynamic Type、ダークモードを優先する。Androidでは同じ機能をMaterialのネイティブUIと戻る操作で提供する。
-- Use universal `@expo/ui` first for settings and platform controls. Main social features use an X-style custom timeline/composer with React Native Reusables and Uniwind; navigation stays native. Isolate iOS-only imports in platform files and provide working Android equivalents. Every icon needs an Android source. Every enabled control must perform its advertised behavior.
-- For intentionally custom UI, use the local React Native Reusables components with Uniwind; follow [docs/ui.md](docs/ui.md). Native controls keep their OS appearance. Custom UI uses the neutral light/dark tokens in `apps/mobile/global.css`; do not copy these tokens into a second JS palette.
-- The sample must work without Google Cloud credentials using local PostgreSQL and Vercel Emulate. Posts and likes are server data; appearance and haptic preferences are device-local. Seed is development-only, idempotent and must preserve user-created data.
-- Use functional Japanese labels without punctuation in headings. Do not invent a brand or accent color. Use official Apple/Google login artwork, native symbols with Android sources, scalable text and minimum 48pt/dp custom touch targets. Separate account information from navigation/actions.
-- Inspect the actual native screen after UI changes. Keep safe-area and keyboard insets in loading/error/empty states too. Like mutations use TanStack Query optimistic cache updates scoped to the post, with rollback and stable references for unchanged rows; never refetch the whole feed or disable all rows for one like. Profile is a user object with its own summary/actions and post collection. Mutations must not enable pull-to-refresh; only a user pull controls that animation. Sheets start at a content-appropriate detent.
-- Decision history: [Expo技術選定検討](chatgpt-conversation://6aec01ec-6938-83e8-94df-24f41ae3ad55). Record implementation decisions and differences in [docs/architecture.md](docs/architecture.md).
+## IssueからPRまで
 
-## Boundaries
+- 実装・修正・文書・開発手順の変更は、Issueの作成または確認、担当の設定から始める。事前の読み取り調査は可能。目的・受け入れ条件・検証方法を記録し、作業範囲が変わったら関連作業を続ける前にIssueを更新する。
+- 1つの実装Issueにつき1ブランチ・1PR。ブランチ名は `codex/<issue>-<topic>` とし、`gh issue develop` でIssueに紐付ける。worktree名は `nuri-<issue>-<topic>` とし、Composeの分離のためホスト内で一意にする。小文字の英数字・ハイフンで63文字以内とし、両端は英数字にする。
+- 実装依頼は検証・コミット・push・Draft PR作成または更新まで進める。PRに `Closes #<issue>` と最新の対象SHAでの確認結果を記載し、IssueとPRのリンクを報告する。
+- Draft解除とマージは許可された範囲で行う。必須チェックとブランチ保護を確認し、マージ後はPRとIssueの状態を取り直す。
 
-- `apps/mobile/src/app`: Expo Router routes/layouts only. No Expo API Routes. Keep UI and hooks outside `app`.
-- `apps/api`: Hono, Better Auth, Drizzle and Google Cloud. Node.js runtime; Bun package manager and server tests.
-- `packages/shared`: Zod schemas and pure functions. No native modules, DB clients, secrets or server environment access.
-- Mobile may import **only the type** `AppType` from `@starter/api/contract`. Use Hono RPC; never import server runtime code or duplicate API response types.
-- Validate external input with Zod. Better Auth authenticates; protected Hono routes authorize. Store sessions with `expo-secure-store` through `@better-auth/expo`.
-- Strict TypeScript: no `any`, unsafe casts or unhandled promises. Reuse library features and existing boundaries; no speculative services or wrappers.
+## スキル
 
-## Issue → branch → PR
+- Expoの作業は `.agents/skills/expo-overview/SKILL.md` から入り、該当するExpo・EASスキルを読む。変更には `minimum-impl`、Issue・PRには `github-issue-pr-ops`、コミットには `conventional-commit` を使う。
+- 人が読むPR・READMEに載せる構成図やフロー図を作成・更新するときは、[`diagram-design`](.agents/skills/diagram-design/SKILL.md)を使う。公開用の書き出しと配置は[README掲載画像の手順](docs/images/readme/README.md#prとreadmeに載せる図)を参照する。
+- 取り込んだスキルと `skills-lock.json` は、スキルの追加・更新を目的とする変更で管理する。
 
-- Start every implementation, fix, or documentation/harness change with a GitHub Issue. Read-only investigation may come first; creating the working branch, editing files, and installing dependencies must follow Issue creation or confirmation of an existing Issue.
-- Read `github-issue-pr-ops`, check existing Issues/PRs to avoid duplicates, record the goal, acceptance criteria and validation plan, and assign yourself before implementation. Incorporate scope changes into that Issue before continuing dependent work.
-- Use **1 implementation Issue → 1 `codex/<issue>-<topic>` branch → 1 PR**. Link the branch to the Issue with `gh issue develop` and reference that Issue in commits and the PR. Keep unrelated work separate.
-- Name the corresponding worktree directory `nuri-<issue>-<topic>`. Compose uses this basename to isolate projects, so keep it unique on the host. Use lowercase letters, digits, and hyphens, start and end with a letter or digit, and stay within 63 characters.
-- An implementation request includes completing this workflow: implement, validate, commit, push and create or update a Draft PR. Do not stop at local edits or ask again whether to create the Issue/PR.
-- Keep the PR description aligned with the final diff and latest tested SHA, include evidence and remaining blockers, and use `Closes #<issue>` for the corresponding implementation Issue. Report the Issue and PR links when handing back the work.
-- Mark ready or merge only within the user's authorization, after required checks pass. Respect branch protection, and confirm the PR/Issue state after merging; creating a PR is not evidence that it has merged.
+## 開発と検証
 
-## Skills and harness
+- [セットアップ](docs/setup.md)に沿って、ホストのPortlessからworktree別のComposeを起動する。共有のHTTPSプロキシと公開CAを使う。起動・停止時は同じworktreeを指定し、DBのボリュームと生成された接続設定を保つ。Gitフックの初回導入はworktree間で直列に行う。
+- ネイティブUIの確認・撮影はPortlessとExpo Device Hubを使う。[仮想端末の接続とクライアントの選び方](docs/setup.md#simulatorとemulatorで開発する)を確認する。
+- [検証手順](docs/testing.md)から変更を保証できる最も低い層を選ぶ。BunはAPI・純粋な処理、Jestはモバイルの状態と操作、Maestroはネイティブの代表経路を担当する。文書変更では整形・リンク・記述の整合を確認する。インフラ検査は `infra/bootstrap` も対象にする。
+- [PRに残す検証結果](docs/testing.md#prに残す検証結果)に従い、対象SHA・環境・操作・実測結果と未確認事項を分ける。指定された確認が止まったら、先に確認できた証拠と再開条件を共有する。
 
-- Read `.agents/skills/expo-overview/SKILL.md` first for Expo work, then the relevant `expo-ui`, `expo-router`, `expo-native-ui`, `expo-data-fetching`, `eas-workflows` or `eas-update` skill.
-- Use `minimum-impl` for code changes, `github-issue-pr-ops` for Issue/PR work and `conventional-commit` for commits. Repository commitlint requires Conventional Commits, with no mandatory Gitmoji or Issue number.
-- Verify APIs against installed SDK 58 types and versioned Expo docs. Install native dependencies with `bunx expo install` from `apps/mobile`.
-- Add Reusables components from the **Uniwind** registry through the existing `components.json`. Keep source under `apps/mobile/src/components/ui`; preserve its upstream license and adapt it to strict types, scalable text and 48pt/dp native touch targets. Add only dependencies used by the selected components.
-- `.codex/config.toml` configures Expo MCP; authenticate with `codex mcp login expo`. Never commit credentials or machine-specific settings.
-- Preserve vendored `.agents/skills` and `skills-lock.json`; do not modify them incidentally.
+## 配信と秘密情報
 
-## Development and validation
-
-- Follow [docs/setup.md](docs/setup.md). Local servers require Docker Compose, Bun, and host Portless 0.16.0 (Node.js 26). The Linux Dev Container is an optional editor/check environment. Mac/Xcode/Android Studio are optional; use Expo Go or EAS builds for iPhone checks.
-- Run `sh scripts/worktree-init.sh` before Compose to generate the mount paths; `setup` creates missing app env files without overwriting values. Host `bun run dev` wraps `portless compose up --build api metro`. Compose installs dependencies and migrates the isolated DB before API startup. Metro can start alone. Use the shared HTTPS/443 proxy and trust its local CA on the host. Internal API/Metro ports are 8080/8081, Portless assigns loopback host ports, and PostgreSQL stays unpublished. Use `sh scripts/services-down.sh` / `bun run services:down` to remove routes and retain volumes. Do not recreate API/Metro with plain `docker compose up`.
-- For native UI verification and PR screenshots, start the worktree’s API and Metro through Portless with `bun run dev:devices`. Open that Metro URL in a Development Build. Launch Expo Device Hub on the host with `bun run devices` and use it to open and operate the iOS Simulator and Android Emulator. Follow [docs/setup.md](docs/setup.md) for public CA trust, Android hosts and serial-specific ADB forwarding; never commit generated connection settings.
-- Dev Container starts only the `workspace` editor and its setup/DB dependencies. Run Portless commands on the host; no Docker socket is mounted in the editor. Initial hook installation must be serialized across worktrees because Git hooks are shared; automatic Compose installs skip lifecycle scripts.
-- `bun run check`: formatting, type-aware lint, strict typecheck, Bun/Jest tests and Fallow. `bun run test:integration` uses an already running, migrated PostgreSQL database. See [docs/testing.md](docs/testing.md) for test layers and evidence.
-- `bun run doctor` and `bun run export:mobile` check Expo dependencies and bundle iOS/Android.
-- After changing Uniwind configuration, run `bun run --cwd apps/mobile styles:generate` and commit `uniwind-types.d.ts` with the configuration. Do not edit or format this generated file. The persisted appearance setting drives `Uniwind.setTheme`; do not add a second theme store or competing `Appearance.setColorScheme` calls.
-- `tofu fmt -check -recursive infra`, `tofu -chdir=infra init -backend=false`, `tofu -chdir=infra validate`, `tflint --chdir=infra`: credential-free IaC checks. Also validate `infra/bootstrap`.
-- Use the lowest sufficient test layer: Bun for server/pure logic, Jest + jest-expo + Testing Library for mobile, Maestro for final native flows. No Vitest or Storybook.
-- Exercise loading/error/empty/content states, failure recovery, keyboard access, large text, dark mode, back and sheet dismissal. Bundling is not proof of native runtime behavior; report device checks that could not run.
-- Before finishing, run relevant checks, inspect the diff for secrets/generated files, update operational docs and report tested results plus remaining blockers.
-
-## Delivery
-
-- Regular CI needs no GCP or Expo secrets. Deployments are gated until account setup in `docs/setup.md` is complete.
-- GCP uses ADC locally and Workload Identity Federation in CI, never long-lived service-account JSON keys. OpenTofu owns resources; Drizzle owns DB schema; CI owns app revisions.
-- Keep migrations compatible with the running API. Migrate before switching traffic; publish production Expo Update only after API readiness succeeds.
-- Native dependency/config changes require a compatible new build. Use fingerprint runtime versions; never force incompatible OTA updates.
-- Do not apply infrastructure, delete persistent data, submit to stores or change production traffic merely to make a check pass.
+- 通常CIはGCPやExpoの秘密情報を必要としない。外部サービスの設定と配信条件は[セットアップ](docs/setup.md)を参照する。Expo MCPの認証は `codex mcp login expo` を使う。
+- GCPのローカル認証はADC、CIはWorkload Identity Federationを使う。長期のサービスアカウント鍵、認証情報、端末の接続設定をコミットしない。
+- OpenTofuはリソース、DrizzleはDBスキーマ、CIは配信を担当する。稼働中のAPIと互換性のあるマイグレーションを先に適用し、準備確認後にトラフィックを切り替える。APIの準備完了後に本番Expo Updateを公開する。
+- ネイティブ依存や設定が変わったら互換ビルドを作る。フィンガープリントをruntime versionに使い、互換性のないOTA更新を配信しない。
+- 検査を通すためにインフラを適用したり、永続データを削除したり、ストアへ提出したり、本番のトラフィックを変更したりしない。
