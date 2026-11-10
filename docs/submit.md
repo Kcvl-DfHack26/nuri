@@ -31,7 +31,7 @@ rsync -ani --delete --exclude='/.git' --exclude='/README.md' \
 
 ## コミットして提出する
 
-提出先で `git add -A` した後、`git diff --cached --stat` と `git diff --cached --check` で差分を確認する。次の比較で、提出先用に調整した3ファイル以外は指定の nuri コミットと一致することを確認する。
+提出先で `git add -A` した後、`git diff --cached --stat` で差分を確認する。提出先用に調整した3ファイルは `git diff --cached --check -- README.md LICENSE .gitignore` で確認する。それ以外は、次の比較で指定の nuri コミットと一致することを確認する。
 
 ```bash
 objects=$(git -C "$nuri_dir" rev-parse --path-format=absolute --git-path objects)
