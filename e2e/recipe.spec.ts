@@ -53,7 +53,7 @@ for (const { name, viewport, firstRowCount } of [
     await page.setViewportSize(viewport === tablet ? phone : tablet);
     await expect(page.getByText('2/8', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: '8 ライン', exact: true }).click();
+    await page.getByRole('button', { name: '8 チーク', exact: true }).click();
     await expect(page.getByText('8/8', { exact: true })).toBeVisible();
     await next.click();
     await expect(page).toHaveURL('/recipes/fox/finish');

@@ -112,12 +112,21 @@ const foxSteps: SeedStep[] = [
     shape: foxLinerShape,
   },
   {
+    part: 'lash',
+    label: 'ライン',
+    title: '粘膜ラインを目の形が平行四辺形に見えるように',
+    hint: '目尻側の上下の粘膜だけを埋める',
+    product: 'アイライン（ペンシル）',
+    colors: ['#38251D'],
+    shape: foxInnerLinerShape,
+  },
+  {
     part: 'shading',
     label: 'シェード',
     title: '骨の凹みに沿って滑らせる',
     hint: '外側から内側へ境目を馴染ませる',
     product: 'シェーディング',
-    colors: ['#A17B60'],
+    colors: ['#6B5443'],
     shape: foxShadingShape,
   },
   {
@@ -128,15 +137,6 @@ const foxSteps: SeedStep[] = [
     product: 'チーク',
     colors: ['#B8754F'],
     shape: foxCheekShape,
-  },
-  {
-    part: 'lash',
-    label: 'ライン',
-    title: '粘膜ラインを目の形が平行四辺形に見えるように',
-    hint: '目尻側の上下の粘膜だけを埋める',
-    product: 'アイライン（ペンシル）',
-    colors: ['#38251D'],
-    shape: foxInnerLinerShape,
   },
 ];
 

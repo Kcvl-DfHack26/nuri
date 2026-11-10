@@ -194,9 +194,9 @@ test('shows the public recipe with ordered products and steps', async () => {
     'eye',
     'highlight',
     'lash',
+    'lash',
     'shading',
     'cheek',
-    'lash',
   ]);
   // Every seeded step says where it paints.
   expect(fox.steps.every((step) => step.shape !== null)).toBe(true);
