@@ -1,0 +1,20 @@
+build:
+  name: Unsigned staging build for iPhone
+  steps:
+    - eas/checkout
+    - eas/use_npm_token
+    - eas/install_node_modules
+    - eas/resolve_build_config
+    - eas/prebuild
+    - run:
+        name: Install CocoaPods dependencies
+        working_directory: ios
+        command: pod install
+    - run:
+        name: Build the unsigned iPhone app
+        command: |
+          set -euo pipefail
+          xcodebuild -workspace ios/nuri.xcworkspace -scheme nuri \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
+    - eas/find_and_upload_build_artifacts
