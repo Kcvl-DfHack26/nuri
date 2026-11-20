@@ -34,7 +34,7 @@ RUN bun install --frozen-lockfile --production --filter @starter/api --filter @s
 FROM build AS preview-build
 RUN bun build apps/api/src/seed.ts --target=node --outdir=apps/api/dist-preview --external=pg --external=@google-cloud/storage
 
-FROM postgres:17.7-bookworm AS preview
+FROM postgres:18.6-bookworm AS preview
 RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 nginx-light qrencode \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=node-base /usr/local/bin/node /usr/local/bin/node
