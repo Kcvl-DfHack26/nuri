@@ -1,6 +1,6 @@
 FROM oven/bun:1.4.4 AS bun
 
-FROM node:26.13.0-bookworm-slim AS node-base
+FROM node:26.13.1-bookworm-slim AS node-base
 
 FROM node-base AS build
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
