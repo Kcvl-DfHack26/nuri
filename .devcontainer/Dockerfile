@@ -1,6 +1,6 @@
 FROM oven/bun:1.4.4 AS bun
 FROM ghcr.io/terraform-linters/tflint:v0.65.0 AS tflint
-FROM node:26.13.0-bookworm
+FROM node:26.13.1-bookworm
 
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
