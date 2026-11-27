@@ -1,4 +1,4 @@
-FROM oven/bun:1.4.4 AS bun
+FROM oven/bun:1.4.5 AS bun
 FROM ghcr.io/terraform-linters/tflint:v0.65.0 AS tflint
 FROM node:26.13.0-bookworm
 
